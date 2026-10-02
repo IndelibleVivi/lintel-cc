@@ -2,6 +2,7 @@
 
 mod network;
 mod remote;
+mod resources;
 
 #[tauri::command]
 async fn request(payload: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -24,7 +25,8 @@ fn main() {
             request,
             browser_request,
             network::network_request,
-            remote::remote_request
+            remote::remote_request,
+            resources::open_resource
         ])
         .run(tauri::generate_context!())
         .expect("Lintel could not start");

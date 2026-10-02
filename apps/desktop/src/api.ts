@@ -2,10 +2,15 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { Api } from './types';
 
 export const transport = isTauri() ? 'native' : import.meta.env.MODE === 'fixture' ? 'synthetic' : 'unavailable';
+export type RequestDiagnostic = {
+  stage: 'local' | 'ssh' | 'runner' | 'response'; reason: string; summary: string;
+  next_steps: string[]; command?: string; exit_code?: number; stderr_excerpt?: string;
+  stderr_truncated?: boolean; submission_uncertain: boolean;
+};
 export class RequestError extends Error {
-  constructor(public code: string, message: string) { super(message); }
+  constructor(public code: string, message: string, public diagnostic?: RequestDiagnostic) { super(message); }
 }
-type Envelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
+export type Envelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string; diagnostic?: RequestDiagnostic } };
 async function send<C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> {
   const payload = { command, ...fields };
   let envelope: Envelope<Api[C]['response']>;
@@ -18,7 +23,7 @@ async function send<C extends keyof Api>(command: C, fields: Api[C]['request']):
   } else {
     throw new RequestError('NATIVE_REQUIRED', '请在 Lintel 桌面应用中使用本机功能。浏览器页面没有获得本机执行权限。');
   }
-  if (!envelope.ok) throw new RequestError(envelope.error.code, envelope.error.message);
+  if (!envelope.ok) throw new RequestError(envelope.error.code, envelope.error.message, envelope.error.diagnostic);
   return envelope.data;
 }
 
@@ -39,7 +44,7 @@ export function requester(alias: string | null): typeof request {
     const result = remoteQueue.then(async () => {
       const payload = command === 'execute' ? { op:'execute', alias, ...fields } : { op:'request', alias, request:{command,...fields} };
       const envelope = await invoke<Envelope<Api[C]['response']>>('remote_request', {payload});
-      if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message);
+      if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message,envelope.error.diagnostic);
       return envelope.data;
     });
     remoteQueue = result.catch(() => undefined);

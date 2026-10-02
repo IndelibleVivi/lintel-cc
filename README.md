@@ -15,7 +15,9 @@
 - 在桌面环境详情中启动 loopback 代理、设置默认允许／阻止与确切主机／端口规则、读回当前生效配置、查看通道连接，再明确请求通过此通道打开 Claude。它只覆盖经过代理的连接。
 - 在设置中预览 Native Messaging 注册、配对扩展和查看实例。站点清理分隔离准备、完整浏览器重启、再次确认删除两步；当前完整持久安装 smoke 尚未通过。扩展开发安装与各浏览器限制见 [浏览器指南](docs/browser.md)。
 
-桌面可选择已登记的 SSH alias，复用同一环境、清理、归档和任务界面；使用系统 OpenSSH 与固定 `lintel request` / `lintel submit` 命令。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
+桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端必须另有 Lintel runner，安装 Claude Code 不会提供它。使用系统 OpenSSH 与固定 `lintel request` / `lintel submit` 命令；runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
+
+App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；私有源码仓库需相应访问权限。
 
 ## 本地构建与试用
 

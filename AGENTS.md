@@ -11,4 +11,6 @@
 - Public docs use repo-relative paths and synthetic examples only. Private notes live outside Git.
 - Relevant verification: cargo test --workspace, desktop typecheck/build, browser tests and synthetic end-to-end checks. Update README/operator/current-state surfaces when their claims change.
 - Desktop remote.rs owns the finite native SSH bridge; runner submit owns durable ACK and detached execution. Remote execute must use submit, and reconnect only queries the original job.
+- Removing an SSH alias changes only the Lintel registry; retain durable task records and query-only recovery. Never erase deduplication state to retry a submission.
+- Desktop resources.rs opens only named documentation resources in the system browser. Keep its fixed HTTPS targets in sync with Resources.tsx; do not expose arbitrary URL or shell execution.
 - Browser clear is preparation only until a real runtime.onStartup generation and separately approved finishClear. Do not substitute extension worker restart or synthetic generation for browser restart evidence.

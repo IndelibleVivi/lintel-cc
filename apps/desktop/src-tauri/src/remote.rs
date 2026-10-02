@@ -21,11 +21,16 @@ const MAX_JSON: usize = 2 * 1024 * 1024;
 #[derive(Debug)]
 struct Failure {
     code: &'static str,
-    message: &'static str,
+    message: String,
+    diagnostic: Option<Value>,
 }
 type Result<T> = std::result::Result<T, Failure>;
 fn failure(code: &'static str, message: &'static str) -> Failure {
-    Failure { code, message }
+    Failure {
+        code,
+        message: message.into(),
+        diagnostic: None,
+    }
 }
 fn storage(_: std::io::Error) -> Failure {
     failure(
@@ -34,7 +39,13 @@ fn storage(_: std::io::Error) -> Failure {
     )
 }
 fn envelope(result: Result<Value>) -> Value {
-    result.unwrap_or_else(|e| json!({"ok":false,"error":{"code":e.code,"message":e.message}}))
+    result.unwrap_or_else(|e| {
+        let mut response = json!({"ok":false,"error":{"code":e.code,"message":e.message}});
+        if let Some(diagnostic) = e.diagnostic {
+            response["error"]["diagnostic"] = diagnostic;
+        }
+        response
+    })
 }
 fn valid_alias(alias: &str) -> Result<&str> {
     if alias.len() > 128
@@ -177,6 +188,249 @@ fn list_aliases(path: &Path) -> Result<Value> {
     )
 }
 
+const MAX_STDERR: usize = 64 * 1024;
+const MAX_EXCERPT: usize = 4096;
+#[derive(Default)]
+struct StderrCapture {
+    bytes: Vec<u8>,
+    truncated: bool,
+}
+impl StderrCapture {
+    fn append(&mut self, bytes: &[u8]) {
+        let keep = bytes.len().min(MAX_STDERR.saturating_sub(self.bytes.len()));
+        self.bytes.extend_from_slice(&bytes[..keep]);
+        self.truncated |= keep < bytes.len();
+    }
+    fn redacted(&self, payload: &Value) -> String {
+        let text = clean_terminal(&String::from_utf8_lossy(&self.bytes));
+        let mut values = Vec::new();
+        request_strings(payload, &mut values);
+        let mut tokens = BTreeSet::new();
+        for value in values {
+            tokens.insert(clean_terminal(value));
+            let escaped = serde_json::to_string(value).unwrap();
+            tokens.insert(clean_terminal(&escaped));
+            if escaped.len() > 2 {
+                tokens.insert(clean_terminal(&escaped[1..escaped.len() - 1]));
+            }
+        }
+        // Match only the original text, never replacements. Short payload
+        // values cannot recursively expand/redact the replacement marker.
+        let mut ranges = Vec::new();
+        for token in tokens.iter().filter(|value| !value.is_empty()) {
+            ranges.extend(
+                text.match_indices(token)
+                    .map(|(start, matched)| (start, start + matched.len())),
+            );
+        }
+        ranges.sort_unstable();
+        let mut result = String::new();
+        let mut cursor = 0;
+        let mut index = 0;
+        while index < ranges.len() {
+            let (start, mut end) = ranges[index];
+            index += 1;
+            while index < ranges.len() && ranges[index].0 <= end {
+                end = end.max(ranges[index].1);
+                index += 1;
+            }
+            result.push_str(&text[cursor..start]);
+            result.push_str("[request value redacted]");
+            cursor = end;
+        }
+        result.push_str(&text[cursor..]);
+        result
+    }
+}
+fn request_strings<'a>(value: &'a Value, strings: &mut Vec<&'a str>) {
+    match value {
+        Value::String(value) => strings.push(value),
+        Value::Array(values) => {
+            for value in values {
+                request_strings(value, strings);
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values() {
+                request_strings(value, strings);
+            }
+        }
+        _ => {}
+    }
+}
+// Strip terminal escape/control sequences before text is shown or classified.
+fn clean_terminal(text: &str) -> String {
+    let mut result = String::new();
+    let mut mode = 0;
+    for ch in text.chars() {
+        match mode {
+            1 => {
+                mode = match ch {
+                    '[' => 2,
+                    ']' => 3,
+                    _ => 0,
+                };
+            }
+            2 => {
+                if ('@'..='~').contains(&ch) {
+                    mode = 0;
+                }
+            }
+            3 => {
+                if ch == '\u{7}' {
+                    mode = 0;
+                } else if ch == '\u{1b}' {
+                    mode = 4;
+                }
+            }
+            4 => {
+                mode = if ch == '\\' { 0 } else { 3 };
+            }
+            _ => {
+                if ch == '\u{1b}' {
+                    mode = 1;
+                } else if ch == '\u{9b}' {
+                    mode = 2;
+                } else if ch == '\u{9d}' {
+                    mode = 3;
+                } else if (!ch.is_control() || ch == '\n' || ch == '\t')
+                    && !matches!(ch, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
+                {
+                    result.push(ch);
+                }
+            }
+        }
+    }
+    result
+}
+fn ssh_reason(stderr: &str) -> &'static str {
+    let text = stderr.to_ascii_lowercase();
+    if text.contains("remote host identification has changed")
+        || text.contains("host key for") && text.contains("has changed")
+    {
+        "host_key_changed"
+    } else if text.contains("no ") && text.contains("host key is known")
+        || text.contains("authenticity of host")
+    {
+        "host_key_unknown"
+    } else if text.contains("host key verification failed") {
+        "host_key_verification_failed"
+    } else if text.contains("could not resolve hostname")
+        || text.contains("name or service not known")
+        || text.contains("nodename nor servname")
+    {
+        "dns"
+    } else if text.contains("connection timed out")
+        || text.contains("operation timed out")
+        || text.contains("connection timeout")
+    {
+        "timeout"
+    } else if text.contains("connection refused") {
+        "connection_refused"
+    } else if text.contains("network is unreachable")
+        || text.contains("no route to host")
+        || text.contains("host is unreachable")
+    {
+        "network_unreachable"
+    } else if text.contains("permission denied")
+        || text.contains("authentication failed")
+        || text.contains("too many authentication failures")
+    {
+        "authentication_failed"
+    } else if text.contains("bad configuration option")
+        || text.contains("bad configuration options")
+        || text.contains("missing argument")
+        || text.contains("bad port")
+        || text.contains("bad owner or permissions on")
+        || text.contains("unsupported option")
+    {
+        "config_invalid"
+    } else {
+        "ssh_unknown"
+    }
+}
+fn diagnose(
+    reason: &'static str,
+    payload: &Value,
+    submit: bool,
+    exit_code: Option<i32>,
+    stderr: &StderrCapture,
+) -> Failure {
+    let (stage, summary, steps): (&str, &str, &[&str]) = match reason {
+        "ssh_unavailable" => ("local", "无法启动系统 OpenSSH。", &["检查系统 /usr/bin/ssh 是否可用及本机执行权限。"]),
+        "pipe_error" => ("local", "本机 SSH 管道读取或写入失败。", &["检查本机进程与资源状态，再连接目标。"]),
+        "dns" => ("ssh", "SSH 无法解析目标主机名。", &["检查 alias 的 HostName、DNS 与当前网络/VPN。"]),
+        "timeout" => ("ssh", "SSH 连接超时。", &["检查目标地址、SSH 端口、防火墙和当前网络；核对主机是否在线。"]),
+        "connection_refused" => ("ssh", "目标拒绝 SSH 连接。", &["核对 SSH 端口及远端 sshd 是否在监听。"]),
+        "network_unreachable" => ("ssh", "当前网络无法到达 SSH 目标。", &["检查路由、VPN 和目标所在网络。"]),
+        "authentication_failed" => ("ssh", "SSH 身份认证失败。", &["核对 alias 的 User、IdentityFile 和系统 ssh-agent 中的身份；本工具使用 BatchMode，不弹出密码输入。"]),
+        "host_key_changed" => ("ssh", "SSH 主机密钥发生变化，连接已停止。", &["通过可信渠道核验主机指纹与变更原因，再自行处理 known_hosts；不要关闭 host key 检查。"]),
+        "host_key_unknown" => ("ssh", "此 SSH 主机的身份尚未获得信任。", &["先在自己的 SSH 工具中通过可信渠道核验并确认主机指纹，再返回 Lintel 连接。"]),
+        "host_key_verification_failed" => ("ssh", "SSH 主机身份验证失败。", &["核对 known_hosts 与可信主机指纹；当前输出不足以判断是首次连接还是密钥变化。"]),
+        "config_invalid" => ("ssh", "OpenSSH 配置无法使用。", &["依据诊断片段检查用户 SSH 配置的选项、参数与访问权限。"]),
+        "ssh_unknown" => ("ssh", "SSH 连接失败，当前输出不能确定具体原因。", &["在本机终端用同一 alias 检查 SSH 连接，并对照本次诊断片段。"]),
+        "runner_missing" => ("runner", "SSH 已到达远端，但找不到 lintel runner。已安装 Claude Code 不代表已经安装 Lintel runner。", &["在目标用户的非交互 SSH PATH 中确认 lintel runner；如需安装，请独立核对来源、架构与授权后进行。Lintel 不会自动安装。"]),
+        "runner_not_executable" => ("runner", "远端找到了 lintel，但它无法执行。", &["检查 lintel 的执行权限、文件格式、架构及加载器/依赖；不要把 Claude Code 可执行文件当作 Lintel runner。"]),
+        "abnormal_exit" => ("runner", "远端 runner 异常退出，未得到可信结果。", &["检查目标上的 lintel runner 版本、运行环境与本次退出码。"]),
+        "runner_rejected" => ("runner", "远端 runner 返回了明确的请求错误。", &["按照原始错误 code/message 核对请求范围、计划与 runner 版本。"]),
+        "invalid_json" => ("response", "远端输出不是完整的 Lintel JSON 响应。", &["确认非交互 shell 启动文件不会向 stdout 打印欢迎信息，并检查 lintel request 是否输出单个 JSON Envelope。"]),
+        "protocol_invalid" => ("response", "远端 JSON 不符合 Lintel response Envelope。", &["核对两端 Lintel 协议/版本，确认远端 lintel 命令没有被其他程序占用。"]),
+        "output_limit" => ("response", "远端响应超过上限。", &["缩小请求范围，并检查远端 runner 输出是否异常。"]),
+        "deadline" => ("response", "远程请求超时，已超过控制端等待时限。", &["SSH 连接或远端处理尚未完成；检查网络及 runner 状态。"]),
+        _ => ("response", "远程响应中断，结果尚未确认。", &["检查网络及 runner 状态。"]),
+    };
+    let query = payload["command"] == "job";
+    let mutating = submit
+        || matches!(
+            payload["command"].as_str(),
+            Some("register" | "create_environment" | "accept_drift" | "reactivate_environment")
+        );
+    let uncertain = mutating && reason != "ssh_unavailable";
+    let continuation = if submit {
+        " 请保留原任务 ID，重连后只查询原任务；不会自动重新提交。"
+    } else if query {
+        " 原任务状态仍待核对；连接恢复后继续查询同一任务。"
+    } else if mutating {
+        " 远端状态需核对；不要据此假定本次操作没有生效。"
+    } else {
+        " 请按诊断建议排查后再次连接或读取。"
+    };
+    let mut next_steps = steps.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+    if submit || query {
+        next_steps
+            .push("使用原 plan/job ID 查询；不要为重试而移除本地任务记录或创建第二份清理。".into());
+    }
+    let mut diagnostic = json!({"stage":stage,"reason":reason,"summary":summary,"next_steps":next_steps,"submission_uncertain":uncertain});
+    if let Some(code) = exit_code {
+        diagnostic["exit_code"] = json!(code);
+    }
+    let mut text = stderr.redacted(payload);
+    let mut cut = text.len().min(MAX_EXCERPT);
+    while !text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let truncated = stderr.truncated || cut < text.len();
+    text.truncate(cut);
+    // Authorization-bearing requests suppress the excerpt entirely: even a
+    // partial or transformed echo of a long passphrase must not reach the UI.
+    if payload.get("approval").is_none()
+        && payload.get("archive_passphrase").is_none()
+        && !text.trim().is_empty()
+    {
+        diagnostic["stderr_excerpt"] = json!(text);
+    }
+    diagnostic["stderr_truncated"] = json!(truncated);
+    Failure {
+        code: if reason == "ssh_unavailable" {
+            "ssh_unavailable"
+        } else {
+            "transport_unknown"
+        },
+        message: format!("{summary}{continuation}"),
+        diagnostic: Some(diagnostic),
+    }
+}
+
 struct Transport {
     ssh: PathBuf,
     deadline: Duration,
@@ -196,6 +450,21 @@ impl Default for Transport {
 impl Transport {
     fn call(&self, alias: &str, payload: &Value, submit: bool) -> Result<Value> {
         valid_alias(alias)?;
+        let mut result = self.exchange(alias, payload, submit);
+        // A diagnostic command is for a user's terminal, never a replay of the
+        // failed operation. Literal alias validation precedes interpolation.
+        let check = format!("/usr/bin/ssh -T -oBatchMode=yes -oStrictHostKeyChecking=yes -oUpdateHostKeys=no -oPermitLocalCommand=no -oClearAllForwardings=yes -oRequestTTY=no -oConnectTimeout=10 -oServerAliveInterval=15 -oServerAliveCountMax=2 {alias} 'command -v lintel'");
+        let diagnostic = match &mut result {
+            Err(error) => error.diagnostic.as_mut(),
+            Ok(response) if response["ok"] == false => response["error"].get_mut("diagnostic"),
+            _ => None,
+        };
+        if let Some(diagnostic) = diagnostic {
+            diagnostic["command"] = json!(check);
+        }
+        result
+    }
+    fn exchange(&self, alias: &str, payload: &Value, submit: bool) -> Result<Value> {
         let mut encoded = serde_json::to_vec(payload)
             .map_err(|_| failure("invalid_request", "请求不能编码为 JSON"))?;
         encoded.push(b'\n');
@@ -227,34 +496,46 @@ impl Transport {
                 "lintel",
                 if submit { "submit" } else { "request" },
             ])
+            .env("LC_ALL", "C")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .process_group(0)
             .spawn()
-            .map_err(|_| failure("ssh_unavailable", "无法启动系统 OpenSSH"))?;
+            .map_err(|_| {
+                diagnose(
+                    "ssh_unavailable",
+                    payload,
+                    submit,
+                    None,
+                    &StderrCapture::default(),
+                )
+            })?;
+        let mut captured = StderrCapture::default();
         let result = (|| {
             let mut input = child.stdin.take();
             let mut output = child.stdout.take().expect("piped stdout");
-            for fd in [input.as_ref().unwrap().as_raw_fd(), output.as_raw_fd()] {
-                // Nonblocking pipes make stalled input, hostile output and the deadline bounded.
+            let mut errors = child.stderr.take().expect("piped stderr");
+            for fd in [
+                input.as_ref().unwrap().as_raw_fd(),
+                output.as_raw_fd(),
+                errors.as_raw_fd(),
+            ] {
                 let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
                 if flags < 0
                     || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
                 {
-                    return Err(failure("transport_unknown", "SSH 管道不可用；请查询原任务"));
+                    return Err(diagnose("pipe_error", payload, submit, None, &captured));
                 }
             }
             let started = Instant::now();
             let mut sent = 0;
             let mut bytes = Vec::new();
             let mut eof = false;
+            let mut stderr_eof = false;
             loop {
                 if started.elapsed() >= self.deadline {
-                    return Err(failure(
-                        "transport_unknown",
-                        "SSH 请求超时；请重连查询原任务，不要重建清理任务",
-                    ));
+                    return Err(diagnose("deadline", payload, submit, None, &captured));
                 }
                 if let Some(stdin) = input.as_mut() {
                     match stdin.write(&encoded[sent..]) {
@@ -265,19 +546,47 @@ impl Transport {
                                 input = None;
                             }
                         }
-                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(e)
+                            if e.kind() == std::io::ErrorKind::WouldBlock
+                                || e.kind() == std::io::ErrorKind::Interrupted => {}
                         Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => input = None,
                         Err(_) => {
-                            return Err(failure(
-                                "transport_unknown",
-                                "SSH 请求写入中断；请查询原任务",
-                            ))
+                            return Err(diagnose("pipe_error", payload, submit, None, &captured))
+                        }
+                    }
+                }
+                // Drain both pipes even after the stderr retention budget is
+                // exhausted. Limit each turn so continuous stderr cannot starve
+                // stdin, stdout or the deadline.
+                let mut buffer = [0; 65536];
+                if !stderr_eof {
+                    for _ in 0..8 {
+                        match errors.read(&mut buffer) {
+                            Ok(0) => {
+                                stderr_eof = true;
+                                break;
+                            }
+                            Ok(count) => captured.append(&buffer[..count]),
+                            Err(e)
+                                if e.kind() == std::io::ErrorKind::WouldBlock
+                                    || e.kind() == std::io::ErrorKind::Interrupted =>
+                            {
+                                break
+                            }
+                            Err(_) => {
+                                return Err(diagnose(
+                                    "pipe_error",
+                                    payload,
+                                    submit,
+                                    None,
+                                    &captured,
+                                ))
+                            }
                         }
                     }
                 }
                 if !eof {
-                    let mut buffer = [0; 65536];
-                    loop {
+                    for _ in 0..8 {
                         match output.read(&mut buffer) {
                             Ok(0) => {
                                 eof = true;
@@ -286,17 +595,28 @@ impl Transport {
                             Ok(count) => {
                                 bytes.extend_from_slice(&buffer[..count]);
                                 if bytes.len() > MAX_JSON {
-                                    return Err(failure(
-                                        "transport_unknown",
-                                        "远端响应超过上限；请查询原任务",
+                                    return Err(diagnose(
+                                        "output_limit",
+                                        payload,
+                                        submit,
+                                        None,
+                                        &captured,
                                     ));
                                 }
                             }
-                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                            Err(e)
+                                if e.kind() == std::io::ErrorKind::WouldBlock
+                                    || e.kind() == std::io::ErrorKind::Interrupted =>
+                            {
+                                break
+                            }
                             Err(_) => {
-                                return Err(failure(
-                                    "transport_unknown",
-                                    "SSH 响应读取中断；请查询原任务",
+                                return Err(diagnose(
+                                    "pipe_error",
+                                    payload,
+                                    submit,
+                                    None,
+                                    &captured,
                                 ))
                             }
                         }
@@ -304,14 +624,48 @@ impl Transport {
                 }
                 if let Some(status) = child
                     .try_wait()
-                    .map_err(|_| failure("transport_unknown", "SSH 状态未知；请查询原任务"))?
+                    .map_err(|_| diagnose("pipe_error", payload, submit, None, &captured))?
                 {
-                    if eof {
-                        if status.code() == Some(255) {
-                            return Err(failure("transport_unknown", "SSH 连接失败；请核验主机身份与连接后查询原任务。未自动接受或修改 host key"));
+                    if eof && stderr_eof {
+                        let text = captured.redacted(payload).to_ascii_lowercase();
+                        let reason = if status.code() == Some(255) {
+                            Some(ssh_reason(&text))
+                        } else if status.code() == Some(127)
+                            && text.contains("lintel")
+                            && (text.contains("not found") || text.contains("no such file"))
+                        {
+                            Some("runner_missing")
+                        } else if status.code() == Some(126)
+                            && text.contains("lintel")
+                            && (text.contains("permission denied")
+                                || text.contains("cannot execute")
+                                || text.contains("exec format"))
+                        {
+                            Some("runner_not_executable")
+                        } else {
+                            None
+                        };
+                        if let Some(reason) = reason {
+                            return Err(diagnose(
+                                reason,
+                                payload,
+                                submit,
+                                status.code(),
+                                &captured,
+                            ));
                         }
-                        let response: Value = serde_json::from_slice(&bytes).map_err(|_| {
-                            failure("transport_unknown", "未收到完整 runner 响应；请查询原任务")
+                        let mut response: Value = serde_json::from_slice(&bytes).map_err(|_| {
+                            diagnose(
+                                if status.success() {
+                                    "invalid_json"
+                                } else {
+                                    "abnormal_exit"
+                                },
+                                payload,
+                                submit,
+                                status.code(),
+                                &captured,
+                            )
                         })?;
                         if response["ok"].as_bool().is_none()
                             || (response["ok"] == true && response.get("data").is_none())
@@ -319,16 +673,33 @@ impl Transport {
                                 && (response["error"]["code"].as_str().is_none()
                                     || response["error"]["message"].as_str().is_none()))
                         {
-                            return Err(failure(
-                                "transport_unknown",
-                                "runner response envelope 无效；请查询原任务",
+                            return Err(diagnose(
+                                "protocol_invalid",
+                                payload,
+                                submit,
+                                status.code(),
+                                &captured,
                             ));
                         }
                         if !status.success() && response["ok"] == true {
-                            return Err(failure(
-                                "transport_unknown",
-                                "runner 异常退出；请查询原任务",
+                            return Err(diagnose(
+                                "abnormal_exit",
+                                payload,
+                                submit,
+                                status.code(),
+                                &captured,
                             ));
+                        }
+                        if response["ok"] == false {
+                            response["error"]["diagnostic"] = diagnose(
+                                "runner_rejected",
+                                payload,
+                                submit,
+                                status.code(),
+                                &captured,
+                            )
+                            .diagnostic
+                            .unwrap();
                         }
                         return Ok(response);
                     }
@@ -341,6 +712,11 @@ impl Transport {
                     },
                     libc::pollfd {
                         fd: if eof { -1 } else { output.as_raw_fd() },
+                        events: libc::POLLIN,
+                        revents: 0,
+                    },
+                    libc::pollfd {
+                        fd: if stderr_eof { -1 } else { errors.as_raw_fd() },
                         events: libc::POLLIN,
                         revents: 0,
                     },
@@ -636,10 +1012,10 @@ impl Controller {
             false,
         )?;
         if response["ok"] == false {
-            return Err(failure(
-                "reconciliation_required",
-                "原任务尚无法核对；请检查远端 journal 与目标状态。本工具不会重新提交此计划",
-            ));
+            let mut error = failure("reconciliation_required", "原任务尚无法核对");
+            error.message = format!("原任务尚无法核对。远端错误 {}：{}。请检查远端 journal 与目标状态；本工具不会重新提交此计划。", response["error"]["code"].as_str().unwrap_or("unknown"), response["error"]["message"].as_str().unwrap_or("未提供具体错误"));
+            error.diagnostic = response["error"].get("diagnostic").cloned();
+            return Err(error);
         }
         self.observe(path, &mut record, response)
     }
@@ -654,22 +1030,29 @@ impl Controller {
             exact_fields(&payload, &["op"], &[])?;
             let hosts = self.hosts()?;
             let mut tasks = Vec::new();
-            for host in hosts.as_array().unwrap() {
-                let alias = host["alias"].as_str().unwrap();
-                let root = self.state.join("tasks").join(alias);
-                if !root.exists() {
-                    continue;
-                }
-                for item in fs::read_dir(root).map_err(storage)? {
-                    let path = item.map_err(storage)?.path();
-                    if path.extension().is_some_and(|v| v == "json") {
-                        let plan_id = path
-                            .file_stem()
-                            .and_then(|v| v.to_str())
-                            .ok_or_else(|| failure("local_record_invalid", "任务记录标识无效"))?;
-                        let mut record = self.checked_record(&path, valid_id(plan_id)?)?;
-                        record["alias"] = json!(alias);
-                        tasks.push(record);
+            let task_root = self.state.join("tasks");
+            if task_root.exists() {
+                for host in fs::read_dir(&task_root).map_err(storage)? {
+                    let host = host.map_err(storage)?;
+                    if !host.file_type().map_err(storage)?.is_dir() {
+                        continue;
+                    }
+                    let alias = host
+                        .file_name()
+                        .into_string()
+                        .map_err(|_| failure("local_record_invalid", "任务主机标识无效"))?;
+                    valid_alias(&alias)?;
+                    for item in fs::read_dir(host.path()).map_err(storage)? {
+                        let path = item.map_err(storage)?.path();
+                        if path.extension().is_some_and(|v| v == "json") {
+                            let plan_id =
+                                path.file_stem().and_then(|v| v.to_str()).ok_or_else(|| {
+                                    failure("local_record_invalid", "任务记录标识无效")
+                                })?;
+                            let mut record = self.checked_record(&path, valid_id(plan_id)?)?;
+                            record["alias"] = json!(alias);
+                            tasks.push(record);
+                        }
                     }
                 }
             }
@@ -691,17 +1074,43 @@ impl Controller {
             }
             return Ok(json!({"ok":true,"data":{"alias":alias}}));
         }
-        if !self
+        if op == "remove_host" {
+            exact_fields(&payload, &["op", "alias"], &[])?;
+            let _held = lock(&self.state.join("hosts.lock"))?;
+            let mut hosts = self.hosts()?;
+            let entries = hosts.as_array_mut().unwrap();
+            let before = entries.len();
+            entries.retain(|host| host["alias"] != alias);
+            let removed = before != entries.len();
+            if removed {
+                save(&self.state.join("hosts.json"), &hosts)?;
+            }
+            return Ok(json!({"ok":true,"data":{"alias":alias,"removed":removed}}));
+        }
+        let registered = self
             .hosts()?
             .as_array()
             .unwrap()
             .iter()
-            .any(|host| host["alias"] == alias)
-        {
-            return Err(failure(
-                "host_not_registered",
-                "请先登记此 SSH alias 再连接",
-            ));
+            .any(|host| host["alias"] == alias);
+        if !registered {
+            // Removing a display entry cannot erase or strand a durable task.
+            let existing_query = op == "reconnect"
+                && payload["plan_id"].as_str().is_some_and(|id| {
+                    valid_id(id).is_ok()
+                        && self
+                            .state
+                            .join("tasks")
+                            .join(alias)
+                            .join(format!("{id}.json"))
+                            .exists()
+                });
+            if !existing_query {
+                return Err(failure(
+                    "host_not_registered",
+                    "请先登记此 SSH alias 再连接；已保留的任务仍可使用原任务查询",
+                ));
+            }
         }
         match op {
             "connect" => {
@@ -1085,5 +1494,341 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             .unwrap()
             .contains("SECRET"));
         assert!(!controller.state.join("tasks").exists());
+    }
+
+    #[test]
+    fn removing_host_retains_pending_jobs_and_readding_cannot_replay() {
+        let (temp, controller) = fixture(&format!(
+            "if test ! -f called; then touch called; exit 255; fi\n{RECEIPT}"
+        ));
+        fs::create_dir_all(controller.config.parent().unwrap()).unwrap();
+        fs::write(
+            &controller.config,
+            "Host synthetic-host\n  HostName synthetic.invalid\n",
+        )
+        .unwrap();
+        let known_hosts = controller.config.parent().unwrap().join("known_hosts");
+        fs::write(&known_hosts, "synthetic untouched host key").unwrap();
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"private-approval"});
+        assert_eq!(
+            envelope(controller.dispatch(request.clone()))["error"]["code"],
+            "transport_unknown"
+        );
+        let task = controller.state.join("tasks/synthetic-host/plan-1.json");
+        let before = fs::read(&task).unwrap();
+        controller
+            .dispatch(json!({"op":"add_host","alias":"other-host"}))
+            .unwrap();
+        assert_eq!(
+            controller
+                .dispatch(json!({"op":"remove_host","alias":"synthetic-host"}))
+                .unwrap()["data"],
+            json!({"alias":"synthetic-host","removed":true})
+        );
+        assert_eq!(
+            controller
+                .dispatch(json!({"op":"remove_host","alias":"synthetic-host"}))
+                .unwrap()["data"]["removed"],
+            false
+        );
+        assert_eq!(fs::read(&task).unwrap(), before);
+        let listed = controller.dispatch(json!({"op":"hosts"})).unwrap();
+        assert_eq!(listed["data"]["hosts"], json!([{"alias":"other-host"}]));
+        assert_eq!(listed["data"]["tasks"][0]["alias"], "synthetic-host");
+        assert_eq!(listed["data"]["tasks"][0]["status"], "submission_unknown");
+        assert_eq!(
+            envelope(controller.dispatch(request.clone()))["error"]["code"],
+            "host_not_registered"
+        );
+        let queried = controller
+            .dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-1"}))
+            .unwrap();
+        assert_eq!(queried["data"]["status"], "completed");
+        assert_eq!(
+            envelope(controller.dispatch(
+                json!({"op":"reconnect","alias":"synthetic-host","plan_id":"unrecorded"})
+            ))["error"]["code"],
+            "host_not_registered"
+        );
+        controller
+            .dispatch(json!({"op":"add_host","alias":"synthetic-host"}))
+            .unwrap();
+        assert_eq!(
+            controller.dispatch(request).unwrap()["data"]["status"],
+            "completed"
+        );
+        let args = fs::read_to_string(temp.path().join("args")).unwrap();
+        assert_eq!(args.lines().filter(|line| *line == "submit").count(), 1);
+        assert_eq!(args.lines().filter(|line| *line == "request").count(), 2);
+        assert_eq!(
+            fs::read_to_string(&controller.config).unwrap(),
+            "Host synthetic-host\n  HostName synthetic.invalid\n"
+        );
+        assert_eq!(
+            fs::read_to_string(known_hosts).unwrap(),
+            "synthetic untouched host key"
+        );
+        assert!(controller
+            .state
+            .join("tasks/synthetic-host/plan-1.lock")
+            .exists());
+    }
+
+    #[test]
+    fn removing_unsubmitted_alias_has_no_transport_or_task_side_effect() {
+        let (temp, controller) = fixture(RECEIPT);
+        let removed = controller
+            .dispatch(json!({"op":"remove_host","alias":"synthetic-host"}))
+            .unwrap();
+        assert_eq!(removed["data"]["removed"], true);
+        assert_eq!(
+            controller.dispatch(json!({"op":"hosts"})).unwrap()["data"],
+            json!({"hosts":[],"tasks":[]})
+        );
+        assert_eq!(
+            controller
+                .dispatch(json!({"op":"remove_host","alias":"never-added"}))
+                .unwrap()["data"]["removed"],
+            false
+        );
+        assert!(!temp.path().join("args").exists());
+        assert!(!controller.state.join("tasks").exists());
+    }
+
+    #[test]
+    fn ssh_diagnostics_classify_only_observed_causes() {
+        for (stderr, expected) in [
+            ("ssh: Could not resolve hostname synthetic.invalid: nodename nor servname provided", "dns"),
+            ("ssh: connect to host synthetic.invalid port 22: Operation timed out", "timeout"),
+            ("ssh: connect to host synthetic.invalid port 22: Connection refused", "connection_refused"),
+            ("ssh: connect to host synthetic.invalid port 22: No route to host", "network_unreachable"),
+            ("synthetic-user@synthetic.invalid: Permission denied (publickey).", "authentication_failed"),
+            ("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!", "host_key_changed"),
+            ("No ED25519 host key is known for synthetic.invalid and you have requested strict checking.", "host_key_unknown"),
+            ("Host key verification failed.", "host_key_verification_failed"),
+            ("synthetic-config: line 4: Bad configuration option: syntheticbad", "config_invalid"),
+            ("kex_exchange_identification: Connection closed by remote host", "ssh_unknown"),
+        ] {
+            let (_temp, controller) = fixture(&format!("test \"$LC_ALL\" = C || exit 8\nprintf '%s\\n' '{stderr}' >&2\nexit 255"));
+            let response = envelope(controller.dispatch(json!({"op":"connect","alias":"synthetic-host"})));
+            let diagnostic = &response["error"]["diagnostic"];
+            assert_eq!(response["error"]["code"], "transport_unknown");
+            assert_eq!(diagnostic["stage"], "ssh");
+            assert_eq!(diagnostic["reason"], expected, "{response}");
+            assert_eq!(diagnostic["exit_code"], 255);
+            assert_eq!(diagnostic["submission_uncertain"], false);
+            assert!(!response["error"]["message"].as_str().unwrap().contains("原任务"));
+            assert!(!diagnostic["next_steps"].as_array().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn runner_and_response_diagnostics_distinguish_missing_binary_from_bad_protocol() {
+        for (body, reason, stage) in [
+            (
+                "printf 'sh: lintel: command not found' >&2; exit 127",
+                "runner_missing",
+                "runner",
+            ),
+            (
+                "printf 'sh: lintel: Permission denied' >&2; exit 126",
+                "runner_not_executable",
+                "runner",
+            ),
+            (
+                "printf 'sh: some-other-program: command not found' >&2; exit 127",
+                "abnormal_exit",
+                "runner",
+            ),
+            ("printf 'a remote login banner'", "invalid_json", "response"),
+            (
+                "printf '%s' '{\"some\":\"json\"}'",
+                "protocol_invalid",
+                "response",
+            ),
+            (
+                "printf '%s' '{\"ok\":true,\"data\":{}}'; exit 7",
+                "abnormal_exit",
+                "runner",
+            ),
+        ] {
+            let (_temp, controller) = fixture(body);
+            let response =
+                envelope(controller.dispatch(json!({"op":"connect","alias":"synthetic-host"})));
+            let diagnostic = &response["error"]["diagnostic"];
+            assert_eq!(diagnostic["reason"], reason, "{response}");
+            assert_eq!(diagnostic["stage"], stage);
+            if reason == "runner_missing" {
+                assert!(response["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Claude Code 不代表"));
+            }
+        }
+    }
+
+    #[test]
+    fn large_stderr_is_drained_bounded_and_control_sequences_never_reach_ui() {
+        let (_temp, controller) = fixture(
+            r"printf '\033[31mConnection refused\033[0m\r\001\033]0;hidden-title\007\n' >&2; head -c 2097152 /dev/zero | tr '\000' x >&2; exit 255",
+        );
+        let response =
+            envelope(controller.dispatch(json!({"op":"connect","alias":"synthetic-host"})));
+        let diagnostic = &response["error"]["diagnostic"];
+        assert_eq!(diagnostic["reason"], "connection_refused");
+        assert_eq!(diagnostic["stderr_truncated"], true);
+        let excerpt = diagnostic["stderr_excerpt"].as_str().unwrap();
+        assert!(excerpt.len() <= MAX_EXCERPT);
+        assert!(!excerpt.contains("hidden-title"));
+        assert!(excerpt
+            .chars()
+            .all(|ch| !ch.is_control() || ch == '\n' || ch == '\t'));
+        // Filling stderr before consuming a large stdin cannot deadlock either pipe.
+        let (temp, controller) = fixture(RECEIPT);
+        fs::write(
+            &controller.transport.ssh,
+            format!(
+                "#!/bin/sh\ncd '{}'\nhead -c 2097152 /dev/zero >&2\ncat > input\n{RECEIPT}\n",
+                temp.path().display()
+            ),
+        )
+        .unwrap();
+        let request = json!({"command":"execute","approval":"x".repeat(512*1024)});
+        assert_eq!(
+            controller
+                .transport
+                .call("synthetic-host", &request, true)
+                .unwrap()["ok"],
+            true
+        );
+    }
+
+    #[test]
+    fn diagnostic_excerpt_redacts_echoed_payload_and_suppresses_authorization_output() {
+        let (temp, controller) =
+            fixture("cat input >&2; printf '\nPermission denied (publickey)' >&2; exit 255");
+        let request = json!({"op":"request","alias":"synthetic-host","request":{"command":"register","name":"PRIVATE_NAME_WITH_\"QUOTE","root":"/private/synthetic/source"}});
+        let response = envelope(controller.dispatch(request));
+        let excerpt = response["error"]["diagnostic"]["stderr_excerpt"]
+            .as_str()
+            .unwrap();
+        assert!(!excerpt.contains("PRIVATE_NAME"));
+        assert!(!excerpt.contains("/private/synthetic/source"));
+        assert_eq!(
+            response["error"]["diagnostic"]["reason"],
+            "authentication_failed"
+        );
+        let secret = "PRIVATE_ARCHIVE_PASSPHRASE";
+        let response = envelope(controller.dispatch(json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-secret","approval":"PRIVATE_APPROVAL","archive_passphrase":secret})));
+        assert_eq!(
+            response["error"]["diagnostic"]["submission_uncertain"],
+            true
+        );
+        assert!(response["error"]["diagnostic"]
+            .get("stderr_excerpt")
+            .is_none());
+        assert!(!response.to_string().contains("PRIVATE"));
+        let record = fs::read_to_string(
+            controller
+                .state
+                .join("tasks/synthetic-host/plan-secret.json"),
+        )
+        .unwrap();
+        assert!(!record.contains("PRIVATE"));
+        assert!(!record.contains("diagnostic"));
+        assert!(!record.contains("stderr"));
+        assert!(fs::read_to_string(temp.path().join("input"))
+            .unwrap()
+            .contains(secret));
+    }
+
+    #[test]
+    fn local_spawn_and_reconnect_errors_keep_action_specific_guidance() {
+        let (_temp, mut controller) = fixture("printf 'Connection refused' >&2; exit 255");
+        let response = envelope(controller.dispatch(
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-existing"}),
+        ));
+        assert_eq!(
+            response["error"]["diagnostic"]["reason"],
+            "connection_refused"
+        );
+        assert!(response["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("原任务"));
+        controller.transport.interpreter = None;
+        controller.transport.ssh = controller.state.join("missing-synthetic-ssh");
+        let response =
+            envelope(controller.dispatch(json!({"op":"connect","alias":"synthetic-host"})));
+        assert_eq!(response["error"]["code"], "ssh_unavailable");
+        assert_eq!(response["error"]["diagnostic"]["stage"], "local");
+        assert_eq!(
+            response["error"]["diagnostic"]["submission_uncertain"],
+            false
+        );
+    }
+
+    #[test]
+    fn diagnostic_commands_are_safe_alias_checks_not_submission_replays() {
+        for (body, submit) in [
+            ("printf 'Connection refused' >&2; exit 255", false),
+            ("printf 'Permission denied (publickey)' >&2; exit 255", true),
+            ("printf '%s' '{\"ok\":false,\"error\":{\"code\":\"synthetic_rejected\",\"message\":\"synthetic error\"}}'; exit 1", true),
+        ] {
+            let (temp, controller) = fixture(body);
+            let payload = if submit { json!({"command":"execute","plan_id":"plan-1","approval":"SENSITIVE_APPROVAL"}) } else { json!({"command":"discover"}) };
+            let response = envelope(controller.transport.call("synthetic-host", &payload, submit));
+            let command = response["error"]["diagnostic"]["command"].as_str().unwrap();
+            assert!(command.ends_with("synthetic-host 'command -v lintel'"));
+            assert!(!command.contains("submit"));
+            assert!(!command.contains("request"));
+            assert!(!command.contains("SENSITIVE"));
+            assert!(!command.contains("plan-1"));
+            let args = fs::read_to_string(temp.path().join("args")).unwrap();
+            for flag in args.lines().filter(|arg| arg.starts_with('-')) { assert!(command.contains(flag), "missing {flag}: {command}"); }
+        }
+        let (_temp, mut controller) = fixture(RECEIPT);
+        controller.transport.ssh = controller.state.join("nonexistent-ssh");
+        controller.transport.interpreter = None;
+        let response =
+            envelope(controller.dispatch(json!({"op":"connect","alias":"synthetic-host"})));
+        assert!(response["error"]["diagnostic"]["command"]
+            .as_str()
+            .unwrap()
+            .contains("synthetic-host 'command -v lintel'"));
+    }
+
+    #[test]
+    fn query_preserves_runner_diagnostic_without_replaying_on_retry() {
+        let (temp, controller) = fixture("printf 'synthetic runner detail' >&2; printf '%s' '{\"ok\":false,\"error\":{\"code\":\"job_not_found\",\"message\":\"synthetic original job missing\"}}'; exit 1");
+        for request in [
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-existing"}),
+            json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-existing","approval":"SENSITIVE_APPROVAL"}),
+        ] {
+            let response = envelope(controller.dispatch(request));
+            assert_eq!(response["error"]["code"], "reconciliation_required");
+            let message = response["error"]["message"].as_str().unwrap();
+            assert!(message.contains("job_not_found"));
+            assert!(message.contains("synthetic original job missing"));
+            assert!(message.contains("不会重新提交"));
+            let diagnostic = &response["error"]["diagnostic"];
+            assert_eq!(diagnostic["reason"], "runner_rejected");
+            assert_eq!(diagnostic["exit_code"], 1);
+            assert_eq!(diagnostic["stderr_excerpt"], "synthetic runner detail");
+            assert!(diagnostic["command"]
+                .as_str()
+                .unwrap()
+                .ends_with("synthetic-host 'command -v lintel'"));
+        }
+        let args = fs::read_to_string(temp.path().join("args")).unwrap();
+        assert_eq!(args.lines().filter(|arg| *arg == "request").count(), 2);
+        assert!(!args.lines().any(|arg| arg == "submit"));
+        assert!(!fs::read_to_string(
+            controller
+                .state
+                .join("tasks/synthetic-host/plan-existing.json")
+        )
+        .unwrap()
+        .contains("diagnostic"));
     }
 }
