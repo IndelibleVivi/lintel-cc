@@ -1,0 +1,37 @@
+export interface Environment {
+  id: string; name: string; host: string; surface: string; root: string;
+  executable: string | null; ownership: string; status: string;
+}
+export interface Capability { name: string; status: string; reason: string }
+export interface Setting { key: string; label: string; value: string | null; source: string; effect_timing: string; status: string }
+export interface Inspection { environment: Environment; settings: Setting[]; assets: { category: string; count: number; bytes: number }[]; warnings: string[] }
+export interface Plan {
+  id: string; hash: string; environment_id: string; title: string;
+  changes: { key: string; label: string; before: string | null; after: string | null; path: string }[];
+  preserves: string[]; warnings: string[]; actions: { id: string; label: string; reversible: boolean }[];
+  created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
+}
+export interface Receipt {
+  id: string; plan_id: string; environment_id: string; title: string; status: string;
+  steps: { id: string; label: string; status: string; message: string }[];
+  created_at: string; restorable: boolean; warnings: string[];
+  new_environment_id?: string; new_root?: string; archive_path?: string;
+}
+export interface Drift { changes: Setting[]; status: string }
+export interface Api {
+  discover: { request: {}; response: { environments: Environment[]; capabilities: Capability[] } };
+  register: { request: { name: string; root: string }; response: Environment };
+  create_environment: { request: { name: string }; response: Environment };
+  inspect: { request: { environment_id: string }; response: Inspection };
+  plan_policy: { request: { environment_id: string; preset: 'preserve' | 'reduce'; keep_remote_control: boolean }; response: Plan };
+  plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[] }; response: Plan };
+  plan_restore: { request: { job_id: string }; response: Plan };
+  execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
+  jobs: { request: {}; response: { jobs: Receipt[] } };
+  job: { request: { job_id: string }; response: Receipt };
+  drift: { request: { environment_id: string }; response: Drift };
+  accept_drift: { request: { environment_id: string }; response: unknown };
+  launch: { request: { environment_id: string }; response: { status: string; message: string } };
+  export_support: { request: {}; response: unknown };
+}
+export type Draft = { preset: 'preserve' | 'reduce'; keepRemoteControl: boolean };

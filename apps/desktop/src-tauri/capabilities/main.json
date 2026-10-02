@@ -1,0 +1,1 @@
+{"identifier":"main","description":"Local Lintel window. No remote content or generic filesystem/shell access.","windows":["main"],"permissions":["core:default"]}

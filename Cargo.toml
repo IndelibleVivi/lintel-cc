@@ -1,0 +1,8 @@
+[workspace]
+members = ["crates/core", "apps/runner", "crates/egress"]
+exclude = ["apps/desktop/src-tauri", "extensions/browser/native-host"]
+resolver = "2"
+
+[profile.release]
+lto = "thin"
+strip = true

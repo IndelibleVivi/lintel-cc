@@ -1,0 +1,15 @@
+/target/
+node_modules/
+dist/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+/outputs/
+/.local/
+__pycache__/
+*.pyc
+/playwright-report/
+/test-results/
+target/

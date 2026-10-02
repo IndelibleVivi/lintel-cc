@@ -1,0 +1,211 @@
+{
+  "schema_version": "draft-1",
+  "artifact_kind": "synthetic_design_example",
+  "executable": false,
+  "plan_id": "example.reset-cc-and-browser",
+  "recipe": "rebuild-local-state-preserving-work",
+  "state": "draft",
+  "plan_hash": null,
+  "ruleset_ref": "unpublished-design-example",
+  "targets": [
+    {
+      "id": "synthetic-cc-terminal",
+      "host_ref": "synthetic-local-host",
+      "user_ref": "synthetic-user",
+      "surface": "claude-code",
+      "config_root_ref": "symbolic-existing-root",
+      "credential_scope_ref": "symbolic-confirmed-target-only-scope",
+      "snapshot_ref": "synthetic-revision-before-reset",
+      "coverage": "fixture-complete-not-real-scan"
+    },
+    {
+      "id": "synthetic-browser-profile",
+      "host_ref": "synthetic-local-host",
+      "user_ref": "synthetic-user",
+      "surface": "browser",
+      "browser": "chromium-fixture",
+      "paired_instance_ref": "synthetic-pairing",
+      "site_set": {
+        "requested_origins": [
+          "https://app.example.test"
+        ],
+        "effective_cookie_domain": "example.test",
+        "scope_accepted": false
+      },
+      "snapshot_ref": "synthetic-browser-revision",
+      "coverage": "fixture-only"
+    },
+    {
+      "id": "synthetic-new-root",
+      "host_ref": "synthetic-local-host",
+      "user_ref": "synthetic-user",
+      "surface": "claude-code",
+      "config_root_ref": "symbolic-new-root",
+      "exists": false
+    }
+  ],
+  "preserve": {
+    "work_categories": [
+      "sessions",
+      "text-instructions",
+      "memory",
+      "project-content"
+    ],
+    "unrelated_environments": true,
+    "unrelated_sites": true,
+    "ssh_and_other_services": true,
+    "executable_config": "archive-but-do-not-enable"
+  },
+  "exclude_from_work_archive": [
+    "credential-values",
+    "cookies",
+    "environment-secrets"
+  ],
+  "operations": [
+    {
+      "id": "o1",
+      "action": "target.quiesce",
+      "depends_on": [],
+      "target_ref": "synthetic-cc-terminal",
+      "reversibility": "conditionally-reversible",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "pause-only-confirmed-writers-and-restart-sources"
+    },
+    {
+      "id": "o2",
+      "action": "work.archive",
+      "depends_on": [
+        "o1"
+      ],
+      "target_ref": "synthetic-cc-terminal",
+      "reversibility": "non-destructive",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "archive-selected-work-categories-with-verified-manifest"
+    },
+    {
+      "id": "o3",
+      "action": "credential.logout",
+      "depends_on": [
+        "o2"
+      ],
+      "target_ref": "synthetic-cc-terminal",
+      "reversibility": "not-reversible",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "network_side_effect": true,
+      "remote_revocation_state": "unknown",
+      "effect": "official-version-tested-logout-in-approved-credential-scope"
+    },
+    {
+      "id": "o4",
+      "action": "credential.remove_local",
+      "depends_on": [
+        "o3"
+      ],
+      "target_ref": "synthetic-cc-terminal",
+      "reversibility": "not-restored-by-default",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "remove-only-resolved-approved-local-credential-state"
+    },
+    {
+      "id": "o5",
+      "action": "state.reset",
+      "depends_on": [
+        "o4"
+      ],
+      "target_ref": "synthetic-cc-terminal",
+      "reversibility": "category-dependent",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "reset-only-approved-and-schema-identified-client-state"
+    },
+    {
+      "id": "o6",
+      "action": "browser.clear_site_data",
+      "depends_on": [],
+      "target_ref": "synthetic-browser-profile",
+      "reversibility": "not-reversible",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "additional_preconditions": [
+        "profile-paired",
+        "effective-cookie-domain-approved",
+        "target-site-writers-quiesced"
+      ],
+      "data_types": [
+        "cookies",
+        "localStorage",
+        "indexedDB",
+        "serviceWorkers",
+        "cacheStorage"
+      ],
+      "excluded_types": [
+        "http-cache",
+        "passwords",
+        "history"
+      ],
+      "acknowledgment": "browser-action-journal-required"
+    },
+    {
+      "id": "o7",
+      "action": "environment.create",
+      "depends_on": [
+        "o5"
+      ],
+      "target_ref": "synthetic-new-root",
+      "reversibility": "conditionally-reversible",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "prepare-supported-root-and-start-entry-without-copying-login"
+    },
+    {
+      "id": "o8",
+      "action": "work.migrate",
+      "depends_on": [
+        "o2",
+        "o7"
+      ],
+      "target_ref": "synthetic-new-root",
+      "reversibility": "conditionally-reversible",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "selected-content-only; executable-config-remains-disabled"
+    },
+    {
+      "id": "o9",
+      "action": "state.verify_reappearance",
+      "depends_on": [
+        "o5",
+        "o6",
+        "o8"
+      ],
+      "target_ref": "synthetic-new-root",
+      "reversibility": "read-only",
+      "status": "not-executed",
+      "retry_policy": "reconcile-before-any-replay",
+      "effect": "static-check-before-optional-new-launch; distinguish-new-state-from-old-state"
+    }
+  ],
+  "completion": {
+    "local_state_reset": "not-executed",
+    "browser_clear": "not-executed",
+    "work_archive": "not-executed",
+    "remote_revocation": "unknown",
+    "new_login": "not-attempted"
+  },
+  "authorization": {
+    "required": true,
+    "granted": false,
+    "scope_and_dependency_choices_resolved": false
+  },
+  "notes": [
+    "所有目标与路径都是符号引用，example.test 是合成站点；此文件不可执行。",
+    "执行前必须解析本机真实版本与范围、重新生成不可变计划并取得授权。",
+    "如果官方注销失败但本地清理仍有意义，需要明确的新决策，不能隐式跳过依赖。",
+    "o6 的目标暂停属于该 action 的有界前置过程，不是允许全局关闭浏览器。",
+    "本例不自动登录、创建账户或更改服务端账号状态。"
+  ]
+}

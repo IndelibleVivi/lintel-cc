@@ -1,0 +1,19 @@
+[package]
+name = "lintel-desktop"
+version = "0.1.0"
+description = "Lintel desktop environment control"
+edition = "2021"
+
+[workspace]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+lintel-core = { path = "../../../crates/core" }
+lintel-egress = { path = "../../../crates/egress" }
+tokio = { version = "1", features = ["rt", "sync"] }
+
+lintel-browser-host = { path = "../../../extensions/browser/native-host" }

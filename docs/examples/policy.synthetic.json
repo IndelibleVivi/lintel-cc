@@ -1,0 +1,133 @@
+{
+  "schema_version": "draft-1",
+  "artifact_kind": "synthetic_design_example",
+  "executable": false,
+  "policy_id": "example.reduce-nonessential",
+  "display_name": "减少外发",
+  "scope": {
+    "environment_ref": "synthetic-cc-terminal",
+    "surface": "claude-code",
+    "credential_access": "none"
+  },
+  "adapter_gate": {
+    "required": true,
+    "observed_product_version": null,
+    "tested_version_ranges": [],
+    "status": "not-tested"
+  },
+  "settings": [
+    {
+      "key": "DISABLE_TELEMETRY",
+      "value": "1",
+      "location": "adapter-resolved-product-settings-env",
+      "mutation": "set-exact-key-after-approved-diff",
+      "effect_timing": "adapter-must-determine",
+      "verification": [
+        "readback",
+        "effective-context-check"
+      ],
+      "source_refs": [
+        "S01",
+        "S05"
+      ]
+    },
+    {
+      "key": "DISABLE_ERROR_REPORTING",
+      "value": "1",
+      "location": "adapter-resolved-product-settings-env",
+      "mutation": "set-exact-key-after-approved-diff",
+      "effect_timing": "adapter-must-determine",
+      "verification": [
+        "readback",
+        "effective-context-check"
+      ],
+      "source_refs": [
+        "S01",
+        "S05"
+      ]
+    },
+    {
+      "key": "DISABLE_FEEDBACK_COMMAND",
+      "value": "1",
+      "location": "adapter-resolved-product-settings-env",
+      "mutation": "set-exact-key-after-approved-diff",
+      "effect_timing": "adapter-must-determine",
+      "verification": [
+        "readback",
+        "effective-context-check"
+      ],
+      "source_refs": [
+        "S01",
+        "S05"
+      ]
+    },
+    {
+      "key": "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+      "value": "1",
+      "location": "adapter-resolved-product-settings-env",
+      "mutation": "set-exact-key-after-approved-diff",
+      "effect_timing": "adapter-must-determine",
+      "verification": [
+        "readback",
+        "effective-context-check"
+      ],
+      "source_refs": [
+        "S01",
+        "S05"
+      ]
+    }
+  ],
+  "leave_unchanged": [
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+    "skipWebFetchPreflight",
+    "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL",
+    "automatic-update-behavior",
+    "authentication",
+    "sessions",
+    "memory",
+    "projects",
+    "unrelated-shell-environment",
+    "user-configured-otel"
+  ],
+  "dependency_decisions": [
+    {
+      "feature": "Remote Control / feature-flag evaluation",
+      "trigger": "DISABLE_TELEMETRY=1 may disable feature-flag evaluation",
+      "decision_required_when_relevant": true,
+      "options": [
+        "apply-reduced-metrics-and-accept-feature-impact",
+        "preserve-feature-and-regenerate-explicitly-weaker-policy"
+      ],
+      "selected": null,
+      "source_refs": [
+        "S01"
+      ]
+    }
+  ],
+  "preconditions": [
+    "scope-resolved",
+    "adapter-behavior-verified",
+    "higher-precedence-sources-accounted-for",
+    "shared-config-scope-approved"
+  ],
+  "verification_claims_allowed": [
+    "configured",
+    "effective_context_confirmed"
+  ],
+  "verification_claims_not_implied": [
+    "all-egress-disabled",
+    "enforcement_verified",
+    "server-account-unlinked",
+    "ban-reversed"
+  ],
+  "rollback": {
+    "kind": "field-diff",
+    "condition": "restore-only-if-current-value-still-matches-owned-write",
+    "credentials_in_backup": false
+  },
+  "authorization": {
+    "granted": false,
+    "plan_hash": null
+  },
+  "notes": "这是领域数据示例；没有执行器授权，不是用户机器的配置，也不是已通过测试的版本规则。"
+}

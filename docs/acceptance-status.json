@@ -1,0 +1,728 @@
+{
+  "product": "Lintel",
+  "spec_version": "0.2.0",
+  "status": "development-candidate-incomplete",
+  "journeys": {
+    "G01": "not-run",
+    "G02": "not-run",
+    "G03": "not-run",
+    "G04": "not-run"
+  },
+  "cases": [
+    {
+      "id": "C01",
+      "scenario": "shell、user settings、project settings 对同一键有不同值",
+      "required": "按被测键的真实规则解释，不能套通用优先级",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "C02",
+      "scenario": "从 GUI、终端、IDE、systemd 启动同一程序",
+      "required": "每个入口分别确认；终端通过不能给其他入口盖章",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "C03",
+      "scenario": "settings 新增 env 与删除 env",
+      "required": "生效时机正确区分；旧进程不能被假装已 unset",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C04",
+      "scenario": "只在一个 profile 应用方案",
+      "required": "其他 root、通用代理、AWS/Google 配置不变",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C05",
+      "scenario": "Keychain 锁定并存在 credential file fallback",
+      "required": "定位到实际使用的存储，不出现“双凭据漏清”",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "C06",
+      "scenario": "两个 config root 实际共享某类认证",
+      "required": "计划报告共享范围，不给“单环境注销”假承诺",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "C07",
+      "scenario": "较旧版本的 auth status 无较新字段",
+      "required": "使用有证据的替代识别或精确降级，不把缺字段当默认 root",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "C08",
+      "scenario": "高层组织策略控制设置",
+      "required": "不通过低层隐藏覆盖；显示控制者",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C09",
+      "scenario": "配置损坏/重复键/不支持格式",
+      "required": "保留原始文件，不整份覆盖；其他独立动作可继续",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C10",
+      "scenario": "apiKeyHelper 或 shell rc 含副作用",
+      "required": "被动发现不执行它，不启动 agent/hook/MCP",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C11",
+      "scenario": "用户预览后换了账号或 config root",
+      "required": "原计划失效；新数据不自动加入旧授权",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "C12",
+      "scenario": "Product-managed telemetry 与用户自设 OTel 并存",
+      "required": "方案按类别改变，不以通配符清空监控配置",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "B01",
+      "scenario": "同一扩展 ID 在两个 profile 安装",
+      "required": "两个配对实例；A 的任务不能落到 B",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B02",
+      "scenario": "profile 被复制，扩展 storage 标识也被复制",
+      "required": "冲突被识别并重新配对，不默默合并",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B03",
+      "scenario": "在目标与邻域预种 Cookie/localStorage/IndexedDB/SW/CacheStorage",
+      "required": "目标按已批准类型清理，邻域按明确范围保留",
+      "status": "partial",
+      "evidence": [
+        "Synthetic Chromium run observed five storage categories removed, neighbor preserved, target tabs closed; full harness did not finish. See docs/browser.md."
+      ]
+    },
+    {
+      "id": "B04",
+      "scenario": "Cookie 的 origin 指向一个子域",
+      "required": "预览展示实际可注册域影响，不声称仅该子域",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B05",
+      "scenario": "Firefox 请求站点级 HTTP cache 清理",
+      "required": "不调用忽略范围的全缓存清理来假装完成；全 profile 选项另行确认",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B06",
+      "scenario": "Firefox 容器 Cookie store 中同站点数据",
+      "required": "依据支持能力限定 store；不串删其他容器",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "B07",
+      "scenario": "目标页、service worker 正在写入存储",
+      "required": "控制新加载并处理写入者；删除后复查，不以早到 callback 结算",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "B08",
+      "scenario": "删除完成后用户重新登录；旧 ACK 丢失",
+      "required": "不自动再删新登录；查询持久结果/重新确认",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B09",
+      "scenario": "隐私选项被其他扩展或策略控制",
+      "required": "返回控制权冲突，不能显示已生效",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B10",
+      "scenario": "WebRTC 设置在整个 profile 生效",
+      "required": "界面明确范围；通话/媒体负例可重现，支持单项恢复",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "B11",
+      "scenario": "专用 browser 启动参数被现有实例接管",
+      "required": "不误认隔离成功；纠正启动/实例绑定",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "B12",
+      "scenario": "扩展被禁用/卸载/升级，native port 丢失",
+      "required": "任务不丢、不擅自重放；保护状态变更有精确原因",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B13",
+      "scenario": "实际 API 没有列举某类存储的能力",
+      "required": "只报 browser-acknowledged；不编造零残留数字",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B14",
+      "scenario": "未批准第三方邮箱/SSO 域",
+      "required": "清理流程不能退出这些站点登录",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "B15",
+      "scenario": "恢复 WebRTC/代理时其他软件已经改值",
+      "required": "显示冲突而非用旧备份覆盖",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "N01",
+      "scenario": "相同 host 上混合模型请求与额外请求",
+      "required": "不按 host 把模型请求一起封掉，也不从 CONNECT 推断请求类型",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N02",
+      "scenario": "仅写 HTTPS_PROXY 后目标直接连接外网",
+      "required": "不显示强约束；覆盖标签只对应受控通道",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N03",
+      "scenario": "允许与拒绝的合成请求",
+      "required": "允许成功、拒绝失败，两者日志与真实结果一致",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N04",
+      "scenario": "观察器失效而目标没有观测事件",
+      "required": "不给“零外发”结论；正对照失败使验证无效",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N05",
+      "scenario": "同一程序从另一个未登记入口启动",
+      "required": "不错误继承已验证标签；提示覆盖不同",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N06",
+      "scenario": "IPv6、UDP、DNS、子进程直接 socket",
+      "required": "强约束下都按规则验证；任何未覆盖项不得忽略",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N07",
+      "scenario": "helper/namespace/extension 未加载或能力不足",
+      "required": "拒绝显示强约束生效，不以配置文件存在判成功",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N08",
+      "scenario": "浏览器只能识别到应用级身份",
+      "required": "不静默扩大 profile 范围，需用户批准应用级范围",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N09",
+      "scenario": "proxy 崩溃、上游失效",
+      "required": "强约束目标不静默直连；普通模式准确报告状态",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N10",
+      "scenario": "目标使用本地 MCP/回调/SSH",
+      "required": "精确批准的本地例外正常；不为方便开放整个 LAN",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N11",
+      "scenario": "上游是 SOCKS，但目标不支持 SOCKS",
+      "required": "使用明确转换适配器或报配置不兼容，不直接写错 URL",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N12",
+      "scenario": "NO_PROXY/大小写代理变量/PAC 造成分流",
+      "required": "报告实际差异；不能用一个 echo 请求代表所有目标",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N13",
+      "scenario": "只查看配置，没有 DNS 外部观测服务",
+      "required": "不报 DNS 泄漏测试通过",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "N14",
+      "scenario": "网络日志中出现 Authorization、Cookie 或 prompt",
+      "required": "测试失败；导出不能带出这些字段",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "N15",
+      "scenario": "用户没同意网络诊断",
+      "required": "App 不运行 STUN、IP/ASN 查询或公共探针",
+      "status": "partial",
+      "evidence": [
+        "crates/egress tests: 3 unit and 7 actual loopback socket tests passed; no process-level direct-egress enforcement."
+      ]
+    },
+    {
+      "id": "R01",
+      "scenario": "目标由 supervisor 自动重启",
+      "required": "先处理已批准重启来源，再清理；不留下立即回写窗口",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "R02",
+      "scenario": "supervisor 与另一工作实例共享",
+      "required": "不全局 stop，计划揭示完整影响或改变操作方式",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "R03",
+      "scenario": "备份空间不足/目标只读",
+      "required": "破坏性动作尚未执行；提供有效改路径方式",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R04",
+      "scenario": "内容归档中夹有凭据或混合状态",
+      "required": "不明文导出；敏感分类与不自动迁入标记有效",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R05",
+      "scenario": "原始 archive 包含旧 hooks/MCP/插件",
+      "required": "恢复内容不自动启用这些执行能力",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R06",
+      "scenario": "原始会话跨版本不能续用",
+      "required": "原始可读/完整性保持；不谎报可续聊恢复",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R07",
+      "scenario": "删除之后同名文件重新生成",
+      "required": "区分新合法状态与旧来源回写，不按文件名误判",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "R08",
+      "scenario": "运行中用户改变了选中 root",
+      "required": "原操作不能作用到新对象",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R09",
+      "scenario": "远端注销失败，本地删除成功",
+      "required": "分字段给结果，不“全部成功”也不抹掉本地完成",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "R10",
+      "scenario": "恢复时用户后续编辑了同一配置",
+      "required": "按字段冲突处理，不整文件盖回旧版本",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R11",
+      "scenario": "扫描受预算限制，只覆盖部分候选",
+      "required": "不能生成声称“全部”的破坏性计划；需要续扫/缩小明确范围",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "R12",
+      "scenario": "回收区只移动未释放空间",
+      "required": "不报告为已释放磁盘空间；这是恢复存储，不是垃圾清除",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "J01",
+      "scenario": "accept 前断网",
+      "required": "客户端可查询同一 idempotency key；不假定已执行",
+      "status": "partial",
+      "evidence": [
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "J02",
+      "scenario": "durable accept 后、返回 ACK 前断网",
+      "required": "重连得到原 job，不建立第二份清理",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "J03",
+      "scenario": "某个不可逆 action 成功后 ACK 丢失",
+      "required": "reconciliation，不直接重跑",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "J04",
+      "scenario": "服务端进程/主机重启",
+      "required": "job 从 journal 恢复，已完成步骤不重复；不确定步骤独立核对",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "J05",
+      "scenario": "两个客户端同时改同一目标",
+      "required": "一个拥有操作权；另一个得到冲突，不产生交错状态",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "J06",
+      "scenario": "客户端取消/超时",
+      "required": "服务端 deadline 起效；已完成副作用仍被记录",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "J07",
+      "scenario": "修改文件时另一个编辑器写入",
+      "required": "检测或避免冲突；不能以脆弱先读后写宣称原子 CAS",
+      "status": "not-met",
+      "evidence": [
+        "Core snapshot checks do not provide atomic CAS against unrelated editors; documented in docs/core.md."
+      ]
+    },
+    {
+      "id": "J08",
+      "scenario": "SSH logout 杀掉 user service",
+      "required": "被实际检测；未验证存活时不承诺断线继续",
+      "status": "partial",
+      "evidence": [
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "J09",
+      "scenario": "SSH host key 改变",
+      "required": "停止并重新确认；不使用自动忽略模式",
+      "status": "partial",
+      "evidence": [
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "J10",
+      "scenario": "macOS 缓存显示旧远端目录",
+      "required": "远端 runner 重新核验；不按旧缓存删除",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "J11",
+      "scenario": "浏览器 service worker 重启",
+      "required": "extension journal 与消息去重保持，不删除新的登录",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "J12",
+      "scenario": "plan 期间规则更新",
+      "required": "使用已冻结版本或使计划失效，不换规则执行旧授权",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "S01",
+      "scenario": "目标路径 symlink 指向未批准目录",
+      "required": "拒绝 mutation；检查最终对象而非仅字符串前缀",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+      ]
+    },
+    {
+      "id": "S02",
+      "scenario": "归档含 `../`、绝对路径、symlink 与压缩炸弹",
+      "required": "导入拒绝，不写出目标根，不耗尽磁盘",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "S03",
+      "scenario": "文件名/日志内嵌 HTML 或指令文本",
+      "required": "仅作为转义数据呈现，不执行、不改权限",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "S04",
+      "scenario": "网页向扩展发送伪造 cleanup 消息",
+      "required": "不到达系统执行器；无 capability 不产生 mutation",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "S05",
+      "scenario": "未配对 profile 或错误 extension ID",
+      "required": "native host 拒绝，不能读取其他环境状态",
+      "status": "partial",
+      "evidence": [
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+      ]
+    },
+    {
+      "id": "S06",
+      "scenario": "规则包包含任意 shell/未知 action",
+      "required": "解析拒绝；签名有效也不能越过编译能力集",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "S07",
+      "scenario": "过期/回退攻击或签名失败的规则更新",
+      "required": "不激活，保留可用已知版本",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "S08",
+      "scenario": "含个人路径/域名/账号的支持报告",
+      "required": "默认脱敏，可预览；不自动上传",
+      "status": "partial",
+      "evidence": [
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+      ]
+    },
+    {
+      "id": "S09",
+      "scenario": "未启动任何网络功能",
+      "required": "应用空闲无 analytics、license、远程资源请求",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "S10",
+      "scenario": "卸载产品",
+      "required": "移除自己的组件；保留原始工作内容；恢复设置须尊重后续修改",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "U01",
+      "scenario": "非开发者首次安装与扩展配对",
+      "required": "无需终端临时加载、修改 flags 或猜 profile",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "U02",
+      "scenario": "普通减少外发任务",
+      "required": "默认一份预览、一次授权；系统必要授权除外，不逐文件问答",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U03",
+      "scenario": "正在进行的重置任务切换窗口/重开 GUI",
+      "required": "能回到相同进度和目标，按钮不变成重复执行",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U04",
+      "scenario": "小窗口、长路径、中英混排",
+      "required": "无关键内容被截断，完整路径可查可复制，目标始终可见",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U05",
+      "scenario": "键盘/屏幕阅读器/深浅主题/减少动画",
+      "required": "主流程均可完成；危险操作与焦点顺序清楚",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U06",
+      "scenario": "部分完成与恢复冲突",
+      "required": "用户能说清已发生和未发生的事，知道哪一项可恢复",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U07",
+      "scenario": "完成清理后继续使用",
+      "required": "有真实启动/重新登录入口，不停留在成功页或文档链接",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    },
+    {
+      "id": "U08",
+      "scenario": "关闭产品/卸载扩展",
+      "required": "功能状态更新准确；保护模式退化不能仍显示全绿",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "U09",
+      "scenario": "发布安装包与升级",
+      "required": "正式浏览器、签名/公证、规则版本与卸载流程分别验证",
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "U10",
+      "scenario": "性能预算",
+      "required": "记录实测时间/内存/包体，未达标写原因，不靠删除任务能力达标",
+      "status": "partial",
+      "evidence": [
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+      ]
+    }
+  ],
+  "updated": "2026-10-03",
+  "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run."
+}

@@ -1,0 +1,11 @@
+{
+  "environment_id": "synthetic-cc",
+  "bind": "127.0.0.1:0",
+  "default_action": "allow",
+  "allowed": [],
+  "blocked": [{"host": "optional.synthetic.invalid", "ports": [443]}],
+  "upstream": null,
+  "max_connections": 64,
+  "connect_timeout_seconds": 10,
+  "connection_lifetime_seconds": 3600
+}
