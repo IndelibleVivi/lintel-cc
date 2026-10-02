@@ -21,6 +21,9 @@ request = json.load(sys.stdin)
 with (root / "calls.jsonl").open("a") as output:
     output.write(json.dumps({"args": sys.argv[1:], "request": request}) + "\\n")
 mode = os.environ.get("LINTEL_FAKE_MODE", "normal")
+if mode == "runner_error":
+    print(json.dumps({"ok": False, "error": {"code": "synthetic_rejection", "message": "synthetic rejection"}}))
+    sys.exit(1)
 if mode == "timeout":
     sys.stderr.write("SYNTHETIC_PRIVATE_STDERR"); sys.stderr.flush(); time.sleep(10)
 if mode == "oversized":
@@ -81,6 +84,7 @@ class TransportTests(unittest.TestCase):
         call = self.calls()[0]
         self.assertEqual(call["args"][-3:], ["synthetic-host", "lintel", "request"])
         self.assertIn("-oStrictHostKeyChecking=yes", call["args"])
+        self.assertIn("-oUpdateHostKeys=no", call["args"])
         self.assertIn("-oPermitLocalCommand=no", call["args"])
         self.assertNotIn(malicious, call["args"])
         self.assertEqual(call["request"]["environment_id"], malicious)
@@ -100,6 +104,7 @@ class TransportTests(unittest.TestCase):
         self.assertTrue(controller.reconnect("synthetic-host", "plan-one")["ok"])
         self.assertTrue(controller.execute("synthetic-host", "plan-one", "SYNTHETIC_APPROVAL_SECRET")["ok"])
         self.assertEqual([c["request"]["command"] for c in self.calls()], ["execute", "job", "job"])
+        self.assertEqual([c["args"][-1] for c in self.calls()], ["submit", "request", "request"])
         self.assertEqual([c["request"].get("job_id") for c in self.calls()][1:], ["plan-one", "plan-one"])
         state = (self.root / "state/synthetic-host/plan-one.json").read_text()
         self.assertNotIn("SYNTHETIC_APPROVAL_SECRET", state)
@@ -179,6 +184,11 @@ class TransportTests(unittest.TestCase):
                     transport.call("synthetic-host", {"command": "jobs"})
             self.assertEqual(error.exception.code, "transport_unknown")
             self.assertNotIn("SYNTHETIC_PRIVATE_STDERR", str(error.exception))
+
+    def test_runner_error_envelope_survives_nonzero_runner_exit(self):
+        with patch.dict(os.environ, {"LINTEL_FAKE_MODE": "runner_error"}):
+            response = self.controller.request("synthetic-host", {"command": "jobs"})
+        self.assertEqual(response["error"]["code"], "synthetic_rejection")
 
     def test_request_schema_cannot_bypass_durable_execute_or_run_shell(self):
         for payload in [

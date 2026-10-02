@@ -13,3 +13,4 @@ __pycache__/
 /playwright-report/
 /test-results/
 target/
+/.playwright-cli/

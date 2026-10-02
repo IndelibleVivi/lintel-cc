@@ -7,9 +7,16 @@ Commands and data:
 - `register` + `name`, `root` → Environment. `create_environment` + `name` → Environment with fresh owned root.
 - `inspect` + `environment_id` → `{environment, settings: Setting[], assets: {category,count,bytes}[], warnings: string[]}`. Never return secrets or whole JSON settings.
 - `plan_policy` + `environment_id`, `preset` (`preserve`|`reduce`), `keep_remote_control` boolean → Plan.
-- `plan_reset` + `environment_id`, `recipe` (`rebuild`), `categories` (selected work classes) → Plan. Whole reset must not claim credential logout if unsupported; untouched old state clearly reported. The current rebuild leaves the original root intact; real credential reset/writer quiescence remain unimplemented.
+- `plan_reset` + `environment_id`, `recipe` (`rebuild`), `categories` (selected work classes) → Plan. Whole reset must not claim credential logout if unsupported; untouched old state clearly reported. The current rebuild leaves the original root intact; other cleanup recipes use plan_cleanup; complete credential/writer coverage remains unverified.
+- `cleanup_inspect` + `environment_id` → `{files,writers,shared_profile_present,official_logout_available,coverage}`. Metadata only.
+- `auth_probe` + `environment_id` → sanitized `{auth_method,logged_in,...}`. Explicitly runs the target CLI auth status; requires matching configDirectory.
+- `plan_cleanup` + `environment_id`, `recipe` (`repair_login`|`reset_client`|`retire`), `writers_confirmed_stopped:true`, `official_logout:boolean`, `categories` → Plan. Scope/executable/files are checked again at execution; reset/retire require an archive passphrase.
+- `reactivate_environment` + `environment_id` → Environment. Re-enables registration without restoring credentials.
+- `archive_inspect` + `job_id`, `archive_passphrase` → `{job_id,created_at,files:[{path,category,bytes,digest}],notes:string}`.
+- `archive_read` + same fields and `path` → `{path,text,bytes,truncated}`; maximum 1 MiB text preview.
+- `plan_import` + `job_id`, `archive_passphrase`, `environment_id`, `categories` → Plan; execute requires the same archive passphrase. No arbitrary source path or overwrite.
 - `plan_restore` + `job_id` → Plan with field-level conflict checks.
-- `execute` + `plan_id`, `approval` (=plan.hash), optional `archive_passphrase` → Receipt. Rebuild requires a passphrase of at least 12 characters; never persist or log it. Persist plan/journal before side effect; repeated ID returns original receipt, never repeats.
+- `execute` + `plan_id`, `approval` (=plan.hash), optional `archive_passphrase` → Receipt. Any plan with archive_passphrase_required requires a passphrase of at least 12 characters; never persist or log it. Persist plan/journal before side effect; repeated ID returns original receipt, never repeats.
 - `jobs` → `{jobs: Receipt[]}`; `job` + `job_id` → Receipt.
 - `drift` + `environment_id` → `{changes: Setting[], status}`; `accept_drift` + environment_id records current owned settings as baseline.
 - `launch_context` + environment_id → `{root,executable}` for the interactive CLI.
@@ -32,4 +39,4 @@ Browser native and network modules use explicit Tauri `browser_request` and `net
 - Reset/migration work selection uses category identifiers `instructions`, `memory`, `sessions`. Unsupported categories must return explicit validation error, not silently drop.
 - Desktop Tauri is a standalone Cargo workspace with path dependency to crates/core; root default members core+runner+egress.
 - Browser native host remains standalone under extensions/browser/native-host, with a path dependency from the desktop and a finite browser_request control adapter.
-- Remote transport calls fixed `lintel request` with JSON stdin, never user-interpolated shell commands.
+- Remote queries call fixed `lintel request`; execute calls fixed `lintel submit` with JSON stdin, never user-interpolated shell commands. submit returns a durable accepted Receipt before its detached worker finishes; query the original job for completion. `discover` through runner request adds the detached_submission capability. Desktop `remote_request` has finite alias/host/connect/request/execute/reconnect operations documented in docs/remote.md.

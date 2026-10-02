@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useId, type ReactNode } from 'react';
 
 export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download';
 const paths: Record<IconName, ReactNode> = {
@@ -20,14 +20,16 @@ const paths: Record<IconName, ReactNode> = {
 };
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
 export function Brand() { return <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 11h6v17H5zm16 0h6v17h-6z" fill="currentColor" opacity=".65"/><path d="M3 4h26v7H3zm11 13h4v11h-4z" fill="currentColor"/></svg>; }
-const names: Record<string, string> = { completed: '已完成', partially_completed: '部分完成', failed: '未完成', configured: '已配置', discovered: '已发现', registered: '已登记', ready: '可用', available: '可用', limited: '范围受限', unsupported: '尚不支持', unverified: '未验证', pending: '待处理', executing: '执行中', accepted: '已接收', verified: '已读回', unchanged: '无变化', clean: '无变化', drifted: '检测到变化', changed: '有变化', unknown: '未确认', preserved: '已保留', skipped: '已跳过', needs_restart: '等待新启动', launched: '已启动', not_configured: '未配置', owned: 'Lintel 管理', external: '外部环境', user: '用户管理', local: '本机', 'claude-code': 'Claude Code', 'next_launch': '下一次新启动', 'next-launch': '下一次新启动', immediate: '立即', not_enforced: '未强制约束', planned: '待确认', not_run: '未运行' };
+const names: Record<string, string> = { separate_module: '独立模块', not_delivered: '尚未交付', awaiting_browser_restart: '等待浏览器重启', not_completed: '尚未完成', not_present: '未发现', retired: '已退役', reactivated: '已重新启用', completed: '已完成', partially_completed: '部分完成', failed: '未完成', configured: '已配置', discovered: '已发现', registered: '已登记', ready: '可用', available: '可用', limited: '范围受限', unsupported: '尚不支持', unverified: '未验证', pending: '待处理', executing: '执行中', accepted: '已接收', verified: '已读回', unchanged: '无变化', clean: '无变化', drifted: '检测到变化', changed: '有变化', unknown: '未确认', preserved: '已保留', skipped: '已跳过', needs_restart: '等待新启动', launched: '已启动', not_configured: '未配置', owned: 'Lintel 管理', external: '外部环境', user: '用户管理', local: '本机', 'claude-code': 'Claude Code', 'next_launch': '下一次新启动', 'next-launch': '下一次新启动', immediate: '立即', not_enforced: '未强制约束', planned: '待确认', not_run: '未运行' };
 export const label = (value: string) => names[value] ?? value;
 export function Status({ value }: { value: string }) { const good = ['completed','configured','ready','available','verified','unchanged','clean','preserved'].includes(value); return <span className={`status ${good ? 'good' : ''}`}><span className="status-dot"/>{label(value)}</span>; }
 export function Notice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral'|'warning'|'error' }) { return <div className={`notice ${tone}`}><Icon name={tone === 'neutral' ? 'help' : 'warning'} size={17}/><div>{children}</div></div>; }
 export function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; ref.current?.showModal(); return () => { ref.current?.close(); if (previous?.isConnected) previous.focus(); }; }, []);
-  return <dialog ref={ref} className={wide ? 'modal wide' : 'modal'} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby="modal-title"><div className="modal-heading"><h2 id="modal-title">{title}</h2><button autoFocus className="icon-button" aria-label="关闭面板" onClick={onClose}><Icon name="close"/></button></div>{children}</dialog>;
+  useEffect(() => { ref.current?.querySelector('.modal-body')?.scrollTo({ top: 0 }); }, [title]);
+  return <dialog ref={ref} className={wide ? 'modal wide' : 'modal'} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby={titleId}><div className="modal-heading"><h2 id={titleId}>{title}</h2><button autoFocus className="icon-button" aria-label="关闭面板" onClick={onClose}><Icon name="close"/></button></div>{children}</dialog>;
 }
 export function formatDate(value: string) { const numeric = Number(value); const date = new Date(Number.isFinite(numeric) ? numeric * (numeric < 1e12 ? 1000 : 1) : value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date); }
 export function formatBytes(value: number) { return value < 1024 ? `${value} B` : value < 1024 ** 2 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1024 ** 2).toFixed(1)} MB`; }

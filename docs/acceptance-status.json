@@ -459,7 +459,7 @@
       "required": "客户端可查询同一 idempotency key；不假定已执行",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -469,7 +469,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -479,7 +479,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -522,7 +522,7 @@
       "required": "被实际检测；未验证存活时不承诺断线继续",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -531,7 +531,7 @@
       "required": "停止并重新确认；不使用自动忽略模式",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -573,7 +573,9 @@
       "scenario": "归档含 `../`、绝对路径、symlink 与压缩炸弹",
       "required": "导入拒绝，不写出目标根，不耗尽磁盘",
       "status": "not-run",
-      "evidence": []
+      "evidence": [
+        "crates/core/src/lifecycle_tests.rs: encrypted archive inspect/read/import, wrong password, same-name conflict and parent traversal rejection passed on synthetic roots; not a full hostile-archive corpus."
+      ]
     },
     {
       "id": "S03",
@@ -621,7 +623,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 10 fake-SSH subprocess tests passed; no actual remote host or detached-service proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
       ]
     },
     {
@@ -696,7 +698,8 @@
       "required": "有真实启动/重新登录入口，不停留在成功页或文档链接",
       "status": "partial",
       "evidence": [
-        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
+        "Limited cleanup/archive/import GUI and core paths passed on synthetic roots; real Keychain, re-login and session continuation remain not-run."
       ]
     },
     {
@@ -724,5 +727,6 @@
     }
   ],
   "updated": "2026-10-03",
-  "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run."
+  "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
+  "implementation_update": "2026-10-03: limited cleanup/archive import, native SSH + detached submit, Clawd/Day-Night UI. Full journeys remain not-run. Current active-SW browser smoke blocked at genuine browser startup evidence; prior static-SW success is superseded."
 }

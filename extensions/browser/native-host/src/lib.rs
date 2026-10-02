@@ -1,4 +1,5 @@
 //! Local-only allowlisted control API. Browser data is never read by this host.
+pub mod installation;
 use fs2::FileExt;
 use serde_json::{json, Value};
 #[cfg(unix)]
@@ -137,7 +138,7 @@ fn action(a: &Value) -> Result<()> {
         "proxy" => &["origins", "port"],
         "blockSites" => &["origins"],
         "pauseRules" => &["minutes"],
-        "restore" => &["receiptId"],
+        "restore" | "finishClear" => &["receiptId"],
         _ => return Err("unknown_action".into()),
     };
     let mut all = vec!["kind"];
@@ -218,7 +219,7 @@ fn action(a: &Value) -> Result<()> {
                 return Err("invalid_duration".into());
             }
         }
-        "restore" => {
+        "restore" | "finishClear" => {
             id(a, "receiptId")?;
         }
         _ => {}
@@ -320,8 +321,46 @@ fn control_inner(db: &mut Value, r: &Value) -> Result<Value> {
 fn valid_extension(s: &str) -> bool {
     (s.len() == 32 && s.chars().all(|c| ('a'..='p').contains(&c))) || s == "lintel@lintel.local"
 }
-/// GUI/CLI entry: local-only fixed operations. No path, executable, or file API.
+/// Generate a browser-specific manifest without registering or authorizing it.
+pub fn manifest(browser: &str, extension: &str, host: &Path) -> Result<Value> {
+    if !host.is_absolute() {
+        return Err("host_path_must_be_absolute".into());
+    }
+    let mut result = json!({"name":"app.lintel.browser","description":"Lintel paired browser bridge","path":host,"type":"stdio"});
+    match browser {
+        "chrome" | "edge" | "chromium"
+            if extension.len() == 32 && extension.chars().all(|c| ('a'..='p').contains(&c)) =>
+        {
+            result["allowed_origins"] = json!([format!("chrome-extension://{extension}/")])
+        }
+        "firefox" if extension == "lintel@lintel.local" => {
+            result["allowed_extensions"] = json!([extension])
+        }
+        "chrome" | "edge" | "chromium" | "firefox" => return Err("invalid_extension_id".into()),
+        _ => return Err("unknown_browser".into()),
+    }
+    Ok(result)
+}
+/// GUI/CLI entry: local-only fixed operations. The explicit native-host installer
+/// accepts a host executable path, never a general execution or filesystem API.
 pub fn control(request: Value) -> Value {
+    if matches!(
+        request["op"].as_str(),
+        Some("installation_plan" | "install_native_host")
+    ) {
+        return envelope((|| {
+            fields(&request, &["op", "browser", "extension_id", "host_path"])?;
+            let browser = string(&request, "browser")?;
+            let extension = string(&request, "extension_id")?;
+            let host = Path::new(string(&request, "host_path")?);
+            let home = PathBuf::from(std::env::var_os("HOME").ok_or("HOME is required")?);
+            if request["op"] == "installation_plan" {
+                installation::plan(browser, extension, host, &home, std::env::consts::OS)
+            } else {
+                installation::install(browser, extension, host, &home, std::env::consts::OS)
+            }
+        })());
+    }
     control_at(&root(), request)
 }
 /// Explicit storage root for synthetic tests and embedding. Never accepts a remote message path.
@@ -458,7 +497,13 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                 let oid = id(receipt, "id")?;
                 if !matches!(
                     receipt["phase"].as_str(),
-                    Some("running" | "completed" | "uncertain" | "rejected")
+                    Some(
+                        "running"
+                            | "completed"
+                            | "uncertain"
+                            | "rejected"
+                            | "awaiting-browser-restart"
+                    )
                 ) {
                     return Err("invalid_receipt_phase".into());
                 }
@@ -584,6 +629,39 @@ mod tests {
                 json!({"op":"query","instance_id":"instance-one","operation_id":"operation-one"})
             )["data"]["phase"],
             "completed"
+        );
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn cleanup_preparation_and_finish_are_distinct_operations() {
+        let p = path();
+        let (ext, token) = setup(&p);
+        let request = json!({"op":"submit","instance_id":"instance-one","operation_id":"prepare-clear","action":{"kind":"clear","origins":["https://claude.ai"],"types":["serviceWorkers","cookies"]}});
+        assert_eq!(control_at(&p, request)["ok"], true);
+        let receipt = json!({"op":"receipt","instance_id":"instance-one","token":token,"receipt":{"id":"prepare-clear","phase":"awaiting-browser-restart","result":{"verification":"preparation-only"}}});
+        assert_eq!(native_at(&p, receipt, &ext, "one")["ok"], true);
+        assert_eq!(
+            control_at(
+                &p,
+                json!({"op":"query","instance_id":"instance-one","operation_id":"prepare-clear"})
+            )["data"]["phase"],
+            "awaiting-browser-restart"
+        );
+        assert_eq!(
+            control_at(
+                &p,
+                json!({"op":"submit","instance_id":"instance-one","operation_id":"finish-clear","action":{"kind":"finishClear","receiptId":"prepare-clear"}})
+            )["ok"],
+            true
+        );
+        assert_eq!(
+            native_at(
+                &p,
+                json!({"op":"install_native_host","instance_id":"instance-one","token":token}),
+                &ext,
+                "one"
+            )["ok"],
+            false
         );
         fs::remove_dir_all(p).unwrap();
     }

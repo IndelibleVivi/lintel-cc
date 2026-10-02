@@ -34,7 +34,7 @@
 
 一个本地 core operation lock 串行化 Lintel 的 mutation。执行期间 `jobs` / `job` 可以读取已原子落盘的 journal；锁被实际 writer 持有时，不将运行中任务标成中断。没有 writer 时查询非终态任务会转为 `needs_reconciliation`。receipt ID 等于 plan ID，重复 execute 返回原记录，不重做动作。
 
-任务先持久接收，再记录执行、验证、结果。异常状态需要查询原任务，不能因 ACK 丢失就再次删除。该进程不是 detached service；进程被杀后不会自动完成剩余动作，尚未实现逐副作用的自动核对恢复。
+任务先持久接收，再记录执行、验证、结果。异常状态需要查询原任务，不能因 ACK 丢失就再次删除。`lintel request` 在前台执行；`lintel submit` 仅接受 execute，将请求通过 stdin 交给独立会话 worker，在 accepted journal 已落盘后返回 ACK。断线后用原 ID 查询，不自动重发。父进程退出后的完成已在合成环境验证；真实 Linux logout/cgroup、主机重启与逐副作用恢复未验证。
 
 恢复只处理 Lintel 修改过的字段：当前值必须仍等于原任务写入值，否则拒绝。无关的后续编辑保留。当前文件写入路径提供快照复查与原子替换，但**不与不合作的外部编辑器构成原子 compare-and-swap**；最后复查与 rename 之间仍有竞争窗口。实际 Claude / supervisor 写入者未暂停，因此不能宣称完整并发清场保障。
 
@@ -44,7 +44,19 @@
 
 当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`。枚举预算为 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验，并检查空间。
 
-工作包是标准 age 口令加密的 JSON，生成后重新读取并核对归档字节。仅在归档完成后创建新环境。`CLAUDE.md` 迁入新根，会话/记忆资料进入 `lintel-imports`；不恢复 settings、hooks、MCP、插件或凭据。旧根不动，因此 receipt 明确是 `partially_completed`，旧登录/客户端清理步骤未完成。没有归档导入 UI；可由兼容 age 工具解密后检查 JSON，勿把其内容直接当执行配置导入。
+工作包是标准 age 口令加密的 JSON，生成后重新读取并核对归档字节。仅在归档完成后创建新环境。`CLAUDE.md` 迁入新根，会话/记忆资料进入 `lintel-imports`；不恢复 settings、hooks、MCP、插件或凭据。旧根不动，因此 receipt 明确是 `partially_completed`，旧登录/客户端清理步骤未完成。桌面“工作归档”和 TUI 可通过 `archive_inspect` 解锁文件清单、`archive_read` 阅读最多 1 MiB 文本，再用 `plan_import` 选择类别与目标，单独批准迁入。core 验证格式、路径、重复路径、类别、容量、文件摘要，并以 `create_new` 防止覆盖同名文件。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
+
+## 有限清理与认证
+
+`cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。
+
+`plan_cleanup` 接受 `repair_login`、`reset_client`、`retire`，要求 `writers_confirmed_stopped: true`，可选 `official_logout`。默认根的混合状态是 home 下 `.claude.json`；专用根使用其 `.claude.json`。修复登录只处理 `.credentials.json`；其余两类还处理预览中的混合状态文件。工作、settings、hooks、MCP 与插件文件不会被通配删除。reset_client 先加密归档并建立新环境，retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
+
+已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper 或暂停 supervisor。官方注销仅接受可验证的本地登录来源；存在共享 Anthropic profile 或相应环境变量时拒绝。该范围在预览、执行检查及实际注销前复查。仅调用官方 `auth logout`，不猜测 Keychain service 名；服务端 token 撤销始终另列 `unverified`。
+
+本地删除先将对象原子移入同目录的私有隔离目录，再核对被冻结的对象，避免按原路径误删随后替换的新文件。冲突时不覆盖新文件；无法回到原位置的对象保留在回执所列隔离目录，必须核对。它不等于对持有开放文件描述符的外部写入者建立 OS 级 CAS。官方命令导致额外状态变化或状态重新出现时，会停止后续动作。未选择官方注销的回执为 `partially_completed`；精确文件已处理不代表 Keychain、Desktop、IDE、浏览器或目录外认证已清空。
+
+TUI 通过 `lintel tui` 提供上述配方、认证检查、归档阅读/迁入与重新启用。口令只从关闭 echo 的交互终端读取，自动化应使用 JSON stdin；不会写入 plan、journal 或支持资料。
 
 ## 启动与支持资料
 

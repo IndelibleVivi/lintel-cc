@@ -11,7 +11,8 @@ for(const browser of ['chromium','firefox']){
  const manifest={manifest_version:3,name:fixture?'Lintel — SYNTHETIC TEST ONLY':'Lintel',version:'0.1.0',description:'Local browser privacy controls, scoped site cleanup, and paired Lintel receipts.',permissions:['storage','browsingData','privacy','nativeMessaging','alarms'],optional_permissions:['cookies','declarativeNetRequest',...(browser==='chromium'?['contentSettings','proxy']:[])],optional_host_permissions:hostPermissions,action:{default_popup:'popup.html',default_title:'Lintel · 当前浏览器'},options_ui:{page:'popup.html',open_in_tab:true},content_security_policy:{extension_pages:"script-src 'self'; object-src 'none'"}};
  if(browser==='chromium'){manifest.minimum_chrome_version='120';manifest.background={service_worker:'background.js',type:'module'};}
  else{manifest.background={scripts:['background.js'],type:'module'};manifest.browser_specific_settings={gecko:{id:'lintel@lintel.local',strict_min_version:'128.0',data_collection_permissions:{required:['none']}}};}
- if(fixture){manifest.permissions.push('cookies','declarativeNetRequest');manifest.optional_permissions=manifest.optional_permissions.filter(v=>!manifest.permissions.includes(v));manifest.host_permissions=hostPermissions;manifest.optional_host_permissions=[];}
+ manifest.optional_permissions.push('webNavigation');
+ if(fixture){manifest.permissions.push('cookies','declarativeNetRequest','webNavigation',...(browser==='chromium'?['contentSettings','proxy']:[]));manifest.optional_permissions=manifest.optional_permissions.filter(v=>!manifest.permissions.includes(v));manifest.host_permissions=hostPermissions;manifest.optional_host_permissions=[];}
  await writeFile(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
  console.log(path.relative(root,out));
 }

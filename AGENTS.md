@@ -10,3 +10,5 @@
 - No generic cleaner, fingerprint spoofing or account-unban claims. No default analytics, license server, TLS interception or full-environment export.
 - Public docs use repo-relative paths and synthetic examples only. Private notes live outside Git.
 - Relevant verification: cargo test --workspace, desktop typecheck/build, browser tests and synthetic end-to-end checks. Update README/operator/current-state surfaces when their claims change.
+- Desktop remote.rs owns the finite native SSH bridge; runner submit owns durable ACK and detached execution. Remote execute must use submit, and reconnect only queries the original job.
+- Browser clear is preparation only until a real runtime.onStartup generation and separately approved finishClear. Do not substitute extension worker restart or synthetic generation for browser restart evidence.

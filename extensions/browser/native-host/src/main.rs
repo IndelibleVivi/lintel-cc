@@ -1,5 +1,5 @@
-use lintel_browser_host::{control, native, random, read_frame, release, write_frame};
-use serde_json::{json, Value};
+use lintel_browser_host::{control, manifest, native, random, read_frame, release, write_frame};
+use serde_json::Value;
 use std::io::{self, Read};
 fn main() {
     if let Err(e) = run() {
@@ -9,6 +9,48 @@ fn main() {
 }
 fn run() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("register") {
+        if args.len() < 4 {
+            return Err("usage: lintel-browser-host register chrome|edge|firefox EXTENSION_ID /absolute/host [--home /absolute/home] [--apply]".into());
+        }
+        let mut home =
+            std::path::PathBuf::from(std::env::var_os("HOME").ok_or("HOME is required")?);
+        let mut apply = false;
+        let mut index = 4;
+        while index < args.len() {
+            match args[index].as_str() {
+                "--apply" => {
+                    apply = true;
+                    index += 1;
+                }
+                "--home" if index + 1 < args.len() => {
+                    home = std::path::PathBuf::from(&args[index + 1]);
+                    index += 2;
+                }
+                _ => return Err("unknown_registration_argument".into()),
+            }
+        }
+        let platform = std::env::consts::OS;
+        let result = if apply {
+            lintel_browser_host::installation::install(
+                &args[1],
+                &args[2],
+                std::path::Path::new(&args[3]),
+                &home,
+                platform,
+            )
+        } else {
+            lintel_browser_host::installation::plan(
+                &args[1],
+                &args[2],
+                std::path::Path::new(&args[3]),
+                &home,
+                platform,
+            )
+        }?;
+        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+        return Ok(());
+    }
     if args.first().map(String::as_str) == Some("control") {
         let mut input = String::new();
         io::stdin()
@@ -24,19 +66,9 @@ fn run() -> Result<(), String> {
     }
     if args.first().map(String::as_str) == Some("manifest") {
         if args.len() != 4 {
-            return Err("usage: lintel-browser-host manifest chromium|firefox EXTENSION_ID /absolute/path/to/host".into());
+            return Err("usage: lintel-browser-host manifest chrome|edge|chromium|firefox EXTENSION_ID /absolute/path/to/host".into());
         }
-        if !std::path::Path::new(&args[3]).is_absolute() {
-            return Err("host path must be absolute".into());
-        }
-        let mut m = json!({"name":"app.lintel.browser","description":"Lintel paired browser bridge","path":args[3],"type":"stdio"});
-        match args[1].as_str() {
-            "chromium" => {
-                m["allowed_origins"] = json!([format!("chrome-extension://{}/", args[2])])
-            }
-            "firefox" => m["allowed_extensions"] = json!([args[2]]),
-            _ => return Err("unknown browser".into()),
-        }
+        let m = manifest(&args[1], &args[2], std::path::Path::new(&args[3]))?;
         println!("{}", serde_json::to_string_pretty(&m).unwrap());
         return Ok(());
     }

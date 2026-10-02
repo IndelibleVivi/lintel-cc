@@ -1,4 +1,8 @@
 //! Lintel's single filesystem plan/execution authority.
+mod archive;
+mod cleanup;
+#[cfg(test)]
+mod lifecycle_tests;
 mod storage;
 mod work;
 use fs2::FileExt;
@@ -81,6 +85,7 @@ fn physical(path: &Path) -> Result<PathBuf> {
 pub struct Engine {
     home: PathBuf,
     state: PathBuf,
+    accept_hook: Option<fn(&Value)>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -93,7 +98,11 @@ impl Engine {
         for name in ["plans", "jobs", "environments", "archives", "baselines"] {
             private_dir(&state.join(name))?;
         }
-        Ok(Self { home, state })
+        Ok(Self {
+            home,
+            state,
+            accept_hook: None,
+        })
     }
     fn path(&self, dir: &str, id: &str) -> PathBuf {
         self.state.join(dir).join(format!("{id}.json"))
@@ -134,7 +143,11 @@ impl Engine {
                     }
                 }
             }
-            self.dispatch(&r)
+            let response = self.dispatch(&r);
+            // Release explicitly: a concurrent subprocess fork may briefly retain
+            // the open file description until exec closes inherited descriptors.
+            fs2::FileExt::unlock(&lock)?;
+            response
         })();
         match result {
             Ok(data) => json!({"ok":true,"data":data}),
@@ -349,6 +362,23 @@ impl Engine {
                 let manifest = work::manifest(Path::new(string(&e, "root")?), &categories)?;
                 self.plan(&e,"rebuild","保留内容，准备新环境",json!([]),vec!["原环境全部内容（尚未注销或删除）","未选中的实例与项目文件"],json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false},{"id":"create","label":"创建新的配置目录","reversible":false},{"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false},{"id":"credentials","label":"旧登录及客户端状态尚需独立处理","reversible":false}]),json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true}))
             }
+            "cleanup_inspect" => self.cleanup_inspect(r),
+            "auth_probe" => self.auth_probe(r),
+            "plan_cleanup" => self.plan_cleanup(r),
+            "reactivate_environment" => {
+                let e = self.env(r)?;
+                let mut all = self.inventory()?;
+                for item in &mut all {
+                    if item["id"] == e["id"] {
+                        item["status"] = json!("discovered");
+                    }
+                }
+                save(&self.state.join("inventory.json"), &json!(all))?;
+                Ok(json!({"status":"reactivated","environment_id":e["id"]}))
+            }
+            "archive_inspect" => self.archive_inspect(r),
+            "archive_read" => self.archive_read(r),
+            "plan_import" => self.plan_import(r),
             "execute" => self.execute(r),
             "jobs" => {
                 let mut jobs = vec![];
@@ -411,6 +441,9 @@ impl Engine {
             }
             "launch_context" => {
                 let e = self.env(r)?;
+                if e["status"] == "retired" {
+                    return Err(err("environment_retired", "请先恢复此环境登记再启动"));
+                }
                 let root = PathBuf::from(string(&e, "root")?);
                 guard(&root)?;
                 let exe = executable()
@@ -471,17 +504,31 @@ impl Engine {
             if json!(manifest) != p["extra"]["manifest"] {
                 return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
             }
+        } else if p["kind"] == "cleanup" {
+            self.block_managed(&e)?;
+            self.check_cleanup(&e, &p, r)?;
+        } else if p["kind"] == "import" {
+            work::check_passphrase(r)?;
         } else {
             self.block_managed(&e)?;
         }
         let mut j = json!({"id":pid,"plan_id":pid,"environment_id":e["id"],"title":p["title"],"status":"accepted","created_at":now(),"restorable":false,"warnings":p["warnings"],"steps":[]});
         save(&jp, &j)?;
+        if let Some(hook) = self.accept_hook {
+            hook(&j);
+        }
         j["status"] = json!("executing");
         save(&jp, &j)?;
         let result = (|| -> Result<()> {
             if p["kind"] == "rebuild" {
                 self.rebuild(&e, &p, r, &mut j, &jp)?;
                 return Ok(());
+            }
+            if p["kind"] == "cleanup" {
+                return self.cleanup(&e, &p, r, &mut j, &jp);
+            }
+            if p["kind"] == "import" {
+                return self.import_work(&e, &p, r, &mut j, &jp);
             }
             if doc.get("env").is_none() {
                 doc["env"] = json!({});
@@ -531,6 +578,9 @@ impl Engine {
         Ok(j)
     }
     fn launch(&self, e: &Value, proxy_url: Option<&str>) -> Result<Value> {
+        if e["status"] == "retired" {
+            return Err(err("environment_retired", "请先恢复此环境登记再启动"));
+        }
         let route = if let Some(url) = proxy_url {
             let raw = url
                 .strip_prefix("http://")
@@ -608,7 +658,7 @@ fn public_plan(mut p: Value) -> Value {
     for key in ["snapshot", "root_identity", "root"] {
         p.as_object_mut().unwrap().remove(key);
     }
-    if p["kind"] == "rebuild" {
+    if p["extra"]["archive_passphrase_required"] == true {
         p["archive_passphrase_required"] = json!(true);
         p["file_count"] = json!(p["extra"]["manifest"].as_array().map_or(0, Vec::len));
     }
@@ -617,6 +667,13 @@ fn public_plan(mut p: Value) -> Value {
 }
 
 pub fn handle_request(request: Value) -> Value {
+    handle_request_inner(request, None)
+}
+/// Runner-only callback after durable acceptance; never a second execution path.
+pub fn handle_request_with_accept(request: Value, hook: fn(&Value)) -> Value {
+    handle_request_inner(request, Some(hook))
+}
+fn handle_request_inner(request: Value, hook: Option<fn(&Value)>) -> Value {
     let result = (|| {
         let home = std::env::var_os("LINTEL_TEST_HOME")
             .or_else(|| std::env::var_os("HOME"))
@@ -634,10 +691,17 @@ pub fn handle_request(request: Value) -> Value {
         Engine::new(home, state)
     })();
     match result {
-        Ok(engine) => engine.request(request),
+        Ok(mut engine) => {
+            engine.accept_hook = hook;
+            engine.request(request)
+        }
         Err(e) => json!({"ok":false,"error":{"code":e.code,"message":e.message}}),
     }
 }
+pub fn decode_request(bytes: &[u8]) -> Result<Value> {
+    parse(bytes)
+}
+
 pub fn parse_request(bytes: &[u8]) -> Value {
     match parse(bytes) {
         Ok(v) => handle_request(v),

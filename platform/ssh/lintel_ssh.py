@@ -22,6 +22,7 @@ ALIAS = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,159}\Z")
 MAX_JSON = 2 * 1024 * 1024
 REMOTE_COMMAND = ("lintel", "request")
+SUBMIT_COMMAND = ("lintel", "submit")
 # Deliberately no shell, generic file, arbitrary-exec, or installation endpoint.
 REQUEST_FIELDS = {
     "discover": {}, "inspect": {"environment_id": str},
@@ -107,11 +108,11 @@ class Transport:
     def __init__(self, ssh: str = "/usr/bin/ssh", deadline: float = 60):
         self.ssh, self.deadline = ssh, deadline
 
-    def call(self, alias: str, payload: dict) -> dict:
+    def call(self, alias: str, payload: dict, *, submit: bool = False) -> dict:
         args = [self.ssh, "-T", "-oBatchMode=yes", "-oStrictHostKeyChecking=yes",
-                "-oPermitLocalCommand=no", "-oClearAllForwardings=yes", "-oRequestTTY=no",
+                "-oUpdateHostKeys=no", "-oPermitLocalCommand=no", "-oClearAllForwardings=yes", "-oRequestTTY=no",
                 "-oConnectTimeout=10", "-oServerAliveInterval=15", "-oServerAliveCountMax=2",
-                valid_alias(alias), *REMOTE_COMMAND]
+                valid_alias(alias), *(SUBMIT_COMMAND if submit else REMOTE_COMMAND)]
         encoded = (json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n").encode()
         if len(encoded) > MAX_JSON:
             raise ControllerError("request_too_large", "The request exceeds the transport budget.")
@@ -167,7 +168,7 @@ class Transport:
                 for stream in (proc.stdin, proc.stdout, proc.stderr):
                     if not stream.closed:
                         stream.close()
-        if code != 0:
+        if code == 255:
             raise ControllerError("transport_unknown", "SSH or runner failed. Verify host trust/connectivity; query the existing job. No host key was accepted automatically.")
         try:
             response = json.loads(output)
@@ -177,6 +178,8 @@ class Transport:
             response["ok"] and "data" not in response
         ) or (not response["ok"] and not isinstance(response.get("error"), dict)):
             raise ControllerError("transport_unknown", "The runner response envelope is invalid; query the existing job.")
+        if code != 0 and response["ok"]:
+            raise ControllerError("transport_unknown", "The runner exited unexpectedly; query the existing job.")
         return response
 
 
@@ -262,7 +265,7 @@ class Controller:
             record = {"plan_id": plan_id, "status": "submission_unknown", "lookup_id": plan_id}
             self._save(path, record)  # durable local intent before starting ssh
             # No payload/approval/passphrase/account/path is retained in the local journal.
-            response = self.transport.call(alias, payload)
+            response = self.transport.call(alias, payload, submit=True)
             record["status"] = "response_received"
             if response["ok"]:
                 receipt = response["data"]

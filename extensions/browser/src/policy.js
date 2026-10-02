@@ -41,13 +41,14 @@ export function normalizeAction(input, config = CONFIG) {
     case 'pauseRules':
       if (!Number.isInteger(a.minutes) || a.minutes < 1 || a.minutes > 60) fail('invalid_pause_duration');
       break;
+    case 'finishClear':
     case 'restore':
       if (typeof a.receiptId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(a.receiptId)) fail('invalid_receipt_id');
       break;
     default: fail('unknown_action');
   }
   // Reject fields which have no meaning for the selected action.
-  const fields = {clear:['origins','types','cookieStoreId'],clearProfileCache:[],webrtc:['setting'],sitePermission:['origins','setting'],proxy:['origins','port'],blockSites:['origins'],pauseRules:['minutes'],restore:['receiptId']}[a.kind];
+  const fields = {clear:['origins','types','cookieStoreId'],finishClear:['receiptId'],clearProfileCache:[],webrtc:['setting'],sitePermission:['origins','setting'],proxy:['origins','port'],blockSites:['origins'],pauseRules:['minutes'],restore:['receiptId']}[a.kind];
   for (const key of Object.keys(a)) if (key !== 'kind' && !fields.includes(key)) fail('irrelevant_field',key);
   return a;
 }
@@ -57,7 +58,7 @@ export function describe(a,config = CONFIG) {
     return {scope:'current-profile',requestedOrigins:a.origins,effectiveStorageScope:config.browser === 'firefox' ? sites.map(s=>new URL(s.origin).hostname) : a.origins,
       effectiveCookieScope:a.types.includes('cookies') ? sites.map(s=>config.browser === 'firefox' ? new URL(s.origin).hostname : s.domain) : [],
       isolationScope:'目标主机的新请求暂时阻止；DNR 作用于整个当前 profile（含其他 Firefox 容器），仅关闭选定 store 的标签。',cookieStoreId:a.cookieStoreId || 'all-stores',types:a.types,irreversible:true,
-      impact:'关闭实际影响范围内的标签；移除 Service Worker 后删除所选数据。目标站点的新请求暂时阻止，完成后需单独解除。Cookie 删除会退出登录；不含邮箱或第三方 SSO。',
+      impact:'先关闭目标标签及嵌入目标 iframe 的宿主标签并注销 Service Worker。已运行的 worker 事件仍可能回写，因此保留隔离，要求用户重启此浏览器后再次预览确认删除。webNavigation 仅用于 frame 匹配，不保存浏览记录。不会自动重启或删除；Cookie 删除会退出登录。',
       observation:'browser-acknowledged；有可选 cookies 权限时只返回剩余数量；没有通用存储枚举能力。'};
   }
   const descriptions = {
@@ -67,7 +68,8 @@ export function describe(a,config = CONFIG) {
     proxy:'仅所选站点 HTTPS/HTTP 请求使用本机 HTTP proxy；其他站点直连。未覆盖 WebRTC、DNS 或全部后台连接；代理未启动会使目标请求失败。',
     blockSites:'阻止所选站点及子域的请求；所有该站点功能都会受影响，不将此规则称为遥测分类。',
     pauseRules:'限时暂停本扩展的持久站点阻断规则；不自动解除清理任务的隔离。',
-    restore:'只恢复仍与本扩展写入值一致且仍归本扩展控制的设置；删除的数据不可恢复。'
+    restore:'只恢复仍与本扩展写入值一致且仍归本扩展控制的设置；删除的数据不可恢复。',
+    finishClear:'浏览器已在准备后重新启动；再次确认原范围后删除数据。隔离保留到单独解除，旧任务 ID 不会再次删除。'
   };
   return {scope:a.kind === 'webrtc' || a.kind === 'clearProfileCache' ? 'current-profile' : 'selected-sites',...a,impact:descriptions[a.kind]};
 }
@@ -81,6 +83,8 @@ export function hostPermissions(a,config=CONFIG) {
 export function requiredPermissions(a,config=CONFIG) {
   const permissions=[];
   if (['clear','blockSites','pauseRules'].includes(a.kind)) permissions.push('declarativeNetRequest');
+  if (a.kind === 'clear') permissions.push('webNavigation');
+  if (a.kind === 'clear' && a.cookieStoreId) permissions.push('cookies');
   if (a.kind === 'sitePermission') permissions.push('contentSettings');
   if (a.kind === 'proxy') permissions.push('proxy');
   return {permissions,origins:hostPermissions(a,config)};

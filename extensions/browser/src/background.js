@@ -47,7 +47,7 @@ async function poll(){
     }
     // Re-send only durable receipts, never browser mutations. Lost ACK is safe.
     const all=await api.storage.local.get(null);
-    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected'].includes(r.phase)&&!r.nativeAcknowledged){
+    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected','awaiting-browser-restart'].includes(r.phase)&&!r.nativeAcknowledged){
       await native('receipt',{receipt:receipt(r)});r.nativeAcknowledged=true;await engine.set(key,r);
     }
   }catch(error){
@@ -78,6 +78,7 @@ async function handle(message,sender){
 async function pollIfConnected(){if(port) await poll();}
 api.runtime.onMessage.addListener((message,sender,sendResponse)=>{handle(message,sender).then(data=>sendResponse({ok:true,data}),e=>sendResponse({ok:false,error:{code:e.code||'extension_error',message:e.message}}));return true;});
 api.alarms.onAlarm.addListener(alarm=>{if(alarm.name==='bridge-status')poll();if(alarm.name==='resume-rules')engine.resumeRules().catch(e=>engine.set('ruleConflict',e.message));});
+api.runtime.onStartup.addListener(()=>engine.browserStarted());
 api.permissions.onRemoved.addListener(()=>engine.set('bridge',{connected:false,reason:'permission-removed; refresh effective status',at:Date.now()}));
 // A connected native port keeps a Chromium MV3 worker alive. Heartbeats also bind
 // concurrent copied installations; alarms recover after an actual worker restart.

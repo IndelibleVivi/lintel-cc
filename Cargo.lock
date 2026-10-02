@@ -920,6 +920,7 @@ dependencies = [
 name = "lintel-runner"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "lintel-core",
  "serde_json",
 ]

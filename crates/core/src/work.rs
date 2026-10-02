@@ -2,7 +2,6 @@ use crate::{err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -27,7 +26,7 @@ pub fn categories(r: &Value) -> Result<Vec<String>> {
     }
     Ok(out)
 }
-fn classify(relative: &Path) -> Option<&'static str> {
+pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     let name = relative.file_name()?.to_str()?;
     if relative == Path::new("CLAUDE.md") {
         return Some("instructions");
@@ -116,14 +115,14 @@ pub fn check_passphrase(r: &Value) -> Result<&str> {
     Ok(s)
 }
 impl Engine {
-    pub(crate) fn rebuild(
+    pub(crate) fn archive_work(
         &self,
         e: &Value,
         p: &Value,
         r: &Value,
         j: &mut Value,
         journal: &Path,
-    ) -> Result<()> {
+    ) -> Result<Vec<Value>> {
         let pass = check_passphrase(r)?;
         let root = PathBuf::from(string(e, "root")?);
         let categories = categories(&p["extra"])?;
@@ -150,17 +149,7 @@ impl Engine {
             files.push(json!({"path":entry["path"],"category":entry["category"],"digest":entry["digest"],"data":data}));
         }
         let package = json!({"schema":"lintel.work/1","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
-        let encryptor = age::Encryptor::with_user_passphrase(age::secrecy::SecretString::from(
-            pass.to_string(),
-        ));
-        let mut encrypted = vec![];
-        let mut writer = encryptor
-            .wrap_output(&mut encrypted)
-            .map_err(|_| err("archive_failed", "无法初始化归档加密"))?;
-        writer.write_all(&serde_json::to_vec(&package)?)?;
-        writer
-            .finish()
-            .map_err(|_| err("archive_failed", "归档加密未完整完成"))?;
+        let encrypted = crate::archive::seal(&package, pass)?;
         let archive = self
             .state
             .join("archives")
@@ -172,6 +161,17 @@ impl Engine {
         j["archive_path"] = json!(archive);
         j["steps"] = json!([{"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"}]);
         save(journal, j)?;
+        Ok(files)
+    }
+    pub(crate) fn rebuild(
+        &self,
+        e: &Value,
+        p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let files = self.archive_work(e, p, r, j, journal)?;
         let new = self.create(&format!("{} · 重建", string(e, "name")?))?;
         j["new_environment_id"] = new["id"].clone();
         j["new_root"] = new["root"].clone();
@@ -197,13 +197,14 @@ impl Engine {
                 return Err(err("migration_failed", "迁入文件校验失败"));
             }
         }
-        j["steps"].as_array_mut().unwrap().extend([
-   json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"}),
-   json!({"id":"credentials","label":"旧登录与客户端状态","status":"not_completed","message":"尚未验证该版本凭据作用域与写入者；旧环境没有注销、删除或停进程，服务端撤销未知。"})]);
-        j["status"] = json!("partially_completed");
-        j["warnings"].as_array_mut().unwrap().push(json!(
-            "本次完成加密归档与新环境准备，完整旧状态清理尚未完成。请妥善保管归档口令。"
-        ));
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"}));
+        if p["kind"] == "rebuild" {
+            j["steps"].as_array_mut().unwrap().push(json!({"id":"credentials","label":"旧登录与客户端状态","status":"not_completed","message":"旧环境没有注销、删除或停进程；完整处理请使用清理配方。"}));
+            j["status"] = json!("partially_completed");
+            j["warnings"].as_array_mut().unwrap().push(json!(
+                "本次完成加密归档与新环境准备，旧状态清理尚未完成。请妥善保管归档口令。"
+            ));
+        }
         Ok(())
     }
 }

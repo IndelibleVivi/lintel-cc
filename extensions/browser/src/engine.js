@@ -1,6 +1,8 @@
 import {CONFIG} from './config.js';
 import {fail,normalizeAction,describe,requiredPermissions,dataOptions,sitesFor} from './policy.js';
-const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+// Browser readback may reorder object fields (notably DNR rules).
+const ordered=value=>Array.isArray(value)?value.map(ordered):value && typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,ordered(value[key])])):value;
+const equal = (a,b) => JSON.stringify(ordered(a)) === JSON.stringify(ordered(b));
 const PERMISSION_API = {location:'location',camera:'camera',microphone:'microphone',notifications:'notifications'};
 const CLEANUP_RULE_START = 10000;
 const NETWORK_RULE_START = 20000;
@@ -19,13 +21,19 @@ export class Engine {
     }
     const record={id:operationId,action,source,phase:'preview',createdAt:Date.now(),expiresAt:Date.now()+300000,preview:describe(action,this.config),permissions:requiredPermissions(action,this.config)};
     if (action.kind === 'clear') {
-      record.preview.writerHandling=action.cookieStoreId ? '容器删除不注销共享 Service Worker；只保证所选 store 的浏览器 API 确认，无法验证后台本地回写停止。' : action.types.includes('serviceWorkers') ? '关闭范围内标签并注销目标 Service Worker；隔离保留到单独解除。' : '未选择 serviceWorkers，无法可靠停止后台本地写入；执行前须选择该类别。';
+      record.preview.writerHandling=action.cookieStoreId ? '容器删除不注销共享 Service Worker；浏览器重启后仍仅保证所选 store 的 API 确认，无法验证后台本地回写停止。' : action.types.includes('serviceWorkers') ? '关闭目标 frame 并注销 Service Worker；重启浏览器后再次确认删除，隔离保留到单独解除。' : '未选择 serviceWorkers，无法可靠停止后台本地写入；执行前须选择该类别。';
       if (!action.cookieStoreId && !action.types.includes('serviceWorkers')) fail('service_worker_quiescence_required',record.preview.writerHandling);
+    }
+    if (action.kind === 'finishClear') {
+      const prior=await this.clearPreparation(action.receiptId);
+      record.preview={...prior.preview,preparationId:prior.id,impact:'已观察到准备后的浏览器启动。确认删除原范围的数据；隔离保留到单独解除。'};
+      record.permissions=prior.permissions;
     }
     if (action.kind === 'restore') {
       const prior=await this.get(`operation:${action.receiptId}`);
       if (!prior?.undo || prior.restoredBy) fail('not_restorable');
       record.preview.restoring=prior.preview;
+      record.permissions=prior.permissions;
     }
     await this.set(`operation:${operationId}`,record);
     return record;
@@ -41,7 +49,8 @@ export class Engine {
     await this.set(key,running); // durable boundary BEFORE any browser mutation
     try {
       const result=await this.execute(running);
-      const done={...running,...result,phase:'completed',completedAt:Date.now()};
+      const phase=result.phase||'completed';
+      const done={...running,...result,phase,...(phase==='completed'?{completedAt:Date.now()}:{preparedAt:Date.now()})};
       await this.set(key,done);return done;
     } catch (error) {
       // API failure may follow a side effect. Keep uncertainty; never retry the ID.
@@ -58,6 +67,7 @@ export class Engine {
   async execute(r) {
     const a=r.action;
     if (a.kind === 'clear') return this.clear(r);
+    if (a.kind === 'finishClear') return this.finishClear(r);
     if (a.kind === 'clearProfileCache') {await this.api.browsingData.removeCache({});return {result:{verification:'browser-acknowledged',scope:'entire-current-profile-http-cache'}};}
     if (a.kind === 'webrtc') return this.applySetting(r,this.api.privacy.network.webRTCIPHandlingPolicy,a.setting,'webrtc');
     if (a.kind === 'proxy') {
@@ -93,23 +103,55 @@ export class Engine {
   }
   async clear(r) {
     const a=r.action, rules=this.rules(a,CLEANUP_RULE_START);
+    if (a.cookieStoreId && !(await this.api.cookies.getAllCookieStores()).some(store=>store.id===a.cookieStoreId)) fail('unknown_cookie_store','所选 Firefox cookie store 不存在；未清理。');
     // Cookie deletion on Chromium expands to the registrable domain, including sibling tabs.
     if (this.config.browser!=='firefox' && a.types.includes('cookies')) rules.forEach((rule,i)=>{rule.condition.urlFilter=`||${sitesFor(a.origins,this.config)[i].domain}^`;});
     const existing=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=CLEANUP_RULE_START && v.id<CLEANUP_RULE_START+100);
     if (existing.length) fail('cleanup_isolation_active','请先核对上次结果并解除旧清理隔离。');
+    if (await this.get('cleanupIsolation')) fail('cleanup_isolation_active','请先核对上次结果并解除旧清理隔离。');
     await this.checkpoint(r,{isolationRuleIds:rules.map(v=>v.id)});
+    await this.set('cleanupIsolation',{operationId:r.id,rules});
     await this.api.declarativeNetRequest.updateDynamicRules({addRules:rules});
     const sites=sitesFor(a.origins,this.config);
     const tabs=await this.api.tabs.query({});
-    const targets=tabs.filter(tab=>{
-      if (a.cookieStoreId && tab.cookieStoreId!==a.cookieStoreId) return false;
-      try {const u=new URL(tab.url);return sites.some(s=>this.config.browser!=='firefox' && a.types.includes('cookies') ? u.hostname===s.domain || u.hostname.endsWith('.'+s.domain) : (this.config.browser==='firefox' ? u.hostname===new URL(s.origin).hostname : u.origin===s.origin));} catch {return false;}
-    });
-    await this.checkpoint(r,{closedTabCount:targets.length});
+    const matches=url=>{
+      try {const u=new URL(url);return sites.some(s=>this.config.browser!=='firefox' && a.types.includes('cookies') ? u.hostname===s.domain || u.hostname.endsWith('.'+s.domain) : (this.config.browser==='firefox' ? u.hostname===new URL(s.origin).hostname : u.origin===s.origin));} catch {return false;}
+    };
+    const targets=[];let embeddedWriterTabCount=0;
+    // Read URLs only for this approved cleanup. Never persist frame URLs/history.
+    // Closing the host tab also terminates local writes in already loaded iframes.
+    for (const tab of tabs) {
+      if (a.cookieStoreId && tab.cookieStoreId!==a.cookieStoreId) continue;
+      const frames=await this.api.webNavigation.getAllFrames({tabId:tab.id});
+      if (matches(tab.url) || frames?.some(frame=>matches(frame.url))) {
+        targets.push(tab);
+        if (!matches(tab.url)) embeddedWriterTabCount++;
+      }
+    }
+    await this.checkpoint(r,{closedTabCount:targets.length,embeddedWriterTabCount});
     if (targets.length) await this.api.tabs.remove(targets.map(t=>t.id));
     const options=dataOptions(a,this.config);
     // Unregister writers first, then clear stores; do not navigate to the sites for verification.
     if (a.types.includes('serviceWorkers')) await this.api.browsingData.remove(options,{serviceWorkers:true});
+    await this.checkpoint(r,{preparedGeneration:await this.get('browserStartupGeneration')||'initial'});
+    return {phase:'awaiting-browser-restart',result:{verification:'preparation-only',storageDeletion:'not-started',closedTabCount:targets.length,embeddedWriterTabCount,isolation:'active-until-explicit-release',nextAction:'restart-browser-then-confirm-finishClear',writerHandling:'unregistration-does-not-stop-active-events'}};
+  }
+  browserStarted() {return this.serial(()=>this.set('browserStartupGeneration',crypto.randomUUID()));}
+  async clearPreparation(id) {
+    const prior=await this.get(`operation:${id}`),owner=await this.get('cleanupIsolation');
+    if (prior?.phase!=='awaiting-browser-restart' || prior.finishedBy || prior.isolationReleasedAt || owner?.operationId!==id) fail('cleanup_preparation_not_active');
+    if ((await this.get('browserStartupGeneration')||'initial')===prior.preparedGeneration) fail('browser_restart_required','请完整退出并重启此浏览器，再确认继续删除；扩展 worker 重启不算浏览器重启。');
+    const active=(await this.api.declarativeNetRequest.getDynamicRules()).filter(rule=>prior.isolationRuleIds.includes(rule.id));
+    if (!equal(active,owner.rules)) fail('cleanup_isolation_changed','清理隔离已变化，未继续删除。');
+    return prior;
+  }
+  async finishClear(r) {
+    const prior=await this.clearPreparation(r.action.receiptId),a=prior.action,sites=sitesFor(a.origins,this.config),options=dataOptions(a,this.config);
+    // Consume the preparation durably before deletion; a failed new operation is
+    // uncertain and cannot turn the preparation into a second deletion attempt.
+    prior.finishedBy=r.id;r.isolationRuleIds=prior.isolationRuleIds;
+    const owner=await this.get('cleanupIsolation');owner.operationId=r.id;
+    await this.api.storage.local.set({[`operation:${prior.id}`]:prior,[`operation:${r.id}`]:r,cleanupIsolation:owner});
     const types=Object.fromEntries(a.types.filter(t=>t!=='serviceWorkers').map(t=>[t,true]));
     if (Object.keys(types).length) await this.api.browsingData.remove(options,types);
     let cookieObservation={verification:'not-enumerated',reason:'optional cookies permission not granted'};
@@ -121,15 +163,19 @@ export class Engine {
       }
       cookieObservation={verification:'enumerated-cookie-count',remaining:count};
     }
-    return {result:{verification:'browser-acknowledged',categories:a.types,cookieObservation,closedTabCount:targets.length,
-      writerHandling:a.cookieStoreId?'container-writers-not-verified':'tabs-closed-service-workers-unregistered',
+    return {result:{verification:'browser-acknowledged',categories:a.types,cookieObservation,closedTabCount:prior.closedTabCount,
+      embeddedWriterTabCount:prior.embeddedWriterTabCount,writerHandling:a.cookieStoreId?'container-frames-closed-service-workers-not-verified':'browser-restarted-after-service-workers-unregistered',
       isolation:'active-until-explicit-release',storageEnumeration:'unavailable',remoteSessionRevocation:'not-performed',relogin:'not-started'}};
   }
   releaseIsolation(id) {return this.serial(async()=>{
     const r=await this.get(`operation:${id}`);
     if (!r?.isolationRuleIds || r.phase==='running') fail('no_releasable_isolation');
+    if (r.isolationReleasedAt) return r;
+    const owner=await this.get('cleanupIsolation');
+    if (owner?.operationId!==id) fail('isolation_owner_conflict','此回执不拥有当前隔离，未移除任何规则。');
     await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:r.isolationRuleIds});
-    r.isolationReleasedAt=Date.now();await this.set(`operation:${id}`,r);return r;
+    r.isolationReleasedAt=Date.now();await this.set(`operation:${id}`,r);
+    await this.api.storage.local.remove('cleanupIsolation');return r;
   });}
   async applySetting(r,setting,value,type) {
     if (!setting) fail('setting_unsupported');
@@ -161,17 +207,22 @@ export class Engine {
   async restore(r) {
     const prior=await this.get(`operation:${r.action.receiptId}`),u=prior?.undo;
     if (!u || prior.restoredBy) fail('not_restorable');
+    let effective;
     if (['webrtc','proxy'].includes(u.type)) {
       const setting=u.type==='webrtc' ? this.api.privacy.network.webRTCIPHandlingPolicy : this.api.proxy.settings;
       const current=await setting.get({});
       if (current.levelOfControl!=='controlled_by_this_extension' || !equal(current.value,u.applied)) fail('restore_conflict','当前值或控制者已变化，未覆盖。');
       if (u.before.levelOfControl==='controlled_by_this_extension') await setting.set({value:u.before.value,scope:'regular'});
       else await setting.clear({scope:'regular'}); // reveal current underlying setting, not stale snapshot
+      effective=await setting.get({});
+      if (u.before.levelOfControl==='controlled_by_this_extension' ? effective.levelOfControl!=='controlled_by_this_extension' || !equal(effective.value,u.before.value) : effective.levelOfControl==='controlled_by_this_extension') fail('restore_not_effective');
     } else if (u.type==='rules') {
       const current=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
       if (!equal(current,u.applied) || await this.get('pausedRules')) fail('restore_conflict');
       await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:current.map(v=>v.id),addRules:u.before});
       await this.set('networkRules',u.before);
+      effective=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
+      if (!equal(effective,u.before)) fail('restore_not_effective');
     } else if (u.type==='content') {
       if (!equal(await this.get(`contentRules:${u.name}`),u.applied)) fail('restore_conflict');
       const api=this.api.contentSettings[u.name];
@@ -179,9 +230,12 @@ export class Engine {
       await api.clear({scope:'regular'}); // clear only this extension's rules of this content type
       for (const rule of u.before) await api.set(rule);
       await this.set(`contentRules:${u.name}`,u.before);
+      effective=[];
+      for (const {origin} of u.effectiveBefore) effective.push({origin,...await api.get({primaryUrl:origin})});
+      for (const rule of u.before) if ((await api.get({primaryUrl:rule.primaryPattern.slice(0,-2)})).setting!==rule.setting) fail('restore_not_effective');
     }
     prior.restoredBy=r.id;await this.set(`operation:${prior.id}`,prior);
-    return {result:{verification:'browser-acknowledged',restored:r.action.receiptId}};
+    return {result:{verification:'effective-readback',restored:r.action.receiptId,effective,...(u.type==='content'?{controller:'not-exposed-by-contentSettings-api'}:{})}};
   }
   async resumeRules() {
     const paused=await this.get('pausedRules');

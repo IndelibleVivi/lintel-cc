@@ -3,20 +3,22 @@ import react from '@vitejs/plugin-react';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
+import { existsSync, readdirSync } from 'node:fs';
 
+const fixturePort = Number(process.env.LINTEL_FIXTURE_PORT ?? '1420');
 function fixtureBridge(): Plugin {
   const fixture = process.env.LINTEL_FIXTURE_ROOT;
   const runner = path.resolve('../../target/debug/lintel');
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {
       server.middlewares.use('/__lintel_fixture/request', (req, res) => {
         const origin = req.headers.origin;
-        if (req.method !== 'POST' || origin !== 'http://127.0.0.1:1420' || req.headers.host !== '127.0.0.1:1420' || req.headers['content-type'] !== 'application/json' || !['127.0.0.1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '')) {
+        if (req.method !== 'POST' || origin !== `http://127.0.0.1:${fixturePort}` || req.headers.host !== `127.0.0.1:${fixturePort}` || req.headers['content-type'] !== 'application/json' || !['127.0.0.1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '')) {
           res.statusCode = 403; res.end('Local fixture access only'); return;
         }
         let body = '';
@@ -48,4 +50,6 @@ function fixtureBridge(): Plugin {
     },
   };
 }
-export default defineConfig(({ mode }) => ({ plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: 1420, strictPort: true }, clearScreen: false }));
+const localFontDirectory = path.resolve('public/local-fonts');
+const localFontUrls = existsSync(localFontDirectory) ? readdirSync(localFontDirectory).filter(file => /^Anthropic(Sans|Serif|Mono)-(Roman|Italic)\.woff2$/.test(file)).map(file => `/local-fonts/${file}`) : [];
+export default defineConfig(({ mode }) => ({ define: { __LINTEL_LOCAL_FONTS__: JSON.stringify(localFontUrls) }, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false }));

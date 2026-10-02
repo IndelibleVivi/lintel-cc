@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod network;
+mod remote;
 
 #[tauri::command]
 async fn request(payload: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -22,7 +23,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             request,
             browser_request,
-            network::network_request
+            network::network_request,
+            remote::remote_request
         ])
         .run(tauri::generate_context!())
         .expect("Lintel could not start");

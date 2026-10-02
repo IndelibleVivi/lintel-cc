@@ -30,3 +30,19 @@ export function request<C extends keyof Api>(command: C, fields: Api[C]['request
   coreQueue = result.catch(() => undefined);
   return result;
 }
+
+// Remote calls share the same typed product contract and retain their host scope.
+export function requester(alias: string | null): typeof request {
+  if (!alias) return request;
+  let remoteQueue: Promise<unknown> = Promise.resolve();
+  return <C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> => {
+    const result = remoteQueue.then(async () => {
+      const payload = command === 'execute' ? { op:'execute', alias, ...fields } : { op:'request', alias, request:{command,...fields} };
+      const envelope = await invoke<Envelope<Api[C]['response']>>('remote_request', {payload});
+      if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message);
+      return envelope.data;
+    });
+    remoteQueue = result.catch(() => undefined);
+    return result;
+  };
+}
