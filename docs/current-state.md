@@ -6,10 +6,10 @@
 
 - core / runner：环境登记与建立、四项外发设置计划/批准/读回、字段恢复、漂移、脱敏支持资料；有限登录修复/客户端重建/退役；加密归档、文本阅读与选择性迁入。清理范围是预览中的准确文件和可显式调用的官方认证入口，不等于全客户端清场。
 - 桌面：同一套本机/SSH 环境、计划、清理、归档和任务界面；浏览器模块全操作入口、Native Messaging 注册计划与配对；本机代理启停/连接观察。所有修改先生成计划或独立确认。
-- 界面：聊天式结构化首页、Clawd 像素几何与八种点按场景、Day / Night / System、可选本地字体、键盘操作及减少动态效果。字体文件不进入 Git，干净 checkout 使用系统 fallback。
+- 界面：聊天式首页按角色招呼、操作框、一行工作入口重排，玩耍入口集中到不挤动工作区的口袋菜单。Clawd 支持摸摸／拖抱／弹飞／连续戳戳害羞与躲藏、下拉起飞；四幅重新绘制的字符风景保留清楚角色轮廓与画面比例，另有跳跃小游戏。提供 Day / Night / System、可选本地字体、键盘操作及减少动态效果。字体文件不进入 Git，干净 checkout 使用系统 fallback。
 - SSH：native Rust bridge 使用系统 OpenSSH、静态 alias、严格 host key 与有限 JSON 请求；`lintel submit` 持久接收后返回 ACK，独立会话 worker 执行，重连只查询原任务。Python controller 是可选 CLI，不是桌面依赖。
 - 浏览器：Chromium MV3 / Firefox 独立适配、Native Messaging host、实例冲突/配对/持久操作记录与固定路径安装器。Chromium 清理先隔离、关闭目标及 iframe 宿主、注销 worker，等待完整浏览器重启，再用新确认继续删除。
-- 网络：loopback CONNECT / 有限 HTTP 转发、精确域名/端口规则、上游与连接事件；仅证明经过通道的流量。界面明确规则表单是下次启动草案，当前 native status 未返回已生效的完整规则配置。
+- 网络：loopback CONNECT / 有限 HTTP 转发、精确域名/端口规则、上游与连接事件；仅证明经过通道的流量。native start/status 返回实际采用的规范化 active_config；界面分开呈现当前生效配置与按环境保存的下次启动草案，支持默认动作及允许／阻止规则和端口。
 
 ## 证据与未验证范围
 
@@ -17,11 +17,11 @@
 | --- | --- |
 | Core | 17 项 Rust tests 通过，包括旧计划冲突、归档导入拒绝覆盖、退役、官方注销 fake CLI、共享认证范围变化拒绝及删除窗口内替换新凭据保留 |
 | CLI / submission | 实际 CLI 配置往返旅程通过；独立 worker 的 durable ACK、父进程退出后完成、原 ID 查询、去重、口令不落记录通过。PTY 中重建/批准/无回显口令/加密归档通过 |
-| Egress | 3 unit + 7 localhost socket tests 通过；没有真实 Claude 公网探针或进程强约束证据 |
+| Egress | 3 unit + 7 localhost socket tests 通过；本轮 native network tests 3/3 新鲜通过，覆盖规范化生效配置读回、精确规则命中、环境隔离、无效配置与通道结束状态。没有真实 Claude 公网探针或进程强约束证据 |
 | Browser | 17 JS + 7 native host Rust tests 通过。旧静止 SW smoke 曾通过；活跃 SW 负例证实注销后仍可能回写。当前两阶段完整 smoke 被 `browser_restart_required` 拒绝，因为临时测试安装未观察到真实 onStartup；没有伪造启动世代，不能标为完整通过 |
-| SSH | 完整 desktop Rust suite 13/13（11 remote + 2 network）与 Python fake-SSH 11/11通过，覆盖严格 host key、固定命令、丢 ACK 查询、stdin 口令不持久化；真实主机未连接，Linux logout/cgroup 与主机重启恢复未验收 |
-| Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。Day/Night、八种彩蛋、减少动态、900×640 四页无横向溢出通过；视觉稿仍属候选 |
-| macOS | arm64 App 本地构建成功，约 13.48 MiB；已观察原生 WebKit 新首页和 Clawd。无 Developer ID、公证、正式分发或 Applications 安装验收 |
+| SSH | 上一轮完整 desktop Rust suite 13/13 与 Python fake-SSH 11/11通过，覆盖严格 host key、固定命令、丢 ACK 查询、stdin 口令不持久化；真实主机未连接，Linux logout/cgroup 与主机重启恢复未验收 |
+| Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。重排后 Home 的 Day/Night、900×640布局、工作入口、口袋展开不挤动操作框、连续戳戳／躲藏／拖甩、鼠标／滚轮／模拟触摸、焦点返回和减少动态已验证；四画收星、等比例缩放、翻页，游戏跳跃／暂停／碰撞／重开与本机最高分通过。网络面板经 synthetic native-response harness 验证延迟响应隔离和停止／编辑／重启。视觉稿仍属候选 |
+| macOS | arm64 App 本地构建成功，约 13.52 MiB；上一轮已观察原生 WebKit 首页和 Clawd，本轮重排与游玩交互主要以浏览器验证，未完成新 native runtime 交互验收。无 Developer ID、公证、正式分发或 Applications 安装验收 |
 
 实际主机为 macOS arm64。Linux、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
 

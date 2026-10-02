@@ -418,8 +418,8 @@ h1,.brand strong{font-family:var(--serif)}
 
 /* Home: a quiet composer, with one small companion. */
 .main-content.home-content{padding:0 42px 32px}
-.home-stage{max-width:696px;margin:clamp(52px,10vh,108px) auto 0}
-.home-greeting{display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:32px}
+.home-stage{max-width:696px;margin:clamp(58px,10vh,88px) auto 0}
+.home-greeting{display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:43px}
 .home-title{font-family:var(--serif);font-size:32px;line-height:1.4;font-weight:400;letter-spacing:-.7px;margin:0}
 .home-greeting p{font-size:12px;margin-top:10px;color:var(--muted);letter-spacing:.25px}
 .environment-composer{border:1px solid var(--line);border-radius:20px;background:var(--paper);box-shadow:0 4px 18px #25231806,0 1px 3px #25231805;padding:23px 23px 15px}
@@ -433,21 +433,17 @@ button.composer-plus{width:30px;height:30px;min-height:30px;border:1px solid var
 .composer-policy select{font-size:12px;color:var(--text);background:transparent;border:0;padding:5px 2px;max-width:180px}
 button.composer-submit{width:33px;height:33px;min-height:33px;border-radius:10px;padding:5px;background:#BB775C;border-color:#BB775C;color:#fff}
 .composer-submit svg{transform:rotate(-90deg)}
-.home-shortcuts{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:18px}
-.home-shortcuts button{background:transparent;border:1px solid var(--line);font-size:11px;min-height:32px;padding:5px 11px;border-radius:8px;gap:6px;font-weight:400}
-.home-shortcuts svg{color:var(--muted);width:14px;height:14px}
-.home-assurance{display:flex;align-items:center;justify-content:center;gap:5px;color:var(--muted);font-size:10px;line-height:1.8;margin-top:18px}
-.inspector-toggle{display:flex;align-items:center;gap:9px;margin-top:47px;border-top:1px solid var(--line);padding-top:13px}
-.inspector-toggle>.text-button{font-size:12px;color:var(--muted)}
-.inspector-toggle>span{margin-left:auto;font-size:10px;color:var(--muted)}
-.inspector-toggle [aria-expanded=true]>svg{transform:rotate(90deg)}
+.home-tools{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 0 12px}
+.home-work-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.home-work-links button,button.inspector-toggle{background:transparent;border:0;color:var(--muted);font-size:12px;min-height:32px;padding:4px 0;gap:6px;font-weight:400}
+.home-work-links button:hover:not(:disabled),button.inspector-toggle:hover:not(:disabled){background:transparent;color:var(--text)}
+button.inspector-toggle{margin-left:auto;flex-shrink:0}
+.inspector-toggle[aria-expanded=true]>svg{transform:rotate(90deg)}
+.inspector-status{display:flex;align-items:center;justify-content:flex-end;gap:14px;border-top:1px solid var(--line);padding-top:11px;font-size:10px;color:var(--muted)}
+.inspector-status>.text-button{font-size:11px}
 .clawd{position:relative;display:flex;flex-direction:column;align-items:center;flex-shrink:0;color:#C17B60;isolation:isolate}
 .clawd-scene{display:block;width:120px;height:80px;overflow:visible}
 .clawd-letters{font:11px var(--mono);fill:#A8A18F}
-.clawd-pet{display:block;min-height:0;padding:0;border:0;background:transparent;color:inherit;border-radius:12px;transition:transform .16s ease}
-.clawd-pet:hover:not(:disabled){background:transparent;transform:translateY(-3px);color:inherit}
-.clawd-pet:active:not(:disabled){transform:translateY(1px) scale(.96)}
-.clawd-pet:focus-visible{outline:1px dashed var(--accent);outline-offset:5px;background:transparent;box-shadow:none}
 .clawd-caption{position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%) translateY(3px);font:11px/1.6 var(--sans);color:var(--muted);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;background:var(--paper);border:1px solid var(--line);padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px #25231806;z-index:4}
 .clawd:hover .clawd-caption,.clawd:focus-within .clawd-caption,.clawd-caption.revealed{opacity:1;transform:translateX(-50%)}
 .clawd-small .clawd-scene{width:76px;height:51px}
@@ -457,7 +453,7 @@ button.composer-submit{width:33px;height:33px;min-height:33px;border-radius:10px
 .clawd-steam{animation:clawd-float 3s ease-in-out infinite}
 @keyframes clawd-blink{0%,43%,47%,100%{transform:scaleY(1)}45%{transform:scaleY(.1)}}
 @keyframes clawd-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
-@media(max-width:1000px){.main-content.home-content{padding-inline:30px}.home-title{font-size:28px}.home-greeting{gap:8px}.home-greeting .clawd-scene{width:100px;height:67px}.home-shortcuts{gap:6px}.home-shortcuts button{padding-inline:8px}}
-@media(max-height:700px){.home-stage{margin-top:36px}.home-greeting{margin-bottom:25px}.inspector-toggle{margin-top:28px}}
-@media(max-width:760px){.main-content.home-content{padding-inline:20px}.home-stage{margin-top:45px}.home-title{font-size:25px}.home-greeting{gap:5px}.home-greeting .clawd-scene{width:90px;height:60px}.home-greeting p{font-size:11px}.environment-composer{padding:19px 18px 14px}.composer-prompt{font-size:14px}.home-shortcuts{gap:6px}.page-heading>.clawd-small{display:none}.clawd-caption{left:0;transform:none;white-space:normal;width:180px}.clawd:hover .clawd-caption,.clawd:focus-within .clawd-caption,.clawd-caption.revealed{transform:none}}
-@media(prefers-reduced-motion:reduce){.clawd-pet,.clawd-caption{transition:none}.clawd-eyes,.clawd-float,.clawd-steam{animation:none}.clawd-pet:hover:not(:disabled),.clawd-pet:active:not(:disabled){transform:none}}
+@media(max-width:1000px){.main-content.home-content{padding-inline:30px}.home-title{font-size:28px}.home-greeting{gap:8px}.home-greeting .clawd-scene{width:100px;height:67px}.home-work-links{gap:15px}}
+@media(max-height:700px){.home-stage{margin-top:48px}.home-greeting{margin-bottom:39px}}
+@media(max-width:760px){.main-content.home-content{padding-inline:20px}.home-stage{margin-top:45px}.home-title{font-size:25px}.home-greeting{gap:5px}.home-greeting .clawd-scene{width:90px;height:60px}.home-greeting p{font-size:11px}.environment-composer{padding:19px 18px 14px}.composer-prompt{font-size:14px}.home-tools{gap:12px}.home-work-links{gap:12px}.home-work-links button,button.inspector-toggle{font-size:11px}.page-heading>.clawd-small{display:none}.clawd-caption{left:0;transform:none;white-space:normal;width:180px}.clawd:hover .clawd-caption,.clawd:focus-within .clawd-caption,.clawd-caption.revealed{transform:none}}
+@media(prefers-reduced-motion:reduce){.clawd-caption{transition:none}.clawd-eyes,.clawd-float,.clawd-steam{animation:none}}

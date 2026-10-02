@@ -1,0 +1,44 @@
+.main-content.home-content{position:relative;overscroll-behavior-y:contain}
+.home-content:has(.is-pulling){user-select:none}
+.home-greeting>.clawd{z-index:5}
+.clawd-flight{position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);z-index:6;width:max-content}
+.clawd-pull-trigger{position:relative;gap:5px;min-height:30px;padding:4px 9px;border:0;background:transparent;color:var(--muted);font:11px/1.5 var(--sans);border-radius:6px}
+.clawd-pull-trigger:hover:not(:disabled){background:var(--soft);color:var(--text)}
+.clawd-pull-trigger>svg{transform:rotate(90deg);transition:transform .18s}
+.is-open .clawd-pull-trigger>svg{transform:rotate(-90deg)}
+.pull-progress{position:absolute;bottom:2px;left:9px;height:2px;width:calc(var(--pull) * .5);max-width:calc(100% - 18px);background:var(--accent);border-radius:2px}
+.pull-hint{position:absolute;top:100%;left:50%;transform:translateX(-50%);font:11px var(--sans);color:var(--muted);white-space:nowrap;padding:5px;background:var(--bg);border-radius:4px;pointer-events:none}
+.clawd-pocket{position:absolute;top:calc(100% + 8px);left:50%;width:288px;transform:translateX(-50%);border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--text);padding:12px;box-shadow:0 12px 36px #30241a20;animation:pocket-arrive .16s ease-out}
+.pocket-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px;padding-left:4px}
+.pocket-heading h2{font:12px/1.6 var(--sans);font-weight:600}
+.pocket-pet-actions{display:flex;gap:6px;padding:0 0 12px}
+.pocket-pet-actions button{flex:1;min-height:34px;padding:6px 9px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:transparent;font-weight:400}
+.pocket-pet-actions button:hover:not(:disabled){background:var(--soft)}
+.pocket-destinations{border-top:1px solid var(--line);padding-top:7px}
+.pocket-destinations button{display:flex;width:100%;justify-content:flex-start;gap:10px;text-align:left;border:0;background:transparent;padding:7px 9px;border-radius:6px;font-size:12px;font-weight:400;min-height:38px}
+.pocket-destinations button:hover:not(:disabled){background:var(--soft)}
+.pocket-glyph{width:20px;font:22px/1 var(--serif);color:var(--accent);text-align:center}
+.pocket-destinations button>span:nth-child(2){flex:1}
+.pocket-destinations svg{color:var(--muted)}
+.pocket-hint{font-size:10px;line-height:1.7;margin:8px 4px 0;color:var(--muted)}
+.clawd:has(.clawd-flight.is-open)>.clawd-caption{opacity:0}
+.clawd:has(.clawd-flight.is-pulling)>.clawd-pet .clawd-scene{transform:translateY(-12px) rotate(-5deg);transition:transform .18s ease-out}
+.clawd:has(.clawd-flight.is-open)>.clawd-pet .clawd-scene{animation:pocket-takeoff .85s cubic-bezier(.2,.7,.25,1)}
+.clawd .clawd-pet{display:block;min-height:0;padding:0;border:0;background:transparent;color:inherit;border-radius:12px;touch-action:none;user-select:none;cursor:grab;transform:translate(var(--pet-x),var(--pet-y));transition:transform .45s cubic-bezier(.18,.9,.25,1.25)}
+.clawd .clawd-pet:hover:not(:disabled){background:transparent;color:inherit;transform:translate(var(--pet-x),calc(var(--pet-y) - 3px))}
+.clawd.is-held .clawd-pet{cursor:grabbing;transform:translate(var(--pet-x),var(--pet-y)) rotate(-5deg);transition:none}
+.clawd-pet .clawd-eyes{translate:var(--look-x) var(--look-y)}
+.clawd.is-jumping .clawd-scene{animation:pet-leap .7s cubic-bezier(.25,.6,.3,1)}
+.scene-fluster .clawd-eyes{animation:none}
+.clawd.is-flinging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y)) rotate(35deg) scale(.6);opacity:.15;transition:transform .52s cubic-bezier(.14,.7,.32,1),opacity .5s}
+.clawd.is-hiding .clawd-pet{visibility:hidden;pointer-events:none}
+.clawd-hideout{position:absolute;bottom:0;right:1px;border:0;background:none;color:var(--accent);padding:3px;min-height:34px;cursor:pointer}
+.clawd-hideout:hover:not(:disabled){background:none;transform:translateY(-2px)}
+.clawd-hideout:focus-visible{outline:0;box-shadow:inset 0 -2px var(--accent);background:var(--accent-bg)}
+.clawd-pet:focus-visible,.clawd-flight button:focus-visible{outline:0;box-shadow:inset 0 -2px var(--accent);background:var(--accent-bg)}
+.clawd .clawd-caption{max-width:210px;white-space:normal;width:max-content;text-align:center}
+@keyframes pocket-arrive{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}
+@keyframes pocket-takeoff{0%{transform:translateY(-12px) rotate(-5deg)}32%{transform:translateY(-58px) rotate(9deg)}68%{transform:translateY(-12px) rotate(-4deg)}84%{transform:translateY(2px) scale(1.06,.93)}100%{transform:translateY(0)}}
+@keyframes pet-leap{0%,100%{transform:translateY(0)}18%{transform:scale(1.07,.87)}55%{transform:translateY(-35px) rotate(-6deg)}82%{transform:scale(1.08,.9)}}
+@media(max-width:760px){.clawd-pocket{width:270px;left:5px;transform:none}.clawd .clawd-caption{max-width:165px}}
+@media(prefers-reduced-motion:reduce){.clawd .clawd-pet,.clawd.is-flinging .clawd-pet,.clawd-pull-trigger>svg{transition:none}.clawd.is-jumping .clawd-scene,.clawd-pocket,.clawd:has(.clawd-flight.is-open)>.clawd-pet .clawd-scene{animation:none}.clawd:has(.clawd-flight.is-pulling)>.clawd-pet .clawd-scene{transform:none;transition:none}.clawd-pet .clawd-eyes{translate:none}}
