@@ -12,6 +12,7 @@ const COVERAGE: &str = "proxy_connections_only";
 
 struct Channel {
     address: String,
+    active_config: Config,
     stop: oneshot::Sender<()>,
     task: tokio::task::JoinHandle<std::io::Result<()>>,
     events: Arc<Mutex<VecDeque<Event>>>,
@@ -36,7 +37,7 @@ fn events(channel: &Channel) -> Vec<Event> {
 
 fn stopped_status() -> Value {
     json!({"ok":true,"data":{
-        "running":false,"address":null,"events":[],"coverage":COVERAGE,
+        "running":false,"address":null,"active_config":null,"events":[],"coverage":COVERAGE,
         "direct_connections_enforced":false
     }})
 }
@@ -67,10 +68,15 @@ impl NetworkState {
                 // bridge's authority; callers cannot request a public listener.
                 cfg["environment_id"] = json!(id);
                 cfg["bind"] = json!("127.0.0.1:0");
-                let config: Config = match serde_json::from_value(cfg) {
+                let mut config: Config = match serde_json::from_value(cfg) {
                     Ok(config) => config,
                     Err(_) => return error("invalid_config", "通道配置无效"),
                 };
+                // Keep the canonical, validated value actually passed to bind.
+                // validate normalizes rule hosts but leaves the upstream URL intact.
+                if let Err(reason) = config.validate() {
+                    return error("invalid_config", reason);
+                }
                 let eid = id.to_string();
                 match tauri::async_runtime::spawn_blocking(move || {
                     core(json!({"command":"inspect","environment_id":eid}))
@@ -91,7 +97,7 @@ impl NetworkState {
                         events.push_back(event);
                     }
                 });
-                let proxy = match Proxy::bind(config, observer).await {
+                let proxy = match Proxy::bind(config.clone(), observer).await {
                     Ok(proxy) => proxy,
                     Err(reason) => return error("channel_start_failed", &reason),
                 };
@@ -107,13 +113,14 @@ impl NetworkState {
                     id.to_string(),
                     Channel {
                         address: address.clone(),
+                        active_config: config.clone(),
                         stop,
                         task,
                         events: event_buffer,
                     },
                 );
                 json!({"ok":true,"data":{
-                    "running":true,"address":address,"events":[],"coverage":COVERAGE,
+                    "running":true,"address":address,"active_config":config,"events":[],"coverage":COVERAGE,
                     "direct_connections_enforced":false,
                     "message":"通道已监听；只有明确配置为使用此通道的客户端才经过它。"
                 }})
@@ -136,8 +143,10 @@ impl NetworkState {
             }
             "status" => {
                 if let Some(channel) = channels.get(id) {
+                    let running = !channel.task.is_finished();
                     json!({"ok":true,"data":{
-                        "running":!channel.task.is_finished(),"address":channel.address,
+                        "running":running,"address":channel.address,
+                        "active_config":if running { Some(&channel.active_config) } else { None },
                         "events":events(channel),"coverage":COVERAGE,
                         "direct_connections_enforced":false
                     }})
@@ -204,13 +213,31 @@ mod tests {
             .dispatch(
                 json!({"op":"start","environment_id":ENVIRONMENT,"config":{
                     "default_action":"deny","bind":"0.0.0.0:9000",
-                    "environment_id":"caller-cannot-rebind-identity"
+                    "environment_id":"caller-cannot-rebind-identity",
+                    "blocked":[{"host":"DENIED.Synthetic.Invalid.","ports":[443]}],
+                    "allowed":[{"host":"LOCALHOST.","ports":[8080,8443]}],
+                    "upstream":"http://LOCALHOST.:8080",
+                    "max_connections":3,"connect_timeout_seconds":2,
+                    "connection_lifetime_seconds":30
                 }}),
                 synthetic_core,
             )
             .await;
         assert_eq!(started["ok"], true);
         assert_eq!(started["data"]["direct_connections_enforced"], false);
+        let active_config = &started["data"]["active_config"];
+        assert_eq!(
+            active_config,
+            &json!({
+                "environment_id":ENVIRONMENT,"bind":"127.0.0.1:0",
+                "default_action":"deny",
+                "blocked":[{"host":"denied.synthetic.invalid","ports":[443]}],
+                "allowed":[{"host":"localhost","ports":[8080,8443]}],
+                "upstream":"http://LOCALHOST.:8080",
+                "max_connections":3,"connect_timeout_seconds":2,
+                "connection_lifetime_seconds":30
+            })
+        );
         let address = started["data"]["address"].as_str().unwrap();
         assert!(address.starts_with("127.0.0.1:"));
         let mut client = TcpStream::connect(address).await.unwrap();
@@ -239,7 +266,9 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(status["data"]["running"], true);
+        assert_eq!(&status["data"]["active_config"], active_config);
         assert_eq!(status["data"]["events"][0]["outcome"], "blocked");
+        assert_eq!(status["data"]["events"][0]["provenance"], "explicit_block");
         assert_eq!(status["data"]["events"][0]["environment_id"], ENVIRONMENT);
         assert!(!status.to_string().contains("SYNTHETIC_SECRET"));
         let launched = state
@@ -266,6 +295,7 @@ mod tests {
             .await;
         assert_eq!(stopped["ok"], true);
         assert_eq!(stopped["data"]["running"], false);
+        assert_eq!(stopped["data"]["active_config"], Value::Null);
         assert!(TcpStream::connect(address).await.is_err());
         let status = state
             .dispatch(
@@ -274,6 +304,7 @@ mod tests {
             )
             .await;
         assert_eq!(status["data"]["address"], Value::Null);
+        assert_eq!(status["data"]["active_config"], Value::Null);
         let unavailable = state
             .dispatch(
                 json!({"op":"launch","environment_id":ENVIRONMENT}),
@@ -289,6 +320,12 @@ mod tests {
         for config in [
             json!("invalid"),
             json!({"upstream":"socks5://localhost:1080"}),
+            json!({"upstream":"http://user:secret@localhost:8080"}),
+            json!({"blocked":[{"host":"*.synthetic.invalid"}]}),
+            json!({"allowed":[{"host":"localhost","ports":[0]}]}),
+            json!({"default_action":"unknown"}),
+            json!({"max_connections":0}),
+            json!({"unknown_rule":true}),
         ] {
             let result = state
                 .dispatch(
@@ -297,7 +334,15 @@ mod tests {
                 )
                 .await;
             assert_eq!(result["ok"], false);
+            assert_eq!(result["error"]["code"], "invalid_config");
             assert!(state.channels.lock().await.is_empty());
+            let status = state
+                .dispatch(
+                    json!({"op":"status","environment_id":ENVIRONMENT}),
+                    synthetic_core,
+                )
+                .await;
+            assert_eq!(status["data"]["active_config"], Value::Null);
         }
         let result = state
             .dispatch(
@@ -307,5 +352,74 @@ mod tests {
             .await;
         assert_eq!(result["error"]["code"], "environment_missing");
         assert!(state.channels.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn readback_and_shutdown_are_scoped_to_each_environment() {
+        let state = NetworkState::default();
+        let other = "00000000-0000-4000-8000-000000000002";
+        for (id, action, host) in [
+            (ENVIRONMENT, "deny", "first.invalid"),
+            (other, "allow", "second.invalid"),
+        ] {
+            let response = state
+                .dispatch(
+                    json!({"op":"start","environment_id":id,"config":{
+                        "default_action":action,"blocked":[{"host":host,"ports":[]}]
+                    }}),
+                    synthetic_core,
+                )
+                .await;
+            assert_eq!(response["ok"], true);
+            assert_eq!(response["data"]["active_config"]["environment_id"], id);
+            assert_eq!(response["data"]["active_config"]["default_action"], action);
+        }
+        state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        let first = state
+            .dispatch(
+                json!({"op":"status","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        let second = state
+            .dispatch(
+                json!({"op":"status","environment_id":other}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(first["data"]["active_config"], Value::Null);
+        assert_eq!(second["data"]["running"], true);
+        assert_eq!(
+            second["data"]["active_config"]["blocked"][0]["host"],
+            "second.invalid"
+        );
+
+        // A crashed/aborted task must not keep advertising its previous rules as active.
+        state.channels.lock().await.get(other).unwrap().task.abort();
+        let ended = timeout(Duration::from_secs(2), async {
+            loop {
+                let status = state
+                    .dispatch(
+                        json!({"op":"status","environment_id":other}),
+                        synthetic_core,
+                    )
+                    .await;
+                if status["data"]["running"] == false {
+                    break status;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(ended["data"]["active_config"], Value::Null);
+        state
+            .dispatch(json!({"op":"stop","environment_id":other}), synthetic_core)
+            .await;
     }
 }

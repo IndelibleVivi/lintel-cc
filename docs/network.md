@@ -33,7 +33,7 @@ Tauri 注册 `network_request` command，调用形式为 `invoke("network_reques
 | `payload.op` | 其他字段 | 行为与返回 |
 | --- | --- | --- |
 | `start` | `environment_id`；可选 object `config` | 先通过 core `inspect` 核对已登记环境，再建立该环境的独立代理。`config` 使用前述 Config schema；native 强制覆盖环境 ID 和 `127.0.0.1:0` bind，调用者不能选择公网监听。已有实例时返回 `channel_exists`，需要先停止再修改规则。 |
-| `status` | `environment_id` | 返回当前任务是否仍运行、地址与最多 200 条连接 metadata。只保存在该应用进程内，不写入日志文件。任务已结束时 `running` 为 false，即使尚有旧地址 / 事件，也不显示为运行中。 |
+| `status` | `environment_id` | 返回当前任务是否仍运行、地址、实际采用的 `active_config` 与最多 200 条连接 metadata。只保存在该应用进程内，不写入日志文件。任务已结束时 `running` 为 false、`active_config` 为 null，即使尚有旧地址 / 事件，也不显示为运行中。 |
 | `stop` | `environment_id` | 关闭监听及已建立连接，等待代理结束后返回 stopped 状态；释放该环境的内存事件。没有实例时返回相同 stopped 状态。不会终止已经启动的 Claude 进程，也不改系统代理。 |
 | `launch` | `environment_id` | 必须有运行中的通道。向共享 core 发送 `launch` 与该通道的 `proxy_url`，原样返回 core envelope。该操作属于用户明确选择的启动动作，不能在 `start` / `status` 时自动调用。 |
 
@@ -43,13 +43,18 @@ Tauri 注册 `network_request` command，调用形式为 `invoke("network_reques
 {
   "running": false,
   "address": null,
+  "active_config": null,
   "events": [],
   "coverage": "proxy_connections_only",
   "direct_connections_enforced": false
 }
 ```
 
-运行中 `address` 是 OS 分配的 `127.0.0.1:port` 字符串；`events` 是上述 typed Event 的数组，部分操作附带解释性 `message`。停止后地址为 null、事件清空。重新启动通道可能分配不同端口，已启动客户端的代理上下文不会自动更新，需要明确重新启动客户端。`launch` 使用 core 的返回 schema，macOS 的正常响应是 `status: "launch_requested"` 与 `message`；这表示 Terminal 接受了启动请求，不是已观察到目标流量。
+运行中 `address` 是 OS 分配的 `127.0.0.1:port` 字符串；`events` 是上述 typed Event 的数组，部分操作附带解释性 `message`。显式停止后地址和 `active_config` 为 null、事件清空。重新启动通道可能分配不同端口，已启动客户端的代理上下文不会自动更新，需要明确重新启动客户端。`launch` 使用 core 的返回 schema，macOS 的正常响应是 `status: "launch_requested"` 与 `message`；这表示 Terminal 接受了启动请求，不是已观察到目标流量。
+
+运行中的 `active_config` 是 native 校验、规范化后交给 `Proxy::bind` 的完整 Config，包含 `environment_id`、`bind`、`default_action`、`allowed`、`blocked`、`upstream` 和三个资源限制。它不是原始请求的回显：规则主机名转为小写、去掉末尾点，IP 使用规范形式；显式规则端口保留。上游 URL 经过校验但字符串不重写。native 始终把环境 ID 设为当前目标，把 `bind` 设为 `127.0.0.1:0`；OS 实际分配的端口使用单独的 `address`，不能把 Config 的端口 0 当作可连接地址。无效配置不会建立通道，也不会留下 `active_config`。
+
+桌面面板分别展示当前生效配置和下次启动草案。重开面板先查询当前通道；停止后可基于已读回的默认动作、阻止/允许规则与端口、上游继续编辑，重新启动时保留已读回的资源限制。草案仅保留在该 webview 的内存中，按环境区分；切换环境清除旧状态展示，旧环境的延迟回复不能替换当前面板。规则文本每行一个主机，可在空格后用逗号列出端口，例如 `example.invalid 443,8443`；省略端口表示全部端口。原通道任务异常结束时必须先清除旧实例，再重新启动。
 
 core 在 macOS 只给新启动上下文设置该 loopback URL 的 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`。这不会修改其他环境、全局 shell 或现有进程，也不会消除目标对 `NO_PROXY` 或其他路由机制的处理。macOS Terminal / 实际 Claude 路由没有在 synthetic 测试中运行；不据此认定应用级直接连接被阻止。其他平台若 core 返回 `terminal_required`，则没有启动目标进程。
 
