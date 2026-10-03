@@ -1,0 +1,72 @@
+name: verify
+
+# Synthetic verification only. This workflow runs the same repository checks as
+# `python3 tests/verify.py` on macOS and Linux. It never performs release,
+# publish, deploy, or account operations, and it does not run real
+# browser/auth/Linux runtime acceptance (see docs/verification.md).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    name: synthetic (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            extensions/browser/package-lock.json
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Linux system packages (Tauri)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Desktop dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Verify entrypoint self-test
+        run: python3 tests/verify.py --self-test
+
+      - name: Synthetic verification
+        run: python3 tests/verify.py --json "$RUNNER_TEMP/lintel-verify/evidence.json"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lintel-verify-${{ matrix.os }}
+          path: ${{ runner.temp }}/lintel-verify/evidence.json
+          if-no-files-found: warn

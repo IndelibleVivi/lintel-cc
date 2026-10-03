@@ -7,7 +7,7 @@
 ## 现在可以做什么
 
 - 登记 Claude Code 配置目录，或创建专用环境。首页选择环境与方案，先预览具体变更，再批准执行。
-- 按四个已识别的官方环境变量调整可选外发；保留无关 settings、通用代理与自设 OTel。结果区分配置读回与实际运行。
+- 按四个主要官方变量调整可选外发，逐变量解释取值；静态识别已安装版本，按版本与 Trusted Devices 条件评估 Remote Control。已有冲突值需要明确选择解除再批准准确删除；未知条件明确标注。保留无关 settings、通用代理与自设 OTel；配置读回与实际运行分开。
 - 查看持久任务结果、检查设置漂移、接受当前值，以及按字段恢复 Lintel 的配置修改。后续编辑冲突会阻止恢复。
 - 将选定的指令、记忆和会话文件以口令加密归档，创建新配置根并迁入工作内容。**此操作不注销旧登录或清除旧目录**；会话与记忆以资料形式保留，不宣称可以续聊。
 - 解锁既有工作归档、阅读文件并生成迁入计划；同名内容不覆盖。清理页提供修复本地登录、清理并重建和退役路径，精确文件与认证范围先预览；本地文件处理不等于服务端撤销。
@@ -15,7 +15,7 @@
 - 在桌面环境详情中启动 loopback 代理、设置默认允许／阻止与确切主机／端口规则、读回当前生效配置、查看通道连接，再明确请求通过此通道打开 Claude。它只覆盖经过代理的连接。
 - 在设置中预览 Native Messaging 注册、配对扩展和查看实例。站点清理分隔离准备、完整浏览器重启、再次确认删除两步；当前完整持久安装 smoke 尚未通过。扩展开发安装与各浏览器限制见 [浏览器指南](docs/browser.md)。
 
-桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端必须另有 Lintel runner，安装 Claude Code 不会提供它。使用系统 OpenSSH 与固定 `lintel request` / `lintel submit` 命令；runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
+桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
 
 App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；私有源码仓库需相应访问权限。
 
@@ -32,7 +32,7 @@ npm run dev:synthetic
 
 打开开发服务器报告的本地地址。`dev:synthetic` 创建独立临时 home/state 并调用真实 CLI，界面明确显示“测试空间”；不会使用你的 Claude 登录或浏览器资料。生成的临时目录会保留便于检查。普通 `npm run dev` 不提供浏览器到本机的执行通道。
 
-构建桌面应用：
+构建桌面应用（若要包含 Linux 安装功能，先按[远程资源准备](docs/remote.md#准备-app-内置资源)构建并打包两种静态 runner；缺少资源时 App 会明确提示）：
 
 ```sh
 cd apps/desktop
@@ -62,16 +62,13 @@ npm run desktop:build
 ## 开发与文档
 
 ```sh
-cargo test --workspace
-cargo build -p lintel-runner
-python3 tests/cli_journey.py
-python3 tests/submission_journey.py
-node --test extensions/browser/tests/*.test.mjs
-cargo test --manifest-path extensions/browser/native-host/Cargo.toml
-python3 -m unittest discover -s platform/ssh/tests -v
+python3 tests/verify.py
+python3 tests/verify.py --list
+python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 ```
 
 - [产品目标](docs/SPEC.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
+- [统一验证与独立 runtime 关口](docs/verification.md)
 - [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)
 - [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)
 - [目标架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
