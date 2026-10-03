@@ -49,7 +49,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 连接后，环境、计划、清理、归档和记录均来自该主机，使用同一套界面。执行调用固定 `lintel submit`，接受回执与最终完成分别呈现；“查询最新结果”和主机面板的持久提交记录查询原 job。SSH 中断后不自动重新提交 mutation。后台 worker 的实际存活仍受远端 OS/session 生命周期影响；真实主机验收与 synthetic/fake-SSH 证据分开，见 [远程指南](remote.md)。
 
-浏览器配对与本机通道属于这台桌面主机，不随 SSH 目标转移。环境详情的“启动与来源”和已完成任务回执都有“打开 Claude”。远端会先核对目标环境、退役状态与程序，再请求 macOS Terminal 通过同一严格 SSH alias、绑定 runner 与真实 PTY 启动 `lintel launch <environment-id>`。程序和配置根由远端 core 再核对，App 不注入 prompt；SSH 断开会结束交互会话，与持久后台任务不同。`launch_requested` 仅表示 Terminal 接受请求，实际登录和运行状态在终端确认。
+浏览器配对与本机通道属于这台桌面主机，不随 SSH 目标转移。环境详情的“启动与来源”和已完成任务回执都有“打开 Claude”。远端会先核对目标环境、退役状态与程序，再请求 macOS Terminal 通过同一严格 SSH alias、绑定 runner 与真实 PTY 启动 `lintel launch <environment-id>`。程序和配置根由远端 core 再核对，App 不注入 prompt；SSH 断开会结束交互会话，与持久后台任务不同。`launch_requested` 仅表示 Terminal 接受请求，实际登录和运行状态在终端确认。远端回执处于 accepted/executing/verifying 时，启动按钮保持不可用；先查询原任务到结束状态，再打开新会话。失败信息会滚入可见范围。
 
 ## 帮助与开发者说明
 
