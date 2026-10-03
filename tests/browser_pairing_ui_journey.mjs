@@ -7,6 +7,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {stripVTControlCharacters} from 'node:util';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const desktop=path.join(repo,'apps/desktop');
@@ -37,10 +38,10 @@ const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/v
 let browser,pair;
 try{
   const url=await new Promise((resolve,reject)=>{
-    let output='';const timer=setTimeout(()=>reject(new Error('isolated Vite preview did not start within 15 seconds')),15000);
+    let output='';const timer=setTimeout(()=>reject(new Error('isolated Vite preview did not start within 15 seconds: '+stripVTControlCharacters(output))),15000);
     preview.once('error',error=>{clearTimeout(timer);reject(error);});
     preview.once('exit',code=>{clearTimeout(timer);reject(new Error(`preview exited ${code}: ${output}`));});
-    for(const stream of [preview.stdout,preview.stderr])stream.on('data',chunk=>{output+=chunk;const match=output.match(/http:\/\/127\.0\.0\.1:\d+\//);if(match){clearTimeout(timer);resolve(match[0]);}});
+    for(const stream of [preview.stdout,preview.stderr])stream.on('data',chunk=>{output+=chunk;const match=stripVTControlCharacters(output).match(/http:\/\/127\.0\.0\.1:\d+\//);if(match){clearTimeout(timer);resolve(match[0]);}});
   });
   assert.equal(execJson(host,['register','chrome',extensionId,host,'--home',home,'--apply']).status,'registered');
   browser=await chromium.launch({headless:true});
