@@ -475,7 +475,8 @@
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
         "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof.",
-        "tests/remote_linux_ssh_journey.py: actual Linux loopback OpenSSH + static x86_64 musl runner, durable accepted ACK deliberately discarded, reopened native Controller queries original job; exactly one submit and one remote job. CI clean 1276c84: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37123017551 . Production VPS logout/cgroup remains unverified."
+        "tests/remote_linux_ssh_journey.py: actual Linux loopback OpenSSH + static x86_64 musl runner, durable accepted ACK deliberately discarded, reopened native Controller queries original job; exactly one submit and one remote job. CI clean 1276c84: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37123017551 . Production VPS logout/cgroup remains unverified.",
+        "Clean 1fb9ab6 CI 37125403657 passed actual Linux OpenSSH/static-musl custom keep/disable/remove plan execution and frozen receipt through lost ACK recovery; exactly one upload, submit and original job. Production VPS session/logout/cgroup remains unverified."
       ]
     },
     {
@@ -740,5 +741,5 @@
   ],
   "updated": "2026-10-03",
   "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Synthetic core/CLI/UI/PTY paths passed. Current custom Linux OpenSSH runtime awaits CI; earlier install/submit/launch runtime passed. Real Claude/production VPS and full journeys remain unverified; persistent browser startup evidence still missing."
+  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Clean 1fb9ab6 CI37125403657 macOS/Ubuntu defaults 12/12 each and real Linux OpenSSH/custom static-musl runtime 1/1 passed (0 ignored). Mac App candidate includes both rebuilt Linux runners; aarch64 runtime, real Claude/production VPS and full journeys remain unverified. Persistent browser startup evidence is still missing."
 }

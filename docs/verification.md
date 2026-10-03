@@ -138,3 +138,5 @@ temporary directory or a private operator location).
 uniqueness, default/explicit/`--all` selection semantics, unknown-id rejection,
 git-state fields, that the default evidence path stays outside the repository,
 and `passed`/`failed`/`skipped`/`deferred` reporting against throwaway commands.
+
+Current custom-policy source acceptance: clean `1fb9ab6` [CI run 37125403657](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37125403657) passed 12/12 defaults on both macOS and Ubuntu. The separately selected Linux OpenSSH runtime check passed 1/1 with 0 ignored; it exercised the seven-field custom contract on a real x86_64 static-musl runner, including exact subset changes, frozen receipt, lost ACK recovery and interactive PTY launch. It uses temporary synthetic roots and inert Claude, and does not establish real Claude effects, production VPS state or aarch64 runtime.
