@@ -17,13 +17,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(test)]
+#[path = "remote_acceptance.rs"]
+mod acceptance;
 #[path = "remote_install.rs"]
 mod installation;
 #[path = "remote_launch.rs"]
 mod launching;
-#[cfg(test)]
-#[path = "remote_acceptance.rs"]
-mod acceptance;
 
 // Both JSON transport and interactive launch keep the same SSH trust boundary.
 fn ssh_options(interactive: bool) -> Vec<&'static str> {
@@ -875,7 +875,7 @@ fn validate_request(request: &Value) -> Result<()> {
         "create_environment" => (&["command", "name"], &[]),
         "plan_policy" => (
             &["command", "environment_id", "preset", "keep_remote_control"],
-            &["trusted_devices", "release_settings"],
+            &["trusted_devices", "release_settings", "custom_settings"],
         ),
         "plan_reset" => (&["command", "environment_id", "recipe", "categories"], &[]),
         "plan_restore" | "job" => (&["command", "job_id"], &[]),
@@ -933,6 +933,42 @@ fn validate_request(request: &Value) -> Result<()> {
     }) {
         return Err(failure("invalid_request", "解除策略字段无效"));
     }
+    if let Some(choices) = request.get("custom_settings") {
+        if request["preset"] != "custom"
+            || !choices.as_object().is_some_and(|choices| {
+                choices.iter().all(|(key, action)| {
+                    [
+                        "DISABLE_TELEMETRY",
+                        "DISABLE_ERROR_REPORTING",
+                        "DISABLE_FEEDBACK_COMMAND",
+                        "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+                        "DO_NOT_TRACK",
+                        "DISABLE_GROWTHBOOK",
+                        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+                    ]
+                    .contains(&key.as_str())
+                        && action
+                            .as_str()
+                            .is_some_and(|a| ["keep", "disable", "remove"].contains(&a))
+                })
+            })
+        {
+            return Err(failure(
+                "invalid_request",
+                "自定义方案只能选择已识别字段的 keep / disable / remove",
+            ));
+        }
+    }
+    if request["preset"] == "custom"
+        && request
+            .get("release_settings")
+            .is_some_and(|v| v.as_array().is_some_and(|v| !v.is_empty()))
+    {
+        return Err(failure(
+            "invalid_request",
+            "自定义方案请用 remove 明确移除字段",
+        ));
+    }
     for key in required.iter().filter(|key| {
         ![
             "keep_remote_control",
@@ -968,7 +1004,8 @@ fn validate_request(request: &Value) -> Result<()> {
     }
     match request["command"].as_str().unwrap() {
         "plan_policy"
-            if ![json!("preserve"), json!("reduce")].contains(&request["preset"])
+            if ![json!("preserve"), json!("reduce"), json!("custom")]
+                .contains(&request["preset"])
                 || !request["keep_remote_control"].is_boolean() =>
         {
             return Err(failure("invalid_request", "保护方案无效"))
@@ -1605,6 +1642,43 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
                 .is_err());
         }
         assert!(!temp.path().join("args").exists());
+    }
+    #[test]
+    fn custom_policy_crosses_finite_schema_without_arbitrary_env() {
+        let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
+        let request = json!({"command":"plan_policy","environment_id":"env-1","preset":"custom","keep_remote_control":true,"trusted_devices":"not_required","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DISABLE_GROWTHBOOK":"remove","DISABLE_TELEMETRY":"keep"}});
+        for choices in [
+            json!(null),
+            json!([]),
+            json!({"API_KEY":"remove"}),
+            json!({"DISABLE_TELEMETRY":"0"}),
+            json!({"DISABLE_TELEMETRY":{"action":"remove"}}),
+        ] {
+            let mut invalid = request.clone();
+            invalid["custom_settings"] = choices;
+            assert!(controller
+                .dispatch(json!({"op":"request","alias":"synthetic-host","request":invalid}))
+                .is_err());
+        }
+        let mut invalid = request.clone();
+        invalid["preset"] = json!("reduce");
+        assert!(validate_request(&invalid).is_err());
+        invalid = request.clone();
+        invalid["release_settings"] = json!(["DISABLE_GROWTHBOOK"]);
+        assert!(validate_request(&invalid).is_err());
+        assert!(
+            !temp.path().join("args").exists(),
+            "invalid choices must fail before SSH"
+        );
+        assert_eq!(
+            controller
+                .dispatch(json!({"op":"request","alias":"synthetic-host","request":request}))
+                .unwrap()["ok"],
+            true
+        );
+        assert!(fs::read_to_string(temp.path().join("args"))
+            .unwrap()
+            .contains("request"));
     }
     #[test]
     fn cleanup_and_archive_payloads_keep_data_on_stdin_without_persistence() {

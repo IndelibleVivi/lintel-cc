@@ -16,20 +16,29 @@
 
 示例 ID/hash 必须换成执行器返回值；不要从示例执行真实 mutation。`plan_policy` 冻结规则版本、配置文件快照、根目录身份与具体字段。预览后文件改变、目录替换、错误 approval 会拒绝执行。core 使用严格 JSON 解析，重复键和损坏 JSON 不会被静默标准化后覆盖。
 
-计划冻结的是 settings.json 的**原始字节快照**与根身份，前置条件随动作实际读写范围生成：不修改 settings 的计划（重建、清理、迁入）在 settings 损坏或含重复键时仍可预览与执行，原字节保持不变；策略修改与字段恢复仍要求 settings 可完整解析。策略规则为 `claude-privacy-v2-2026-10-03`：`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 按非空值生效，`"0"`、`"false"` 也会关闭；反馈、调查、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 按标准 boolean 解析，`0/false/no/off` 不生效。未核验的 boolean 写法标为不确定。规则、作用范围、产品证据和功能影响由同一个 core 模型返回，GUI 不自行推断。
+计划冻结的是 settings.json 的**原始字节快照**与根身份，前置条件随动作实际读写范围生成：不修改 settings 的计划（重建、清理、迁入）在 settings 损坏或含重复键时仍可预览与执行，原字节保持不变；策略修改与字段恢复仍要求 settings 可完整解析。策略规则为 `claude-privacy-v3-2026-10-03`：`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 按非空字符串生效，`"0"`、`"false"` 也会关闭；反馈、调查、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 按标准 boolean 字符串解析，`0/false/no/off` 不生效。已识别 env 键只接受字符串值；未核验的 boolean 写法标为不确定。规则、作用范围、产品证据和功能影响由同一个 core 模型返回，GUI 不自行推断。
 
 程序先按 PATH 定位；非交互 PATH 未包含用户原生安装时，静态检查当前用户的 `~/.local/bin/claude`。不扫描其他用户或执行 shell 初始化。版本只从定位到的原生 `claude/versions/<version>` 路径或 Claude Code npm `package.json` 静态识别；不会运行 Claude 或查询账号。不认识的安装方式、版本家族或 prerelease 保留未知。`discover`、`inspect` 和计划都会重新识别；执行前程序路径/版本证据变化会要求重新预览，不把最新官方文档当作本机版本。
 
-环境概览（`inspect`）的工作内容统计只读文件元数据，不读取内容、不计算 digest、不受归档准入上限影响；扫描超出预算或部分条目不可读时按类别标记 `complete: false`，而不是让无关的设置检查整体失败。
+环境概览（`inspect`）返回下述七个已识别 env 键的当前字符串值、settings 路径、状态和 `effect_timing: next_launch`；每项 `runtime_verified: false`，配置状态不构成运行时效果证明。工作内容统计只读文件元数据，不读取内容、不计算 digest、不受归档准入上限影响；扫描超出预算或部分条目不可读时按类别标记 `complete: false`，而不是让无关的设置检查整体失败。
 
 | 方案 | 当前精确修改 |
 | --- | --- |
 | `preserve` | 设置 `DISABLE_ERROR_REPORTING=1`、`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1`；保留指标与主动反馈的当前值 |
 | `reduce` | 上述两项加 `DISABLE_TELEMETRY=1`、`DISABLE_FEEDBACK_COMMAND=1` |
-| `keep_remote_control=true` | 根据版本与 Trusted Devices 条件判断是否可同时关闭 telemetry；已有冲突列出，未经显式选择不移除 |
-| `release_settings` | 用户选中的冲突字段进入明确的 `after:null` 删除差异；批准准确计划后才移除，可按字段恢复 |
+| `custom` | `custom_settings` 按字段选择 `keep` / `disable` / `remove`；缺少字段视为 `keep` |
+| `keep_remote_control=true` | `preserve` / `reduce` 根据版本与 Trusted Devices 条件判断是否可同时关闭 telemetry；`custom` 只记录意图并评估准确 diff，不覆盖明确选择 |
+| `release_settings` | `preserve` / `reduce` 用户选中的冲突字段进入明确的 `after:null` 删除差异；批准准确计划后才移除，可按字段恢复 |
 
-修改位置是已登记 root 的 `settings.json` 中的 `env`。默认不新增总禁用开关；仅显式解除 Remote Control 冲突时可移除预览中的总开关或 GrowthBook/DO_NOT_TRACK 字段。不通配清除 OTel，不修改代理、AWS/Google 设置、权限、hooks 或 MCP。配置读回不代表既有进程生效；界面标记下一次新启动。项目、组织服务端策略、IDE、服务入口与实际认证来源尚未完整探测。检测到已知本地 managed-settings 文件时，拒绝用低层设置覆盖。
+自定义方案的请求示例：
+
+```json
+{"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"custom","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DO_NOT_TRACK":"keep","DISABLE_GROWTHBOOK":"remove"},"keep_remote_control":true,"trusted_devices":"not_required"}
+```
+
+`custom_settings` 只接受 `DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`DISABLE_FEEDBACK_COMMAND`、`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 七个键。`keep` 保留当前字符串原值；`disable` 在现值按该键语义已关闭时保留原值，否则写字符串 `"1"`；`remove` 明确删除该 user settings 的键，不保证功能开启，缺失键不产生改动。缺省 `custom_settings` 等于空对象。空 diff 执行保留文件原始字节、权限与文件是否存在，仍更新 drift baseline，receipt 记录完成且 `restorable: false`。`custom_settings` 不可用于其他 preset，`null`、数组、未知键、嵌套对象和未知 action 均拒绝；`custom` 不接受非空 `release_settings`，请用 `remove` 表达删除。
+
+修改位置是已登记 root 的 `settings.json` 中的 `env`。`preserve` / `reduce` 默认不新增总禁用开关；`custom` 可明确选择七个字段中的任意一项。所有改动均进入同一字段 diff、准确批准、读回与恢复路径。不通配清除 OTel，不修改代理、AWS/Google 设置、JSON permissions、hooks 或 MCP；写入沿用私有文件模式，保留已有读权限并移除 group/other 写权限。配置读回不代表既有进程生效；界面标记下一次新启动。项目、组织服务端策略、IDE、服务入口与实际认证来源尚未完整探测。检测到已知本地 managed-settings 文件时，拒绝用低层设置覆盖。
 
 ## Remote Control 版本与既有配置
 
@@ -42,9 +51,9 @@
 
 `DISABLE_GROWTHBOOK` 与非必要流量总开关有各自取值语义，生效时独立阻断 Remote Control。`trusted_devices` 只接受 `unknown`（默认）、`required`、`not_required`，属于用户声明而非组织探测。规则依据：[官方环境变量](https://code.claude.com/docs/en/env-vars)、[Remote Control 条件](https://code.claude.com/docs/en/remote-control)，核验日期 2026-10-03。
 
-先减少外发再选择保留功能时，core 会计算当前值并列出冲突；用户通过 `release_settings` 明确选择解除 `DISABLE_TELEMETRY`、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 或 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。已有值不按写入者擅自删除，外部后续编辑仍使旧计划拒绝执行。删除只作用于该 user settings；shell/项目/组织来源由其设置者掌握。删除不会 unset 既有进程，需重新启动。
+先减少外发再选择保留功能时，core 会计算当前值并列出冲突；在 `preserve` / `reduce` 中，用户通过 `release_settings` 明确选择解除 `DISABLE_TELEMETRY`、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 或 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`。在 `custom` 中用字段 `remove` 明确删除。已有值不按写入者擅自删除，外部后续编辑仍使旧计划拒绝执行。删除只作用于该 user settings；shell/项目/组织来源由其设置者掌握。删除不会 unset 既有进程，需重新启动。
 
-`inspect.policy`、`Plan.policy`、`Receipt.policy` 保留同一版本证据和规则；计划/回执中的条件是该准确 diff 的配置推演。`blocked`、`conditional`、`configuration_compatible` 均不是实际运行证明；账号、订阅、组织启用、设备 enrollment、API endpoint 和其他配置来源未验收。旧 runner 未返回版本化结果时，桌面明确提示更新执行器。
+`inspect.policy`、`Plan.policy`、`Receipt.policy` 保留同一版本证据和规则；`supported_presets` 明确列出可用方案。计划和回执保留 `preset`、custom 的准确 `custom_settings` 选择以及该准确 diff 的配置推演；规则版本改变会使未执行的旧策略计划要求重新预览。`blocked`、`conditional`、`configuration_compatible` 均不是实际运行证明；账号、订阅、组织启用、设备 enrollment、API endpoint 和其他配置来源未验收。旧 runner 未返回版本化结果或未声明支持 custom 时，桌面明确提示更新执行器。
 
 ## 环境与存储
 
@@ -88,4 +97,4 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 
 `export_support` 使用白名单，只含平台、版本、计数与能力信息；不包含目录、环境名、配置正文、令牌、会话或目的地主机。它不自动上传。
 
-验证：`cargo test -p lintel-core` 和 `python3 tests/cli_journey.py` 均只修改新建的合成目录。前者覆盖错误输入、陈旧计划、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询与加密迁移；后者跨实际 CLI 进程执行完整的配置往返。
+验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py` 与 `python3 tests/policy_journey.py` 均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询与加密迁移；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、七项 inspect、自定义选择/空改动/回执冻结/字段恢复和外部编辑拒绝。版本探测使用 inert executable，不运行 Claude。

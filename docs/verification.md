@@ -40,8 +40,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
-| `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY, inert user-local Claude) |
-| `journey-policy` | journey | `python3 tests/policy_journey.py` (versioned policy identity and drift) |
+| `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY launch plus custom policy approval and restoration, synthetic roots) |
+| `journey-policy` | journey | `python3 tests/policy_journey.py` (versioned policy, custom keep/disable/remove, no-op, restoration and external edits) |
 
 The two standalone Rust entrypoints beyond the root workspace (`apps/desktop/src-tauri`,
 `extensions/browser/native-host`) are listed because the root `Cargo.toml`

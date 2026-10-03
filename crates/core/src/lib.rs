@@ -7,7 +7,7 @@ mod policy;
 mod storage;
 mod work;
 use fs2::FileExt;
-use policy::{FLAGS, RULE};
+use policy::RULE;
 use serde_json::{json, Value};
 #[cfg(target_os = "macos")]
 use std::process::{Command, Stdio};
@@ -278,11 +278,12 @@ impl Engine {
                     .into(),
             );
         }
-        if extra["policy"]["release_settings"]
-            .as_array()
-            .is_some_and(|v| !v.is_empty())
+        if extra["policy"].is_object()
+            && changes
+                .as_array()
+                .is_some_and(|v| v.iter().any(|change| change["after"].is_null()))
         {
-            warnings.push("仅删除预览中显式选择的 user settings 字段，会重新开放相应流量；外部 shell/项目/组织配置不受修改。删除不会解除已有进程中的变量，需要重新启动。".into());
+            warnings.push("仅删除预览中显式选择的 user settings 字段；删除后此来源不再提供该开关，不保证功能开启。外部 shell/项目/组织配置不受修改，已有进程中的变量需重新启动才会重新读取。".into());
         }
         let mut p = json!({"id":id(),"environment_id":e["id"],"kind":kind,"title":title,"changes":changes,"preserves":preserves,"warnings":warnings,"actions":actions,"created_at":now(),"status":"planned","rule_version":RULE,"root":e["root"],"root_identity":[rm.dev(),rm.ino()],"snapshot":snap,"extra":extra});
         p["hash"] = json!(digest(&serde_json::to_vec(&p)?));
@@ -311,7 +312,7 @@ impl Engine {
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
-                let settings:Vec<Value>=FLAGS.iter().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","status":policy::setting_status(key,&doc["env"][key])})).collect();
+                let settings:Vec<Value>=policy::fields().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","runtime_verified":false,"status":policy::setting_status(key,&doc["env"][key])})).collect();
                 let assets = work::summaries(Path::new(string(&e, "root")?))?;
                 Ok(
                     json!({"environment":e,"settings":settings,"assets":assets,"policy":policy::assessment(&doc,&e["product_evidence"],policy::trusted_devices(r)?),"warnings":self.warnings(&e)}),
@@ -326,10 +327,10 @@ impl Engine {
                 let p = self.plan(
                     &e,
                     "policy",
-                    if preset == "reduce" {
-                        "减少外发"
-                    } else {
-                        "保持功能"
+                    match preset {
+                        "reduce" => "减少外发",
+                        "custom" => "自定义保护",
+                        _ => "保持功能",
                     },
                     changes,
                     vec![
@@ -590,6 +591,15 @@ impl Engine {
             if p["kind"] == "import" {
                 return self.import_work(&e, &p, r, &mut j, &jp);
             }
+            if p["kind"] == "policy"
+                && p["extra"]["policy"]["preset"] == "custom"
+                && p["changes"].as_array().is_some_and(Vec::is_empty)
+            {
+                self.baseline(&e)?;
+                j["steps"] = json!([{"id":"settings","label":"精确字段检查","status":"completed","message":"所选字段无需修改；原文件和权限保持不变，运行效果尚未验证。"}]);
+                j["status"] = json!("completed");
+                return Ok(());
+            }
             if doc.get("env").is_none() {
                 doc["env"] = json!({});
             }
@@ -848,6 +858,119 @@ mod tests {
         fs::write(root.join("settings.json"), "{\"changed\":true}").unwrap();
         let r = engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
         assert_eq!(r["error"]["code"], "stale_plan");
+    }
+    #[test]
+    fn custom_apply_receipt_and_restore_preserve_unrelated_values() {
+        let (_t, engine, e, root) = setup();
+        let path = root.join("settings.json");
+        let original = json!({"env":{
+            "DISABLE_TELEMETRY":"false", "DISABLE_ERROR_REPORTING":"0",
+            "DISABLE_FEEDBACK_COMMAND":"false", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY":"原字节值",
+            "DO_NOT_TRACK":"off", "DISABLE_GROWTHBOOK":"yes", "UNRELATED":"keep"
+        },"permissions":{"allow":["Read"]},"hooks":{"synthetic":"keep"}});
+        save(&path, &original).unwrap();
+        let choices = json!({"DISABLE_TELEMETRY":"disable","DISABLE_ERROR_REPORTING":"disable",
+            "DISABLE_FEEDBACK_COMMAND":"disable","DO_NOT_TRACK":"remove","DISABLE_GROWTHBOOK":"remove"});
+        let response = engine.request(json!({"command":"plan_policy","environment_id":e["id"],"preset":"custom","custom_settings":choices}));
+        assert_eq!(response["ok"], true, "{response}");
+        let p = &response["data"];
+        assert_eq!(p["title"], "自定义保护");
+        assert_eq!(
+            load(&path).unwrap(),
+            original,
+            "preview must not mutate settings"
+        );
+        let j = engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+        assert_eq!(j["data"]["status"], "completed", "{j}");
+        assert_eq!(j["data"]["policy"], p["policy"]);
+        assert_eq!(j["data"]["policy"]["custom_settings"], choices);
+        let mut expected = original.clone();
+        expected["env"]["DISABLE_FEEDBACK_COMMAND"] = json!("1");
+        expected["env"]
+            .as_object_mut()
+            .unwrap()
+            .remove("DO_NOT_TRACK");
+        expected["env"]
+            .as_object_mut()
+            .unwrap()
+            .remove("DISABLE_GROWTHBOOK");
+        assert_eq!(load(&path).unwrap(), expected);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        expected["env"]["UNRELATED_LATER"] = json!("preserve");
+        save(&path, &expected).unwrap();
+        let restored = engine.request(json!({"command":"plan_restore","job_id":p["id"]}));
+        assert_eq!(restored["ok"], true, "{restored}");
+        let rp = &restored["data"];
+        let result =
+            engine.request(json!({"command":"execute","plan_id":rp["id"],"approval":rp["hash"]}));
+        assert_eq!(result["data"]["status"], "completed", "{result}");
+        let mut final_doc = original;
+        final_doc["env"]["UNRELATED_LATER"] = json!("preserve");
+        assert_eq!(load(&path).unwrap(), final_doc);
+    }
+    #[test]
+    fn custom_noop_keeps_original_bytes_mode_and_drift_baseline() {
+        let (_t, engine, e, root) = setup();
+        let path = root.join("settings.json");
+        let raw = b"{ \"env\": { \"DISABLE_TELEMETRY\": \"false\", \"UNRELATED\": \"keep\" } }\n";
+        fs::write(&path, raw).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+        let response = engine.request(
+            json!({"command":"plan_policy","environment_id":e["id"],"preset":"custom",
+            "custom_settings":{"DISABLE_TELEMETRY":"disable","DO_NOT_TRACK":"remove"}}),
+        );
+        assert_eq!(response["ok"], true, "{response}");
+        let p = &response["data"];
+        assert!(p["changes"].as_array().unwrap().is_empty());
+        let result =
+            engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+        assert_eq!(result["data"]["status"], "completed", "{result}");
+        assert_eq!(result["data"]["restorable"], false);
+        assert_eq!(fs::read(&path).unwrap(), raw);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+        assert_eq!(
+            engine.request(json!({"command":"drift","environment_id":e["id"]}))["data"]["status"],
+            "unchanged"
+        );
+        let mut doc = load(&path).unwrap();
+        doc["env"]["DISABLE_TELEMETRY"] = json!("");
+        save(&path, &doc).unwrap();
+        assert_eq!(
+            engine.request(json!({"command":"drift","environment_id":e["id"]}))["data"]["status"],
+            "changed"
+        );
+        let absent = engine.create("absent settings").unwrap();
+        let response = engine.request(
+            json!({"command":"plan_policy","environment_id":absent["id"],"preset":"custom"}),
+        );
+        let p = &response["data"];
+        let result =
+            engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+        assert_eq!(result["data"]["status"], "completed", "{result}");
+        assert!(!Path::new(absent["root"].as_str().unwrap())
+            .join("settings.json")
+            .exists());
+    }
+    #[test]
+    fn policy_plan_from_old_rule_requires_new_preview() {
+        let (_t, engine, e, root) = setup();
+        let p = plan(&engine, &e);
+        let path = engine.path("plans", string(&p, "id").unwrap());
+        let mut saved = load(&path).unwrap();
+        saved["rule_version"] = json!("claude-privacy-v2-2026-10-03");
+        saved.as_object_mut().unwrap().remove("hash");
+        saved["hash"] = json!(digest(&serde_json::to_vec(&saved).unwrap()));
+        save(&path, &saved).unwrap();
+        let response = engine
+            .request(json!({"command":"execute","plan_id":saved["id"],"approval":saved["hash"]}));
+        assert_eq!(response["error"]["code"], "rule_changed", "{response}");
+        assert!(!root.join("settings.json").exists());
     }
     #[test]
     fn symlink_target_not_changed() {

@@ -192,6 +192,10 @@ stderr 最多在内存保留 64 KiB，显示片段最多 4096 字节并按 UTF-8
 
 `lintel submit` 的 detached worker 行为和 journal 由 runner/core 所有。`setsid` 脱离当前 SSH 会话与“机器登录策略允许 worker 长期存活”是不同事实：控制端不启用 linger、不改登录策略、不安装 systemd service，不能承诺所有 VPS 在退出登录后仍允许任务继续。实际 host 的 session/cgroup 或 user-manager 行为仍需按 [G03 / J01–J10](ACCEPTANCE.md) 验证。主机重启、不可逆 action 的不确定结果与恢复冲突由 core 的 journal/reconciliation 处理，不能靠控制端重新提交修复。
 
+## 自定义远端方案
+
+桌面与 Python CLI 的 `plan_policy` 都接受 `preset: "custom"` 及有限的 `custom_settings`，字段与三种 action 见 [core 合同](core.md)。请求只放在 JSON stdin；不是任意 env 写入或 shell 入口。新 App 根据远端 assessment 的 `supported_presets` 判断可用性：旧 runner 的自定义编辑被禁用，需通过批准的运行器准备流程更新并重新检查。已有任务继续使用它们冻结的 runner，不会为了新方案改写原任务版本。Python 也接受 inspect/plan 的用户声明 `trusted_devices` 和 preset 的 `release_settings`，提交仍必须使用准确 plan/hash 与 durable execute。
+
 ## 可选 Python CLI
 
 CLI 保留静态 alias import、普通请求、一次提交与查询。以下只使用 synthetic 标识；实际命令会连接所选 host，必须属于用户已授权的远程操作。

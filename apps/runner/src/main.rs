@@ -196,7 +196,60 @@ fn tui() {
             }
             "3" => json!({"command":"create_environment","name":read_line("环境名: ")}),
             "4" => {
-                json!({"command":"plan_policy","environment_id":read_line("环境 ID: "),"preset":if read_line("减少外发? [y/N]: ")=="y"{"reduce"}else{"preserve"},"keep_remote_control":read_line("保留 Remote Control? [Y/n]: ")!="n"})
+                let id = read_line("环境 ID: ");
+                let preset = loop {
+                    let selection =
+                        read_line("方案 reduce 减少外发 / preserve 保持功能 / custom 自定义: ");
+                    if ["reduce", "preserve", "custom"].contains(&selection.as_str()) {
+                        break selection;
+                    }
+                    println!("请输入一个方案名称；不自动替你选择。");
+                };
+                let mut request = json!({"command":"plan_policy","environment_id":id,"preset":preset,"keep_remote_control":read_line("保留 Remote Control? [Y/n]: ")!="n"});
+                request["trusted_devices"] = json!(loop {
+                    let condition = read_line(
+                        "组织 Trusted Devices 条件 unknown / required / not_required [unknown]: ",
+                    );
+                    if condition.is_empty() {
+                        break "unknown".to_string();
+                    }
+                    if ["unknown", "required", "not_required"].contains(&condition.as_str()) {
+                        break condition;
+                    }
+                    println!("请输入一个有效条件，仅记录你的声明。");
+                });
+                if preset == "custom" {
+                    let inspected = lintel_core::handle_request(
+                        json!({"command":"inspect","environment_id":id}),
+                    );
+                    if inspected["ok"] != true {
+                        show(&inspected);
+                        continue;
+                    }
+                    println!("只选择当前配置根的字段：keep 保持原值，disable 关闭，remove 移除覆盖（可能重新开放流量）。需新启动；稍后显示准确 diff 并再次批准。");
+                    let mut choices = serde_json::Map::new();
+                    for rule in inspected["data"]["policy"]["rules"].as_array().unwrap() {
+                        println!(
+                            "{} · {} · 当前 {}",
+                            rule["label"].as_str().unwrap(),
+                            rule["key"].as_str().unwrap(),
+                            rule["value"]
+                        );
+                        let action = loop {
+                            let action = read_line("keep / disable / remove [keep]: ");
+                            if action.is_empty() {
+                                break "keep".to_string();
+                            }
+                            if ["keep", "disable", "remove"].contains(&action.as_str()) {
+                                break action;
+                            }
+                            println!("请输入 keep / disable / remove。");
+                        };
+                        choices.insert(rule["key"].as_str().unwrap().to_string(), json!(action));
+                    }
+                    request["custom_settings"] = choices.into();
+                }
+                request
             }
             "5" => json!({"command":"plan_restore","job_id":read_line("原任务 ID: ")}),
             "6" => {

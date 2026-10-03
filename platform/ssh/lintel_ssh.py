@@ -31,6 +31,15 @@ REQUEST_FIELDS = {
     "plan_restore": {"job_id": str}, "jobs": {}, "job": {"job_id": str},
     "drift": {"environment_id": str}, "export_support": {},
 }
+OPTIONAL_FIELDS = {
+    "inspect": {"trusted_devices": str},
+    "plan_policy": {"trusted_devices": str, "release_settings": list, "custom_settings": dict},
+}
+POLICY_KEYS = {"DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_FEEDBACK_COMMAND",
+               "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "DO_NOT_TRACK", "DISABLE_GROWTHBOOK",
+               "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+REMOTE_KEYS = {"DISABLE_TELEMETRY", "DO_NOT_TRACK", "DISABLE_GROWTHBOOK",
+               "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
 
 
 class ControllerError(Exception):
@@ -88,15 +97,25 @@ def validate_request(payload: dict) -> dict:
     if not isinstance(payload, dict) or not isinstance(payload.get("command"), str) or payload["command"] not in REQUEST_FIELDS:
         raise ControllerError("unsupported_command", "Use an allowed read/plan request, or the separate execute operation.")
     fields = REQUEST_FIELDS[payload["command"]]
-    if set(payload) != {"command", *fields}:
+    optional = OPTIONAL_FIELDS.get(payload["command"], {})
+    if not {"command", *fields} <= set(payload) or not set(payload) <= {"command", *fields, *optional}:
         raise ControllerError("invalid_request", "The request fields do not match this command's schema.")
-    for key, expected in fields.items():
+    for key, expected in (fields | {k: v for k, v in optional.items() if k in payload}).items():
         if type(payload[key]) is not expected:
             raise ControllerError("invalid_request", "A request field has the wrong type.")
         if expected is str and (not payload[key] or len(payload[key]) > 1024):
             raise ControllerError("invalid_request", "A request field has an invalid length.")
-    if payload["command"] == "plan_policy" and payload["preset"] not in {"preserve", "reduce"}:
+    if payload.get("trusted_devices", "unknown") not in {"unknown", "required", "not_required"}:
+        raise ControllerError("invalid_request", "The Trusted Devices condition is invalid.")
+    if payload["command"] == "plan_policy" and payload["preset"] not in {"preserve", "reduce", "custom"}:
         raise ControllerError("invalid_request", "The policy preset is not supported.")
+    if "release_settings" in payload and not all(type(v) is str and v in REMOTE_KEYS for v in payload["release_settings"]):
+        raise ControllerError("invalid_request", "Only known Remote Control fields can be released.")
+    if "custom_settings" in payload:
+        if payload["preset"] != "custom" or not all(k in POLICY_KEYS and type(v) is str and v in {"keep", "disable", "remove"} for k, v in payload["custom_settings"].items()):
+            raise ControllerError("invalid_request", "Custom choices must use known policy keys and keep/disable/remove.")
+    if payload.get("preset") == "custom" and payload.get("release_settings"):
+        raise ControllerError("invalid_request", "Use explicit remove choices in a custom policy.")
     if payload["command"] == "plan_reset":
         if payload["recipe"] != "rebuild" or not all(type(v) is str and len(v) <= 128 for v in payload["categories"]):
             raise ControllerError("invalid_request", "The rebuild recipe/categories are invalid.")

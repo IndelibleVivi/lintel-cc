@@ -3,7 +3,7 @@ use crate::{err, Result};
 use serde_json::{json, Value};
 use std::path::Path;
 
-pub(crate) const RULE: &str = "claude-privacy-v2-2026-10-03";
+pub(crate) const RULE: &str = "claude-privacy-v3-2026-10-03";
 pub(crate) const FLAGS: [(&str, &str); 4] = [
     ("DISABLE_TELEMETRY", "产品指标"),
     ("DISABLE_ERROR_REPORTING", "错误回报"),
@@ -186,7 +186,7 @@ pub(crate) fn assessment(doc: &Value, product: &Value, trusted: &str) -> Value {
         "semantics":if ["DISABLE_TELEMETRY","DISABLE_ERROR_REPORTING","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"].contains(&key){"nonempty"}else{"boolean"},
         "scope":"registered_root_user_settings","effect_timing":"next_launch",
     })).collect();
-    json!({"rule_version":RULE,"product":product,"rules":rules,"remote_control":{
+    json!({"rule_version":RULE,"supported_presets":["preserve","reduce","custom"],"product":product,"rules":rules,"remote_control":{
         "status":status,"summary":summary,"blockers":blockers,"trusted_devices":trusted,
         "trusted_devices_source":if trusted=="unknown"{"unverified"}else{"user_declared"},
         "version_family":match modern(product){Some(true)=>"2.1.283+",Some(false)=>"before_2.1.283",None=>"unknown"},
@@ -217,9 +217,38 @@ pub(crate) fn plan(
     path: &Path,
 ) -> Result<(Value, Value)> {
     let preset = request["preset"].as_str().unwrap_or("");
-    if !["preserve", "reduce"].contains(&preset) {
+    if !["preserve", "reduce", "custom"].contains(&preset) {
         return Err(err("invalid_preset", "未知保护方案"));
     }
+    let custom = if preset == "custom" {
+        let choices = request.get("custom_settings").cloned().unwrap_or(json!({}));
+        let choices_object = choices
+            .as_object()
+            .ok_or_else(|| err("invalid_request", "custom_settings 必须是字段 action 对象"))?;
+        for (key, action) in choices_object {
+            if !fields().any(|(known, _)| known == key) {
+                return Err(err("invalid_request", "custom_settings 包含未识别的字段"));
+            }
+            if !action
+                .as_str()
+                .is_some_and(|s| ["keep", "disable", "remove"].contains(&s))
+            {
+                return Err(err(
+                    "invalid_request",
+                    "字段 action 必须是 keep / disable / remove",
+                ));
+            }
+        }
+        choices
+    } else {
+        if request.get("custom_settings").is_some() {
+            return Err(err(
+                "invalid_request",
+                "custom_settings 只适用于 custom 方案",
+            ));
+        }
+        json!({})
+    };
     let keep = match request.get("keep_remote_control") {
         None => false,
         Some(v) => v
@@ -245,6 +274,12 @@ pub(crate) fn plan(
             })
             .collect::<Result<_>>()?,
     };
+    if preset == "custom" && !releases.is_empty() {
+        return Err(err(
+            "invalid_request",
+            "custom 方案请通过字段 remove 明确删除，不接受 release_settings",
+        ));
+    }
     if !keep && !releases.is_empty() {
         return Err(err(
             "invalid_request",
@@ -271,32 +306,42 @@ pub(crate) fn plan(
     }
     let mut changes = vec![];
     for (key, label) in fields() {
-        let release = releases.contains(&key);
-        let set = FLAGS.iter().any(|(k, _)| *k == key)
+        let action = if preset == "custom" {
+            custom[key].as_str().unwrap_or("keep")
+        } else if releases.contains(&key) {
+            "remove"
+        } else if FLAGS.iter().any(|(k, _)| *k == key)
             && (preset == "reduce"
                 || [
                     "DISABLE_ERROR_REPORTING",
                     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
                 ]
                 .contains(&key))
-            && !(keep && key == "DISABLE_TELEMETRY" && telemetry_needed(product, trusted));
-        let value = if release {
-            Value::Null
-        } else if set && disabled(key, &doc["env"][key]) != Some(true) {
-            json!("1")
+            && !(keep && key == "DISABLE_TELEMETRY" && telemetry_needed(product, trusted))
+        {
+            "disable"
         } else {
-            continue;
+            "keep"
+        };
+        let value = match action {
+            "remove" if doc["env"].get(key).is_some() => Value::Null,
+            "disable" if disabled(key, &doc["env"][key]) != Some(true) => json!("1"),
+            _ => continue,
         };
         changes.push(
             json!({"key":key,"label":label,"before":doc["env"][key],"after":value,"path":path}),
         );
-        if release {
+        if action == "remove" {
             after["env"].as_object_mut().unwrap().remove(key);
         } else {
             after["env"][key] = value;
         }
     }
     let mut policy = assessment(&after, product, trusted);
+    policy["preset"] = json!(preset);
+    if preset == "custom" {
+        policy["custom_settings"] = custom;
+    }
     policy["keep_remote_control"] = json!(keep);
     policy["release_settings"] = json!(releases);
     policy["current_remote_control"] = current["remote_control"].clone();
@@ -404,6 +449,133 @@ mod tests {
                 .0[0]["before"],
             "external"
         );
+    }
+    #[test]
+    fn custom_actions_preserve_values_and_only_change_selected_fields() {
+        let doc = json!({"env":{
+            "DISABLE_TELEMETRY":"false", "DISABLE_ERROR_REPORTING":"0",
+            "DISABLE_FEEDBACK_COMMAND":"false", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY":"TrUe",
+            "DO_NOT_TRACK":"off", "DISABLE_GROWTHBOOK":"yes", "UNRELATED":"保留原值"
+        },"permissions":{"allow":["Read"]}});
+        let choices = json!({
+            "DISABLE_TELEMETRY":"disable", "DISABLE_ERROR_REPORTING":"disable",
+            "DISABLE_FEEDBACK_COMMAND":"disable", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY":"keep",
+            "DO_NOT_TRACK":"remove", "DISABLE_GROWTHBOOK":"remove",
+            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"remove"
+        });
+        let (changes, result) = plan(
+            &doc, &json!({"version":"2.1.283"}),
+            &json!({"preset":"custom","custom_settings":choices,"keep_remote_control":true,"trusted_devices":"not_required"}),
+            Path::new("/synthetic/settings.json"),
+        ).unwrap();
+        assert_eq!(changes.as_array().unwrap().len(), 3);
+        assert_eq!(changes[0]["key"], "DISABLE_FEEDBACK_COMMAND");
+        assert_eq!(changes[0]["before"], "false");
+        assert_eq!(changes[0]["after"], "1");
+        assert_eq!(changes[1]["before"], "off");
+        assert!(changes[1]["after"].is_null());
+        assert_eq!(changes[2]["before"], "yes");
+        assert!(changes[2]["after"].is_null());
+        assert_eq!(result["preset"], "custom");
+        assert_eq!(result["custom_settings"], choices);
+        assert_eq!(
+            result["remote_control"]["status"],
+            "configuration_compatible"
+        );
+        assert_eq!(
+            result["supported_presets"],
+            json!(["preserve", "reduce", "custom"])
+        );
+        for key in [
+            "DISABLE_TELEMETRY",
+            "DISABLE_ERROR_REPORTING",
+            "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+        ] {
+            let rule = result["rules"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["key"] == key)
+                .unwrap();
+            assert_eq!(rule["value"], doc["env"][key]);
+        }
+    }
+    #[test]
+    fn custom_missing_choices_keep_and_explicit_remote_choices_are_not_overridden() {
+        let doc =
+            json!({"env":{"DISABLE_GROWTHBOOK":"false","DISABLE_TELEMETRY":"","UNRELATED":"keep"}});
+        for request in [
+            json!({"preset":"custom"}),
+            json!({"preset":"custom","custom_settings":{},"release_settings":[]}),
+        ] {
+            let (changes, policy) = plan(
+                &doc,
+                &json!({"version":"2.1.283"}),
+                &request,
+                Path::new("/synthetic/settings.json"),
+            )
+            .unwrap();
+            assert!(changes.as_array().unwrap().is_empty());
+            assert_eq!(policy["custom_settings"], json!({}));
+        }
+        for (version, trusted, expected) in [
+            ("2.1.282", "not_required", "blocked"),
+            ("2.1.283", "required", "blocked"),
+            ("2.1.283", "unknown", "conditional"),
+            ("2.1.283", "not_required", "configuration_compatible"),
+        ] {
+            let (changes, policy) = plan(&doc, &json!({"version":version}),
+                &json!({"preset":"custom","keep_remote_control":true,"trusted_devices":trusted,"custom_settings":{"DISABLE_TELEMETRY":"disable"}}),
+                Path::new("/synthetic/settings.json")).unwrap();
+            assert_eq!(changes.as_array().unwrap().len(), 1);
+            assert_eq!(changes[0]["key"], "DISABLE_TELEMETRY");
+            assert_eq!(changes[0]["after"], "1");
+            assert_eq!(
+                policy["remote_control"]["status"], expected,
+                "{version} {trusted}"
+            );
+            assert_eq!(policy["keep_remote_control"], true);
+        }
+    }
+    #[test]
+    fn custom_choices_reject_unsupported_shapes_actions_and_preset_mixups() {
+        for choices in [
+            Value::Null,
+            json!([]),
+            json!({"UNKNOWN":"disable"}),
+            json!({"DISABLE_TELEMETRY":{"action":"disable"}}),
+            json!({"DISABLE_TELEMETRY":"enable"}),
+            json!({"DISABLE_TELEMETRY":true}),
+        ] {
+            let error = plan(
+                &json!({}),
+                &json!({"version":"2.1.283"}),
+                &json!({"preset":"custom","custom_settings":choices}),
+                Path::new("/synthetic/settings.json"),
+            )
+            .unwrap_err();
+            assert_eq!(error.code, "invalid_request", "{choices}");
+        }
+        for preset in ["preserve", "reduce"] {
+            for choices in [json!({}), json!({"DISABLE_TELEMETRY":"keep"})] {
+                assert_eq!(
+                    plan(
+                        &json!({}),
+                        &json!({}),
+                        &json!({"preset":preset,"custom_settings":choices}),
+                        Path::new("/synthetic/settings.json")
+                    )
+                    .unwrap_err()
+                    .code,
+                    "invalid_request"
+                );
+            }
+        }
+        for keep in [false, true] {
+            assert_eq!(plan(&json!({"env":{"DISABLE_TELEMETRY":"1"}}), &json!({"version":"2.1.282"}),
+                &json!({"preset":"custom","keep_remote_control":keep,"release_settings":["DISABLE_TELEMETRY"]}),
+                Path::new("/synthetic/settings.json")).unwrap_err().code, "invalid_request");
+        }
     }
     #[test]
     fn version_detection_is_static_and_specific() {

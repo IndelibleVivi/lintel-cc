@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the real CLI/TUI launch with a PTY and an inert user-local Claude."""
+"""Exercise real CLI/TUI launch and custom policy in a synthetic PTY/home."""
 import errno
 import json
 import os
@@ -79,4 +79,25 @@ with tempfile.TemporaryDirectory(prefix='lintel-launch-') as tmp:
     output = terminal(['tui'], f"o\n{environment['id']}\nq\n".encode())
     assert '打开 Claude' in output
     assert log.read_text().splitlines() == [str(root), str(root), '0']
-    print('PASS: native install discovery without PATH; CLI/TUI PTY launch; exact root/cwd; zero prompts; hidden-pipe/extra-argument rejection')
+    settings = root / 'settings.json'
+    original = {'env': {'DISABLE_TELEMETRY': 'false', 'DISABLE_ERROR_REPORTING': 'false',
+                        'DISABLE_FEEDBACK_COMMAND': 'false', 'DISABLE_GROWTHBOOK': 'true',
+                        'UNRELATED': 'keep'}, 'permissions': {'allow': ['Read']}}
+    settings.write_text(json.dumps(original))
+    # Seven canonical core controls in display order. Invalid action must re-prompt,
+    # never silently preserve or apply a different choice. Approval remains separate.
+    output = terminal(['tui'], (f"4\n{environment['id']}\ncustom\nn\n\n"
+                               "keep\nkeep\ninvalid\ndisable\nkeep\nkeep\nremove\nkeep\napply\nq\n").encode())
+    assert '自定义保护' in output and '请输入 keep / disable / remove' in output
+    written = json.loads(settings.read_text())
+    assert written['env']['DISABLE_FEEDBACK_COMMAND'] == '1'
+    assert 'DISABLE_GROWTHBOOK' not in written['env']
+    for key in ('DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING', 'UNRELATED'):
+        assert written['env'][key] == original['env'][key]
+    assert written['permissions'] == original['permissions']
+    receipt = request(dict(command='jobs'))['jobs'][0]
+    assert receipt['policy']['preset'] == 'custom' and receipt['status'] == 'completed'
+    restore = request(dict(command='plan_restore', job_id=receipt['id']))
+    assert request(dict(command='execute', plan_id=restore['id'], approval=restore['hash']))['status'] == 'completed'
+    assert json.loads(settings.read_text()) == original
+    print('PASS: native install discovery; CLI/TUI PTY launch; exact root/cwd; zero prompts; hidden-pipe/extra-argument rejection; TUI custom choices/invalid input/approval/receipt/exact restoration')

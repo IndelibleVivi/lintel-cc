@@ -7,6 +7,7 @@ export default function PolicyEvidence({ policy, projected = false }: { policy: 
   return <section className="policy-evidence" aria-label={projected ? '执行后预计功能条件' : '当前功能条件'}>
     <div className="fact-row"><span>产品版本</span><span>{policy.product.version ?? '未识别'} · {source}</span></div>
     <Notice tone={remote.status === 'configuration_compatible' ? 'neutral' : 'warning'}><strong>{projected ? '执行后预计条件' : '当前配置条件'}</strong><p>{remote.summary}</p></Notice>
+    {policy.preset === 'custom' && <details className="environment-diagnostics"><summary>本次自定义选择</summary><p>选择随计划与回执保存；未选字段保持原值。移除只撤掉本环境覆盖。</p>{policy.rules.map(rule => <div className="fact-row" key={rule.key}><span>{rule.label}</span><span>{{ keep: '保持原值', disable: '关闭这一项', remove: '移除本环境覆盖' }[policy.custom_settings?.[rule.key] ?? 'keep']}</span></div>)}</details>}
     <details className="environment-diagnostics"><summary>变量语义与验证范围</summary>
       <p>仅核对当前环境 user settings。组织条件为用户声明；shell、项目、组织配置、账号资格和实际 Remote Control 运行仍未验证。移除字段后需新启动。</p>
       {policy.rules.map(rule => <div className="policy-rule" key={rule.key}><code>{rule.key}</code><span>{rule.value === null ? '未设置' : JSON.stringify(rule.value)} · {rule.disabled === null ? '取值语义未确认' : rule.disabled ? '配置为关闭' : '此开关未关闭'}</span><small>{rule.semantics === 'nonempty' ? '任意非空值生效，包括 0 / false' : '按布尔值解析，0 / false 不生效'}</small></div>)}

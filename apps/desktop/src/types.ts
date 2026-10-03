@@ -5,8 +5,12 @@ export interface Environment {
 }
 export interface ProductEvidence { version: string | null; source: 'native_version_path' | 'npm_package' | 'unknown'; executable: string | null }
 export type TrustedDevices = 'unknown' | 'required' | 'not_required';
+export type PolicyPreset = 'preserve' | 'reduce' | 'custom';
+export type PolicyChoice = 'keep' | 'disable' | 'remove';
+export type CustomSettings = Record<string, PolicyChoice>;
 export interface PolicyAssessment {
   rule_version: string; product: ProductEvidence;
+  supported_presets?: PolicyPreset[]; preset?: PolicyPreset; custom_settings?: CustomSettings;
   rules: { key: string; label: string; value: string | null; disabled: boolean | null; semantics: 'nonempty' | 'boolean'; scope: string; effect_timing: string }[];
   remote_control: { status: 'blocked' | 'conditional' | 'configuration_compatible'; summary: string; trusted_devices: TrustedDevices; trusted_devices_source: string; version_family: string; runtime_verified: false; blockers: { key: string; value: string | null; status: string; reason: string; source: string }[]; unverified: string[] };
   keep_remote_control?: boolean; release_settings?: string[];
@@ -36,7 +40,7 @@ export interface Api {
   register: { request: { name: string; root: string }; response: Environment };
   create_environment: { request: { name: string }; response: Environment };
   inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
-  plan_policy: { request: { environment_id: string; preset: 'preserve' | 'reduce'; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[] }; response: Plan };
+  plan_policy: { request: { environment_id: string; preset: PolicyPreset; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[]; custom_settings?: CustomSettings }; response: Plan };
   plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[] }; response: Plan };
   plan_restore: { request: { job_id: string }; response: Plan };
   execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
@@ -54,4 +58,4 @@ export interface Api {
   launch: { request: { environment_id: string }; response: { status: string; message: string } };
   export_support: { request: {}; response: unknown };
 }
-export type Draft = { preset: 'preserve' | 'reduce'; keepRemoteControl: boolean; trustedDevices?: TrustedDevices; releaseSettings?: string[] };
+export type Draft = { preset: PolicyPreset; keepRemoteControl: boolean; trustedDevices?: TrustedDevices; releaseSettings?: string[]; customSettings?: CustomSettings };

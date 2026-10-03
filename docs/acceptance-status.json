@@ -31,7 +31,8 @@
       "required": "生效时机正确区分；旧进程不能被假装已 unset",
       "status": "partial",
       "evidence": [
-        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "Custom policy core/CLI tests distinguish keep from exact remove and preserve no-op bytes/mode; effect remains next_launch with runtime_verified:false. Existing live sessions are not mutated or claimed unset."
       ]
     },
     {
@@ -40,7 +41,8 @@
       "required": "其他 root、通用代理、AWS/Google 配置不变",
       "status": "partial",
       "evidence": [
-        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "Custom policy CLI and App synthetic UI exercised a selected root while preserving unrelated settings and a separate neighbor root; no real proxy/cloud/profile mutation."
       ]
     },
     {
@@ -657,7 +659,8 @@
       "required": "默认一份预览、一次授权；系统必要授权除外，不逐文件问答",
       "status": "partial",
       "evidence": [
-        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
+        "App synthetic native bridge exercised seven custom choices, RC conflict/compatible preview, exact diff approval, completed receipt, restore and older-runner limitation; real core executed only temporary synthetic roots."
       ]
     },
     {
@@ -676,7 +679,8 @@
       "status": "partial",
       "evidence": [
         "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
-        "Remote launch App synthetic native bridge checked at 1120x760 Day and 900x640 Night: paths remain copyable, failure scrolls into view and no horizontal document overflow. Full-product accessibility/layout acceptance remains partial."
+        "Remote launch App synthetic native bridge checked at 1120x760 Day and 900x640 Night: paths remain copyable, failure scrolls into view and no horizontal document overflow. Full-product accessibility/layout acceptance remains partial.",
+        "Custom editor rendered in 1120x800 Day and 900x640 Night with long source paths and no horizontal overflow; complete paths remain visible in expandable source details. Owner visual acceptance remains separate."
       ]
     },
     {
@@ -686,7 +690,8 @@
       "status": "partial",
       "evidence": [
         "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
-        "Remote launch App synthetic native bridge verified keyboard activation, Day/Night and accepted-to-completed state; complete screen-reader and all main journeys remain unverified."
+        "Remote launch App synthetic native bridge verified keyboard activation, Day/Night and accepted-to-completed state; complete screen-reader and all main journeys remain unverified.",
+        "Custom editor uses labeled native radio/select controls; keyboard selection/focus and Day/Night checked in rendered synthetic App. Complete screen-reader and full main-journey acceptance remain unverified."
       ]
     },
     {
@@ -735,5 +740,5 @@
   ],
   "updated": "2026-10-03",
   "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-03: versioned policy, App-bundled user-level runner install and exact-environment SSH Terminal launch connected. Real Linux x86_64 OpenSSH/static-musl synthetic runtime passed; real Claude/production VPS and full journeys remain unverified. Genuine persistent browser startup evidence remains missing; prior static-SW success is superseded."
+  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Synthetic core/CLI/UI/PTY paths passed. Current custom Linux OpenSSH runtime awaits CI; earlier install/submit/launch runtime passed. Real Claude/production VPS and full journeys remain unverified; persistent browser startup evidence still missing."
 }

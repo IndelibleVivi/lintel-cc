@@ -74,8 +74,7 @@ fn linux_openssh_runtime_journey() {
     let home = base.join("home");
     let root = home.join("synthetic-claude");
     let settings = root.join("settings.json");
-    let original =
-        json!({"env":{"UNRELATED_SYNTHETIC_FLAG":"keep"},"permissions":{"allow":["Read"]}});
+    let original = json!({"env":{"UNRELATED_SYNTHETIC_FLAG":"keep","DISABLE_TELEMETRY":"false","DISABLE_FEEDBACK_COMMAND":"false","DISABLE_GROWTHBOOK":"true"},"permissions":{"allow":["Read"]}});
     fs::write(&settings, serde_json::to_vec(&original).unwrap()).unwrap();
 
     let c = controller(&base);
@@ -161,7 +160,12 @@ fn linux_openssh_runtime_journey() {
     );
     let policy = request(
         &reopened,
-        json!({"command":"plan_policy","environment_id":eid,"preset":"reduce","keep_remote_control":false}),
+        json!({"command":"plan_policy","environment_id":eid,"preset":"custom","keep_remote_control":true,"trusted_devices":"not_required","custom_settings":{"DISABLE_TELEMETRY":"keep","DISABLE_ERROR_REPORTING":"disable","DISABLE_FEEDBACK_COMMAND":"disable","DISABLE_GROWTHBOOK":"remove"}}),
+    );
+    assert_eq!(policy["policy"]["preset"], "custom");
+    assert_eq!(
+        policy["policy"]["remote_control"]["status"],
+        "configuration_compatible"
     );
     assert_eq!(
         serde_json::from_slice::<Value>(&fs::read(&settings).unwrap()).unwrap(),
@@ -202,14 +206,21 @@ fn linux_openssh_runtime_journey() {
         "ACK loss must not create another job"
     );
     let written: Value = serde_json::from_slice(&fs::read(&settings).unwrap()).unwrap();
-    for key in [
-        "DISABLE_TELEMETRY",
-        "DISABLE_ERROR_REPORTING",
-        "DISABLE_FEEDBACK_COMMAND",
-        "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
-    ] {
+    for key in ["DISABLE_ERROR_REPORTING", "DISABLE_FEEDBACK_COMMAND"] {
         assert_eq!(written["env"][key], "1", "{key}");
     }
+    assert_eq!(
+        written["env"]["DISABLE_TELEMETRY"], "false",
+        "custom keep preserves nonempty external value"
+    );
+    assert!(written["env"].get("DISABLE_GROWTHBOOK").is_none());
+    assert!(written["env"]
+        .get("CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY")
+        .is_none());
+    assert_eq!(
+        receipt["policy"], policy["policy"],
+        "custom choices freeze through lost ACK"
+    );
     assert_eq!(written["env"]["UNRELATED_SYNTHETIC_FLAG"], "keep");
     assert_eq!(written["permissions"], original["permissions"]);
     let local_record = fs::read_to_string(

@@ -94,6 +94,23 @@ class TransportTests(unittest.TestCase):
                 self.controller.request(alias, {"command": "jobs"})
         self.assertEqual(len(self.calls()), 1)
 
+    def test_custom_policy_choices_are_finite_and_kept_on_stdin(self):
+        request = {"command": "plan_policy", "environment_id": "synthetic-env", "preset": "custom",
+                   "keep_remote_control": True, "trusted_devices": "not_required",
+                   "custom_settings": {"DISABLE_TELEMETRY": "keep", "DISABLE_GROWTHBOOK": "remove",
+                                       "DISABLE_ERROR_REPORTING": "disable"}}
+        for choices in [None, [], {"API_KEY": "remove"}, {"DISABLE_TELEMETRY": "0"},
+                        {"DISABLE_TELEMETRY": {"action": "disable"}}]:
+            with self.assertRaises(ssh.ControllerError):
+                self.controller.request("synthetic-host", dict(request, custom_settings=choices))
+        for change in [{"preset": "reduce"}, {"release_settings": ["DISABLE_GROWTHBOOK"]}]:
+            with self.assertRaises(ssh.ControllerError):
+                self.controller.request("synthetic-host", request | change)
+        self.assertFalse((self.root / "calls.jsonl").exists())
+        self.assertTrue(self.controller.request("synthetic-host", request)["ok"])
+        self.assertEqual(self.calls()[0]["request"], request)
+        self.assertNotIn("custom_settings", " ".join(self.calls()[0]["args"]))
+
     def test_lost_ack_reconnect_and_repeated_execute_query_one_original_job(self):
         with patch.dict(os.environ, {"LINTEL_FAKE_MODE": "lose_ack"}):
             with self.assertRaises(ssh.ControllerError) as error:

@@ -128,7 +128,7 @@ for _id, _desc, _file in (
      "submission_journey.py"),
     ("journey-work-preservation", "work-preservation journey (large session, A->B->C, damaged settings)",
      "work_preservation_journey.py"),
-    ("journey-launch", "interactive CLI/TUI launch (real PTY, inert Claude)", "launch_journey.py"),
+    ("journey-launch", "interactive CLI/TUI launch and custom policy (real PTY, synthetic roots)", "launch_journey.py"),
     ("journey-policy", "versioned policy journey (version/value/ownership compatibility)", "policy_journey.py"),
 ):
     CHECKS.append(_check(_id, _desc, "journey", PYTHON, f"tests/{_file}", tools=("cargo",),
