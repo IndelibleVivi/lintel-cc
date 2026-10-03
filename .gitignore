@@ -14,3 +14,5 @@ __pycache__/
 /test-results/
 target/
 /.playwright-cli/
+/apps/desktop/src-tauri/runner-bundles/*.json
+/apps/desktop/src-tauri/runner-bundles/*/lintel

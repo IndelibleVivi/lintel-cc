@@ -17,6 +17,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "remote_install.rs"]
+mod installation;
+
 const MAX_JSON: usize = 2 * 1024 * 1024;
 #[derive(Debug)]
 struct Failure {
@@ -184,7 +187,7 @@ fn list_aliases(path: &Path) -> Result<Value> {
         }
     }
     Ok(
-        json!({"ok":true,"data":{"aliases":aliases,"ignored":ignored,"coverage":"只列出当前文件的 literal Host；不解析 Include、Match 或通配符，也不执行配置"}}),
+        json!({"ok":true,"data":{"aliases":aliases,"ignored":ignored,"coverage":"只列出当前文件的 literal Host；不解析 Include、Match 或通配符，静态导入不执行配置。连接固定关闭 ProxyCommand / RemoteCommand / PermitLocalCommand"}}),
     )
 }
 
@@ -369,7 +372,7 @@ fn diagnose(
         "host_key_verification_failed" => ("ssh", "SSH 主机身份验证失败。", &["核对 known_hosts 与可信主机指纹；当前输出不足以判断是首次连接还是密钥变化。"]),
         "config_invalid" => ("ssh", "OpenSSH 配置无法使用。", &["依据诊断片段检查用户 SSH 配置的选项、参数与访问权限。"]),
         "ssh_unknown" => ("ssh", "SSH 连接失败，当前输出不能确定具体原因。", &["在本机终端用同一 alias 检查 SSH 连接，并对照本次诊断片段。"]),
-        "runner_missing" => ("runner", "SSH 已到达远端，但找不到 lintel runner。已安装 Claude Code 不代表已经安装 Lintel runner。", &["在目标用户的非交互 SSH PATH 中确认 lintel runner；如需安装，请独立核对来源、架构与授权后进行。Lintel 不会自动安装。"]),
+        "runner_missing" => ("runner", "SSH 已到达远端，但找不到 lintel runner。已安装 Claude Code 不代表已经安装 Lintel runner。", &["在目标用户的非交互 SSH PATH 中确认 lintel runner；请在此面板选择“检查并准备运行器”，预览后批准用户级安装。"]),
         "runner_not_executable" => ("runner", "远端找到了 lintel，但它无法执行。", &["检查 lintel 的执行权限、文件格式、架构及加载器/依赖；不要把 Claude Code 可执行文件当作 Lintel runner。"]),
         "abnormal_exit" => ("runner", "远端 runner 异常退出，未得到可信结果。", &["检查目标上的 lintel runner 版本、运行环境与本次退出码。"]),
         "runner_rejected" => ("runner", "远端 runner 返回了明确的请求错误。", &["按照原始错误 code/message 核对请求范围、计划与 runner 版本。"]),
@@ -380,13 +383,16 @@ fn diagnose(
         _ => ("response", "远程响应中断，结果尚未确认。", &["检查网络及 runner 状态。"]),
     };
     let query = payload["command"] == "job";
+    let install = payload["command"] == "install_runner";
     let mutating = submit
         || matches!(
             payload["command"].as_str(),
             Some("register" | "create_environment" | "accept_drift" | "reactivate_environment")
         );
     let uncertain = mutating && reason != "ssh_unavailable";
-    let continuation = if submit {
+    let continuation = if install {
+        " 请保留原安装记录，使用“核对原安装”确认结果；不会重新上传。"
+    } else if submit {
         " 请保留原任务 ID，重连后只查询原任务；不会自动重新提交。"
     } else if query {
         " 原任务状态仍待核对；连接恢复后继续查询同一任务。"
@@ -396,7 +402,9 @@ fn diagnose(
         " 请按诊断建议排查后再次连接或读取。"
     };
     let mut next_steps = steps.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
-    if submit || query {
+    if install {
+        next_steps.push("在主机面板核对同一个 install_id；不创建第二份上传计划。".into());
+    } else if submit || query {
         next_steps
             .push("使用原 plan/job ID 查询；不要为重试而移除本地任务记录或创建第二份清理。".into());
     }
@@ -453,7 +461,7 @@ impl Transport {
         let mut result = self.exchange(alias, payload, submit);
         // A diagnostic command is for a user's terminal, never a replay of the
         // failed operation. Literal alias validation precedes interpolation.
-        let check = format!("/usr/bin/ssh -T -oBatchMode=yes -oStrictHostKeyChecking=yes -oUpdateHostKeys=no -oPermitLocalCommand=no -oClearAllForwardings=yes -oRequestTTY=no -oConnectTimeout=10 -oServerAliveInterval=15 -oServerAliveCountMax=2 {alias} 'command -v lintel'");
+        let check = format!("/usr/bin/ssh -T -oBatchMode=yes -oStrictHostKeyChecking=yes -oUpdateHostKeys=no -oPermitLocalCommand=no -oProxyCommand=none -oRemoteCommand=none -oClearAllForwardings=yes -oRequestTTY=no -oConnectTimeout=10 -oServerAliveInterval=15 -oServerAliveCountMax=2 {alias} 'command -v lintel'");
         let diagnostic = match &mut result {
             Err(error) => error.diagnostic.as_mut(),
             Ok(response) if response["ok"] == false => response["error"].get_mut("diagnostic"),
@@ -471,6 +479,26 @@ impl Transport {
         if encoded.len() > MAX_JSON {
             return Err(failure("request_too_large", "请求超过 SSH transport 上限"));
         }
+        self.wire(
+            alias,
+            payload,
+            submit,
+            &encoded,
+            &[
+                "lintel".into(),
+                if submit { "submit" } else { "request" }.into(),
+            ],
+        )
+    }
+    fn wire(
+        &self,
+        alias: &str,
+        payload: &Value,
+        submit: bool,
+        encoded: &[u8],
+        remote: &[String],
+    ) -> Result<Value> {
+        valid_alias(alias)?;
         let mut command = Command::new(&self.ssh);
         #[cfg(test)]
         if let Some(interpreter) = &self.interpreter {
@@ -487,15 +515,16 @@ impl Transport {
                 "-oStrictHostKeyChecking=yes",
                 "-oUpdateHostKeys=no",
                 "-oPermitLocalCommand=no",
+                "-oProxyCommand=none",
+                "-oRemoteCommand=none",
                 "-oClearAllForwardings=yes",
                 "-oRequestTTY=no",
                 "-oConnectTimeout=10",
                 "-oServerAliveInterval=15",
                 "-oServerAliveCountMax=2",
                 alias,
-                "lintel",
-                if submit { "submit" } else { "request" },
             ])
+            .args(remote)
             .env("LC_ALL", "C")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -743,8 +772,14 @@ impl Transport {
 }
 
 fn private_dir(path: &Path) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
     match fs::symlink_metadata(path) {
-        Ok(m) if m.is_dir() && !m.file_type().is_symlink() => Ok(()),
+        Ok(m) if m.is_dir() && !m.file_type().is_symlink() => {
+            if m.uid() != unsafe { libc::geteuid() } {
+                return Err(failure("local_state_invalid", "本地记录目录不属于当前用户"));
+            }
+            Ok(())
+        }
         Ok(_) => Err(failure(
             "local_state_invalid",
             "本地记录目录不能是文件或符号链接",
@@ -819,17 +854,15 @@ fn load(path: &Path) -> Result<Value> {
 fn validate_request(request: &Value) -> Result<()> {
     let (required, optional): (&[&str], &[&str]) = match field(request, "command")? {
         "discover" | "jobs" | "export_support" => (&["command"], &[]),
-        "inspect"
-        | "drift"
-        | "accept_drift"
-        | "cleanup_inspect"
-        | "auth_probe"
-        | "reactivate_environment" => (&["command", "environment_id"], &[]),
+        "inspect" => (&["command", "environment_id"], &["trusted_devices"]),
+        "drift" | "accept_drift" | "cleanup_inspect" | "auth_probe" | "reactivate_environment" => {
+            (&["command", "environment_id"], &[])
+        }
         "register" => (&["command", "name", "root"], &[]),
         "create_environment" => (&["command", "name"], &[]),
         "plan_policy" => (
             &["command", "environment_id", "preset", "keep_remote_control"],
-            &[],
+            &["trusted_devices", "release_settings"],
         ),
         "plan_reset" => (&["command", "environment_id", "recipe", "categories"], &[]),
         "plan_restore" | "job" => (&["command", "job_id"], &[]),
@@ -864,6 +897,29 @@ fn validate_request(request: &Value) -> Result<()> {
         }
     };
     exact_fields(request, required, optional)?;
+    if request.get("trusted_devices").is_some_and(|v| {
+        !v.as_str()
+            .is_some_and(|s| ["unknown", "required", "not_required"].contains(&s))
+    }) {
+        return Err(failure("invalid_request", "Trusted Devices 条件无效"));
+    }
+    if request.get("release_settings").is_some_and(|v| {
+        !v.as_array().is_some_and(|values| {
+            values.iter().all(|v| {
+                v.as_str().is_some_and(|s| {
+                    [
+                        "DISABLE_TELEMETRY",
+                        "DO_NOT_TRACK",
+                        "DISABLE_GROWTHBOOK",
+                        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+                    ]
+                    .contains(&s)
+                })
+            })
+        })
+    }) {
+        return Err(failure("invalid_request", "解除策略字段无效"));
+    }
     for key in required.iter().filter(|key| {
         ![
             "keep_remote_control",
@@ -923,9 +979,10 @@ struct Controller {
     state: PathBuf,
     config: PathBuf,
     transport: Transport,
+    bundles: PathBuf,
 }
 impl Controller {
-    fn system() -> Result<Self> {
+    fn system(bundles: PathBuf) -> Result<Self> {
         let home = std::env::var_os("HOME")
             .map(PathBuf::from)
             .ok_or_else(|| failure("home_missing", "找不到当前用户目录"))?;
@@ -942,6 +999,7 @@ impl Controller {
             state: state.join("remote"),
             config: home.join(".ssh/config"),
             transport: Transport::default(),
+            bundles,
         })
     }
     fn hosts(&self) -> Result<Value> {
@@ -997,7 +1055,11 @@ impl Controller {
                     "远端 receipt 与原任务不匹配；执行保持禁用，请查询原任务",
                 ));
             }
-            record["lookup_id"] = receipt["id"].clone();
+            // A receipt only redirects later queries when the remote echoes the
+            // original plan id; anything else keeps lookup_id pinned locally.
+            if receipt["id"] == record["plan_id"] {
+                record["lookup_id"] = receipt["id"].clone();
+            }
             record["status"] = receipt["status"].clone();
         } else {
             record["status"] = json!("response_received");
@@ -1006,10 +1068,11 @@ impl Controller {
         Ok(response)
     }
     fn query(&self, alias: &str, path: &Path, mut record: Value) -> Result<Value> {
-        let response = self.transport.call(
+        let response = self.runner_call(
             alias,
             &json!({"command":"job","job_id":record["lookup_id"]}),
             false,
+            record.get("runner_digest"),
         )?;
         if response["ok"] == false {
             let mut error = failure("reconciliation_required", "原任务尚无法核对");
@@ -1037,26 +1100,38 @@ impl Controller {
                     if !host.file_type().map_err(storage)?.is_dir() {
                         continue;
                     }
+                    // A stray or non-conforming entry must not break the
+                    // whole inventory; skip it and list what is readable.
                     let alias = host
                         .file_name()
                         .into_string()
-                        .map_err(|_| failure("local_record_invalid", "任务主机标识无效"))?;
-                    valid_alias(&alias)?;
+                        .ok()
+                        .filter(|name| valid_alias(name).is_ok());
+                    let Some(alias) = alias else { continue };
                     for item in fs::read_dir(host.path()).map_err(storage)? {
                         let path = item.map_err(storage)?.path();
                         if path.extension().is_some_and(|v| v == "json") {
-                            let plan_id =
-                                path.file_stem().and_then(|v| v.to_str()).ok_or_else(|| {
-                                    failure("local_record_invalid", "任务记录标识无效")
-                                })?;
-                            let mut record = self.checked_record(&path, valid_id(plan_id)?)?;
+                            let Ok(plan_id) = path
+                                .file_stem()
+                                .and_then(|v| v.to_str())
+                                .ok_or_else(|| failure("local_record_invalid", "任务记录标识无效"))
+                                .and_then(|stem| valid_id(stem))
+                            else {
+                                continue;
+                            };
+                            let Ok(mut record) = self.checked_record(&path, plan_id) else {
+                                continue;
+                            };
                             record["alias"] = json!(alias);
                             tasks.push(record);
                         }
                     }
                 }
             }
-            return Ok(json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks}}));
+            let installs = self.install_inventory()?;
+            return Ok(
+                json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks,"installations":installs}}),
+            );
         }
         let alias = valid_alias(field(&payload, "alias")?)?;
         if op == "add_host" {
@@ -1095,16 +1170,18 @@ impl Controller {
             .any(|host| host["alias"] == alias);
         if !registered {
             // Removing a display entry cannot erase or strand a durable task.
-            let existing_query = op == "reconnect"
-                && payload["plan_id"].as_str().is_some_and(|id| {
-                    valid_id(id).is_ok()
-                        && self
-                            .state
-                            .join("tasks")
-                            .join(alias)
-                            .join(format!("{id}.json"))
-                            .exists()
-                });
+            let existing_query = (op == "query_install"
+                && self.install_record_exists(alias, &payload))
+                || op == "reconnect"
+                    && payload["plan_id"].as_str().is_some_and(|id| {
+                        valid_id(id).is_ok()
+                            && self
+                                .state
+                                .join("tasks")
+                                .join(alias)
+                                .join(format!("{id}.json"))
+                                .exists()
+                    });
             if !existing_query {
                 return Err(failure(
                     "host_not_registered",
@@ -1113,15 +1190,27 @@ impl Controller {
             }
         }
         match op {
+            "prepare_runner" | "install_runner" | "query_install" => {
+                self.install_dispatch(alias, &payload)
+            }
             "connect" => {
                 exact_fields(&payload, &["op", "alias"], &[])?;
-                self.transport
-                    .call(alias, &json!({"command":"discover"}), false)
+                self.runner_call(
+                    alias,
+                    &json!({"command":"discover"}),
+                    false,
+                    self.binding(alias)?.as_ref(),
+                )
             }
             "request" => {
                 exact_fields(&payload, &["op", "alias", "request"], &[])?;
                 validate_request(&payload["request"])?;
-                self.transport.call(alias, &payload["request"], false)
+                self.runner_call(
+                    alias,
+                    &payload["request"],
+                    false,
+                    self.binding(alias)?.as_ref(),
+                )
             }
             "execute" | "reconnect" => {
                 let required = if op == "execute" {
@@ -1167,8 +1256,12 @@ impl Controller {
                     }
                     request["archive_passphrase"] = passphrase.clone();
                 }
+                if let Some(digest) = self.binding(alias)? {
+                    record["runner_digest"] = digest;
+                }
                 save(&path, &record)?; // Durable local intent precedes the one possible submission.
-                let response = self.transport.call(alias, &request, true)?;
+                let response =
+                    self.runner_call(alias, &request, true, record.get("runner_digest"))?;
                 self.observe(&path, &mut record, response)
             }
             _ => Err(failure("unsupported_operation", "不支持此远程操作")),
@@ -1177,9 +1270,23 @@ impl Controller {
 }
 
 #[tauri::command]
-pub async fn remote_request(payload: Value) -> Value {
+pub async fn remote_request(app: tauri::AppHandle, payload: Value) -> Value {
+    use tauri::Manager;
+    let bundles = if cfg!(debug_assertions) {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("runner-bundles")
+    } else {
+        match app.path().resource_dir() {
+            Ok(path) => path.join("remote-runners"),
+            Err(_) => {
+                return envelope(Err(failure(
+                    "bundle_unavailable",
+                    "无法定位 App 内的远端 runner",
+                )))
+            }
+        }
+    };
     match tauri::async_runtime::spawn_blocking(move || {
-        envelope(Controller::system().and_then(|controller| controller.dispatch(payload)))
+        envelope(Controller::system(bundles).and_then(|controller| controller.dispatch(payload)))
     })
     .await
     {
@@ -1211,6 +1318,7 @@ mod tests {
         .unwrap();
         fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
         let controller = Controller {
+            bundles: temp.path().join("bundles"),
             state: temp.path().join("state/remote"),
             config: temp.path().join("home/.ssh/config"),
             transport: Transport {
@@ -1253,6 +1361,7 @@ mod tests {
             .dispatch(json!({"op":"add_host","alias":"second-host"}))
             .unwrap();
         let reopened = Controller {
+            bundles: controller.bundles.clone(),
             state: controller.state.clone(),
             config: controller.config.clone(),
             transport: Transport::default(),
@@ -1347,6 +1456,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             "submission_unknown"
         );
         let reopened = Controller {
+            bundles: controller.bundles.clone(),
             state: controller.state,
             config: controller.config,
             transport: controller.transport,
@@ -1369,6 +1479,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     fn concurrent_submit_is_serialized_and_second_call_only_queries() {
         let (temp, controller) = fixture(RECEIPT);
         let other = Controller {
+            bundles: controller.bundles.clone(),
             state: controller.state.clone(),
             config: controller.config.clone(),
             transport: Transport {
@@ -1583,7 +1694,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         assert_eq!(removed["data"]["removed"], true);
         assert_eq!(
             controller.dispatch(json!({"op":"hosts"})).unwrap()["data"],
-            json!({"hosts":[],"tasks":[]})
+            json!({"hosts":[],"tasks":[],"installations":[]})
         );
         assert_eq!(
             controller

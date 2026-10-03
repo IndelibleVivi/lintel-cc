@@ -389,7 +389,8 @@ button.quiet-button{border:0;background:transparent;color:var(--muted);padding-l
 /* A paper-and-terminal workspace, with Clawd as a quiet companion. */
 :root{--sans:"Anthropic Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;--serif:"Anthropic Serif",Georgia,"Songti SC",serif;--mono:"Anthropic Mono","SFMono-Regular",Consolas,monospace;font-family:var(--sans)}
 h1,.brand strong{font-family:var(--serif)}
-.brand strong{font-weight:480;font-size:29px;letter-spacing:-1px}.brand-cursor{color:var(--accent);font-weight:500}
+.brand strong{font-weight:480;font-size:29px;letter-spacing:-1px}.brand-cursor{color:var(--accent);font-weight:500;animation:brand-blink 2.6s steps(1) infinite}
+@keyframes brand-blink{0%,55%{opacity:1}56%,100%{opacity:0}}
 .target-context{margin-right:auto}.target-bar .connection{display:none}.target-bar .target-line select{max-width:250px}.target-bar .eyebrow{font-size:9px}
 .fixture-banner{position:static;justify-content:center;padding:5px 14px;border-block:1px dashed var(--line);font-family:var(--mono);font-size:10px;flex-shrink:0;background:transparent}
 .theme-switch{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:3px;gap:1px;flex-shrink:0;background:var(--soft)}
@@ -431,7 +432,8 @@ h1,.brand strong{font-family:var(--serif)}
 button.composer-plus{width:30px;height:30px;min-height:30px;border:1px solid var(--line);border-radius:50%;color:var(--muted);padding:5px}
 .composer-policy{display:flex;align-items:center;gap:5px;margin-left:auto;color:var(--muted)}
 .composer-policy select{font-size:12px;color:var(--text);background:transparent;border:0;padding:5px 2px;max-width:180px}
-button.composer-submit{width:33px;height:33px;min-height:33px;border-radius:10px;padding:5px;background:#BB775C;border-color:#BB775C;color:#fff}
+button.composer-submit{width:33px;height:33px;min-height:33px;border-radius:10px;padding:5px;background:var(--accent);border-color:var(--accent);color:#fff}
+button.composer-submit:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong)}
 .composer-submit svg{transform:rotate(-90deg)}
 .home-tools{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 0 12px}
 .home-work-links{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
@@ -465,3 +467,83 @@ button.inspector-toggle{margin-left:auto;flex-shrink:0}
 .request-failure{min-width:0;margin-block:12px}.request-failure .notice small{display:block;margin-top:6px;font:11px/1.7 var(--mono);overflow-wrap:anywhere}.request-failure .notice p{margin-top:5px}.failure-guidance{padding:14px 16px;border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;font-size:12px;line-height:1.8}.failure-guidance h4{font-size:12px}.failure-guidance ol{padding-left:19px;margin:8px 0}.failure-guidance li+li{margin-top:7px}.failure-guidance details{margin-top:12px}.failure-guidance summary{cursor:pointer}.failure-guidance pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 var(--mono);max-height:200px;overflow:auto;background:var(--soft);padding:12px;border-radius:6px;margin-top:8px}.failure-guidance .button-row{margin-top:12px;flex-wrap:wrap}.failure-guidance .button-row>span{font-size:11px;color:var(--muted)}.failure-guidance .text-button{font-size:12px}.diagnostic-command{padding:10px;background:var(--soft);border-radius:6px;margin-top:12px}.diagnostic-command>span{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}.diagnostic-command code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}.failure-uncertain{margin-top:12px;color:var(--accent-strong)}
 .resource-links{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:12px;font-size:12px}.resource-link a{color:var(--accent-strong);text-decoration:underline;text-underline-offset:3px}.resource-link a:focus-visible{outline:1px solid var(--focus);outline-offset:3px}.resource-error{display:block;color:var(--muted);font-size:11px}.resource-error code{display:block;font-size:11px;overflow-wrap:anywhere}.developer-resources p{font-size:12px;line-height:1.8;margin-top:8px;color:var(--muted)}.developer-resources h4{font-size:13px;margin-top:22px}.developer-resources .small-print{font-size:11px}
 @media(max-width:760px){.host-row{flex-wrap:wrap}.host-row>.host-actions{margin-left:auto}.remote-task{flex-wrap:wrap}.remote-task>div{flex-basis:100%}.remote-task>button{margin-left:auto}.remote-removed{flex-wrap:wrap}}
+
+/* Warm-light pass: morning paper by day, quiet moonlight by night. */
+:root{--ambient:radial-gradient(62% 46% at 68% -6%,#EAC79F33,transparent 74%),radial-gradient(48% 40% at 4% 106%,#B9C4A61f,transparent 72%);--clawd-halo:radial-gradient(closest-side,#EDCFA952,transparent 74%);--clawd-ground:#40301B21;--shadow-soft:0 1px 2px #40301B07,0 6px 18px #40301B08;--shadow-lift:0 14px 34px #40301B0f,0 2px 6px #40301B09}
+:root[data-theme=dark]{--ambient:radial-gradient(56% 42% at 74% -5%,#C9D2E82e,transparent 72%),radial-gradient(1.4px 1.4px at 14% 16%,#E8E4D959,#E8E4D900 100%),radial-gradient(1.2px 1.2px at 31% 9%,#E8E4D945,#E8E4D900 100%),radial-gradient(1.6px 1.6px at 52% 19%,#E8E4D94f,#E8E4D900 100%),radial-gradient(1.1px 1.1px at 63% 7%,#E8E4D938,#E8E4D900 100%),radial-gradient(1.3px 1.3px at 87% 22%,#E8E4D947,#E8E4D900 100%),radial-gradient(1.2px 1.2px at 42% 30%,#E8E4D92e,#E8E4D900 100%),radial-gradient(1.5px 1.5px at 76% 33%,#E8E4D933,#E8E4D900 100%),radial-gradient(44% 36% at 6% 108%,#3E4A3B2e,transparent 72%);--clawd-halo:radial-gradient(closest-side,#CBD4E62e,transparent 74%);--clawd-ground:#00000059;--shadow-soft:0 1px 2px #0006,0 6px 18px #0005;--shadow-lift:0 14px 34px #0007,0 2px 6px #0006}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ambient:radial-gradient(56% 42% at 74% -5%,#C9D2E82e,transparent 72%),radial-gradient(1.4px 1.4px at 14% 16%,#E8E4D959,#E8E4D900 100%),radial-gradient(1.2px 1.2px at 31% 9%,#E8E4D945,#E8E4D900 100%),radial-gradient(1.6px 1.6px at 52% 19%,#E8E4D94f,#E8E4D900 100%),radial-gradient(1.1px 1.1px at 63% 7%,#E8E4D938,#E8E4D900 100%),radial-gradient(1.3px 1.3px at 87% 22%,#E8E4D947,#E8E4D900 100%),radial-gradient(1.2px 1.2px at 42% 30%,#E8E4D92e,#E8E4D900 100%),radial-gradient(1.5px 1.5px at 76% 33%,#E8E4D933,#E8E4D900 100%),radial-gradient(44% 36% at 6% 108%,#3E4A3B2e,transparent 72%);--clawd-halo:radial-gradient(closest-side,#CBD4E62e,transparent 74%);--clawd-ground:#00000059;--shadow-soft:0 1px 2px #0006,0 6px 18px #0005;--shadow-lift:0 14px 34px #0007,0 2px 6px #0006}
+}
+.workspace{background-image:var(--ambient);background-color:var(--bg)}
+.sidebar{background:linear-gradient(180deg,var(--sidebar) 30%,color-mix(in srgb,var(--sidebar) 82%,var(--bg)))}
+.nav-item.active{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.sidebar-environment.chosen{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+
+/* Home: the companion stands in his own little pool of light. */
+.home-greeting{flex-direction:column;text-align:center;gap:2px;margin-bottom:40px}
+.home-greeting>.clawd{z-index:5}
+.home-greeting .clawd::before{content:'';position:absolute;inset:-34px -46px;background:var(--clawd-halo);z-index:-1;pointer-events:none}
+.home-greeting .clawd::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:86px;height:11px;border-radius:50%;background:radial-gradient(closest-side,var(--clawd-ground),transparent 78%);pointer-events:none;transition:opacity .3s}
+.home-greeting .clawd.is-hiding::after,.home-greeting .clawd.is-flinging::after{opacity:0}
+.home-greeting .clawd-scene{width:134px;height:89px}
+.home-greeting .clawd-flight{top:calc(100% + 4px)}
+.home-greeting>div{display:flex;flex-direction:column;align-items:center}
+.home-greeting .home-title{margin-top:26px}
+.home-greeting p{margin-top:9px}
+.environment-composer{box-shadow:var(--shadow-lift),inset 0 1px #ffffff75;transition:border-color .16s,box-shadow .16s}
+:root[data-theme=dark] .environment-composer{box-shadow:var(--shadow-lift),inset 0 1px #ffffff12}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .environment-composer{box-shadow:var(--shadow-lift),inset 0 1px #ffffff12}
+}
+.environment-composer:focus-within{border-color:color-mix(in srgb,var(--focus) 55%,var(--line))}
+.surface,.job-list,.drift-result,.capability-list{box-shadow:var(--shadow-soft)}
+.preset.chosen{box-shadow:var(--shadow-soft)}
+.recipe.chosen{box-shadow:var(--shadow-soft)}
+.modal{box-shadow:var(--shadow-lift)}
+.toast{box-shadow:var(--shadow-lift)}
+.clawd-pocket{box-shadow:var(--shadow-lift)}
+
+@media(max-width:1000px){.home-greeting .clawd-scene{width:112px;height:75px}}
+@media(max-width:760px){.home-greeting .clawd-scene{width:98px;height:65px}.home-greeting .home-title{margin-top:22px}}
+@media(prefers-reduced-motion:reduce){.home-greeting .clawd::after{transition:none}}
+
+/* Versioned policy conditions share the existing paper surfaces. */
+.policy-evidence{padding:0 20px 16px}
+.policy-evidence .notice p{margin:6px 0 0}
+.policy-condition{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:16px 20px;border-top:1px solid var(--line)}
+.policy-condition select{padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:var(--paper);min-height:38px}
+.policy-condition small{grid-column:1/-1;color:var(--muted)}
+.policy-rule{display:grid;gap:5px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
+.policy-rule code,.policy-release code{overflow-wrap:anywhere;white-space:normal}
+.policy-rule small{color:var(--muted)}
+.policy-release{border-top:1px solid var(--line)}
+@media(max-width:600px){.policy-condition{grid-template-columns:minmax(0,1fr)}.policy-condition select{width:100%}}
+
+.install-facts { display: grid; gap: 12px; margin: 18px 0; }
+.install-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
+.install-facts dt { color: var(--muted); font-size: 12px; }
+.install-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.install-facts code { white-space: normal; overflow-wrap: anywhere; }
+.remote-install ol { font-size: 13px; line-height: 1.7; padding-left: 24px; }
+.host-actions { flex-wrap: wrap; }
+
+.remote-install { margin: 24px 0; padding: 23px 24px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-soft); }
+.install-heading { display: flex; align-items: center; gap: 13px; }
+.install-heading > div { flex: 1; min-width: 0; }
+.install-heading .eyebrow { letter-spacing: .2px; font-size: 11px; overflow-wrap: anywhere; }
+.install-heading h3 { margin: 3px 0 0; font-family: var(--serif); font-weight: 500; font-size: 23px; line-height: 1.4; }
+.install-symbol { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; color: var(--accent); background: var(--accent-bg); border-radius: 12px; }
+.install-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 19px; font-size: 11px; color: var(--muted); }
+.install-meta > span:first-child { padding: 3px 9px; border-radius: 6px; color: var(--accent-strong); background: var(--accent-bg); }
+.install-description { max-width: 58ch; margin: 15px 0 10px; font-size: 13px; line-height: 1.8; }
+.install-scope { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--text); line-height: 1.7; }
+.install-scope svg { flex-shrink: 0; margin-top: 3px; color: var(--accent); }
+.install-details { margin: 19px 0 20px; color: var(--muted); font-size: 12px; }
+.install-details > summary { display: flex; align-items: center; gap: 6px; width: fit-content; cursor: pointer; list-style: none; }
+.install-details > summary::-webkit-details-marker { display: none; }
+.install-details[open] > summary svg { transform: rotate(90deg); }
+.install-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 -24px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--soft); border-radius: 0 0 16px 16px; }
+.install-footer small { color: var(--muted); font-size: 11px; max-width: 34ch; line-height: 1.7; }
+.install-footer button { flex-shrink: 0; }
+.install-records > summary { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.install-records > summary span { padding: 0 6px; border-radius: 4px; background: var(--soft); font-size: 11px; }
+.install-records .remote-task details { margin-top: 5px; font-size: 11px; color: var(--muted); }
+@media (max-width: 950px) { .install-footer { flex-wrap: wrap; } .install-heading h3 { font-size: 21px; } }

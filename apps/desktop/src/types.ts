@@ -1,20 +1,31 @@
 export interface Environment {
   id: string; name: string; host: string; surface: string; root: string;
   executable: string | null; ownership: string; status: string;
+  product_version?: string | null; product_evidence?: ProductEvidence;
+}
+export interface ProductEvidence { version: string | null; source: 'native_version_path' | 'npm_package' | 'unknown'; executable: string | null }
+export type TrustedDevices = 'unknown' | 'required' | 'not_required';
+export interface PolicyAssessment {
+  rule_version: string; product: ProductEvidence;
+  rules: { key: string; label: string; value: string | null; disabled: boolean | null; semantics: 'nonempty' | 'boolean'; scope: string; effect_timing: string }[];
+  remote_control: { status: 'blocked' | 'conditional' | 'configuration_compatible'; summary: string; trusted_devices: TrustedDevices; trusted_devices_source: string; version_family: string; runtime_verified: false; blockers: { key: string; value: string | null; status: string; reason: string; source: string }[]; unverified: string[] };
+  keep_remote_control?: boolean; release_settings?: string[];
 }
 export interface Capability { name: string; status: string; reason: string }
 export interface Setting { key: string; label: string; value: string | null; source: string; effect_timing: string; status: string }
-export interface Inspection { environment: Environment; settings: Setting[]; assets: { category: string; count: number; bytes: number }[]; warnings: string[] }
+export interface Inspection { environment: Environment; settings: Setting[]; assets: { category: string; count: number; bytes: number; complete?: boolean }[]; warnings: string[]; policy?: PolicyAssessment }
 export interface Plan {
   id: string; hash: string; environment_id: string; title: string;
   changes: { key: string; label: string; before: string | null; after: string | null; path: string }[];
   preserves: string[]; warnings: string[]; actions: { id: string; label: string; reversible: boolean }[];
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
+  policy?: PolicyAssessment;
 }
 export interface Receipt {
   id: string; plan_id: string; environment_id: string; title: string; status: string;
   steps: { id: string; label: string; status: string; message: string }[];
   created_at: string; restorable: boolean; warnings: string[];
+  policy?: PolicyAssessment;
   local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
 }
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }
@@ -24,8 +35,8 @@ export interface Api {
   discover: { request: {}; response: { environments: Environment[]; capabilities: Capability[] } };
   register: { request: { name: string; root: string }; response: Environment };
   create_environment: { request: { name: string }; response: Environment };
-  inspect: { request: { environment_id: string }; response: Inspection };
-  plan_policy: { request: { environment_id: string; preset: 'preserve' | 'reduce'; keep_remote_control: boolean }; response: Plan };
+  inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
+  plan_policy: { request: { environment_id: string; preset: 'preserve' | 'reduce'; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[] }; response: Plan };
   plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[] }; response: Plan };
   plan_restore: { request: { job_id: string }; response: Plan };
   execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
@@ -43,4 +54,4 @@ export interface Api {
   launch: { request: { environment_id: string }; response: { status: string; message: string } };
   export_support: { request: {}; response: unknown };
 }
-export type Draft = { preset: 'preserve' | 'reduce'; keepRemoteControl: boolean };
+export type Draft = { preset: 'preserve' | 'reduce'; keepRemoteControl: boolean; trustedDevices?: TrustedDevices; releaseSettings?: string[] };
