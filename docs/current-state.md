@@ -1,16 +1,20 @@
 # 当前状态
 
-2026-10-03 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
+2026-10-04 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
 
-## 浏览器首次连接（App 内置 host 候选）
+## 浏览器首次连接（App 内置扩展与 host 候选）
 
-桌面不再要求用户编译 native host 或输入程序路径。App 自带当前平台的独立 executable；选择浏览器与精确扩展 ID，先只读预览，再批准安装到当前用户固定版本／摘要目录并注册，profile 短码另行批准。本安装器管理的旧注册可对照后更新，其他来源或修改过的注册／组件保留并拒绝覆盖。整份批准计划重新核对；已成功批准重复调用只查询。授权失败不发布 manifest，修复状态后可重新预览；独立 CLI 手工 installer 保留，桌面已退役其 arbitrary host-path 操作。
+App 伴随扩展文件准备已接通：非 fixture Chromium / Firefox 包随 App 构建，桌面选择浏览器后只读预览，再批准准备稳定的当前用户目录。Chrome / Edge 共用 Chromium 目录，Firefox 独立目录；受管更新保持加载路径，非受管或被改动的内容拒绝覆盖，整份计划与当前文件重新核对。准备后的 Finder 入口和路径复制只交接文件，目标 profile 仍需浏览器开发加载。安装器中断切换须新的恢复预览与批准；原批准资源改变则停止恢复，保留文件供核对，不显示成完成。
 
-本轮相关默认检查 3/3 通过：desktop 44 passed＋2 ignored，native host 12 passed，typecheck/Vite build 成功。macOS App 约 16.91 MiB，包含实际 787440-byte host 与两种既有 Linux runner；App 内 host 大小／SHA 与 metadata 一致。独立测试从 **App 包内资源** 安装到合成 home，使用注册文件的真实可执行路径验证 native frames 与非授权 extension 拒绝（1/1，0 ignored）。构建页面的合成 native bridge 检查预览不安装、整份批准、浏览器切换撤回预览、过期／缺资源／冲突／更新／重复核对、单独配对、键盘和 Day/Night 1120／900 布局；视觉仍属候选，未验证真实个人浏览器连接。
+随后填入准确扩展 ID，另行预览并批准内置 Native Messaging host 安装，再核对 profile 短码。host 稳定目录／精确注册／owned 更新与 query-only 重复核对保留；独立 CLI 手工 installer 仍有实际用途，桌面不接受任意 host 路径。目录准备、组件注册、profile 配对与在线轮询是不同事实。
 
-同一源码 clean `71b54e2` 已通过 [CI 验收](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37134544628)：macOS／Ubuntu 默认检查各 12/12，无跳过；Ubuntu 独立 OpenSSH runtime 1/1、0 ignored，通过原有静态 musl 上传／丢 ACK 查询／custom 任务与 PTY 启动。该 CI 没有运行正式浏览器验收或 macOS App 打包；上述包内 host 实验与 App 构建是本机独立证据。
+本轮 desktop 检查 57 passed、0 failed、0 ignored，明确过滤 1 项独立 Linux runtime；其中两项分别从 **App 包内资源** 安装实际扩展／host 到临时 home，验证扩展文件完全一致、未创建浏览器 profile 或注册，以及真实 host native frames／非授权 extension 拒绝。扩展安装器 12 项含实际资源测试通过，覆盖完整批准、资源／目标变更、fixture 拒绝、受管更新、非受管保留、symlink 和目录切换中断／部分清理恢复。TypeScript、Vite 与 Tauri App build 通过。
 
-默认构建排除仅供本机使用的字体和加载列表，App 中无 woff2；六份本地文件保留，开发服务器和显式 local-candidate 仍可使用。内置 host 只支持 native 同架构构建，跨架构／universal App 会明确拒绝。扩展仍需开发加载，未签名／上架；完整持久 browser restart 两阶段清理仍未通过。未安装、激活或发布 App，真实 VPS 仍未写入。
+构建页面的合成 native bridge 检查扩展预览不安装、整份批准、有限 reveal、路径复制（合成 clipboard）、三种浏览器说明、更新／重复核对／中断继续与冲突禁用、过期／缺资源／冲突、浏览器切换撤回状态、pending 禁用、单独配对、键盘与 Day/Night 1120／900 布局；长路径可读，无横向溢出。视觉仍属候选，未证明 native WebKit、Finder 的实际展示或浏览器加载。
+
+当前 macOS App 约 17.17 MiB，含 Chromium 47799 bytes、Firefox 47961 bytes（各 8 个文件），实际 bytes／摘要与包内 inventory 一致。独立 host 787440 bytes 与两种既有 Linux runner 的大小／SHA 也相符。默认包无 woff2，本地六份字体保留；开发／显式 local-candidate 可用本地字体。host 只支持 native 同架构构建，跨架构／universal 明确拒绝。App 未安装到 Applications、激活、公证或发布；真实 VPS 未写入。
+
+前轮 clean `71b54e2` 已通过 [CI 验收](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37134544628)：macOS／Ubuntu 默认各 12/12，Ubuntu 独立 OpenSSH runtime 1/1、0 ignored。该证据对应前轮源码；本轮的 App 构建、包内资源与页面检查是本机独立证据。完整持久 `runtime.onStartup` 两阶段清理仍未通过，未伪造启动世代或削弱 active writer 断言；扩展仍需开发加载，Firefox 临时加载退出后移除，签名／商店分发和 U01 非开发者旅程尚未验收。
 
 ## 已交付的自定义保护（前轮证据）
 

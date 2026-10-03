@@ -41,7 +41,8 @@
     },
     "resources": {
       "runner-bundles/": "remote-runners/",
-      "browser-host-bundle/": "browser-host/"
+      "browser-host-bundle/": "browser-host/",
+      "browser-extension-bundle/": "browser-extensions/"
     }
   }
 }

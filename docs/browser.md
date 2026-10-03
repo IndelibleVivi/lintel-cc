@@ -30,9 +30,21 @@ WebRTC 不是设备级无泄漏证明。站点代理不代表 DNS、WebRTC、QUI
 
 第二次确认的浏览器 callback/Promise 成功记为 `browser-acknowledged`。Firefox 容器无法按 store 注销 Service Worker，仍明确标记 `container-frames-closed-service-workers-not-verified`，不宣称容器后台写入已完全停止。容器操作需要可选 `cookies` 权限，用于验证 store 存在并识别其标签；未知 store 在修改前拒绝。没有通用存储枚举能力时不显示“零残留”。可选 `cookies` 权限已授予时仅返回剩余数量，Cookie 值不离开扩展执行上下文，也不进入 journal。正式包默认不申请该权限，合成测试包单独预授权。
 
-## 构建与开发安装
+## App 内准备与开发加载
 
-仓库根目录：
+macOS App 已带 Chromium / Firefox 伴随扩展，不要求桌面用户安装 Node、拿源码或编译 host。首页“浏览器”→“连接一个新的 profile”选择目标浏览器，按三步进行：
+
+1. “预览扩展目录”：只读核对版本、大小、文件清单和目标目录；批准后才准备文件。Chrome / Edge 共用当前用户 `~/Library/Application Support/Lintel/browser-extensions/chromium/`，Firefox 使用同级 `firefox/`。准备完成后可在 Finder 打开，或复制目录／manifest 路径。
+2. 在目标 profile 加载扩展。Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`，启用开发者模式，选择“Load unpacked / 加载已解压的扩展”和已准备的目录。Firefox 打开 `about:debugging#/runtime/this-firefox`，选择“Load Temporary Add-on”和目录里的 `manifest.json`。随后将管理页中的准确扩展 ID 填到 App 第二步，预览并另行批准本地连接。
+3. 生成配对请求，在目标扩展输入挑战值，核对两端短码，再批准这份 profile。目录准备、本地连接注册、profile 配对、最近轮询在线是四个不同事实。
+
+准备只复制 App 内置文件，不写浏览器 profile、偏好、扩展加载登记、native manifest 或 allowlist。目录保持稳定，移动 App 不影响浏览器加载路径；原有受管文件可预览后批准更新，随后要在浏览器重新加载。非受管目录、被改动的文件或 ownership 冲突会拒绝覆盖；批准前重新核对整份计划。上次准备中断时，新的预览会列出待完成的受管目录切换；重新批准后才继续，不把备份或暂存目录当成已完成。未完成切换期间 App 资源版本改变会阻止恢复；需先核对原版本资源和目录变化，保留现有状态，不自动改用新版本继续。已准备的相同版本可重复核对，无须重写。
+
+这仍是开发加载：Chrome / Edge 需要开发者模式，Firefox 临时扩展在退出后移除，长期 Firefox 安装需要签名。商店／签名分发与非开发者首次安装验收尚未完成。文件准备成功不代表浏览器已经加载，更不代表当前两阶段清理已通过验收。
+
+## 独立构建与开发安装
+
+以下供开发者或独立 operator 使用；App 用户可直接走上面的目录准备。仓库根目录：
 
 ```sh
 node extensions/browser/scripts/build.mjs
@@ -55,9 +67,9 @@ Firefox：`about:debugging` → This Firefox → Load Temporary Add-on → 选�
 
 **桌面用户：** 在首页“浏览器”打开“连接一个新的 profile”，选择 Chrome / Edge / Firefox，输入目标扩展的准确 ID，点击“预览本地连接安装”。App 自带当前平台的 host，桌面无需构建或指定可执行路径。预览只读；显示版本、大小、组件摘要、安装路径、注册内容和既有注册。批准安装后，组件放到当前用户的 `~/Library/Application Support/Lintel/browser-host/<version>-<sha256>/`，注册文件指向其中 `lintel-browser-host`，不会随 App 移动而改变。
 
-桌面安装目前支持 macOS。相同组件／注册可核对；本安装器管理的旧版本可在对照旧注册后批准更新，旧二进制保留。其他来源的注册、修改过的组件或失配的 ownership 记录会阻止覆盖；未把它们自动认领。整个批准计划在写入前重查，过期时需重新预览。安装会授权该准确 extension ID，**短码配对仍是下一次独立批准**；成功不表示 profile 在线。扩展本身仍按上节开发加载，App 内置 host 不代表扩展已签名、上架或两阶段清理已验收。
+桌面安装目前支持 macOS。相同组件／注册可核对；本安装器管理的旧版本可在对照旧注册后批准更新，旧二进制保留。其他来源的注册、修改过的组件或失配的 ownership 记录会阻止覆盖；未把它们自动认领。整个批准计划在写入前重查，过期时需重新预览。安装会授权该准确 extension ID，**短码配对仍是下一次独立批准**；成功不表示 profile 在线。扩展可由 App 准备固定目录后按上节开发加载；内置组件不代表扩展已签名、上架或两阶段清理已验收。
 
-`npm run desktop:build` 自动编译并打包独立 host，目前要求与 Rust host 相同架构的 native 构建；跨架构与 universal App 构建会明确拒绝，避免打入错误组件。开发资源可在 `apps/desktop` 运行 `npm run prepare:browser-host` 准备；这里只生成 App 资源，不注册个人浏览器。资源缺失时 App 返回具体 `bundle_unavailable` 提示。Linux 独立 CLI 仍按以下路径使用手工安装器；桌面不再开放手填 host 路径的安装操作。
+`npm run desktop:build` 自动构建非 fixture Chromium / Firefox 扩展并打包独立 host，目前要求与 Rust host 相同架构的 native 构建；跨架构与 universal App 构建会明确拒绝，避免打入错误组件。开发资源可在 `apps/desktop` 运行 `npm run prepare:browser-extension` 与 `npm run prepare:browser-host` 准备；这里只生成 App 资源，不注册个人浏览器。资源缺失时 App 返回具体 `bundle_unavailable` 提示。Linux 独立 CLI 仍按以下路径使用手工安装器；桌面不再开放手填 host 路径的安装操作。
 
 **独立 CLI：** 以下命令仍供直接使用 host 的 operator 使用。
 
@@ -103,6 +115,9 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 | 输入 | data |
 | --- | --- |
+| `{"op":"bundled_extension_plan","browser":"chrome"}` | **仅桌面**：只读 `{schema,browser,package,version,sha256,bytes,files,extension_path,manifest_path,resource_path,platform,effect,existing_installation,existing_files,recovery,status,install_action}`；Chrome / Edge 映射到 chromium，Firefox 到 firefox。status 为 ready / already-installed / conflict，install_action 为 install / upgrade / none / blocked；recovery 为 null 或上一批准准备的 `{phase,action,message,transaction,stage_path,previous_path,stage_files,stage_record,previous_installation,previous_files}` |
+| `{"op":"install_bundled_extension","approved_plan":{...}}` | **仅桌面**：批准并复查完整计划，返回 `{status,plan,loading:"required",pairing:"required"}`；status 为 installed / updated / already-installed。只准备固定目录；发生中断不能返回成功，需新的恢复预览与批准 |
+| `{"op":"reveal_bundled_extension","browser":"chrome"}` | **仅桌面**：核对受管且完整的固定扩展目录后在 Finder 打开，返回 `{status:"revealed",browser,package,extension_path}`；不接受 path 或 URL；没有已完成的受管目录时拒绝 |
 | `{"op":"bundled_host_plan","browser":"chrome","extension_id":"EXTENSION_ID"}` | **仅桌面**：只读 `{schema,browser,extension_id,version,sha256,bytes,host_path,manifest_path,manifest,state_path,effect,platform,architecture,existing_manifest,existing_registration,existing_host,installed_host,status,install_action}`。status 为 ready / already-registered / conflict；install_action 为 install / upgrade / none / blocked |
 | `{"op":"install_bundled_host","approved_plan":{...}}` | **仅桌面**：完整 frozen plan 批准与复查，返回 `{status,plan,pairing:"required"}`。status 为 registered / updated / already-registered；相同已成功批准只查询，不再次写入或授权；blocked 拒绝 |
 | `{"op":"installation_plan","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{browser,extension_id,manifest_path,manifest,state_path,effect}`；只预览当前用户固定路径 |

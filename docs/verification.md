@@ -55,8 +55,9 @@ or skipped, which is that host's environment, not a change to the check.
 
 The default desktop build already runs TypeScript checking; `desktop-typecheck` remains separately selectable.
 
-`desktop-tauri-bundle` also prepares and packages the existing browser native-host
-executable before the frontend/native build. It does not register a personal
+`desktop-tauri-bundle` also prepares non-fixture Chromium / Firefox extension
+files and the existing browser native-host executable before the frontend/native
+build. It does not register a personal
 browser. The ordinary frontend build excludes operator-supplied local fonts;
 explicit `--mode local-candidate` is a local-only artifact, not the default
 candidate build.
@@ -79,6 +80,25 @@ App's `Contents/Resources/browser-host` directory to run the same ignored test
 against the packaged artifact. This variable is read only by that synthetic test,
 not by production IPC. The host packaging helper currently rejects cross-target
 and universal App builds; use a matching native macOS architecture.
+
+Bundled-extension tests cover read-only inventory previews, complete approval,
+fixed-user preparation, owned updates, stale/unowned/symlink conflicts and
+explicit recovery of interrupted directory replacement on synthetic homes.
+To exercise the actual generated extension resources:
+
+```sh
+npm --prefix apps/desktop run prepare:browser-extension
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml actual_packaged_extensions_install_from_bundle_with_no_profile_mutation -- --ignored
+```
+
+After building the App, set the test-only
+`LINTEL_TEST_BROWSER_EXTENSION_RESOURCES` to its
+`Contents/Resources/browser-extensions` directory to verify the packaged files.
+This tests the App-resource-to-user-directory boundary and absence of browser
+profile/native-host mutation. It does not load an extension or establish
+persistent browser installation, `runtime.onStartup` or the full two-stage clear.
+The Finder action accepts a named browser only; the actual user interaction with
+Finder and the browser's load picker remains independent runtime acceptance.
 
 ### Categories
 

@@ -13,3 +13,8 @@
 
 # Operator-supplied fonts have no established redistribution grant.
 /public/local-fonts/
+
+# Generated canonical App extension resources.
+/src-tauri/browser-extension-bundle/manifest.json
+/src-tauri/browser-extension-bundle/chromium/
+/src-tauri/browser-extension-bundle/firefox/

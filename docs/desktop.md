@@ -45,9 +45,9 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 首页或清理页的“浏览器工作空间”提供配对、WebRTC、站点清理、站点权限、站点代理、站点阻断、临时暂停规则和独立的全 profile HTTP cache 清理。Firefox 不支持的站点权限、站点代理和 CacheStorage 适配明确显示限制。
 
-首次安装在首页“浏览器”→“连接一个新的 profile”：先加载开发扩展，选择浏览器并填入精确扩展 ID，点击“预览本地连接安装”。App 内置 Native Messaging host，无需单独构建或填写程序路径。预览显示版本、大小、固定组件位置、注册文件和授权 ID；详细内容可对照 manifest 与组件 SHA-256。批准后安装到当前用户的 Lintel 固定目录，移动 App 不改变浏览器所指向的组件位置。已有相同注册可核对；已有本安装器管理的版本先展示更新预览，其余冲突保留并拒绝覆盖。批准前复查整份计划，文件或注册变化需重新预览。
+首次连接在首页“浏览器”→“连接一个新的 profile”按三步进行。先选择浏览器，点击“预览扩展目录”，核对版本、文件范围与当前用户目录后“批准准备扩展目录”；App 已包含两种正式站点配置的开发包，无需用户拿源码或运行构建。准备后可在 Finder 打开、复制目录路径，并按旁边说明在目标 profile 加载。Chrome / Edge 使用同一固定 Chromium 目录，Firefox 选择 `manifest.json` 临时加载。受管更新保持路径，随后需在浏览器重新加载；外部或改动过的文件拒绝覆盖，切换浏览器会撤回原预览。第二步填入准确扩展 ID，点击“预览本地连接安装”。App 内置 Native Messaging host，无需单独构建或填写程序路径。预览显示版本、大小、固定组件位置、注册文件和授权 ID；详细内容可对照 manifest 与组件 SHA-256。批准后安装到当前用户的 Lintel 固定目录，移动 App 不改变浏览器所指向的组件位置。已有相同注册可核对；已有本安装器管理的版本先展示更新预览，其余冲突保留并拒绝覆盖。批准前复查整份计划，文件或注册变化需重新预览。
 
-安装只完成组件与精确 extension ID 授权，不表示 profile 已配对或在线。继续生成配对请求，在目标扩展输入挑战值，核对两端短码后另行批准。App 缺少组件时给出具体提示；扩展仍是开发安装，未签名／上架，完整持久 browser restart 清理尚未验收。开发扩展与独立 CLI host 的取得方式见 [浏览器指南](browser.md)。
+安装只完成组件与精确 extension ID 授权，不表示 profile 已配对或在线。继续生成配对请求，在目标扩展输入挑战值，核对两端短码后另行批准。App 缺少组件时给出具体提示；扩展仍是开发安装，未签名／上架，完整持久 browser restart 清理尚未验收。App 内目录准备、各浏览器加载与独立 CLI host 的用法见 [浏览器指南](browser.md)。
 
 桌面提交只准备请求，用户仍需在目标扩展中核对与批准。站点清理先隔离请求、关闭相关页面并注销 Service Worker，随后显示“等待浏览器重启后继续”；用户重启该浏览器并再次批准后才删除其余存储。已完成的数据删除不可恢复，清理隔离需在扩展内单独解除。可恢复的 WebRTC、权限、代理与阻断设置提供独立恢复预览。提交前保留操作 ID；回复丢失时查询原任务，不自动创建新 ID 重做。
 
@@ -108,7 +108,7 @@ npm run build
 npm run desktop:build
 ```
 
-`desktop:build` 的 pre-build 会编译现有独立 browser host 并准备资源，App 随包包含当前平台可执行文件；不会安装到个人浏览器目录。目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 构建会明确拒绝。开发时若需实际测试内置组件，可先运行 `npm run prepare:browser-host`，但任何注册仍需在 App 中预览并批准。前端 `npm run build` 不运行 host 安装器。
+`desktop:build` 的 pre-build 会从 `extensions/browser/src` 构建非 fixture 的 Chromium / Firefox 扩展，生成 `browser-extension-bundle` 资源，并编译现有独立 browser host。App 随包包含这两种扩展和当前平台 host；构建本身不会准备用户扩展目录或注册浏览器。目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 构建会明确拒绝。开发时可运行 `npm run prepare:browser-extension` 与 `npm run prepare:browser-host` 准备资源；复制目录和注册都仍需在 App 中预览并批准。前端 `npm run build` 不运行这些安装器。
 
 同时开发时可用 `LINTEL_FIXTURE_PORT=1422 npm run dev:synthetic`，默认仍是 1420。fixture bridge 的端口、Origin 与 Host 校验使用同一配置。合成模式所有 core 状态与发现都位于临时目录，界面持续标明测试空间；原生浏览器、SSH、认证命令与网络模块不会在网页中伪造成功。新增请求必须进入明确 allowlist；登记路径不能逃出合成 home。
 

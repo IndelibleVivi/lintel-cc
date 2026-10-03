@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon, Notice, formatBytes } from './ui';
+import BrowserExtensionSetup from './BrowserExtensionSetup';
 
 type HostPlan = {
   browser: string; extension_id: string; version: string; sha256: string; bytes: number;
@@ -21,12 +22,14 @@ export default function BrowserHostSetup({ native, busy, request, run, onInstall
   const [plan, setPlan] = useState<HostPlan | null>(null);
   const actionName = plan?.install_action === 'upgrade' ? '批准更新本地连接' : plan?.install_action === 'none' ? '核对已安装组件' : '批准安装本地连接';
   return <div className="browser-host-setup">
-    <div className="browser-host-fields">
+    <div className="browser-target-field">
       <label className="field">目标浏览器<select disabled={busy} value={browser} onChange={event => {
         setBrowser(event.target.value); setExtensionId(event.target.value === 'firefox' ? 'lintel@lintel.local' : ''); setPlan(null);
       }}>{[['chrome', 'Chrome'], ['edge', 'Edge'], ['firefox', 'Firefox']].map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
-      <label className="field">已安装扩展的 ID<input disabled={busy} value={extensionId} onChange={event => { setExtensionId(event.target.value); setPlan(null); }} spellCheck={false} autoComplete="off" placeholder="扩展管理页中的 ID"/><small>{browser === 'firefox' ? 'Lintel 的 Firefox 扩展 ID 固定；临时扩展会在退出浏览器后移除。' : '从目标 profile 的扩展管理页复制。每份 profile 仍需单独配对。'}</small></label>
     </div>
+    <BrowserExtensionSetup key={browser} browser={browser} native={native} busy={busy} request={request} run={run}/>
+    <h4 className="browser-setup-step"><span>2</span>安装本地连接</h4>
+    <label className="field browser-extension-id">已安装扩展的 ID<input disabled={busy} value={extensionId} onChange={event => { setExtensionId(event.target.value); setPlan(null); }} spellCheck={false} autoComplete="off" placeholder="扩展管理页中的 ID"/><small>{browser === 'firefox' ? 'Lintel 的 Firefox 扩展 ID 固定；临时扩展会在退出浏览器后移除。' : '从目标 profile 的扩展管理页复制。每份 profile 仍需单独配对。'}</small></label>
     <p className="small-print">App 自带本地连接组件，无需编译或填写程序路径。预览只检查；批准后安装到当前用户的 Lintel 目录，并注册给这个扩展 ID。</p>
     <button disabled={busy || !native || !extensionId.trim()} onClick={() => void run(async () => {
       setPlan(null); setPlan(await request<HostPlan>({ op: 'bundled_host_plan', browser, extension_id: extensionId.trim() }));
