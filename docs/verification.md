@@ -108,7 +108,7 @@ default synthetic checks. All server/config/key files are temporary; sshd runs
 under the current user on loopback with PAM disabled. It does not edit accounts,
 system sshd or services.
 
-Actual VPS logout/cgroup, host reboot, aarch64 runtime and macOS Terminal GUI remain
+Actual VPS logout/cgroup, host reboot, aarch64 runtime and the complete macOS Terminal-to-VPS GUI journey remain
 independent gaps; this Linux fixture does not prove those behaviors.
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)

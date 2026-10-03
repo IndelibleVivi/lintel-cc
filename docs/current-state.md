@@ -6,7 +6,7 @@
 
 远端环境详情与回执“打开 Claude”已接通：只读 preflight 后请求 macOS Terminal，以固定严格 SSH、PTY 与绑定 runner 启动所选环境；CLI/TUI 同一配置根启动，隐藏管道和 prompt 参数拒绝。发现增加当前用户 native `~/.local/bin/claude` fallback，保留 PATH 优先级。原生 SSH launch 3 项回归、完整 desktop 34 项与 core 25 项通过；独立 CLI/TUI PTY journey 使用 inert Claude 通过。App 合成 native bridge 入口/键盘/失败恢复已验证，保留现有界面样式；真实 macOS Terminal 已在临时本机配置根执行 inert 程序，核验 cwd/config root、TTY 与零参数；完整 macOS→真实 VPS 交互仍未验收。accepted 回执须先查询到结束状态再开放启动按钮，失败反馈滚入可见范围；对应 App 合成 bridge 检查通过。
 
-新增 Ubuntu 独立 OpenSSH runtime 入口覆盖实际静态 musl runner 上传、丢安装 ACK 核对、丢 submit ACK 原任务查询与 PTY 启动。当前仅已编译／入口自检，Linux runtime 结果待 CI；不计为通过。默认入口 12/12 已通过，含五条合成 journey；ignored 的独立 Linux test 不计入通过。两种 Linux runner 与 macOS App 已按新源码重建，候选约 16.78 MiB，未安装／激活／正式发行。
+Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37123017551)（clean `1276c84`）：实际 x86_64 静态 musl runner 上传、丢安装 ACK 核对、丢 submit ACK 原任务查询与真实 PTY 启动，上传和提交各一次。使用临时 loopback sshd、合成 home/state 与 inert Claude，无登录或模型请求；不证明生产 VPS、logout/cgroup 或重启存活。macOS/Ubuntu 默认入口分别 12/12 已通过，含五条合成 journey；ignored 的独立 Linux test 不计入通过。两种 Linux runner 与 macOS App 已按新源码重建，候选约 16.78 MiB，未安装／激活／正式发行。
 
 ## 已接通
 
@@ -30,17 +30,17 @@
 | Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。重排后 Home 的 Day/Night、900×640布局、工作入口、口袋展开不挤动操作框、连续戳戳／躲藏／拖甩、鼠标／滚轮／模拟触摸、焦点返回和减少动态已验证；四画收星、等比例缩放、翻页，游戏跳跃／暂停／碰撞／重开与本机最高分通过。网络面板经 synthetic native-response harness 验证延迟响应隔离和停止／编辑／重启。新增安装卡合成 native bridge 验证预览前不上传、显式批准、丢回包后的状态同步、原安装只读查询、关闭／重开／迟到响应隔离与连接管理；安装卡 Day/Night 和 900×640 长路径详情已实际渲染检查，视觉仍待用户接受。F04 界面使用真实合成 CLI 完成计划／批准／解除／回执／组织条件往返；新增 SSH 合成 native-response harness 验证具体错误／摘要复制、显式重连、移除／撤销／失败保留、当前主机回本机、原任务查询和关闭面板后的迟到响应隔离；帮助链接 ID 与 900×640 长命令排版通过。其后完成纸上晨光/夜里月光环境光、首页问候纵向重排、统一柔影刻度、clay tint 选中态的 Day/Night/窄屏截图 QA；浏览器面板移除独立「允许扩展 ID」按钮（扩展授权并入用户确认的安装路径），经合成空间复核；概览「已设置关闭」计数使用各变量解析后的 configured 状态。视觉稿仍属候选 |
 | macOS | arm64 App 本地构建成功，约 16.78 MiB，含本轮策略界面与两种静态 Linux runner；typecheck、Vite 与 Tauri release 构建通过。此前已观察原生 WebKit 首页和 Clawd，本轮 SSH 界面使用浏览器合成 bridge 验证，未完成新 native runtime／真实 VPS 交互验收；没有自动重启已打开的旧窗口。无 Developer ID、公证、正式分发或 Applications 安装验收 |
 
-统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与五条合成 journey；浏览器与 native bundle 显式 opt-in。macOS 本轮默认 12 个检查通过；入口证据记录检查时的 HEAD 与工作树状态。CI 提供 macOS/Linux 合成 matrix，其结果与真实目标 runtime 验收分别记录。[首次 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37119853055) 的 clean HEAD `1654211` 已在 macOS 与 Ubuntu 分别完成 11/11（无跳过）；包括 Linux 源码 runner 的合成 CLI／detached submission 旅程。两种 Linux musl ELF 已交叉构建并打包，但 App 内置的这两份 musl ELF 尚未在目标 Linux 主机执行。
+统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与五条合成 journey；浏览器与 native bundle 显式 opt-in。macOS 本轮默认 12 个检查通过；入口证据记录检查时的 HEAD 与工作树状态。CI 提供 macOS/Linux 合成 matrix，其结果与真实目标 runtime 验收分别记录。[首次 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37119853055) 的 clean HEAD `1654211` 已在 macOS 与 Ubuntu 分别完成 11/11（无跳过）；包括 Linux 源码 runner 的合成 CLI／detached submission 旅程。两种 Linux musl ELF 已交叉构建并打包。后续 `1276c84` 的 x86_64 musl 构建已在 Ubuntu 隔离 SSH 中执行安装、后台任务和交互启动旅程；App 内资源独立通过字节／SHA 打包核验，aarch64 runtime 仍未验收。
 
-实际主机为 macOS arm64。App 内置 Linux musl runner 执行、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
+实际主机为 macOS arm64。Linux x86_64 musl 已有上述 CI runtime 证据；aarch64、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
 
 ## 完整目标仍缺少
 
 1. **真实认证与写入者控制：** Keychain/共享 profile、Desktop/IDE/service 的完整定位与生命周期，supervisor 暂停、重新登录及旧会话续用。当前仅按名称识别部分 Claude 进程；明确要求目标写入者先停，不能归属的进程阻止清理。官方 auth 命令仅有合成 CLI 证据，不能宣称生产注销已验收。
 2. **完整外发策略与强约束：** 自定义/更多取舍、入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
-3. **远程运行：** 用户级安装／版本绑定已接入候选，但真实 VPS 安装与任务实跑、supervisor、真实 SSH logout/cgroup 和主机重启恢复仍未验收。当前 detached 本地证据不能取代远端 runtime 验收。
+3. **远程运行：** 用户级安装／版本绑定已接入候选，但真实 VPS 安装与任务实跑、supervisor、真实 SSH logout/cgroup 和主机重启恢复仍未验收。Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／detached 原任务查询／交互 PTY；它不能取代生产 VPS session/cgroup 与重启验收。
 4. **浏览器旅程：** 首先在真实持久安装的独立测试 profile 完成 onStartup 两阶段清理验收，再验 Chrome、Edge、Firefox。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。
 5. **发行与维护：** 菜单栏、定时漂移、签名规则更新、卸载、升级、正式签名/公证、性能预算。
 6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。混合状态加密备份不支持自动恢复；会话/记忆迁入不证明可以续聊。
 
-这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是持久浏览器测试安装、真实认证/入口矩阵与独立 Linux runtime 验收；不在个人登录或生产服务上替代测试。
+这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是持久浏览器测试安装、真实认证/入口矩阵与 VPS session/cgroup/重启验收；不在个人登录或生产服务上替代测试。

@@ -20,8 +20,10 @@
       "id": "C02",
       "scenario": "从 GUI、终端、IDE、systemd 启动同一程序",
       "required": "每个入口分别确认；终端通过不能给其他入口盖章",
-      "status": "not-run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "tests/launch_journey.py executes CLI and TUI with real PTY and inert Claude; actual macOS Terminal local launcher also verified on a temporary root. IDE/systemd and complete macOS-to-VPS GUI paths remain unverified."
+      ]
     },
     {
       "id": "C03",
@@ -86,7 +88,8 @@
       "required": "被动发现不执行它，不启动 agent/hook/MCP",
       "status": "partial",
       "evidence": [
-        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "crates/core/src/lib.rs native-install discovery test and tests/remote_linux_ssh_journey.py verify current-user ~/.local/bin fallback without PATH or Claude execution during metadata discovery; no other-user scanning."
       ]
     },
     {
@@ -469,7 +472,8 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof.",
+        "tests/remote_linux_ssh_journey.py: actual Linux loopback OpenSSH + static x86_64 musl runner, durable accepted ACK deliberately discarded, reopened native Controller queries original job; exactly one submit and one remote job. CI clean 1276c84: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37123017551 . Production VPS logout/cgroup remains unverified."
       ]
     },
     {
@@ -671,7 +675,8 @@
       "required": "无关键内容被截断，完整路径可查可复制，目标始终可见",
       "status": "partial",
       "evidence": [
-        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
+        "Remote launch App synthetic native bridge checked at 1120x760 Day and 900x640 Night: paths remain copyable, failure scrolls into view and no horizontal document overflow. Full-product accessibility/layout acceptance remains partial."
       ]
     },
     {
@@ -680,7 +685,8 @@
       "required": "主流程均可完成；危险操作与焦点顺序清楚",
       "status": "partial",
       "evidence": [
-        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
+        "Remote launch App synthetic native bridge verified keyboard activation, Day/Night and accepted-to-completed state; complete screen-reader and all main journeys remain unverified."
       ]
     },
     {
@@ -699,7 +705,8 @@
       "status": "partial",
       "evidence": [
         "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
-        "Limited cleanup/archive/import GUI and core paths passed on synthetic roots; real Keychain, re-login and session continuation remain not-run."
+        "Limited cleanup/archive/import GUI and core paths passed on synthetic roots; real Keychain, re-login and session continuation remain not-run.",
+        "CLI/TUI real PTY launch and native remote Terminal launcher are connected to the selected configuration root. App synthetic native bridge verifies accepted receipt blocks launch until original-job completion; Linux OpenSSH launches inert Claude with exact cwd/config root, TTY and zero arguments. Real Claude login/account/runtime is unverified."
       ]
     },
     {
@@ -728,5 +735,5 @@
   ],
   "updated": "2026-10-03",
   "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-03: limited cleanup/archive import, native SSH + detached submit, Clawd/Day-Night UI. Full journeys remain not-run. Current active-SW browser smoke blocked at genuine browser startup evidence; prior static-SW success is superseded."
+  "implementation_update": "2026-10-03: versioned policy, App-bundled user-level runner install and exact-environment SSH Terminal launch connected. Real Linux x86_64 OpenSSH/static-musl synthetic runtime passed; real Claude/production VPS and full journeys remain unverified. Genuine persistent browser startup evidence remains missing; prior static-SW success is superseded."
 }
