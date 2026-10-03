@@ -79,11 +79,7 @@ lintel-browser-host register firefox lintel@lintel.local /absolute/path/to/linte
 
 Chromium 系列用户级 host manifest 位于该 user-data-dir 的 `NativeMessagingHosts/` 子目录；Chrome for Testing 146 起有独立默认路径。自动 smoke 只向自己新建的临时 user-data-dir 注册，并把 host DB 指向同一临时根；不使用个人注册目录。浏览器 profile 与 host 注册的作用域不同，配对实例身份仍然必须独立确认。
 
-显式授权精确扩展 ID 后 host 才接受该扩展：
-
-```sh
-printf '%s\n' '{"op":"allow_extension","extension_id":"EXTENSION_ID"}' | lintel-browser-host control
-```
+host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户确认的安装路径：`register --apply` 或桌面「批准注册此 host」（`install_native_host`）在写入 manifest 的同一流程内把该 ID 加入 host allowlist。通用 control 通道上的 `allow_extension` 不再接受写入，直接返回 `allow_extension_requires_installer`，防止任何同用户进程绕过已确认的安装动作自行放行任意扩展。
 
 桌面端可将以上步骤包装成用户发起的安装流程；不得偷偷注册。卸载前在扩展中逐项恢复仍归本扩展控制的设置并解除清理隔离。移除 native manifest 和 host 后连接会显示离线；浏览器卸载扩展会移除其 DNR/content/privacy/proxy 控制。浏览器删除的数据不能恢复，bridge 回执不会假装提供“撤销全部”。
 
@@ -101,13 +97,13 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 | --- | --- |
 | `{"op":"installation_plan","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{browser,extension_id,manifest_path,manifest,state_path,effect}`；只预览当前用户固定路径 |
 | `{"op":"install_native_host","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{status,plan,pairing:"required"}`；用户批准后安装。browser 也可为 edge/firefox；只允许本地 control，扩展管道不开放 |
-| `{"op":"pair_create"}` | `{challenge, code, expires_at}`；8 位 hex 短码，5 分钟有效 |
+| `{"op":"pair_create"}` | `{challenge, code, expires_at}`；12 位大写 hex 短码，5 分钟有效；同时未决挑战上限 8 个，超出逐出最旧 |
 | `{"op":"pair_pending"}` | `[{challenge, code, instance_id, label, browser, extension_id}]` |
 | `{"op":"pair_approve","challenge":"..."}` | 已配对实例记录；必须由桌面用户显式批准 |
 | `{"op":"instances"}` | `[{instance_id,label,browser,extension_id,paired,conflict,last_seen,online}]` |
 | `{"op":"submit","instance_id":"...","operation_id":"UUID","action":{...}}` | `{instance_id,id,action,phase,created_at}` |
 | `{"op":"query","instance_id":"...","operation_id":"UUID"}` | 同一操作及收到的 `receipt`；不重新执行 |
-| `{"op":"allow_extension","extension_id":"..."}` | `{allowed: extensionId}`；仅供明确批准的本地安装流程 |
+| `{"op":"allow_extension","extension_id":"..."}` | 不再开放：始终返回 `allow_extension_requires_installer`；授权只走安装路径（见上节） |
 
 `expires_at`、`created_at`、`last_seen` 使用 Unix 秒。extension receipt 的 `createdAt`、`startedAt`、`completedAt` 使用 epoch 毫秒。`paired` 是持久配对；`online` 表示最近 20 秒收到本地 native poll，两者不能互相替代。Native port 断开、权限撤销、重复实例冲突都不能显示为有效保护。
 
@@ -145,7 +141,7 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 内部请求共同字段 `{op, request_id, instance_id, token}`；token 为本地生成的 256 位随机数，仅存于扩展 `storage.local` 与用户私有 bridge DB，不使用 sync。
 
-- `pair_request` 附加 `{code,label,browser}`：短码挑战与扩展实例绑定，返回 `{paired:false,pending:true,challenge,code}`；不能自行批准。
+- `pair_request` 附加 `{code,label}`：短码挑战与扩展实例绑定，返回 `{paired:false,pending:true,challenge,code}`；不能自行批准。`browser` 字段由 host 根据 argv 校验过的调用方扩展 ID 派生（`lintel@lintel.local` → firefox，32 位 Chromium ID → chromium），请求里自报的 browser 一律忽略。短码连续 5 次错误尝试会把所有存活中的待配对短码作废，需要重新生成。
 - `poll`：返回 `{paired:true,proposals:[...]}`；绑定当前 native connection lease。
 - `receipt` 附加 `{receipt:{id,phase,result?,error?,completedAt?}}`：只报告结果；不会请求执行。
 
@@ -174,7 +170,7 @@ npm run test:browser
 
 合成构建 `node scripts/build.mjs --fixture` 生成显眼命名的 fixture 包，只接受 `http://localhost:18765`。其 Cookie/DNR/loopback 权限是测试预授权，与正式包分开。不要将 fixture 包发布给普通用户。
 
-2026-10-03 验证：17 项 JS contract tests 与 7 项 Rust tests 通过。macOS arm64 / Playwright 管理的 Chromium 155.0.8059.12 曾通过完整静止 Service Worker smoke：目标与 iframe 宿主关闭、主导航隔离、五类存储删除/邻域保留、定位权限目标级 block/restore、完整浏览器重启后相同操作 ID 不重删新登录，以及真实 `connectNative` 短码请求/本地批准/浏览器确认 WebRTC/host 持久回执往返。旧运行证据在本地生成的 `extensions/browser/artifacts/browser-smoke.json`，**不能替代下述当前两阶段实现的验收**。
+2026-10-03 验证：20 项 JS contract tests 与 11 项 Rust tests 通过。macOS arm64 / Playwright 管理的 Chromium 155.0.8059.12 曾通过完整静止 Service Worker smoke：目标与 iframe 宿主关闭、主导航隔离、五类存储删除/邻域保留、定位权限目标级 block/restore、完整浏览器重启后相同操作 ID 不重删新登录，以及真实 `connectNative` 短码请求/本地批准/浏览器确认 WebRTC/host 持久回执往返。旧运行证据在本地生成的 `extensions/browser/artifacts/browser-smoke.json`，**不能替代下述当前两阶段实现的验收**。
 
 加入真正活跃的 SW `waitUntil` CacheStorage writer 后，测试证明旧流程在注销成功后仍发生回写。当前源实现已改为重启前后分步确认，contract tests 验证 worker 重启不能冒充浏览器重启、相同准备记录不能二次删除、隔离 ownership 不可跨任务解除。当前完整 smoke 未通过：命令行临时加载的扩展在 Chromium 重启后没有给出 `runtime.onStartup` 世代，执行器正确返回 `browser_restart_required` 而未继续删除。未伪造启动标记或减弱 active writer 断言。需要在真实持久安装的 synthetic 扩展环境继续验证此路径；正式 Chrome/Edge/Firefox 分别验收也尚未完成。失败记录写入本地 `extensions/browser/artifacts/browser-smoke-failure.json`，不纳入 Git。
 

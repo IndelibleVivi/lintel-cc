@@ -11,7 +11,9 @@ const profile=await mkdtemp(path.join(os.tmpdir(),'lintel-synthetic-browser-'));
 const ext=path.join(root,'dist/chromium-fixture');
 const host=path.join(root,'native-host/target/debug/lintel-browser-host');
 execFileSync('cargo',['build','--manifest-path',path.join(root,'native-host/Cargo.toml')],{stdio:'inherit'});
-const state=path.join(profile,'synthetic-native-state');
+// Must equal the installer's derived state path for `--home profile` so the
+// explicit `register --apply` authorization and the host control calls agree.
+const state=path.join(profile,os.platform()==='darwin'?'Library/Application Support/Lintel/browser-bridge':'.local/state/lintel/browser-bridge');
 const nativeControl=request=>{const result=JSON.parse(execFileSync(host,['control'],{env:{...process.env,LINTEL_BROWSER_STATE:state},input:JSON.stringify(request),encoding:'utf8'}));assert.equal(result.ok,true,JSON.stringify(result.error));return result.data;};
 const server=http.createServer((req,res)=>{res.setHeader('Cache-Control','no-store');if(req.url==='/sw.js'){res.setHeader('Content-Type','text/javascript');res.end("self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('message',e=>{if(e.data==='synthetic-writer')e.waitUntil((async()=>{for(let i=0;i<100;i++){const cache=await caches.open('lintel-worker-writer');await cache.put('/writer',new Response('SYNTHETIC'));if(i===0)e.ports[0].postMessage('writing');await new Promise(r=>setTimeout(r,50));}})());});");}else{res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Synthetic storage fixture</title><h1>Synthetic storage fixture</h1>'+ (req.url==='/embed'?'<iframe src="http://localhost:18765/writer"></iframe>':req.url==='/writer'?'<script>setInterval(()=>localStorage.setItem("active-writer","SYNTHETIC"),10)</script>':''));}});
 await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(18765,'127.0.0.1',resolve);});
@@ -53,7 +55,7 @@ try{
 
  await page.bringToFront();
  const manifestDir=path.join(profile,'NativeMessagingHosts');await mkdir(manifestDir,{recursive:true});await writeFile(path.join(manifestDir,'app.lintel.browser.json'),execFileSync(host,['manifest','chromium',extensionId,host]));
- nativeControl({op:'allow_extension',extension_id:extensionId});const challenge=nativeControl({op:'pair_create'});
+ const install=JSON.parse(execFileSync(host,['register','chrome',extensionId,host,'--home',profile,'--apply'],{env:{...process.env,LINTEL_BROWSER_STATE:state},encoding:'utf8'}));assert.equal(install.status,'registered');const challenge=nativeControl({op:'pair_create'});
  await page.getByLabel('应用内的配对短码').fill(challenge.code);await page.getByLabel('这份 profile 的名字').fill('Synthetic isolated Chromium');await page.getByRole('button',{name:'提交配对请求',exact:true}).click();await page.waitForFunction(()=>document.getElementById('pair-status').textContent.includes('请求已提交') || document.getElementById('error').textContent);
  assert.equal(await page.locator('#error').textContent(),'');const pending=nativeControl({op:'pair_pending'});assert.equal(pending.length,1);assert.equal(pending[0].code,challenge.code);const paired=nativeControl({op:'pair_approve',challenge:challenge.challenge});
  await page.getByRole('button',{name:'刷新状态',exact:true}).click();await page.locator('#pair-status').getByText('已配对 · 桌面连接有效',{exact:true}).waitFor();

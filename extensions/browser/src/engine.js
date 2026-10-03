@@ -3,6 +3,9 @@ import {fail,normalizeAction,describe,requiredPermissions,dataOptions,sitesFor} 
 // Browser readback may reorder object fields (notably DNR rules).
 const ordered=value=>Array.isArray(value)?value.map(ordered):value && typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,ordered(value[key])])):value;
 const equal = (a,b) => JSON.stringify(ordered(a)) === JSON.stringify(ordered(b));
+const ruleKey=rule=>rule && typeof rule==='object' && rule.id!==undefined ? rule.id : 0;
+// DNR may return the same rule set in a different array order than it was stored; compare by rule id.
+const equalRules = (a,b) => JSON.stringify([...(a||[])].sort((x,y)=>ruleKey(x)-ruleKey(y)).map(ordered)) === JSON.stringify([...(b||[])].sort((x,y)=>ruleKey(x)-ruleKey(y)).map(ordered));
 const PERMISSION_API = {location:'location',camera:'camera',microphone:'microphone',notifications:'notifications'};
 const CLEANUP_RULE_START = 10000;
 const NETWORK_RULE_START = 20000;
@@ -38,7 +41,12 @@ export class Engine {
     await this.set(`operation:${operationId}`,record);
     return record;
   }
-  commit(id) {return this.serial(async()=>{
+  // `onRunning` runs after preflight succeeds and the durable `running` journal
+  // boundary is crossed, but before any browser mutation. Callers use it to
+  // report `running` to the host only once the op can no longer be rejected
+  // without a side effect. A preflight rejection leaves the op in `preview`
+  // (re-deliverable) and never invokes the callback.
+  commit(id,{onRunning}={}) {return this.serial(async()=>{
     const key=`operation:${id}`,r=await this.get(key);
     if (!r) fail('unknown_operation');
     if (r.phase !== 'preview') return r; // running/uncertain/completed never replay
@@ -47,6 +55,16 @@ export class Engine {
     if (!await this.api.permissions.contains(r.permissions)) fail('permissions_missing');
     const running={...r,phase:'running',startedAt:Date.now()};
     await this.set(key,running); // durable boundary BEFORE any browser mutation
+    if (onRunning) {
+      try {
+        await onRunning(running);
+      } catch (error) {
+        // The host was not told `running`, so no phantom op exists. Restore the
+        // preview so the operation stays re-deliverable; no browser mutation ran.
+        await this.set(key,r);
+        throw error;
+      }
+    }
     try {
       const result=await this.execute(running);
       const phase=result.phase||'completed';
@@ -142,7 +160,7 @@ export class Engine {
     if (prior?.phase!=='awaiting-browser-restart' || prior.finishedBy || prior.isolationReleasedAt || owner?.operationId!==id) fail('cleanup_preparation_not_active');
     if ((await this.get('browserStartupGeneration')||'initial')===prior.preparedGeneration) fail('browser_restart_required','请完整退出并重启此浏览器，再确认继续删除；扩展 worker 重启不算浏览器重启。');
     const active=(await this.api.declarativeNetRequest.getDynamicRules()).filter(rule=>prior.isolationRuleIds.includes(rule.id));
-    if (!equal(active,owner.rules)) fail('cleanup_isolation_changed','清理隔离已变化，未继续删除。');
+    if (!equalRules(active,owner.rules)) fail('cleanup_isolation_changed','清理隔离已变化，未继续删除。');
     return prior;
   }
   async finishClear(r) {

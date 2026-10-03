@@ -68,8 +68,13 @@ async function handle(message,sender){
     case 'preview': return engine.preview(message.action);
     case 'commit': {
       const r=await engine.get(`operation:${message.id}`);
-      if (r?.source==='app') {await poll();if (!(await engine.get('pairing'))?.paired) fail('pairing_required');await native('receipt',{receipt:{id:r.id,phase:'running'}});}
-      const result=await engine.commit(message.id);await pollIfConnected();return result;
+      if (r?.source==='app') {await poll();if (!(await engine.get('pairing'))?.paired) fail('pairing_required');}
+      // Report `running` only after commit has durably crossed its running
+      // journal boundary. A preflight rejection (permissions_missing,
+      // preview_expired, ...) throws before onRunning, so the host is never told
+      // `running` for an op that stayed re-deliverable in preview.
+      const result=await engine.commit(message.id,{onRunning:r?.source==='app' ? async()=>{await native('receipt',{receipt:{id:r.id,phase:'running'}});} : undefined});
+      await pollIfConnected();return result;
     }
     case 'releaseIsolation': return engine.releaseIsolation(message.id);
     default: fail('unknown_popup_message');

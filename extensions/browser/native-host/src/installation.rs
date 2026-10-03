@@ -1,5 +1,5 @@
 //! Explicit local installer. This module is never exposed to extension messages.
-use crate::{control_at, manifest};
+use crate::manifest;
 use serde_json::{json, Value};
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
@@ -82,13 +82,8 @@ pub fn install(
             .map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
     }
-    let authorization = control_at(
-        Path::new(plan["state_path"].as_str().unwrap()),
-        json!({"op":"allow_extension","extension_id":extension}),
-    );
-    if authorization["ok"] != true {
-        return Err(format!("authorization_failed:{}", authorization["error"]));
-    }
+    crate::authorize_extension(Path::new(plan["state_path"].as_str().unwrap()), extension)
+        .map_err(|e| format!("authorization_failed:{e}"))?;
     Ok(
         json!({"status":if existed {"already-registered"} else {"registered"},"plan":plan,"pairing":"required"}),
     )

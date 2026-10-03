@@ -11,6 +11,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 pub const MAX_FRAME: usize = 65536;
+/// Pairing codes are short-lived secrets. 12 hex chars = 48 bits of entropy.
+const PAIR_CODE_LEN: usize = 12;
+/// A pending pairing code is invalidated after this many failed pair_request attempts.
+const PAIR_MAX_FAILURES: u64 = 5;
+/// Bound outstanding pairing challenges so a local process cannot grow the map without limit.
+const PAIR_MAX_PENDING: usize = 8;
 type Result<T> = std::result::Result<T, String>;
 fn now() -> u64 {
     SystemTime::now()
@@ -234,10 +240,23 @@ fn control_inner(db: &mut Value, r: &Value) -> Result<Value> {
     match op {
         "pair_create" => {
             fields(r, &["op"])?;
+            // Expire the oldest outstanding challenges before adding another, so a
+            // local process cannot grow the pending map without bound.
+            let mut entries: Vec<(String, u64)> = db["pairings"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(k, v)| (k.clone(), v["expires_at"].as_u64().unwrap_or(0)))
+                .collect();
+            entries.sort_by_key(|(_, expires)| *expires);
+            while entries.len() >= PAIR_MAX_PENDING {
+                let (oldest, _) = entries.remove(0);
+                db["pairings"].as_object_mut().unwrap().remove(&oldest);
+            }
             let challenge = random();
-            let code = random()[..8].to_uppercase();
+            let code = random()[..PAIR_CODE_LEN].to_uppercase();
             db["pairings"][&challenge] =
-                json!({"code":code,"expires_at":now()+300,"status":"waiting"});
+                json!({"code":code,"expires_at":now()+300,"status":"waiting","failed_attempts":0});
             Ok(json!({"challenge":challenge,"code":code,"expires_at":now()+300}))
         }
         "pair_pending" => {
@@ -304,22 +323,44 @@ fn control_inner(db: &mut Value, r: &Value) -> Result<Value> {
             Ok(result)
         }
         "allow_extension" => {
+            // Authorization is an explicit installer action only. Reaching this
+            // through generic control (CLI `control`, Tauri `browser_request`) would
+            // let any same-user process allowlist an arbitrary extension without the
+            // user-confirmed manifest installation.
             fields(r, &["op", "extension_id"])?;
-            let ext = string(r, "extension_id")?;
-            if !valid_extension(ext) {
-                return Err("invalid_extension_id".into());
-            }
-            let list = db["allowed_extensions"].as_array_mut().unwrap();
-            if !list.contains(&json!(ext)) {
-                list.push(json!(ext));
-            }
-            Ok(json!({"allowed":ext}))
+            Err("allow_extension_requires_installer".into())
         }
         _ => Err("unknown_control_operation".into()),
     }
 }
 fn valid_extension(s: &str) -> bool {
     (s.len() == 32 && s.chars().all(|c| ('a'..='p').contains(&c))) || s == "lintel@lintel.local"
+}
+/// Map the argv-validated caller identity to its browser family. A Firefox
+/// add-on ID can never be recorded as chromium, and vice versa.
+fn browser_for_identity(extension: &str) -> Result<&'static str> {
+    match extension {
+        "lintel@lintel.local" => Ok("firefox"),
+        e if e.len() == 32 && e.chars().all(|c| ('a'..='p').contains(&c)) => Ok("chromium"),
+        _ => Err("invalid_caller_identity".into()),
+    }
+}
+/// Authorize an exact extension ID in the host allowlist. This is the *only*
+/// write path for `allowed_extensions`; it is invoked by the explicit installer
+/// (`installation::install`, behind `--apply` / the desktop "批准注册此 host"
+/// confirmation), never by generic `control`. The user-confirmed manifest
+/// installation is the authorization gate.
+pub(crate) fn authorize_extension(path: &Path, extension: &str) -> Result<Value> {
+    if !valid_extension(extension) {
+        return Err("invalid_extension_id".into());
+    }
+    transaction(path, |db| {
+        let list = db["allowed_extensions"].as_array_mut().unwrap();
+        if !list.contains(&json!(extension)) {
+            list.push(json!(extension));
+        }
+        Ok(json!({"allowed":extension}))
+    })
 }
 /// Generate a browser-specific manifest without registering or authorizing it.
 pub fn manifest(browser: &str, extension: &str, host: &Path) -> Result<Value> {
@@ -449,24 +490,42 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                 if label.len() > 80 || label.chars().any(char::is_control) {
                     return Err("invalid_label".into());
                 }
-                if !matches!(request["browser"].as_str(), Some("chromium" | "firefox")) {
-                    return Err("invalid_browser".into());
-                }
-                let (challenge, p) = db["pairings"]
-                    .as_object_mut()
+                // Browser identity is derived from the argv-validated caller, never
+                // from a request field the extension can spoof.
+                let browser = browser_for_identity(extension)?;
+                let now_ts = now();
+                let challenge = db["pairings"]
+                    .as_object()
                     .unwrap()
-                    .iter_mut()
+                    .iter()
                     .find(|(_, v)| {
                         v["code"] == code
                             && v["status"] == "waiting"
-                            && v["expires_at"].as_u64().unwrap_or(0) > now()
+                            && v["expires_at"].as_u64().unwrap_or(0) > now_ts
                     })
-                    .ok_or("invalid_pairing_code")?;
+                    .map(|(k, _)| k.clone());
+                let Some(challenge) = challenge else {
+                    // Count the failed attempt against every live waiting code so
+                    // repeated guessing consumes attempts and invalidates codes.
+                    for v in db["pairings"].as_object_mut().unwrap().values_mut() {
+                        if v["status"] == "waiting"
+                            && v["expires_at"].as_u64().unwrap_or(0) > now_ts
+                        {
+                            let n = v["failed_attempts"].as_u64().unwrap_or(0) + 1;
+                            v["failed_attempts"] = json!(n);
+                            if n >= PAIR_MAX_FAILURES {
+                                v["status"] = json!("invalidated");
+                            }
+                        }
+                    }
+                    return Err("invalid_pairing_code".into());
+                };
+                let p = &mut db["pairings"][&challenge];
                 p["status"] = json!("requested");
                 p["instance_id"] = json!(i);
                 p["token"] = json!(token);
                 p["label"] = json!(label);
-                p["browser"] = request["browser"].clone();
+                p["browser"] = json!(browser);
                 p["extension_id"] = json!(extension);
                 Ok(json!({"paired":false,"pending":true,"challenge":challenge,"code":code}))
             }
@@ -581,10 +640,7 @@ mod tests {
     }
     fn setup(p: &Path) -> (String, String) {
         let ext = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        assert_eq!(
-            control_at(p, json!({"op":"allow_extension","extension_id":ext}))["ok"],
-            true
-        );
+        assert_eq!(authorize_extension(p, ext).unwrap()["allowed"], ext);
         let pair = control_at(p, json!({"op":"pair_create"}));
         let token = random();
         let req = json!({"op":"pair_request","request_id":"r","instance_id":"instance-one","token":token,"code":pair["data"]["code"],"label":"Synthetic","browser":"chromium"});
@@ -711,6 +767,79 @@ mod tests {
         })
         .unwrap();
         assert_eq!(native_at(&p, poll, &ext, "restarted")["ok"], true);
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn generic_control_cannot_allowlist_extension() {
+        let p = path();
+        let ext = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let denied = control_at(&p, json!({"op":"allow_extension","extension_id":ext}));
+        assert_eq!(denied["ok"], false);
+        assert_eq!(
+            denied["error"]["code"],
+            "allow_extension_requires_installer"
+        );
+        // The explicit installer-only path still authorizes the exact ID.
+        assert_eq!(authorize_extension(&p, ext).unwrap()["allowed"], ext);
+        // An extension that was never installed stays unable to use the native pipe.
+        let pair = control_at(&p, json!({"op":"pair_create"}));
+        let req = json!({"op":"pair_request","request_id":"r","instance_id":"instance-one","token":random(),"code":pair["data"]["code"],"label":"Synthetic"});
+        assert_eq!(
+            native_at(&p, req, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "one")["error"]["code"],
+            "extension_not_allowed"
+        );
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn pairing_code_entropy_and_failure_lockout() {
+        let p = path();
+        let ext = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        authorize_extension(&p, ext).unwrap();
+        let pair = control_at(&p, json!({"op":"pair_create"}));
+        let code = pair["data"]["code"].as_str().unwrap().to_owned();
+        assert_eq!(code.len(), 12);
+        assert!(code
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        let token = random();
+        let guess = |c: &str| json!({"op":"pair_request","request_id":"r","instance_id":"instance-one","token":token,"code":c,"label":"Synthetic"});
+        for _ in 0..PAIR_MAX_FAILURES {
+            assert_eq!(
+                native_at(&p, guess("000000000000"), ext, "one")["error"]["code"],
+                "invalid_pairing_code"
+            );
+        }
+        // After the attempt limit the real code is invalidated for everyone.
+        assert_eq!(
+            native_at(&p, guess(&code), ext, "one")["error"]["code"],
+            "invalid_pairing_code"
+        );
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn outstanding_pairing_codes_are_capped() {
+        let p = path();
+        for _ in 0..PAIR_MAX_PENDING + 4 {
+            assert_eq!(control_at(&p, json!({"op":"pair_create"}))["ok"], true);
+        }
+        let count = transaction(&p, |db| {
+            Ok(json!(db["pairings"].as_object().unwrap().len()))
+        })
+        .unwrap();
+        assert_eq!(count, json!(PAIR_MAX_PENDING));
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn browser_is_derived_from_caller_identity() {
+        let p = path();
+        let ff = "lintel@lintel.local";
+        authorize_extension(&p, ff).unwrap();
+        let pair = control_at(&p, json!({"op":"pair_create"}));
+        // A Firefox add-on cannot register as chromium by spoofing the field.
+        let req = json!({"op":"pair_request","request_id":"r","instance_id":"instance-one","token":random(),"code":pair["data"]["code"],"label":"Synthetic","browser":"chromium"});
+        assert_eq!(native_at(&p, req, ff, "one")["ok"], true);
+        let pending = control_at(&p, json!({"op":"pair_pending"}));
+        assert_eq!(pending["data"][0]["browser"], "firefox");
         fs::remove_dir_all(p).unwrap();
     }
 }
