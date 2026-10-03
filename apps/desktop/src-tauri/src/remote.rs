@@ -19,7 +19,33 @@ use std::{
 
 #[path = "remote_install.rs"]
 mod installation;
+#[path = "remote_launch.rs"]
+mod launching;
+#[cfg(test)]
+#[path = "remote_acceptance.rs"]
+mod acceptance;
 
+// Both JSON transport and interactive launch keep the same SSH trust boundary.
+fn ssh_options(interactive: bool) -> Vec<&'static str> {
+    vec![
+        if interactive { "-tt" } else { "-T" },
+        "-oBatchMode=yes",
+        "-oStrictHostKeyChecking=yes",
+        "-oUpdateHostKeys=no",
+        "-oPermitLocalCommand=no",
+        "-oProxyCommand=none",
+        "-oRemoteCommand=none",
+        "-oClearAllForwardings=yes",
+        if interactive {
+            "-oRequestTTY=force"
+        } else {
+            "-oRequestTTY=no"
+        },
+        "-oConnectTimeout=10",
+        "-oServerAliveInterval=15",
+        "-oServerAliveCountMax=2",
+    ]
+}
 const MAX_JSON: usize = 2 * 1024 * 1024;
 #[derive(Debug)]
 struct Failure {
@@ -509,21 +535,8 @@ impl Transport {
             command.arg(&self.ssh);
         }
         let mut child = command
-            .args([
-                "-T",
-                "-oBatchMode=yes",
-                "-oStrictHostKeyChecking=yes",
-                "-oUpdateHostKeys=no",
-                "-oPermitLocalCommand=no",
-                "-oProxyCommand=none",
-                "-oRemoteCommand=none",
-                "-oClearAllForwardings=yes",
-                "-oRequestTTY=no",
-                "-oConnectTimeout=10",
-                "-oServerAliveInterval=15",
-                "-oServerAliveCountMax=2",
-                alias,
-            ])
+            .args(ssh_options(false))
+            .arg(alias)
             .args(remote)
             .env("LC_ALL", "C")
             .stdin(Stdio::piped())
@@ -980,6 +993,7 @@ struct Controller {
     config: PathBuf,
     transport: Transport,
     bundles: PathBuf,
+    terminal: Option<PathBuf>,
 }
 impl Controller {
     fn system(bundles: PathBuf) -> Result<Self> {
@@ -999,6 +1013,7 @@ impl Controller {
             state: state.join("remote"),
             config: home.join(".ssh/config"),
             transport: Transport::default(),
+            terminal: cfg!(target_os = "macos").then(|| PathBuf::from("/usr/bin/open")),
             bundles,
         })
     }
@@ -1190,6 +1205,7 @@ impl Controller {
             }
         }
         match op {
+            "launch" => self.launch_remote(alias, &payload),
             "prepare_runner" | "install_runner" | "query_install" => {
                 self.install_dispatch(alias, &payload)
             }
@@ -1305,7 +1321,7 @@ mod tests {
     use tempfile::TempDir;
 
     // This fake executable never starts OpenSSH. Paths, responses and homes are synthetic.
-    fn fixture(body: &str) -> (TempDir, Controller) {
+    pub(super) fn fixture(body: &str) -> (TempDir, Controller) {
         let temp = tempfile::tempdir().unwrap();
         let script = temp.path().join("ssh");
         fs::write(
@@ -1318,6 +1334,7 @@ mod tests {
         .unwrap();
         fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
         let controller = Controller {
+            terminal: Some(temp.path().join("open")),
             bundles: temp.path().join("bundles"),
             state: temp.path().join("state/remote"),
             config: temp.path().join("home/.ssh/config"),
@@ -1361,6 +1378,7 @@ mod tests {
             .dispatch(json!({"op":"add_host","alias":"second-host"}))
             .unwrap();
         let reopened = Controller {
+            terminal: controller.terminal.clone(),
             bundles: controller.bundles.clone(),
             state: controller.state.clone(),
             config: controller.config.clone(),
@@ -1456,6 +1474,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             "submission_unknown"
         );
         let reopened = Controller {
+            terminal: controller.terminal.clone(),
             bundles: controller.bundles.clone(),
             state: controller.state,
             config: controller.config,
@@ -1479,6 +1498,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     fn concurrent_submit_is_serialized_and_second_call_only_queries() {
         let (temp, controller) = fixture(RECEIPT);
         let other = Controller {
+            terminal: controller.terminal.clone(),
             bundles: controller.bundles.clone(),
             state: controller.state.clone(),
             config: controller.config.clone(),

@@ -3,7 +3,8 @@ name: verify
 # Synthetic verification only. This workflow runs the same repository checks as
 # `python3 tests/verify.py` on macOS and Linux. It never performs release,
 # publish, deploy, or account operations, and it does not run real
-# browser/auth/Linux runtime acceptance (see docs/verification.md).
+# browser/auth acceptance. Linux additionally runs an isolated OpenSSH runtime
+# journey with inert Claude fixtures (see docs/verification.md).
 on:
   push:
     branches: ["**"]
@@ -51,7 +52,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev
+            libjavascriptcoregtk-4.1-dev \
+            openssh-server openssh-client musl-tools
 
       - name: Desktop dependencies
         working-directory: apps/desktop
@@ -63,10 +65,20 @@ jobs:
       - name: Synthetic verification
         run: python3 tests/verify.py --json "$RUNNER_TEMP/lintel-verify/evidence.json"
 
+      - name: Build static Linux runner
+        if: runner.os == 'Linux'
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
+
+      - name: Linux OpenSSH runtime acceptance
+        if: runner.os == 'Linux'
+        run: python3 tests/verify.py --checks linux-ssh-runtime --json "$RUNNER_TEMP/lintel-verify/linux-ssh-runtime.json"
+
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lintel-verify-${{ matrix.os }}
-          path: ${{ runner.temp }}/lintel-verify/evidence.json
+          path: ${{ runner.temp }}/lintel-verify/*.json
           if-no-files-found: warn

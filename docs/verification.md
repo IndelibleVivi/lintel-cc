@@ -40,6 +40,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
+| `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY, inert user-local Claude) |
 | `journey-policy` | journey | `python3 tests/policy_journey.py` (versioned policy identity and drift) |
 
 The two standalone Rust entrypoints beyond the root workspace (`apps/desktop/src-tauri`,
@@ -86,12 +87,29 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 
 | id | what it needs |
 | --- | --- |
+| `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and desktop build prerequisites; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
 
-Linux runner/service runtime acceptance (logout, cgroup, reboot recovery) has no
-automated in-repo entrypoint and is therefore not a registered check; it is
-recorded here as an explicit remaining gap rather than a runnable pass.
+Linux OpenSSH runtime has a separate opt-in entrypoint:
+
+```sh
+rustup target add x86_64-unknown-linux-musl
+cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
+python3 tests/verify.py --checks linux-ssh-runtime --json /tmp/lintel-linux-ssh.json
+```
+
+It exercises native preview/approval/upload, installation ACK loss and query-only
+recovery, real durable submit with dropped ACK, original-job reconnect and
+interactive SSH PTY launch. Claude is inert; no login or model calls occur. The
+launcher requires exactly one executed Rust acceptance test, rather than treating
+an empty test filter as a pass. Ubuntu CI explicitly selects this check after its
+default synthetic checks. All server/config/key files are temporary; sshd runs
+under the current user on loopback with PAM disabled. It does not edit accounts,
+system sshd or services.
+
+Actual VPS logout/cgroup, host reboot, aarch64 runtime and macOS Terminal GUI remain
+independent gaps; this Linux fixture does not prove those behaviors.
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)
 and the [acceptance status](acceptance-status.json). Passing the default checks

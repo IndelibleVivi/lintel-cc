@@ -1,5 +1,5 @@
 //! Explicit Claude Code cleanup recipes. No Keychain service-name guessing.
-use crate::{archive, err, executable, now, storage::*, string, work, Engine, Result};
+use crate::{archive, err, now, storage::*, string, work, Engine, Result};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -268,7 +268,7 @@ impl Engine {
         }
         if p["extra"]["official_logout"] == true {
             self.check_auth_scope()?;
-            if executable().as_deref() != e["executable"].as_str() {
+            if self.executable().as_deref() != e["executable"].as_str() {
                 #[cfg(not(test))]
                 return Err(err("executable_changed", "Claude 启动来源改变，请重新检查"));
             }

@@ -97,11 +97,19 @@ ssh -T -oBatchMode=yes -oStrictHostKeyChecking=yes -oUpdateHostKeys=no \
 
 若 `command -v lintel` 没有返回路径，先修复该 SSH 会话的 PATH；若返回了非预期程序，核对命令名冲突或旧版本；若路径正确但 `--help` 不能运行，核对执行权限、CPU 架构、文件格式和 Linux 加载器/运行依赖。两项通过后，回到 Lintel 连接该 alias，应用会用真正的 `discover` 请求取得环境与能力。源码构建、用户级安装、非交互 PATH 可见和真实远端任务验收是各自独立的结果。
 
+## 从 App 打开远端会话
+
+连接并选择环境后，在“环境详情 → 启动与来源”或已完成任务回执点击“打开 Claude”。App 先通过 `launch_context` 核对准确环境、退役状态和程序，再打开 macOS Terminal。Terminal 使用固定严格 SSH 选项、同一个 alias 与绑定 runner，分配真实 PTY 并执行 `lintel launch <environment-id>`。环境 ID 先限制字符，再由远端 core 验证 UUID 和登记；程序路径及配置根只在远端解析，远端返回的字符串不放进本机 shell。
+
+runner 按 PATH 优先定位 Claude；找不到时，静态检查当前 SSH 用户官方 native 安装位置 `~/.local/bin/claude`，不加载 shell rc、不扫描其他用户，也不为发现版本而运行 Claude。此路径来自[官方安装说明](https://code.claude.com/docs/en/setup#auto-updates)。目标用户未安装时返回 `executable_missing`，不会自动安装或登录 Claude。
+
+`launch_requested` 仅表示 Terminal 已接受请求；登录和实际会话状态在终端观察。Lintel 不传 prompt、口令或模型请求，不自动重启已有会话。交互会话随 SSH 结束，后台 mutation 仍走 durable `submit` 与原 job 查询。Linux TUI 也提供 `o 打开 Claude`；直接 CLI 使用 `lintel launch <environment-id>`，要求 stdin/stdout TTY、恰好一个环境 ID。它不把本机代理当成远端保护。
+
 ## 固定请求与 native API
 
-普通操作使用绑定版本的专用用户路径，尚无绑定时使用 PATH 的 `lintel request`；独立执行使用同一路径的 `submit`，stdin JSON 仍使用 `command: "execute"`。环境 ID、路径、approval 和 archive passphrase 都只通过 stdin 传递，不拼进远端命令。协议见 [protocol.md](../contracts/protocol.md)。
+普通操作使用绑定版本的专用用户路径，尚无绑定时使用 PATH 的 `lintel request`；独立执行使用同一路径的 `submit`，stdin JSON 仍使用 `command: "execute"`。普通请求的环境 ID、路径、approval 和 archive passphrase 都只通过 stdin 传递，不拼进远端命令。协议见 [protocol.md](../contracts/protocol.md)。
 
-SSH 同时固定开启 `BatchMode=yes`、`PermitLocalCommand=no`、`ProxyCommand=none`、`RemoteCommand=none`、`ClearAllForwardings=yes`、禁用 TTY，并限制连接建立和存活检查。JSON stdin / stdout 上限为 2 MiB，独立 runner 上传字节上限为 32 MiB；控制端总 deadline 为 60 秒；runner 自己还执行其更窄的请求上限。桌面 native bridge 同时非阻塞读取 stdout / stderr，stderr 超出保留上限后仍排空管道，避免大错误输出阻塞进程。诊断只用于本次本机显示，不写入任务记录。SSH 中断、输出不完整或超限仍返回 `transport_unknown`；runner 的合法 error envelope 即使伴随非零退出也保留原有 code/message，并可附加诊断。没有自动重试执行。
+JSON 与上传 SSH 同时固定开启 `BatchMode=yes`、`PermitLocalCommand=no`、`ProxyCommand=none`、`RemoteCommand=none`、`ClearAllForwardings=yes`、禁用 TTY，并限制连接建立和存活检查。JSON stdin / stdout 上限为 2 MiB，独立 runner 上传字节上限为 32 MiB；控制端总 deadline 为 60 秒；runner 自己还执行其更窄的请求上限。桌面 native bridge 同时非阻塞读取 stdout / stderr，stderr 超出保留上限后仍排空管道，避免大错误输出阻塞进程。诊断只用于本次本机显示，不写入任务记录。SSH 中断、输出不完整或超限仍返回 `transport_unknown`；runner 的合法 error envelope 即使伴随非零退出也保留原有 code/message，并可附加诊断。没有自动重试执行。
 
 Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{ok:true,data:...}` 或 `{ok:false,error:{code,message,diagnostic?}}`。现有 code/message 保留，新增的 diagnostic 为可选字段。
 
@@ -114,6 +122,7 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 | `prepare_runner` | `alias` | 只读探测并持久化安装预览，返回 `{install_id,alias,probe,bundle,destination,approval,effects,status}` |
 | `install_runner` | `alias`, `install_id`, `approval` | 批准准确预览，重查目标与本地文件；一次上传，核验后绑定。重复调用只核对 |
 | `query_install` | `alias`, `install_id` | 核对原安装；已移除 alias 的已有安装也可查询，不上传 |
+| `launch` | `alias`, `environment_id` | 只读 launch_context 核对后请求 macOS Terminal：固定严格 SSH＋PTY＋绑定 runner `launch id`，返回 `{status:"launch_requested",message}`；不接受 proxy、prompt、命令或路径 |
 | `connect` | `alias` | 远端 `discover` 的 `{environments,capabilities}` |
 | `request` | `alias`, `request` | 允许的 core 请求原有 `data`；不再嵌套 Envelope |
 | `execute` | `alias`, `plan_id`, `approval`，可选 `archive_passphrase` | 一次 `lintel submit`，返回 durable Receipt；重复调用只查原 job |

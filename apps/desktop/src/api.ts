@@ -42,7 +42,7 @@ export function requester(alias: string | null): typeof request {
   let remoteQueue: Promise<unknown> = Promise.resolve();
   return <C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> => {
     const result = remoteQueue.then(async () => {
-      const payload = command === 'execute' ? { op:'execute', alias, ...fields } : { op:'request', alias, request:{command,...fields} };
+      const payload = command === 'execute' || command === 'launch' ? { op:command, alias, ...fields } : { op:'request', alias, request:{command,...fields} };
       const envelope = await invoke<Envelope<Api[C]['response']>>('remote_request', {payload});
       if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message,envelope.error.diagnostic);
       return envelope.data;

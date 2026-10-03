@@ -9,13 +9,13 @@ mod work;
 use fs2::FileExt;
 use policy::{FLAGS, RULE};
 use serde_json::{json, Value};
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 use std::{
     fs::{self, OpenOptions},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
-#[cfg(target_os = "macos")]
-use std::process::{Command, Stdio};
 use storage::*;
 
 #[derive(Debug)]
@@ -54,15 +54,20 @@ fn valstr(v: &Value) -> Value {
         Value::Null
     }
 }
-fn executable() -> Option<String> {
-    std::env::var_os("PATH")
-        .and_then(|p| {
-            std::env::split_paths(&p)
-                .map(|d| d.join("claude"))
-                .find(|f| f.is_file())
+fn find_executable(home: &Path, path: Option<&std::ffi::OsStr>) -> Option<String> {
+    // Non-interactive SSH need not inherit the user's ~/.local/bin PATH.
+    // PATH keeps its precedence; the native install fallback is this user's only.
+    let candidates = path
+        .into_iter()
+        .flat_map(std::env::split_paths)
+        .map(|d| d.join("claude"))
+        .chain(std::iter::once(home.join(".local/bin/claude")));
+    candidates
+        .filter(|p| {
+            fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
         })
-        .and_then(|p| p.canonicalize().ok())
-        .map(|p| p.to_string_lossy().to_string())
+        .find_map(|p| p.canonicalize().ok())
+        .map(|p| p.to_string_lossy().into_owned())
 }
 fn physical(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute()
@@ -99,6 +104,9 @@ impl Engine {
             state,
             accept_hook: None,
         })
+    }
+    fn executable(&self) -> Option<String> {
+        find_executable(&self.home, std::env::var_os("PATH").as_deref())
     }
     fn path(&self, dir: &str, id: &str) -> PathBuf {
         self.state.join(dir).join(format!("{id}.json"))
@@ -182,7 +190,7 @@ impl Engine {
         }
         let env = policy::environment(
             json!({"id":id(),"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
-            executable(),
+            self.executable(),
         );
         all.push(env.clone());
         save(&self.state.join("inventory.json"), &json!(all))?;
@@ -289,7 +297,7 @@ impl Engine {
                     let _ = self.register("Claude Code · 默认环境", &root, false);
                 }
                 let mut all = self.inventory()?;
-                let exe = executable();
+                let exe = self.executable();
                 for e in &mut all {
                     *e = policy::environment(e.clone(), exe.clone());
                 }
@@ -301,7 +309,7 @@ impl Engine {
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
             "create_environment" => self.create(string(r, "name")?),
             "inspect" => {
-                let e = policy::environment(self.env(r)?, executable());
+                let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
                 let settings:Vec<Value>=FLAGS.iter().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","status":policy::setting_status(key,&doc["env"][key])})).collect();
                 let assets = work::summaries(Path::new(string(&e, "root")?))?;
@@ -310,7 +318,7 @@ impl Engine {
                 )
             }
             "plan_policy" => {
-                let e = policy::environment(self.env(r)?, executable());
+                let e = policy::environment(self.env(r)?, self.executable());
                 self.block_managed(&e)?;
                 let (path, doc, _) = self.settings(&e)?;
                 let preset = string(r, "preset")?;
@@ -469,7 +477,8 @@ impl Engine {
                 }
                 let root = PathBuf::from(string(&e, "root")?);
                 guard(&root)?;
-                let exe = executable()
+                let exe = self
+                    .executable()
                     .ok_or_else(|| err("executable_missing", "没有找到 Claude Code"))?;
                 Ok(json!({"root":root,"executable":exe}))
             }
@@ -539,7 +548,7 @@ impl Engine {
             if p["rule_version"] != RULE {
                 return Err(err("rule_changed", "策略规则已更新，请重新预览"));
             }
-            if p["extra"]["product"] != policy::product(executable().as_deref()) {
+            if p["extra"]["product"] != policy::product(self.executable().as_deref()) {
                 return Err(err(
                     "stale_product",
                     "目标程序或产品版本在预览后改变，请重新预览",
@@ -648,7 +657,7 @@ impl Engine {
         } else {
             None
         };
-        let exe = executable().ok_or_else(|| {
+        let exe = self.executable().ok_or_else(|| {
             err(
                 "executable_missing",
                 "没有找到 Claude Code，请安装后重新检查",
@@ -894,6 +903,42 @@ mod tests {
         drop(lock);
         let orphan = engine.request(json!({"command":"job","job_id":jid}));
         assert_eq!(orphan["data"]["status"], "needs_reconciliation");
+    }
+    #[test]
+    fn executable_discovery_uses_current_user_native_install_without_running_it() {
+        let t = TempDir::new().unwrap();
+        let home = t.path().join("home");
+        let native = home.join(".local/bin/claude");
+        fs::create_dir_all(native.parent().unwrap()).unwrap();
+        fs::write(&native, "not executed").unwrap();
+        fs::set_permissions(&native, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(find_executable(&home, None).is_none());
+        fs::set_permissions(&native, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            find_executable(&home, None),
+            Some(
+                native
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            )
+        );
+        let bin = t.path().join("bin");
+        fs::create_dir(&bin).unwrap();
+        fs::write(bin.join("claude"), "PATH first").unwrap();
+        fs::set_permissions(bin.join("claude"), fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            find_executable(&home, Some(bin.as_os_str())),
+            Some(
+                bin.join("claude")
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            )
+        );
+        assert!(find_executable(&t.path().join("other-user"), None).is_none());
     }
     #[test]
     fn launch_rejects_non_loopback_proxy_before_starting_any_process() {

@@ -18,6 +18,15 @@ fn checked_digest(value: &Value) -> Result<&str> {
         })
         .ok_or_else(|| failure("invalid_bundle", "Runner 校验值无效"))
 }
+pub(super) fn runner_program(bound: Option<&Value>) -> Result<String> {
+    match bound {
+        Some(value) => Ok(format!(
+            "\"$HOME/.local/share/lintel/runners/{}/lintel\"",
+            checked_digest(value)?
+        )),
+        None => Ok("lintel".into()),
+    }
+}
 fn shell_script(script: &str) -> Vec<String> {
     vec![format!("sh -c '{}'", script.replace('\'', "'\\''"))]
 }
@@ -51,7 +60,7 @@ impl Controller {
         let Some(bound) = bound else {
             return self.transport.call(alias, payload, submit);
         };
-        let sha = checked_digest(bound)?;
+        let program = runner_program(Some(bound))?;
         let mut bytes = serde_json::to_vec(payload).unwrap();
         bytes.push(b'\n');
         if bytes.len() > MAX_JSON {
@@ -59,9 +68,7 @@ impl Controller {
         }
         let mode = if submit { "submit" } else { "request" };
         // The only interpolated field is a validated lowercase SHA-256.
-        let command = vec![format!(
-            "\"$HOME/.local/share/lintel/runners/{sha}/lintel\" {mode}"
-        )];
+        let command = vec![format!("{program} {mode}")];
         self.transport
             .wire(alias, payload, submit, &bytes, &command)
     }
@@ -453,6 +460,7 @@ eval "$last"
         )
         .unwrap();
         let c = Controller {
+            terminal: None,
             state: root.join("state/remote"),
             config: home.join(".ssh/config"),
             bundles: root.join("bundles"),

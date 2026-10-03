@@ -106,6 +106,11 @@ CHECKS: List[Check] = [
            *(NPM or "npm", "run", "build"), cwd=ROOT / "apps/desktop", tools=("npm",),
            paths=(ROOT / "apps/desktop/node_modules",), requires="apps/desktop/node_modules"),
     # Independent / real-runtime evidence: never in the implicit default group.
+    _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
+           PYTHON, "tests/remote_linux_ssh_journey.py", "target/x86_64-unknown-linux-musl/release/lintel",
+           tools=("cargo", "ssh", "ssh-keygen"), paths=(ROOT / "target/x86_64-unknown-linux-musl/release/lintel",),
+           loopback=True, requires="Linux x86_64; OpenSSH sshd; static musl runner; desktop build prerequisites",
+           independent=True, reason="needs an actual Linux runtime and isolated loopback sshd"),
     _check("browser-smoke", "real Chromium two-phase clear smoke (Playwright, synthetic profile)",
            "independent", *(NODE or "node", "extensions/browser/tests/browser-smoke.mjs"),
            tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),
@@ -123,6 +128,7 @@ for _id, _desc, _file in (
      "submission_journey.py"),
     ("journey-work-preservation", "work-preservation journey (large session, A->B->C, damaged settings)",
      "work_preservation_journey.py"),
+    ("journey-launch", "interactive CLI/TUI launch (real PTY, inert Claude)", "launch_journey.py"),
     ("journey-policy", "versioned policy journey (version/value/ownership compatibility)", "policy_journey.py"),
 ):
     CHECKS.append(_check(_id, _desc, "journey", PYTHON, f"tests/{_file}", tools=("cargo",),

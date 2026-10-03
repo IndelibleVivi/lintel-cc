@@ -1,6 +1,6 @@
 mod submission;
 use serde_json::json;
-use std::io::{self, Read, Write};
+use std::io::{self, IsTerminal, Read, Write};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "help" {
@@ -16,18 +16,17 @@ fn main() {
         return;
     }
     if args[0] == "launch" {
-        let response = lintel_core::handle_request(
-            json!({"command":"launch_context","environment_id":args.get(1)}),
-        );
-        if response["ok"] != true {
-            eprintln!("{}", response);
-            std::process::exit(1)
+        if args.len() != 2 {
+            eprintln!("Usage: lintel launch <environment-id>");
+            std::process::exit(1);
         }
-        let data = &response["data"];
-        let mut command = std::process::Command::new(data["executable"].as_str().unwrap());
-        command
-            .current_dir(data["root"].as_str().unwrap())
-            .env("CLAUDE_CONFIG_DIR", data["root"].as_str().unwrap());
+        let mut command = match launch_command(&args[1]) {
+            Ok(command) => command,
+            Err(message) => {
+                eprintln!("{message}");
+                std::process::exit(1);
+            }
+        };
         use std::os::unix::process::CommandExt;
         eprintln!("Launch failed: {}", command.exec());
         std::process::exit(1);
@@ -64,6 +63,26 @@ fn main() {
     if response["ok"] != true {
         std::process::exit(1)
     }
+}
+fn launch_command(environment_id: &str) -> Result<std::process::Command, String> {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err(
+            "terminal_required: 请在交互终端使用 lintel launch；不会在隐藏管道中启动 Claude。"
+                .into(),
+        );
+    }
+    let response = lintel_core::handle_request(
+        json!({"command":"launch_context","environment_id":environment_id}),
+    );
+    if response["ok"] != true {
+        return Err(response.to_string());
+    }
+    let data = &response["data"];
+    let mut command = std::process::Command::new(data["executable"].as_str().unwrap());
+    command
+        .current_dir(data["root"].as_str().unwrap())
+        .env("CLAUDE_CONFIG_DIR", data["root"].as_str().unwrap());
+    Ok(command)
 }
 fn read_line(prompt: &str) -> String {
     print!("{prompt}");
@@ -167,7 +186,7 @@ fn archive_tui() {
 fn tui() {
     println!("  ▐▛███▜▌  Lintel\n ▝▜█████▛▘ 环境整理，先预览再执行。\n   ▘▘ ▝▝");
     loop {
-        println!("\n1 环境清单   2 登记环境   3 新建环境   4 应用方案\n5 恢复配置   6 任务记录   7 检查漂移   8 清理与重建\n9 工作归档   i 检查环境   a 认证检查   r 重新启用   q 退出");
+        println!("\n1 环境清单   2 登记环境   3 新建环境   4 应用方案\n5 恢复配置   6 任务记录   7 检查漂移   8 清理与重建\n9 工作归档   i 检查环境   a 认证检查   r 重新启用   o 打开 Claude   q 退出");
         let choice = read_line("> ");
         let request = match choice.as_str() {
             "q" => return,
@@ -207,6 +226,17 @@ fn tui() {
             }
             "9" => {
                 archive_tui();
+                continue;
+            }
+            "o" => {
+                match launch_command(&read_line("环境 ID: ")) {
+                    Ok(mut command) => {
+                        if let Err(error) = command.status() {
+                            eprintln!("启动失败: {error}");
+                        }
+                    }
+                    Err(message) => eprintln!("{message}"),
+                }
                 continue;
             }
             "i" => json!({"command":"inspect","environment_id":read_line("环境 ID: ")}),
