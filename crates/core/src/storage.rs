@@ -52,6 +52,11 @@ pub fn private_dir(path: &Path) -> Result<()> {
 }
 pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     guard(path)?;
+    // Refuse FIFOs and other non-regular files before opening: a blocking
+    // open on a FIFO would stall the operation while holding the global lock.
+    if !fs::symlink_metadata(path)?.file_type().is_file() {
+        return Err(err("file_limit", "文件类型或容量不受支持"));
+    }
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW)

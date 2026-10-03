@@ -86,7 +86,9 @@ fn validated_files(package: &Value) -> Result<Vec<Value>> {
 
 fn target(root: &Path, f: &Value) -> Result<PathBuf> {
     let relative = Path::new(string(f, "path")?);
-    let p = if f["category"] == "instructions" {
+    // Archives produced by a later generation may already carry lintel-imports
+    // paths; those keep their logical location instead of being re-wrapped.
+    let p = if f["category"] == "instructions" || relative.starts_with("lintel-imports") {
         root.join(relative)
     } else {
         root.join("lintel-imports").join(relative)

@@ -3,16 +3,19 @@ mod archive;
 mod cleanup;
 #[cfg(test)]
 mod lifecycle_tests;
+mod policy;
 mod storage;
 mod work;
 use fs2::FileExt;
+use policy::{FLAGS, RULE};
 use serde_json::{json, Value};
 use std::{
     fs::{self, OpenOptions},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
 };
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 use storage::*;
 
 #[derive(Debug)]
@@ -27,13 +30,6 @@ pub(crate) fn err(code: &str, message: &str) -> Error {
         message: message.into(),
     }
 }
-const FLAGS: [(&str, &str); 4] = [
-    ("DISABLE_TELEMETRY", "产品指标与 feature flags"),
-    ("DISABLE_ERROR_REPORTING", "错误回报"),
-    ("DISABLE_FEEDBACK_COMMAND", "主动反馈"),
-    ("CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "质量调查"),
-];
-const RULE: &str = "claude-public-env-2026-10-03";
 fn now() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -184,7 +180,10 @@ impl Engine {
         {
             return Ok(e.clone());
         }
-        let env = json!({"id":id(),"name":name,"host":"local","surface":"claude-code","root":root,"executable":executable(),"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified","product_version":null});
+        let env = policy::environment(
+            json!({"id":id(),"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
+            executable(),
+        );
         all.push(env.clone());
         save(&self.state.join("inventory.json"), &json!(all))?;
         Ok(env)
@@ -210,7 +209,7 @@ impl Engine {
                 "settings.json 或 env 必须是 JSON 对象；原文件未改动",
             ));
         }
-        for (key, _) in FLAGS {
+        for (key, _) in policy::fields() {
             if doc["env"].get(key).is_some_and(|v| !v.is_string()) {
                 return Err(err(
                     "unsupported_settings",
@@ -253,11 +252,31 @@ impl Engine {
         actions: Value,
         extra: Value,
     ) -> Result<Value> {
-        let (_, _, snap) = self.settings(e)?;
+        // Freeze the raw settings bytes and root identity without parsing:
+        // plans that never write settings (rebuild/cleanup/import) must not be
+        // gated on a parseable settings file. Settings-writing plans parse
+        // separately in their dispatch arm before calling this.
         let root = PathBuf::from(string(e, "root")?);
+        guard(&root)?;
+        let snap = snapshot(&root.join("settings.json"))?;
         let rm = fs::metadata(&root)?;
         use std::os::unix::fs::MetadataExt;
-        let mut p = json!({"id":id(),"environment_id":e["id"],"kind":kind,"title":title,"changes":changes,"preserves":preserves,"warnings":self.warnings(e),"actions":actions,"created_at":now(),"status":"planned","rule_version":RULE,"root":e["root"],"root_identity":[rm.dev(),rm.ino()],"snapshot":snap,"extra":extra});
+        let mut warnings = self.warnings(e);
+        if extra["policy"]["keep_remote_control"] == true {
+            warnings.push(
+                extra["policy"]["remote_control"]["summary"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+            );
+        }
+        if extra["policy"]["release_settings"]
+            .as_array()
+            .is_some_and(|v| !v.is_empty())
+        {
+            warnings.push("仅删除预览中显式选择的 user settings 字段，会重新开放相应流量；外部 shell/项目/组织配置不受修改。删除不会解除已有进程中的变量，需要重新启动。".into());
+        }
+        let mut p = json!({"id":id(),"environment_id":e["id"],"kind":kind,"title":title,"changes":changes,"preserves":preserves,"warnings":warnings,"actions":actions,"created_at":now(),"status":"planned","rule_version":RULE,"root":e["root"],"root_identity":[rm.dev(),rm.ino()],"snapshot":snap,"extra":extra});
         p["hash"] = json!(digest(&serde_json::to_vec(&p)?));
         save(&self.path("plans", string(&p, "id")?), &p)?;
         Ok(public_plan(p))
@@ -272,7 +291,7 @@ impl Engine {
                 let mut all = self.inventory()?;
                 let exe = executable();
                 for e in &mut all {
-                    e["executable"] = json!(exe);
+                    *e = policy::environment(e.clone(), exe.clone());
                 }
                 save(&self.state.join("inventory.json"), &json!(all))?;
                 Ok(
@@ -282,24 +301,20 @@ impl Engine {
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
             "create_environment" => self.create(string(r, "name")?),
             "inspect" => {
-                let e = self.env(r)?;
+                let e = policy::environment(self.env(r)?, executable());
                 let (path, doc, _) = self.settings(&e)?;
-                let settings:Vec<Value>=FLAGS.iter().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","status":if doc["env"][key]=="1"{"configured"}else{"unchanged"}})).collect();
+                let settings:Vec<Value>=FLAGS.iter().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","status":policy::setting_status(key,&doc["env"][key])})).collect();
                 let assets = work::summaries(Path::new(string(&e, "root")?))?;
                 Ok(
-                    json!({"environment":e,"settings":settings,"assets":assets,"warnings":self.warnings(&e)}),
+                    json!({"environment":e,"settings":settings,"assets":assets,"policy":policy::assessment(&doc,&e["product_evidence"],policy::trusted_devices(r)?),"warnings":self.warnings(&e)}),
                 )
             }
             "plan_policy" => {
-                let e = self.env(r)?;
+                let e = policy::environment(self.env(r)?, executable());
                 self.block_managed(&e)?;
                 let (path, doc, _) = self.settings(&e)?;
                 let preset = string(r, "preset")?;
-                if !["preserve", "reduce"].contains(&preset) {
-                    return Err(err("invalid_preset", "未知保护方案"));
-                }
-                let keep = r["keep_remote_control"].as_bool().unwrap_or(false);
-                let changes:Vec<Value>=FLAGS.iter().filter(|(k,_)|preset=="reduce"||["DISABLE_ERROR_REPORTING","CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY"].contains(k)).filter(|(k,_)|!keep||*k!="DISABLE_TELEMETRY").filter(|(k,_)|doc["env"][k]!="1").map(|(key,label)|json!({"key":key,"label":label,"before":valstr(&doc["env"][key]),"after":"1","path":path})).collect();
+                let (changes, assessment) = policy::plan(&doc, &e["product_evidence"], r, &path)?;
                 let p = self.plan(
                     &e,
                     "policy",
@@ -308,7 +323,7 @@ impl Engine {
                     } else {
                         "保持功能"
                     },
-                    json!(changes),
+                    changes,
                     vec![
                         "登录与凭据",
                         "会话、指令与记忆",
@@ -316,7 +331,7 @@ impl Engine {
                         "通用代理与自设 OTel",
                     ],
                     json!([{"id":"settings","label":"应用明确的外发设置并读回","reversible":true}]),
-                    json!({"preset":preset,"keep_remote_control":keep}),
+                    json!({"preset":preset,"product":e["product_evidence"],"policy":assessment}),
                 )?;
                 Ok(p)
             }
@@ -327,6 +342,14 @@ impl Engine {
                     return Err(err("not_restorable", "此任务没有可恢复的配置改动"));
                 }
                 let old = load(&self.path("plans", string(&job, "plan_id")?))?;
+                if !old.is_object() || !old["hash"].is_string() {
+                    return Err(err("invalid_plan", "保存的计划损坏，无法据此恢复"));
+                }
+                let mut unhashed = old.clone();
+                unhashed.as_object_mut().unwrap().remove("hash");
+                if old["hash"] != digest(&serde_json::to_vec(&unhashed)?) {
+                    return Err(err("plan_changed", "保存的计划已变化，无法据此恢复"));
+                }
                 let e = self.env(&json!({"environment_id":old["environment_id"]}))?;
                 let (path, doc, _) = self.settings(&e)?;
                 let mut changes = vec![];
@@ -425,7 +448,7 @@ impl Engine {
                 }
                 let base = load(&p)?;
                 let mut changes = vec![];
-                for (key, label) in FLAGS {
+                for (key, label) in policy::fields() {
                     if base.get(key).is_some() && base[key] != valstr(&doc["env"][key]) {
                         changes.push(json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":"user_settings","effect_timing":"next_launch","status":"changed"}))
                     }
@@ -463,7 +486,7 @@ impl Engine {
     fn baseline(&self, e: &Value) -> Result<()> {
         let (_, doc, _) = self.settings(e)?;
         let mut b = json!({});
-        for (key, _) in FLAGS {
+        for (key, _) in policy::fields() {
             b[key] = valstr(&doc["env"][key])
         }
         save(&self.path("baselines", string(e, "id")?), &b)
@@ -471,6 +494,9 @@ impl Engine {
     fn execute(&self, r: &Value) -> Result<Value> {
         let pid = safe_id(r, "plan_id")?;
         let p = load(&self.path("plans", &pid))?;
+        if !p.is_object() || !p["hash"].is_string() {
+            return Err(err("invalid_plan", "保存的计划损坏，请重新预览"));
+        }
         if r["approval"] != p["hash"] {
             return Err(err("approval_mismatch", "授权与当前预览不一致"));
         }
@@ -494,9 +520,31 @@ impl Engine {
         if json!([m.dev(), m.ino()]) != p["root_identity"] {
             return Err(err("stale_plan", "配置目录的实际对象已变化"));
         }
-        let (path, mut doc, snap) = self.settings(&e)?;
+        // Preconditions follow the plan's actual write scope. Plans that never
+        // touch settings (rebuild/cleanup/import) freeze and compare the raw
+        // settings bytes; an unparseable settings file must not block them.
+        // Settings-writing plans still require a fully parsed document.
+        let (path, mut doc, snap) = match p["kind"].as_str() {
+            Some("rebuild" | "cleanup" | "import") => {
+                let path = root.join("settings.json");
+                let snap = snapshot(&path)?;
+                (path, Value::Null, snap)
+            }
+            _ => self.settings(&e)?,
+        };
         if snap != p["snapshot"] {
             return Err(err("stale_plan", "预览后配置被修改，请重新预览"));
+        }
+        if p["kind"] == "policy" {
+            if p["rule_version"] != RULE {
+                return Err(err("rule_changed", "策略规则已更新，请重新预览"));
+            }
+            if p["extra"]["product"] != policy::product(executable().as_deref()) {
+                return Err(err(
+                    "stale_product",
+                    "目标程序或产品版本在预览后改变，请重新预览",
+                ));
+            }
         }
         if p["kind"] == "rebuild" {
             work::check_passphrase(r)?;
@@ -513,6 +561,9 @@ impl Engine {
             self.block_managed(&e)?;
         }
         let mut j = json!({"id":pid,"plan_id":pid,"environment_id":e["id"],"title":p["title"],"status":"accepted","created_at":now(),"restorable":false,"warnings":p["warnings"],"steps":[]});
+        if p["extra"]["policy"].is_object() {
+            j["policy"] = p["extra"]["policy"].clone();
+        }
         save(&jp, &j)?;
         if let Some(hook) = self.accept_hook {
             hook(&j);
@@ -538,7 +589,7 @@ impl Engine {
                 .ok_or_else(|| err("invalid_plan", "计划变更列表缺失"))?
             {
                 let key = string(c, "key")?;
-                if !FLAGS.iter().any(|(k, _)| *k == key) {
+                if !policy::fields().any(|(k, _)| k == key) {
                     return Err(err("invalid_action", "计划包含不受支持的字段"));
                 }
                 if c["after"].is_null() {
@@ -551,7 +602,9 @@ impl Engine {
                 return Err(err("stale_plan", "写入前发现配置变化"));
             }
             let mode = if path.exists() {
-                fs::metadata(&path)?.permissions().mode() & 0o777
+                // Never preserve a group/other-writable mode on rewrite; that
+                // would keep the file open to unsupervised local writers.
+                fs::metadata(&path)?.permissions().mode() & 0o777 & !0o022
             } else {
                 0o600
             };
@@ -655,6 +708,9 @@ impl Engine {
     }
 }
 fn public_plan(mut p: Value) -> Value {
+    if p["extra"]["policy"].is_object() {
+        p["policy"] = p["extra"]["policy"].clone();
+    }
     for key in ["snapshot", "root_identity", "root"] {
         p.as_object_mut().unwrap().remove(key);
     }
@@ -930,5 +986,120 @@ mod tests {
         assert!(!plain.contains("do-not-run"));
         let parsed: Value = serde_json::from_str(&plain).unwrap();
         assert_eq!(parsed["files"].as_array().unwrap().len(), 3);
+    }
+    fn rebuild_once(engine: &Engine, env_id: &Value) -> Value {
+        let p = engine.request(json!({"command":"plan_reset","environment_id":env_id,"recipe":"rebuild","categories":["instructions","memory","sessions"]}))["data"].clone();
+        let j = engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":"synthetic passphrase for testing only"}));
+        assert_eq!(j["data"]["status"], "partially_completed", "{j}");
+        j["data"].clone()
+    }
+    fn unseal_work(path: &str) -> Value {
+        let encrypted = fs::read(path).unwrap();
+        let decryptor = age::Decryptor::new(encrypted.as_slice()).unwrap();
+        let identity = age::scrypt::Identity::new(age::secrecy::SecretString::from(
+            "synthetic passphrase for testing only".to_string(),
+        ));
+        let mut reader = decryptor
+            .decrypt(std::iter::once(&identity as &dyn age::Identity))
+            .unwrap();
+        let mut plain = String::new();
+        use std::io::Read;
+        reader.read_to_string(&mut plain).unwrap();
+        serde_json::from_str(&plain).unwrap()
+    }
+    #[test]
+    fn second_rebuild_retains_previously_imported_work() {
+        let (_t, engine, e, root) = setup();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        fs::create_dir_all(root.join("projects/example/memory")).unwrap();
+        fs::write(
+            root.join("projects/example/memory/MEMORY.md"),
+            "synthetic memory",
+        )
+        .unwrap();
+        fs::write(
+            root.join("projects/example/session.jsonl"),
+            "{\"text\":\"synthetic session\"}\n",
+        )
+        .unwrap();
+        let first = rebuild_once(&engine, &e["id"]);
+        let second = rebuild_once(&engine, &first["new_environment_id"]);
+        let new2 = PathBuf::from(second["new_root"].as_str().unwrap());
+        assert!(new2.join("CLAUDE.md").exists());
+        assert!(new2
+            .join("lintel-imports/projects/example/session.jsonl")
+            .exists());
+        assert!(new2
+            .join("lintel-imports/projects/example/memory/MEMORY.md")
+            .exists());
+        assert!(!new2.join("lintel-imports/lintel-imports").exists());
+        let package = unseal_work(second["archive_path"].as_str().unwrap());
+        let digests: std::collections::HashSet<String> = package["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["digest"].as_str().unwrap().to_string())
+            .collect();
+        for content in [
+            "synthetic instruction",
+            "synthetic memory",
+            "{\"text\":\"synthetic session\"}\n",
+        ] {
+            assert!(
+                digests.contains(&digest(content.as_bytes())),
+                "second archive lost earlier work: {content}"
+            );
+        }
+    }
+    #[test]
+    fn oversized_work_does_not_break_inspection() {
+        let (_t, engine, e, root) = setup();
+        fs::write(
+            root.join("settings.json"),
+            r#"{"env":{"DISABLE_ERROR_REPORTING":"1"}}"#,
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("projects/demo")).unwrap();
+        fs::write(
+            root.join("projects/demo/session.jsonl"),
+            vec![b'x'; 9 * 1024 * 1024],
+        )
+        .unwrap();
+        let r = engine.request(json!({"command":"inspect","environment_id":e["id"]}));
+        assert_eq!(r["ok"], true, "{r}");
+        let assets = r["data"]["assets"].as_array().unwrap();
+        let sessions = assets.iter().find(|a| a["category"] == "sessions").unwrap();
+        assert_eq!(sessions["count"], 1);
+        assert_eq!(sessions["complete"], true);
+        // The destructive plan still enforces its own admission limit in full.
+        let p = engine.request(json!({"command":"plan_reset","environment_id":e["id"],"recipe":"rebuild","categories":["sessions"]}));
+        assert_eq!(p["ok"], false);
+        assert!(
+            ["file_limit", "archive_limit"].contains(&p["error"]["code"].as_str().unwrap()),
+            "{p}"
+        );
+    }
+    #[test]
+    fn malformed_settings_allows_work_preservation_plan_and_execution() {
+        let (_t, engine, e, root) = setup();
+        let damaged = r#"{"env":{"DISABLE_TELEMETRY":"1",}}"#;
+        fs::write(root.join("settings.json"), damaged).unwrap();
+        fs::write(root.join("CLAUDE.md"), "preservable instructions").unwrap();
+        let policy = engine
+            .request(json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce"}));
+        assert_eq!(policy["error"]["code"], "invalid_json");
+        let p = engine.request(json!({"command":"plan_reset","environment_id":e["id"],"recipe":"rebuild","categories":["instructions"]}));
+        assert_eq!(p["ok"], true, "{p}");
+        let j = engine.request(json!({"command":"execute","plan_id":p["data"]["id"],"approval":p["data"]["hash"],"archive_passphrase":"synthetic passphrase for testing only"}));
+        assert_eq!(j["data"]["status"], "partially_completed", "{j}");
+        assert_eq!(
+            fs::read_to_string(root.join("settings.json")).unwrap(),
+            damaged
+        );
+        let new = PathBuf::from(j["data"]["new_root"].as_str().unwrap());
+        assert_eq!(
+            fs::read_to_string(new.join("CLAUDE.md")).unwrap(),
+            "preservable instructions"
+        );
     }
 }

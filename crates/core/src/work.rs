@@ -31,13 +31,18 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     if relative == Path::new("CLAUDE.md") {
         return Some("instructions");
     }
-    if relative.starts_with("projects")
+    // Work previously preserved into lintel-imports keeps its category so a
+    // later archive covers it again; only the active root CLAUDE.md counts as
+    // instructions.
+    let work_area =
+        relative.starts_with("projects") || relative.starts_with("lintel-imports/projects");
+    if work_area
         && relative.components().any(|c| c.as_os_str() == "memory")
         && relative.extension().is_some_and(|x| x == "md")
     {
         return Some("memory");
     }
-    if relative.starts_with("projects") && name.ends_with(".jsonl") {
+    if work_area && name.ends_with(".jsonl") {
         return Some("sessions");
     }
     None
@@ -65,7 +70,10 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
                 .map_err(|_| err("path_escape", "路径离开了选定目录"))?;
             let m = fs::symlink_metadata(&p)?;
             if m.file_type().is_symlink() {
-                if rel.starts_with("projects") || rel == Path::new("CLAUDE.md") {
+                if rel.starts_with("projects")
+                    || rel.starts_with("lintel-imports")
+                    || rel == Path::new("CLAUDE.md")
+                {
                     return Err(err(
                         "symlink_target",
                         "工作内容包含符号链接，需要先明确其实际目标",
@@ -74,7 +82,7 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
                 continue;
             }
             if m.is_dir() {
-                if rel.starts_with("projects") {
+                if rel.starts_with("projects") || rel.starts_with("lintel-imports") {
                     stack.push(p)
                 }
                 continue;
@@ -97,12 +105,83 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
     out.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
     Ok(out)
 }
+/// Overview statistics for the inspector. This walk reads metadata only: no
+/// file contents, no digests, and none of the archive admission limits (those
+/// stay on `manifest`, which destructive plans must still pass in full). When
+/// the scan budget runs out or entries cannot be read, the result is marked
+/// `complete: false` instead of failing the unrelated settings inspection.
 pub fn summaries(root: &Path) -> Result<Vec<Value>> {
-    let all = manifest(
-        root,
-        &["instructions".into(), "memory".into(), "sessions".into()],
-    )?;
-    Ok(["instructions","memory","sessions"].iter().map(|c|{let files:Vec<_>=all.iter().filter(|v|v["category"]==*c).collect();json!({"category":c,"count":files.len(),"bytes":files.iter().map(|v|v["bytes"].as_u64().unwrap_or(0)).sum::<u64>()})}).collect())
+    guard(root)?;
+    let start = Instant::now();
+    let mut stack = vec![root.to_path_buf()];
+    let mut stats: std::collections::BTreeMap<&'static str, (u64, u64)> = Default::default();
+    let mut complete = true;
+    let mut entries = 0;
+    'walk: while let Some(dir) = stack.pop() {
+        let items = match fs::read_dir(&dir) {
+            Ok(items) => items,
+            Err(_) => {
+                complete = false;
+                continue;
+            }
+        };
+        for item in items {
+            entries += 1;
+            if entries > 50000 || start.elapsed() > Duration::from_secs(30) {
+                complete = false;
+                break 'walk;
+            }
+            let item = match item {
+                Ok(item) => item,
+                Err(_) => {
+                    complete = false;
+                    continue;
+                }
+            };
+            let p = item.path();
+            let rel = match p.strip_prefix(root) {
+                Ok(rel) => rel,
+                Err(_) => {
+                    complete = false;
+                    continue;
+                }
+            };
+            let m = match fs::symlink_metadata(&p) {
+                Ok(m) => m,
+                Err(_) => {
+                    complete = false;
+                    continue;
+                }
+            };
+            if m.file_type().is_symlink() {
+                if rel.starts_with("projects")
+                    || rel.starts_with("lintel-imports")
+                    || rel == Path::new("CLAUDE.md")
+                {
+                    complete = false;
+                }
+                continue;
+            }
+            if m.is_dir() {
+                if rel.starts_with("projects") || rel.starts_with("lintel-imports") {
+                    stack.push(p)
+                }
+                continue;
+            }
+            if let Some(category) = classify(rel) {
+                let stat = stats.entry(category).or_default();
+                stat.0 += 1;
+                stat.1 += m.len();
+            }
+        }
+    }
+    Ok(["instructions", "memory", "sessions"]
+        .iter()
+        .map(|c| {
+            let (count, bytes) = stats.get(c).copied().unwrap_or((0, 0));
+            json!({"category":c,"count":count,"bytes":bytes,"complete":complete})
+        })
+        .collect())
 }
 pub fn check_passphrase(r: &Value) -> Result<&str> {
     let s = string(r, "archive_passphrase")?;
@@ -181,11 +260,14 @@ impl Engine {
         for f in &files {
             let relative = Path::new(string(f, "path")?);
             // Only the one supported text instruction location is active. Session/memory formats are preserved for inspection, not falsely claimed resumable.
-            let target = if f["category"] == "instructions" {
-                destination.join(relative)
-            } else {
-                destination.join("lintel-imports").join(relative)
-            };
+            // Content already held in lintel-imports keeps its logical path; it
+            // must not be wrapped into lintel-imports/lintel-imports.
+            let target =
+                if f["category"] == "instructions" || relative.starts_with("lintel-imports") {
+                    destination.join(relative)
+                } else {
+                    destination.join("lintel-imports").join(relative)
+                };
             private_dir(
                 target
                     .parent()
