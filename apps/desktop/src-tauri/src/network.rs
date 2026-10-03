@@ -324,6 +324,7 @@ mod tests {
             json!({"blocked":[{"host":"*.synthetic.invalid"}]}),
             json!({"allowed":[{"host":"localhost","ports":[0]}]}),
             json!({"default_action":"unknown"}),
+            json!({"blocked":[{"host":"synthetic.invalid"}]}),
             json!({"max_connections":0}),
             json!({"unknown_rule":true}),
         ] {
@@ -346,7 +347,7 @@ mod tests {
         }
         let result = state
             .dispatch(
-                json!({"op":"start","environment_id":ENVIRONMENT}),
+                json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"deny"}}),
                 unavailable_core,
             )
             .await;

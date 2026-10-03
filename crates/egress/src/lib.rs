@@ -38,18 +38,43 @@ pub enum DefaultAction {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default = "default_environment_id")]
     pub environment_id: String,
+    #[serde(default = "default_bind")]
     pub bind: SocketAddr,
+    /// Required on the wire: an omitted action must fail closed, not silently
+    /// become allow-all. `DefaultAction::default()` stays for programmatic use.
     pub default_action: DefaultAction,
+    #[serde(default)]
     pub allowed: Vec<Rule>,
+    #[serde(default)]
     pub blocked: Vec<Rule>,
     /// HTTP or HTTPS proxy, with no userinfo. SOCKS requires a separate adapter.
+    #[serde(default)]
     pub upstream: Option<String>,
+    #[serde(default = "default_max_connections")]
     pub max_connections: usize,
+    #[serde(default = "default_connect_timeout")]
     pub connect_timeout_seconds: u64,
+    #[serde(default = "default_connection_lifetime")]
     pub connection_lifetime_seconds: u64,
+}
+fn default_environment_id() -> String {
+    "unassigned".into()
+}
+fn default_bind() -> SocketAddr {
+    "127.0.0.1:0".parse().unwrap()
+}
+fn default_max_connections() -> usize {
+    64
+}
+fn default_connect_timeout() -> u64 {
+    10
+}
+fn default_connection_lifetime() -> u64 {
+    3600
 }
 impl Default for Config {
     fn default() -> Self {
@@ -151,7 +176,32 @@ impl Destination {
 fn normalize_host(host: &str) -> Result<String, &'static str> {
     let host = host.trim_end_matches('.').to_ascii_lowercase();
     if let Ok(ip) = host.parse::<IpAddr>() {
+        // IPv4-mapped IPv6 names the same socket as its embedded IPv4; match
+        // rules on one canonical form so either spelling hits an exact-IP rule.
+        if let IpAddr::V6(v6) = ip {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return Ok(v4.to_string());
+            }
+        }
         return Ok(ip.to_string());
+    }
+    // inet_aton-style spellings (decimal/octal/hex atoms, short or mixed
+    // dotted forms) resolve to an IP at connect time but never parse above;
+    // refusing them keeps exact-IP rules unbypassable instead of silently
+    // string-matching. Each atom is all-digits or 0x-prefixed hex; ordinary
+    // alphanumeric hostnames are unaffected.
+    let ambiguous_numeric = !host.is_empty()
+        && host.split('.').all(|label| {
+            if label.is_empty() {
+                return false;
+            }
+            match label.strip_prefix("0x").or_else(|| label.strip_prefix("0X")) {
+                Some(hex) => !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()),
+                None => label.bytes().all(|b| b.is_ascii_digit()),
+            }
+        });
+    if ambiguous_numeric {
+        return Err("invalid_host");
     }
     if host.is_empty()
         || host.len() > 253
@@ -676,6 +726,51 @@ mod unit_tests {
                 .0,
             "deny"
         );
+    }
+    #[test]
+    fn exact_ip_rules_cannot_be_bypassed_by_alternate_spellings() {
+        let mut config = Config::default();
+        config.blocked.push(Rule {
+            host: "127.0.0.1".into(),
+            ports: vec![],
+        });
+        config.validate().unwrap();
+        // IPv4-mapped IPv6 names the same socket and must hit the IPv4 rule.
+        assert_eq!(
+            config
+                .decide(&destination("[::ffff:127.0.0.1]:443", None).unwrap())
+                .0,
+            "deny"
+        );
+        assert_eq!(
+            config
+                .decide(&destination("[::ffff:7f00:1]:443", None).unwrap())
+                .0,
+            "deny"
+        );
+        // inet_aton-style spellings resolve at connect time but never reach
+        // the matcher: they are refused outright instead of bypassing rules.
+        for spelling in [
+            "127.1:443",
+            "127.000.000.001:443",
+            "2130706433:443",
+            "0x7f000001:443",
+            "017700000001:443",
+            "0x7f.0.0.1:443",
+        ] {
+            assert!(destination(spelling, None).is_err(), "{spelling}");
+        }
+        // Ordinary hostnames and valid IPv4 keep working.
+        assert!(destination("example.com:443", None).is_ok());
+        assert_eq!(
+            destination("192.168.0.1:443", None).unwrap().authority(),
+            "192.168.0.1:443"
+        );
+    }
+    #[test]
+    fn wire_config_requires_an_explicit_default_action() {
+        assert!(serde_json::from_value::<Config>(serde_json::json!({"default_action":"deny"})).is_ok());
+        assert!(serde_json::from_value::<Config>(serde_json::json!({"blocked":[{"host":"example.com","ports":[]}]})).is_err());
     }
     #[test]
     fn rejects_unsupported_route_and_ambiguous_framing() {

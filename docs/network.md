@@ -69,9 +69,9 @@ Synthetic bridge 测试通过 fake core 核对 inspect / launch 请求形状，�
 
 ## 规则与实际支持范围
 
-配置字段参见 [synthetic 配置](../crates/egress/examples/policy.synthetic.json)。`environment_id` 只接受短的字母数字 / `-` / `_` 标识，不接受路径或账号名。`allowed`、`blocked` 中每项为 `{ "host": "example.invalid", "ports": [443] }`；域名不区分大小写，使用精确 hostname / IP，不支持通配符。空 `ports` 代表该主机的所有端口。显式 `blocked` 优先，其次 `allowed`，最后 `default_action`（`allow` 或 `deny`）。规则在建立每个请求 / tunnel 前检查，域名判断不等于对 TLS 内部 URL 的检查。
+配置字段参见 [synthetic 配置](../crates/egress/examples/policy.synthetic.json)。`environment_id` 只接受短的字母数字 / `-` / `_` 标识，不接受路径或账号名。`allowed`、`blocked` 中每项为 `{ "host": "example.invalid", "ports": [443] }`；域名不区分大小写，使用精确 hostname / IP，不支持通配符。IP 按规范形式比较：`::ffff:127.0.0.1` 这类 IPv4-mapped IPv6 归一到其内嵌 IPv4 参与匹配，规则写一侧即可覆盖两种写法；`127.1`、纯十进制整数或 `0x` 十六进制等 inet_aton 式 IP 写法（规则或请求目的地都一样）被直接拒绝，不能借此绕过精确 IP 规则。空 `ports` 代表该主机的所有端口。显式 `blocked` 优先，其次 `allowed`，最后 `default_action`（`allow` 或 `deny`）。`default_action` 在配置 JSON 中是必填字段：省略即配置无效、拒绝启动，不会静默变成全放行。规则在建立每个请求 / tunnel 前检查，域名判断不等于对 TLS 内部 URL 的检查。
 
-默认 `allow`，没有未经证明的内置 telemetry 黑名单。`api.anthropic.com` 是用途混合域名，默认保留；CONNECT 从不把其加密内容分类成 telemetry。若用户明确把任何主机加入 `blocked` 或选择 `deny` allowlist，它会按该显式规则阻止整个主机 / 端口，可能同时影响必要功能。减少产品可选外发应同时依赖对应产品支持的原生配置。
+产品立场上的缺省动作是 `allow`，没有未经证明的内置 telemetry 黑名单；但这不是配置缺省——如上一节所述，wire 配置必须显式写出 `default_action`。`api.anthropic.com` 是用途混合域名，默认保留；CONNECT 从不把其加密内容分类成 telemetry。若用户明确把任何主机加入 `blocked` 或选择 `deny` allowlist，它会按该显式规则阻止整个主机 / 端口，可能同时影响必要功能。减少产品可选外发应同时依赖对应产品支持的原生配置。
 
 | 能力 | 当前行为 |
 | --- | --- |
