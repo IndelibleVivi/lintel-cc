@@ -283,7 +283,6 @@ button:active:not(:disabled){transform:none}
 .pairing-code>span{display:block;font-size:12px;color:var(--muted)}
 .pairing-code>strong{font-family:monospace;font-size:23px;letter-spacing:4px;display:block;color:var(--accent);margin:5px 0 8px}
 .pairing-code>p{font-size:12px}
-.pairing-code textarea{font-family:monospace;font-size:13px;resize:none;min-height:55px;margin-top:10px}
 .pairing-code>.text-button{font-size:12px;margin-top:5px}
 .pending-pair{border:1px solid var(--line);border-radius:7px;padding:14px;margin-top:12px;display:flex;flex-direction:column;gap:6px}
 .pending-pair p,.pending-pair code{font-size:12px;word-break:break-all}

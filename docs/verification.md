@@ -134,7 +134,37 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | --- | --- |
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and desktop build prerequisites; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
+| `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
+
+Browser runtime and App pairing have a separate opt-in entrypoint (repository root):
+
+```sh
+npm --prefix apps/desktop ci
+npm --prefix apps/desktop run build
+npm --prefix extensions/browser ci
+(cd extensions/browser && npx playwright install chromium)
+python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/lintel-browser-runtime.json
+```
+
+CI explicitly selects both checks on macOS and Ubuntu after the default checks;
+Ubuntu also selects the Linux OpenSSH check below. Browser smoke uses a real
+headless Chromium process, a disposable persistent profile and a synthetic
+extension that accepts local fixture origins only. Its native installation
+helper restores its disposable manifest byte for byte, closes the old browser
+process, then relaunches without extension-loading flags. It requires a different
+native `runtime.onStartup` generation before the second, separately approved
+deletion. No profile preferences or startup markers are written by the harness.
+The detailed `browser-smoke.json` records process IDs, loading flags, generation
+and native-host receipts. These are real-runtime observations with synthetic
+data, not claude.ai or logged-in Claude acceptance. Formal Chrome, Edge, Firefox
+and AdsPower remain separate platform checks; see the [browser guide](browser.md).
+
+The pairing journey starts its own loopback preview server on an ephemeral port.
+Set `LINTEL_PAIRING_UI_REPORT` to an output file to retain its detailed report;
+the parent directory must already exist. CI retains this alongside entrypoint
+and startup evidence. Both browser checks accept `PLAYWRIGHT_MODULE` when using
+an already installed matching Playwright runtime.
 
 Linux OpenSSH runtime has a separate opt-in entrypoint:
 

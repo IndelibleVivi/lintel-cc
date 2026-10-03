@@ -1,10 +1,11 @@
 name: verify
 
-# Synthetic verification only. This workflow runs the same repository checks as
-# `python3 tests/verify.py` on macOS and Linux. It never performs release,
+# Synthetic defaults plus isolated browser/Linux runtime verification. This
+# workflow uses `python3 tests/verify.py` on macOS and Linux. It never performs release,
 # publish, deploy, or account operations, and it does not run real
-# browser/auth acceptance. Linux additionally runs an isolated OpenSSH runtime
-# journey with inert Claude fixtures (see docs/verification.md).
+# auth acceptance. Independent browser checks run real headless Chromium with
+# temporary profiles/local fixtures. Linux additionally runs isolated OpenSSH
+# with inert Claude fixtures (see docs/verification.md).
 on:
   push:
     branches: ["**"]
@@ -59,6 +60,12 @@ jobs:
         working-directory: apps/desktop
         run: npm ci
 
+      - name: Browser test dependencies
+        working-directory: extensions/browser
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
       - name: Verify entrypoint self-test
         run: python3 tests/verify.py --self-test
 
@@ -74,6 +81,22 @@ jobs:
       - name: Linux OpenSSH runtime acceptance
         if: runner.os == 'Linux'
         run: python3 tests/verify.py --checks linux-ssh-runtime --json "$RUNNER_TEMP/lintel-verify/linux-ssh-runtime.json"
+
+      - name: Independent browser runtime and App pairing
+        env:
+          LINTEL_PAIRING_UI_REPORT: ${{ runner.temp }}/lintel-verify/browser-pairing-ui.json
+        run: |
+          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
+
+      - name: Collect browser startup evidence
+        if: always()
+        run: |
+          if [ -f extensions/browser/artifacts/browser-smoke.json ]; then
+            cp extensions/browser/artifacts/browser-smoke.json "$RUNNER_TEMP/lintel-verify/browser-smoke.json"
+          fi
+          if [ -f extensions/browser/artifacts/browser-smoke-failure.json ]; then
+            cp extensions/browser/artifacts/browser-smoke-failure.json "$RUNNER_TEMP/lintel-verify/browser-smoke-failure.json"
+          fi
 
       - name: Upload evidence
         if: always()

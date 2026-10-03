@@ -136,7 +136,7 @@
       "required": "目标按已批准类型清理，邻域按明确范围保留",
       "status": "partial",
       "evidence": [
-        "Synthetic Chromium run observed five storage categories removed, neighbor preserved, target tabs closed; full harness did not finish. See docs/browser.md."
+        "2026-10-04 macOS arm64 / Playwright Chromium 155.0.8059.12: complete two-stage browser-smoke passes all 11 assertions after native persistent installation and actual process restart. Five target storage categories removed and neighbor retained; local synthetic origins only. See docs/browser.md."
       ]
     },
     {
@@ -168,8 +168,10 @@
       "id": "B07",
       "scenario": "目标页、service worker 正在写入存储",
       "required": "控制新加载并处理写入者；删除后复查，不以早到 callback 结算",
-      "status": "not-run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "2026-10-04 real Chromium smoke: active SW waitUntil CacheStorage writer and iframe writer, isolation/target-host closure, actual old-process exit/new-process startup with native onStartup generation, separately approved finishClear and post-deletion reads passed. No fabricated startup events or profile preference writes; formal browsers/Firefox writer behavior remains unverified."
+      ]
     },
     {
       "id": "B08",
@@ -177,7 +179,8 @@
       "required": "不自动再删新登录；查询持久结果/重新确认",
       "status": "partial",
       "evidence": [
-        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior.",
+        "Current real Chromium smoke repeats the old committed operation after a new synthetic login Cookie is seeded; the new Cookie survives. Native host pairing, explicit browser confirmation and durable receipt roundtrip pass on a temporary profile. Real provider re-login and formal browsers remain unverified."
       ]
     },
     {
@@ -193,8 +196,10 @@
       "id": "B10",
       "scenario": "WebRTC 设置在整个 profile 生效",
       "required": "界面明确范围；通话/媒体负例可重现，支持单项恢复",
-      "status": "not-run",
-      "evidence": []
+      "status": "partial",
+      "evidence": [
+        "Current real Chromium smoke submits WebRTC through connectNative, requires browser-side approval and records native effective-setting readback in a durable host receipt. Actual calls/media/network negative cases, Firefox and complete scope acceptance remain unverified."
+      ]
     },
     {
       "id": "B11",
@@ -655,7 +660,8 @@
       "status": "not-run",
       "evidence": [
         "Desktop candidate bundles the native host and exposes read-only preview plus frozen approval, stable current-user install and separate pairing. Actual packaged host installation/framing and rendered synthetic App flow pass; extension still needs developer loading and formal non-developer installation/pairing journey has not run.",
-        "App candidate now also supplies non-fixture Chromium/Firefox files through full frozen preview/approval to stable current-user directories, with owned update and interrupted recovery. Actual App-packaged files installed and compared in synthetic homes, with no browser profile/native registration mutation; browser developer loading remains required. Formal non-developer installation and pairing remains not-run."
+        "App candidate now also supplies non-fixture Chromium/Firefox files through full frozen preview/approval to stable current-user directories, with owned update and interrupted recovery. Actual App-packaged files installed and compared in synthetic homes, with no browser profile/native registration mutation; browser developer loading remains required. Formal non-developer installation and pairing remains not-run.",
+        "App copy-to-pair defect fixed: the rendered production page now copies the 12-hex code instead of its internal challenge. tests/browser_pairing_ui_journey.mjs uses real core/host processes and framed pair_request/explicit approval, with synthetic invoke and clipboard. This does not close native WebKit, OS clipboard or non-developer installation acceptance."
       ]
     },
     {
@@ -748,6 +754,6 @@
     }
   ],
   "updated": "2026-10-04",
-  "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Earlier clean 71b54e2 CI37134544628 macOS/Ubuntu defaults 12/12 each and real Linux OpenSSH/custom static-musl runtime 1/1 passed (0 ignored). Mac App candidate includes both rebuilt Linux runners; aarch64 runtime, real Claude/production VPS and full journeys remain unverified. Persistent browser startup evidence is still missing. App-supplied browser host now has frozen preview/approval, stable current-user installation and ownership-reviewed upgrades; packaged executable/framing passed on synthetic macOS home. Default App builds exclude local-only fonts. Extension developer loading, formal browser restart and non-developer installation remain unverified. 2026-10-04: App-supplied non-fixture Chromium/Firefox extension preparation added with full frozen approval, fixed user directory, owned update/interrupted recovery and finite Finder reveal. Desktop 57 tests pass including two actual App-resource opt-ins, with independent Linux runtime filtered; local App candidate 17.17 MiB and rendered synthetic flow pass. Clean 67f8549 CI37142533163 macOS/Ubuntu defaults 12/12 each and independent Linux OpenSSH static-musl runtime 1/1 passed, with 0 ignored in the runtime test; all three artifacts record the same clean HEAD. App-resource opt-ins and rendered UI are separate local evidence, not part of the CI defaults. No personal browser install, activation, signed distribution or full browser restart acceptance."
+  "evidence_semantics": "partial means bounded executed synthetic/unit or isolated real-runtime evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
+  "implementation_update": "2026-10-04: App candidate supplies non-fixture Chromium/Firefox files and native host through frozen preview/approval, stable current-user directories and owned update/recovery. Prior clean 67f8549 CI37142533163 passed macOS/Ubuntu defaults 12/12 each and independent Linux OpenSSH static-musl runtime 1/1, 0 ignored. Local packaged-resource opt-ins, rendered UI and 17.17 MiB arm64 App build are separate evidence. Current full real Chromium two-stage browser-smoke passes all 11 original assertions on macOS arm64 / Playwright Chromium 155.0.8059.12 after browser-native persistent fixture install, actual old-process exit/new startup without extension-loading flags and real production onStartup generation; active writers, five storage categories/neighbor preservation, duplicate operation safety and real Native Messaging receipts pass. App copies the actual 12-hex pairing code; rendered-page-to-real-host regression passes with synthetic invoke/clipboard. CI now explicitly selects both browser checks on macOS/Ubuntu; fresh clean-source results are pending. Formal Chrome/Edge/Firefox/AdsPower, native WebKit/OS clipboard, signed/non-developer distribution, real Claude/auth/model effects, production VPS and aarch64 runtime remain unverified. No personal browser installation or activation; full SPEC and G01-G04/U01 remain incomplete."
 }

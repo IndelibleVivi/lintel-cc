@@ -115,6 +115,13 @@ CHECKS: List[Check] = [
            "independent", *(NODE or "node", "extensions/browser/tests/browser-smoke.mjs"),
            tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),
            independent=True, reason="needs Playwright and a real browser restart generation"),
+    _check("browser-pairing-ui", "built App copy/real native host pairing/approval journey (synthetic invoke and clipboard)",
+           "independent", *(NODE or "node", "tests/browser_pairing_ui_journey.mjs"),
+           tools=("node", "cargo"), paths=(
+               Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
+               ROOT / "apps/desktop/node_modules", ROOT / "apps/desktop/dist/index.html"),
+           loopback=True, requires="Playwright Chromium; built desktop frontend; Rust; synthetic invoke/clipboard, not native WebKit",
+           independent=True, reason="needs Playwright and a built App; real host values and framed native pairing"),
     _check("desktop-tauri-bundle", "native macOS Tauri app bundle build (npm run desktop:build)",
            "independent", *(NPM or "npm", "run", "desktop:build"), cwd=ROOT / "apps/desktop",
            tools=("npm", "cargo"), requires="Xcode Command Line Tools and a macOS host",

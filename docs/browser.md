@@ -36,11 +36,17 @@ macOS App 已带 Chromium / Firefox 伴随扩展，不要求桌面用户安装 N
 
 1. “预览扩展目录”：只读核对版本、大小、文件清单和目标目录；批准后才准备文件。Chrome / Edge 共用当前用户 `~/Library/Application Support/Lintel/browser-extensions/chromium/`，Firefox 使用同级 `firefox/`。准备完成后可在 Finder 打开，或复制目录／manifest 路径。
 2. 在目标 profile 加载扩展。Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`，启用开发者模式，选择“Load unpacked / 加载已解压的扩展”和已准备的目录。Firefox 打开 `about:debugging#/runtime/this-firefox`，选择“Load Temporary Add-on”和目录里的 `manifest.json`。随后将管理页中的准确扩展 ID 填到 App 第二步，预览并另行批准本地连接。
-3. 生成配对请求，在目标扩展输入挑战值，核对两端短码，再批准这份 profile。目录准备、本地连接注册、profile 配对、最近轮询在线是四个不同事实。
+3. 生成配对请求，复制 App 显示的 12 位配对短码，在目标扩展输入并提交请求；核对两端短码，再在 App 批准这份 profile。目录准备、本地连接注册、profile 配对、最近轮询在线是四个不同事实。
 
 准备只复制 App 内置文件，不写浏览器 profile、偏好、扩展加载登记、native manifest 或 allowlist。目录保持稳定，移动 App 不影响浏览器加载路径；原有受管文件可预览后批准更新，随后要在浏览器重新加载。非受管目录、被改动的文件或 ownership 冲突会拒绝覆盖；批准前重新核对整份计划。上次准备中断时，新的预览会列出待完成的受管目录切换；重新批准后才继续，不把备份或暂存目录当成已完成。未完成切换期间 App 资源版本改变会阻止恢复；需先核对原版本资源和目录变化，保留现有状态，不自动改用新版本继续。已准备的相同版本可重复核对，无须重写。
 
-这仍是开发加载：Chrome / Edge 需要开发者模式，Firefox 临时扩展在退出后移除，长期 Firefox 安装需要签名。商店／签名分发与非开发者首次安装验收尚未完成。文件准备成功不代表浏览器已经加载，更不代表当前两阶段清理已通过验收。
+这仍是开发加载：Chrome / Edge 需要开发者模式，Firefox 临时扩展在退出后移除，长期 Firefox 安装需要签名。商店／签名分发与非开发者首次安装验收尚未完成。文件准备成功不代表浏览器已经加载。独立 Chromium 的两阶段清理有下述真实 runtime 证据，正式浏览器与非开发者安装仍需各自验收。
+
+### AdsPower 与其他 Chromium 浏览器
+
+AdsPower 的 [profile 文档](https://help.adspower.com/docs/creating_browser_profiles) 区分基于 Chrome 的 SunBrowser 与基于 Firefox 的 FlowerBrowser；[扩展文档](https://help.adspower.com/docs/extensions) 说明 Chrome 商店／ZIP 与受管扩展的安装方式。通过 AdsPower 管理扩展可能涉及云端上传、缓存或扩展数据同步，应按其实际设置判断范围，Lintel 不会自动上传。扩展 API 兼容性不能证明 Native Messaging 可用；本轮没有找到可核实的 AdsPower host 注册路径，也没有操作 AdsPower 的现有 profile。
+
+当前 App 安装器只提供 Chrome、Edge、Firefox 的固定注册路径；选择 Chrome 不代表安装到了 AdsPower。AdsPower 的 Native Messaging、完整重启与清理尚未验收，不列为已支持平台。需要在独立新建 profile 验证该浏览器实际读取的注册与调用行为后，才能实现它的安装入口。
 
 ## 独立构建与开发安装
 
@@ -97,7 +103,7 @@ lintel-browser-host register firefox lintel@lintel.local /absolute/path/to/linte
 | macOS | `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/` | `~/Library/Application Support/Microsoft Edge/NativeMessagingHosts/` | `~/Library/Application Support/Mozilla/NativeMessagingHosts/` |
 | Linux | `~/.config/google-chrome/NativeMessagingHosts/` | `~/.config/microsoft-edge/NativeMessagingHosts/` | `~/.mozilla/native-messaging-hosts/` |
 
-Chromium 系列用户级 host manifest 位于该 user-data-dir 的 `NativeMessagingHosts/` 子目录；Chrome for Testing 146 起有独立默认路径。自动 smoke 只向自己新建的临时 user-data-dir 注册，并把 host DB 指向同一临时根；不使用个人注册目录。浏览器 profile 与 host 注册的作用域不同，配对实例身份仍然必须独立确认。
+本 smoke 使用的 Chromium / Chrome for Testing 从临时 user-data-dir 的 `NativeMessagingHosts/` 子目录读取 host manifest；其他发行版的注册位置需分别核实，不能据此推断 AdsPower。自动 smoke 只向自己新建的临时 user-data-dir 注册，并把 host DB 指向同一临时根；不使用个人注册目录。浏览器 profile 与 host 注册的作用域不同，配对实例身份仍然必须独立确认。
 
 host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户确认的安装路径：独立 `register --apply`，或桌面「批准安装本地连接／批准更新本地连接」（`install_bundled_host`）在安装流程内把该 ID 加入 host allowlist。通用 control 通道上的 `allow_extension` 不再接受写入，直接返回 `allow_extension_requires_installer`，防止任何同用户进程绕过已确认的安装动作自行放行任意扩展。
 
@@ -186,7 +192,7 @@ Host 操作存储与 extension journal 相互补充。相同 operation ID 绑定
 node --test extensions/browser/tests/*.test.mjs
 cargo test --manifest-path extensions/browser/native-host/Cargo.toml
 cd extensions/browser
-npm install
+npm ci
 npx playwright install chromium
 npm run test:browser
 ```
@@ -195,13 +201,22 @@ npm run test:browser
 
 合成构建 `node scripts/build.mjs --fixture` 生成显眼命名的 fixture 包，只接受 `http://localhost:18765`。其 Cookie/DNR/loopback 权限是测试预授权，与正式包分开。不要将 fixture 包发布给普通用户。
 
-2026-10-03 验证：20 项 JS contract tests 与 11 项 Rust tests 通过。macOS arm64 / Playwright 管理的 Chromium 155.0.8059.12 曾通过完整静止 Service Worker smoke：目标与 iframe 宿主关闭、主导航隔离、五类存储删除/邻域保留、定位权限目标级 block/restore、完整浏览器重启后相同操作 ID 不重删新登录，以及真实 `connectNative` 短码请求/本地批准/浏览器确认 WebRTC/host 持久回执往返。旧运行证据在本地生成的 `extensions/browser/artifacts/browser-smoke.json`，**不能替代下述当前两阶段实现的验收**。
+2026-10-04 验证：20 项 JS contract tests 与 12 项 native host Rust tests 有既有通过证据。macOS arm64 / Playwright Chromium 155.0.8059.12 的当前完整两阶段 smoke 已通过，保留原有 11 项断言：真正活跃的 SW `waitUntil` CacheStorage writer 与 iframe writer、目标／宿主关闭、隔离保持、五类存储删除／邻域保留、定位权限目标级 block/restore、旧 operation ID 不重删新的合成登录，以及真实 `connectNative` 短码请求／本地批准／浏览器确认 WebRTC／host 持久回执。
 
-加入真正活跃的 SW `waitUntil` CacheStorage writer 后，测试证明旧流程在注销成功后仍发生回写。当前源实现已改为重启前后分步确认，contract tests 验证 worker 重启不能冒充浏览器重启、相同准备记录不能二次删除、隔离 ownership 不可跨任务解除。当前完整 smoke 未通过：命令行临时加载的扩展在 Chromium 重启后没有给出 `runtime.onStartup` 世代，执行器正确返回 `browser_restart_required` 而未继续删除。未伪造启动标记或减弱 active writer 断言。需要在真实持久安装的 synthetic 扩展环境继续验证此路径；正式 Chrome/Edge/Firefox 分别验收也尚未完成。失败记录写入本地 `extensions/browser/artifacts/browser-smoke-failure.json`，不纳入 Git。
+持久安装由测试专用 [persistent-install.mjs](../extensions/browser/tests/persistent-install.mjs) 调用 Chromium 原生管理页安装器完成：仅临时破坏自己复制的 fixture manifest，以取得浏览器生成的加载失败恢复凭据，随后逐字节恢复，再由原生安装器重试。这遵循 [Chromium 原生 reload/loadUnpacked 实现](https://chromium.googlesource.com/chromium/src/+/main/chrome/browser/extensions/api/developer_private/developer_private_functions.cc)；不是产品的自动扩展安装入口。测试确认旧浏览器进程已退出、新进程不同、重新启动没有 `--load-extension` 或 `--disable-extensions-except`，同一扩展身份保留，生产监听器实际收到新的 `runtime.onStartup` 世代，再单独确认 `finishClear`。没有写入 profile preferences、扩展存储或伪造启动事件。详细证据写入本地 `extensions/browser/artifacts/browser-smoke.json`，失败则写 `browser-smoke-failure.json`；这些生成文件不纳入 Git。
 
-另一个已定位的 harness 问题是 macOS headless 背景页的存储调用不完成；测试现在先 `bringToFront()` 再种植/观察 fixture，并使用与缓存浏览器匹配的 Playwright runtime，30 秒阶段 deadline 未放宽。测试不是正式 Chrome/Edge/Firefox 的验收，也未证明 Firefox 容器/CacheStorage 的实际行为。
+此前的活跃 SW 负例证明“注销成功”仍可能回写；命令行临时加载和独立 CDP 临时安装又未产生持久启动世代，执行器正确拒绝 `browser_restart_required`。这些失败推动了现在的两步流程和原生持久安装 harness，不能用旧静止 worker 成功替代当前检查。macOS headless fixture 在种植／读取存储前需 `bringToFront()`，浏览器与 Playwright revision 要匹配；30 秒阶段 deadline 未放宽。
 
-未完成的产品范围：真实持久安装扩展的两阶段重启清理验收、正式 Chrome/Edge/Firefox 各版本验收、Firefox 容器实测/独立 CacheStorage 清理/按站点代理、离线克隆识别、native host 与扩展的签名分发、专用浏览器启动与防进程接管、主应用 deep link、journal 用户归档工具。上述边界需要继续实现或验收，不能因为开发包构建成功而宣布整个浏览器模块交付。
+App 配对也有可重复运行的页面到真实 host 检查。旧页面复制的是 64 位内部 challenge，被 `pair_request` 拒绝为 `invalid_pairing_code`；现在显示并复制真正的 12 位短码，随后核对并批准内部 pending challenge。仓库根目录构建前端并运行：
+
+```sh
+npm --prefix apps/desktop run build
+python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/lintel-browser-runtime.json
+```
+
+这需要上面的 Playwright 依赖；`browser-pairing-ui` 使用真实 core／host 进程，但 invoke 和 clipboard 是合成 transport。它验证复制值被实际 framed native 请求接受、显式批准、离线状态、短码更新与键盘／Day/Night 布局；不证明 native WebKit、OS clipboard 或非开发者首次安装。CI 在 macOS／Ubuntu 单独选取两项，不将其混入默认合成检查；具体结果见 [当前状态](current-state.md) 与 [验证指南](verification.md)。
+
+未完成的产品范围：正式 Chrome/Edge/Firefox 与 AdsPower 各版本验收、Firefox 容器实测／独立 CacheStorage 清理／按站点代理、离线克隆识别、native host 与扩展的签名分发、专用浏览器启动与防进程接管、主应用 deep link、journal 用户归档工具。独立 Chromium 使用真实 runtime 与合成数据，不访问 claude.ai、不证明真实认证或重新登录；开发包与局部通过不代表整个浏览器模块交付。
 
 ## 官方能力依据
 
