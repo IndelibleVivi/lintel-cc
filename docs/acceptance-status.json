@@ -606,7 +606,8 @@
       "required": "native host 拒绝，不能读取其他环境状态",
       "status": "partial",
       "evidence": [
-        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior.",
+        "App-packaged native host installed via the actual bundled installer into a synthetic home; manifest executable returns framed extension_not_allowed for an unselected extension, with request_id preserved. No personal browser profile or formal-browser acceptance."
       ]
     },
     {
@@ -652,7 +653,9 @@
       "scenario": "非开发者首次安装与扩展配对",
       "required": "无需终端临时加载、修改 flags 或猜 profile",
       "status": "not-run",
-      "evidence": []
+      "evidence": [
+        "Desktop candidate bundles the native host and exposes read-only preview plus frozen approval, stable current-user install and separate pairing. Actual packaged host installation/framing and rendered synthetic App flow pass; extension still needs developer loading and formal non-developer installation/pairing journey has not run."
+      ]
     },
     {
       "id": "U02",
@@ -681,7 +684,8 @@
       "evidence": [
         "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
         "Remote launch App synthetic native bridge checked at 1120x760 Day and 900x640 Night: paths remain copyable, failure scrolls into view and no horizontal document overflow. Full-product accessibility/layout acceptance remains partial.",
-        "Custom editor rendered in 1120x800 Day and 900x640 Night with long source paths and no horizontal overflow; complete paths remain visible in expandable source details. Owner visual acceptance remains separate."
+        "Custom editor rendered in 1120x800 Day and 900x640 Night with long source paths and no horizontal overflow; complete paths remain visible in expandable source details. Owner visual acceptance remains separate.",
+        "Bundled-host setup and approval rendered from the system-font production build at 1120x800 Day and 900x640 Night; long synthetic paths wrap, manifest/details remain inspectable and error feedback scrolls into view. Owner visual acceptance remains separate."
       ]
     },
     {
@@ -692,7 +696,8 @@
       "evidence": [
         "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
         "Remote launch App synthetic native bridge verified keyboard activation, Day/Night and accepted-to-completed state; complete screen-reader and all main journeys remain unverified.",
-        "Custom editor uses labeled native radio/select controls; keyboard selection/focus and Day/Night checked in rendered synthetic App. Complete screen-reader and full main-journey acceptance remain unverified."
+        "Custom editor uses labeled native radio/select controls; keyboard selection/focus and Day/Night checked in rendered synthetic App. Complete screen-reader and full main-journey acceptance remain unverified.",
+        "Bundled-host preview/approval uses labeled native controls; keyboard Enter, disabled pending/conflict states, Day/Night and independent pairing checked in a rendered synthetic App. Complete screen-reader and formal browser journeys remain unverified."
       ]
     },
     {
@@ -741,5 +746,5 @@
   ],
   "updated": "2026-10-03",
   "evidence_semantics": "partial means bounded synthetic/unit evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Clean 1fb9ab6 CI37125403657 macOS/Ubuntu defaults 12/12 each and real Linux OpenSSH/custom static-musl runtime 1/1 passed (0 ignored). Mac App candidate includes both rebuilt Linux runners; aarch64 runtime, real Claude/production VPS and full journeys remain unverified. Persistent browser startup evidence is still missing."
+  "implementation_update": "2026-10-03: seven-field custom keep/disable/remove policy connected through core, App, TUI and finite native/Python SSH requests; v3 plans freeze exact choices and old pending rules require new preview. Clean 1fb9ab6 CI37125403657 macOS/Ubuntu defaults 12/12 each and real Linux OpenSSH/custom static-musl runtime 1/1 passed (0 ignored). Mac App candidate includes both rebuilt Linux runners; aarch64 runtime, real Claude/production VPS and full journeys remain unverified. Persistent browser startup evidence is still missing. App-supplied browser host now has frozen preview/approval, stable current-user installation and ownership-reviewed upgrades; packaged executable/framing passed on synthetic macOS home. Default App builds exclude local-only fonts. Extension developer loading, formal browser restart and non-developer installation remain unverified."
 }

@@ -13,7 +13,7 @@
 - 解锁既有工作归档、阅读文件并生成迁入计划；同名内容不覆盖。清理页提供修复本地登录、清理并重建和退役路径，精确文件与认证范围先预览；本地文件处理不等于服务端撤销。
 - 首页以聊天式操作框组织真实环境操作，提供 Day / Night / System、可摸摸／拖抱／弹飞的 Clawd、连续戳戳害羞与躲藏彩蛋。下拉放飞可打开口袋菜单，进入四幅点阵风景和跳跃小游戏；不调用聊天模型。
 - 在桌面环境详情中启动 loopback 代理、设置默认允许／阻止与确切主机／端口规则、读回当前生效配置、查看通道连接，再明确请求通过此通道打开 Claude。它只覆盖经过代理的连接。
-- 在设置中预览 Native Messaging 注册、配对扩展和查看实例。站点清理分隔离准备、完整浏览器重启、再次确认删除两步；当前完整持久安装 smoke 尚未通过。扩展开发安装与各浏览器限制见 [浏览器指南](docs/browser.md)。
+- 在首页“浏览器”入口安装本地连接、配对扩展和查看实例。App 内置 Native Messaging host，不需要单独编译或填写程序路径；选择浏览器与精确扩展 ID，先预览，再批准安装到当前用户的固定目录。版本更新也需核对现有注册并批准。扩展本身仍需开发加载，未签名或上架；站点清理分隔离准备、完整浏览器重启、再次确认删除两步，当前完整持久安装 smoke 尚未通过。安装流程与各浏览器限制见 [浏览器指南](docs/browser.md)。
 
 桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
 
@@ -39,7 +39,7 @@ cd apps/desktop
 npm run desktop:build
 ```
 
-输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。
+构建会自动编译并打包当前平台的 browser host，目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 会明确拒绝；默认前端构建排除仅供本机使用的可选字体，使用系统 fallback。输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。扩展开发包仍单独准备，见 [浏览器指南](docs/browser.md)。
 
 独立 CLI：
 

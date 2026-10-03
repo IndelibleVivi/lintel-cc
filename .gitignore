@@ -16,3 +16,5 @@ target/
 /.playwright-cli/
 /apps/desktop/src-tauri/runner-bundles/*.json
 /apps/desktop/src-tauri/runner-bundles/*/lintel
+/apps/desktop/src-tauri/browser-host-bundle/manifest.json
+/apps/desktop/src-tauri/browser-host-bundle/lintel-browser-host

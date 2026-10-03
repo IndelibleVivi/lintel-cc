@@ -6,6 +6,7 @@ const resources = {
   developer: 'https://github.com/IndelibleVivi',
   source: 'https://github.com/IndelibleVivi/lintel-cc',
   'remote-setup': 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md',
+  'browser-setup': 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/browser.md',
   'vps-guide': 'https://github.com/IndelibleVivi/infra-field-guide',
   'vps-basics': 'https://github.com/IndelibleVivi/infra-field-guide/blob/main/docs/01-vps-basics.md',
   'ssh-troubleshooting': 'https://github.com/IndelibleVivi/infra-field-guide/blob/main/docs/08-troubleshooting.md',

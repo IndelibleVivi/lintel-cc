@@ -8,6 +8,8 @@
     "dev:synthetic": "node scripts/synthetic-dev.mjs",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
+    "prepare:browser-host": "node scripts/prepare-browser-host.mjs",
+    "build:desktop-resources": "npm run prepare:browser-host && npm run build",
     "tauri": "tauri",
     "desktop:build": "tauri build --bundles app"
   },

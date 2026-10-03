@@ -347,8 +347,8 @@ fn browser_for_identity(extension: &str) -> Result<&'static str> {
 }
 /// Authorize an exact extension ID in the host allowlist. This is the *only*
 /// write path for `allowed_extensions`; it is invoked by the explicit installer
-/// (`installation::install`, behind `--apply` / the desktop "批准注册此 host"
-/// confirmation), never by generic `control`. The user-confirmed manifest
+/// (`installation::install` / `install_reviewed`, behind CLI `--apply` or the
+/// desktop bundled-host approval), never by generic `control`. The user-confirmed manifest
 /// installation is the authorization gate.
 pub(crate) fn authorize_extension(path: &Path, extension: &str) -> Result<Value> {
     if !valid_extension(extension) {

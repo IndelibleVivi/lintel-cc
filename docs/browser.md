@@ -53,6 +53,14 @@ Firefox：`about:debugging` → This Firefox → Load Temporary Add-on → 选�
 
 ### Native host manifest 与注册
 
+**桌面用户：** 在首页“浏览器”打开“连接一个新的 profile”，选择 Chrome / Edge / Firefox，输入目标扩展的准确 ID，点击“预览本地连接安装”。App 自带当前平台的 host，桌面无需构建或指定可执行路径。预览只读；显示版本、大小、组件摘要、安装路径、注册内容和既有注册。批准安装后，组件放到当前用户的 `~/Library/Application Support/Lintel/browser-host/<version>-<sha256>/`，注册文件指向其中 `lintel-browser-host`，不会随 App 移动而改变。
+
+桌面安装目前支持 macOS。相同组件／注册可核对；本安装器管理的旧版本可在对照旧注册后批准更新，旧二进制保留。其他来源的注册、修改过的组件或失配的 ownership 记录会阻止覆盖；未把它们自动认领。整个批准计划在写入前重查，过期时需重新预览。安装会授权该准确 extension ID，**短码配对仍是下一次独立批准**；成功不表示 profile 在线。扩展本身仍按上节开发加载，App 内置 host 不代表扩展已签名、上架或两阶段清理已验收。
+
+`npm run desktop:build` 自动编译并打包独立 host，目前要求与 Rust host 相同架构的 native 构建；跨架构与 universal App 构建会明确拒绝，避免打入错误组件。开发资源可在 `apps/desktop` 运行 `npm run prepare:browser-host` 准备；这里只生成 App 资源，不注册个人浏览器。资源缺失时 App 返回具体 `bundle_unavailable` 提示。Linux 独立 CLI 仍按以下路径使用手工安装器；桌面不再开放手填 host 路径的安装操作。
+
+**独立 CLI：** 以下命令仍供直接使用 host 的 operator 使用。
+
 以下命令仅生成 manifest 到 stdout，不注册、不修改任何个人浏览器。用真实、已审查的绝对 host 二进制路径替换占位符：
 
 ```sh
@@ -79,9 +87,9 @@ lintel-browser-host register firefox lintel@lintel.local /absolute/path/to/linte
 
 Chromium 系列用户级 host manifest 位于该 user-data-dir 的 `NativeMessagingHosts/` 子目录；Chrome for Testing 146 起有独立默认路径。自动 smoke 只向自己新建的临时 user-data-dir 注册，并把 host DB 指向同一临时根；不使用个人注册目录。浏览器 profile 与 host 注册的作用域不同，配对实例身份仍然必须独立确认。
 
-host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户确认的安装路径：`register --apply` 或桌面「批准注册此 host」（`install_native_host`）在写入 manifest 的同一流程内把该 ID 加入 host allowlist。通用 control 通道上的 `allow_extension` 不再接受写入，直接返回 `allow_extension_requires_installer`，防止任何同用户进程绕过已确认的安装动作自行放行任意扩展。
+host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户确认的安装路径：独立 `register --apply`，或桌面「批准安装本地连接／批准更新本地连接」（`install_bundled_host`）在安装流程内把该 ID 加入 host allowlist。通用 control 通道上的 `allow_extension` 不再接受写入，直接返回 `allow_extension_requires_installer`，防止任何同用户进程绕过已确认的安装动作自行放行任意扩展。
 
-桌面端可将以上步骤包装成用户发起的安装流程；不得偷偷注册。卸载前在扩展中逐项恢复仍归本扩展控制的设置并解除清理隔离。移除 native manifest 和 host 后连接会显示离线；浏览器卸载扩展会移除其 DNR/content/privacy/proxy 控制。浏览器删除的数据不能恢复，bridge 回执不会假装提供“撤销全部”。
+桌面只在准确预览获批准后安装和注册。卸载前在扩展中逐项恢复仍归本扩展控制的设置并解除清理隔离。移除 native manifest 和 host 后连接会显示离线；浏览器卸载扩展会移除其 DNR/content/privacy/proxy 控制。浏览器删除的数据不能恢复，bridge 回执不会假装提供“撤销全部”。
 
 ## Native bridge 接口
 
@@ -95,8 +103,10 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 | 输入 | data |
 | --- | --- |
+| `{"op":"bundled_host_plan","browser":"chrome","extension_id":"EXTENSION_ID"}` | **仅桌面**：只读 `{schema,browser,extension_id,version,sha256,bytes,host_path,manifest_path,manifest,state_path,effect,platform,architecture,existing_manifest,existing_registration,existing_host,installed_host,status,install_action}`。status 为 ready / already-registered / conflict；install_action 为 install / upgrade / none / blocked |
+| `{"op":"install_bundled_host","approved_plan":{...}}` | **仅桌面**：完整 frozen plan 批准与复查，返回 `{status,plan,pairing:"required"}`。status 为 registered / updated / already-registered；相同已成功批准只查询，不再次写入或授权；blocked 拒绝 |
 | `{"op":"installation_plan","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{browser,extension_id,manifest_path,manifest,state_path,effect}`；只预览当前用户固定路径 |
-| `{"op":"install_native_host","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{status,plan,pairing:"required"}`；用户批准后安装。browser 也可为 edge/firefox；只允许本地 control，扩展管道不开放 |
+| `{"op":"install_native_host","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{status,plan,pairing:"required"}`；用户批准后安装。browser 也可为 edge/firefox；以上两个手工路径操作仅供独立 CLI local control，桌面返回 unsupported_browser_operation，扩展管道不开放 |
 | `{"op":"pair_create"}` | `{challenge, code, expires_at}`；12 位大写 hex 短码，5 分钟有效；同时未决挑战上限 8 个，超出逐出最旧 |
 | `{"op":"pair_pending"}` | `[{challenge, code, instance_id, label, browser, extension_id}]` |
 | `{"op":"pair_approve","challenge":"..."}` | 已配对实例记录；必须由桌面用户显式批准 |

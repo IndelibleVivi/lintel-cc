@@ -42,6 +42,26 @@ pub fn install(
     platform: &str,
 ) -> Result<Value, String> {
     let plan = plan(browser, extension, host, home, platform)?;
+    apply(plan, None)
+}
+
+/// App installer entry after it has checked its ownership record and the full
+/// user-approved preview. The expected registration is null only when absent.
+/// This remains installer-only: native extension messages cannot reach it.
+pub fn install_reviewed(
+    browser: &str,
+    extension: &str,
+    host: &Path,
+    home: &Path,
+    platform: &str,
+    approved_existing: &Value,
+) -> Result<Value, String> {
+    let plan = plan(browser, extension, host, home, platform)?;
+    apply(plan, Some(approved_existing))
+}
+
+fn apply(plan: Value, approved_existing: Option<&Value>) -> Result<Value, String> {
+    let host = Path::new(plan["manifest"]["path"].as_str().unwrap());
     let host_meta = fs::metadata(host).map_err(|e| format!("host_not_available:{e}"))?;
     if !host_meta.is_file() {
         return Err("host_not_file".into());
@@ -52,7 +72,7 @@ pub fn install(
     }
     let target = Path::new(plan["manifest_path"].as_str().unwrap());
     // A pre-existing different registration belongs to an explicit upgrade decision.
-    let existed = match fs::symlink_metadata(target) {
+    let existing = match fs::symlink_metadata(target) {
         Ok(meta) => {
             if meta.file_type().is_symlink() {
                 return Err("manifest_symlink".into());
@@ -60,32 +80,59 @@ pub fn install(
             let existing: Value =
                 serde_json::from_slice(&fs::read(target).map_err(|e| e.to_string())?)
                     .map_err(|e| format!("manifest_conflict:{e}"))?;
-            if existing != plan["manifest"] {
+            if approved_existing.is_some_and(|approved| approved != &existing) {
+                return Err("stale_plan:registration changed after preview".into());
+            }
+            if approved_existing.is_none() && existing != plan["manifest"] {
                 return Err(
                     "manifest_conflict:existing registration differs; review it before replacing"
                         .into(),
                 );
             }
-            true
+            Some(existing)
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            if approved_existing.is_some_and(|approved| !approved.is_null()) {
+                return Err("stale_plan:registration disappeared after preview".into());
+            }
+            None
+        }
         Err(e) => return Err(e.to_string()),
     };
-    if !existed {
+    // The exact registration and any reviewed previous manifest have now been
+    // validated. Complete the installer-only authorization before publishing a
+    // manifest: an invalid bridge DB must not leave an unowned registration
+    // that blocks the user's repaired-state retry.
+    crate::authorize_extension(
+        Path::new(plan["state_path"].as_str().unwrap()),
+        plan["extension_id"].as_str().unwrap(),
+    )
+    .map_err(|e| format!("authorization_failed:{e}"))?;
+    let existed = existing.is_some();
+    let changed = existing
+        .as_ref()
+        .is_none_or(|value| value != &plan["manifest"]);
+    if changed {
         fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
+        let write_path = if existed {
+            target.with_extension(format!("{}.tmp", crate::random()))
+        } else {
+            target.to_path_buf()
+        };
         let mut options = fs::OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
         options.mode(0o600);
-        let mut file = options.open(target).map_err(|e| e.to_string())?;
+        let mut file = options.open(&write_path).map_err(|e| e.to_string())?;
         file.write_all(&serde_json::to_vec_pretty(&plan["manifest"]).unwrap())
             .map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
+        if existed {
+            fs::rename(write_path, target).map_err(|e| e.to_string())?;
+        }
     }
-    crate::authorize_extension(Path::new(plan["state_path"].as_str().unwrap()), extension)
-        .map_err(|e| format!("authorization_failed:{e}"))?;
     Ok(
-        json!({"status":if existed {"already-registered"} else {"registered"},"plan":plan,"pairing":"required"}),
+        json!({"status":if existed && changed {"updated"} else if existed {"already-registered"} else {"registered"},"plan":plan,"pairing":"required"}),
     )
 }
 
@@ -125,6 +172,43 @@ mod tests {
         }
         assert!(manifest("chrome", "*", &host).is_err());
         assert!(manifest("firefox", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &host).is_err());
+        fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn reviewed_registration_rechecks_exact_previous_manifest() {
+        let home =
+            std::env::temp_dir().join(format!("lintel-reviewed-install-{}", crate::random()));
+        fs::create_dir_all(&home).unwrap();
+        let host = home.join("synthetic-host");
+        fs::write(&host, b"synthetic host").unwrap();
+        #[cfg(unix)]
+        fs::set_permissions(&host, fs::Permissions::from_mode(0o700)).unwrap();
+        let id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let p = plan("chrome", id, &host, &home, "linux").unwrap();
+        install_reviewed("chrome", id, &host, &home, "linux", &Value::Null).unwrap();
+        assert!(
+            install_reviewed("chrome", id, &host, &home, "linux", &Value::Null)
+                .unwrap_err()
+                .starts_with("stale_plan:")
+        );
+        let new_id = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        assert!(install("chrome", new_id, &host, &home, "linux")
+            .unwrap_err()
+            .starts_with("manifest_conflict:"));
+        let reviewed =
+            install_reviewed("chrome", new_id, &host, &home, "linux", &p["manifest"]).unwrap();
+        assert_eq!(reviewed["status"], "updated");
+        let current = fs::read(p["manifest_path"].as_str().unwrap()).unwrap();
+        assert!(
+            install_reviewed("chrome", id, &host, &home, "linux", &p["manifest"])
+                .unwrap_err()
+                .starts_with("stale_plan:")
+        );
+        assert_eq!(
+            fs::read(p["manifest_path"].as_str().unwrap()).unwrap(),
+            current
+        );
         fs::remove_dir_all(home).unwrap();
     }
 }

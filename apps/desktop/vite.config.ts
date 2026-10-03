@@ -52,4 +52,9 @@ function fixtureBridge(): Plugin {
 }
 const localFontDirectory = path.resolve('public/local-fonts');
 const localFontUrls = existsSync(localFontDirectory) ? readdirSync(localFontDirectory).filter(file => /^Anthropic(Sans|Serif|Mono)-(Roman|Italic)\.woff2$/.test(file)).map(file => `/local-fonts/${file}`) : [];
-export default defineConfig(({ mode }) => ({ define: { __LINTEL_LOCAL_FONTS__: JSON.stringify(localFontUrls) }, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false }));
+export default defineConfig(({ command, mode }) => {
+  // public/ currently contains only optional operator-supplied fonts. Ordinary
+  // candidate builds must not carry those local assets into someone else's App.
+  const localAssets = command === 'serve' || mode === 'local-candidate';
+  return { define: { __LINTEL_LOCAL_FONTS__: JSON.stringify(localAssets ? localFontUrls : []) }, publicDir: localAssets ? 'public' : false, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false };
+});

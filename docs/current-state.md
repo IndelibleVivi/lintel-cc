@@ -2,6 +2,14 @@
 
 2026-10-03 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
 
+## 浏览器首次连接（App 内置 host 候选）
+
+桌面不再要求用户编译 native host 或输入程序路径。App 自带当前平台的独立 executable；选择浏览器与精确扩展 ID，先只读预览，再批准安装到当前用户固定版本／摘要目录并注册，profile 短码另行批准。本安装器管理的旧注册可对照后更新，其他来源或修改过的注册／组件保留并拒绝覆盖。整份批准计划重新核对；已成功批准重复调用只查询。授权失败不发布 manifest，修复状态后可重新预览；独立 CLI 手工 installer 保留，桌面已退役其 arbitrary host-path 操作。
+
+本轮相关默认检查 3/3 通过：desktop 44 passed＋2 ignored，native host 12 passed，typecheck/Vite build 成功。macOS App 约 16.91 MiB，包含实际 787440-byte host 与两种既有 Linux runner；App 内 host 大小／SHA 与 metadata 一致。独立测试从 **App 包内资源** 安装到合成 home，使用注册文件的真实可执行路径验证 native frames 与非授权 extension 拒绝（1/1，0 ignored）。构建页面的合成 native bridge 检查预览不安装、整份批准、浏览器切换撤回预览、过期／缺资源／冲突／更新／重复核对、单独配对、键盘和 Day/Night 1120／900 布局；视觉仍属候选，未验证真实个人浏览器连接。
+
+默认构建排除仅供本机使用的字体和加载列表，App 中无 woff2；六份本地文件保留，开发服务器和显式 local-candidate 仍可使用。内置 host 只支持 native 同架构构建，跨架构／universal App 会明确拒绝。扩展仍需开发加载，未签名／上架；完整持久 browser restart 两阶段清理仍未通过。未安装、激活或发布 App，真实 VPS 仍未写入。
+
 ## 本轮自定义保护（源码与合成界面已接通）
 
 新增第三种方案 `custom`：七项既有控制逐项 keep / disable / remove，未选字段保持原值；关闭语义由 core 判断，移除只撤掉当前 user settings 覆盖。全选保持不重写 settings 字节、权限或缺失文件。准确 diff 与选择冻结进计划/回执，后续编辑冲突会拒绝执行/恢复；`keep_remote_control` 不自动改写明确选择。规则 v3 要求旧待执行计划重新预览，旧回执与恢复保留。inspect 展示七项来源与 `next_launch`，运行效果仍未验证。

@@ -55,6 +55,31 @@ or skipped, which is that host's environment, not a change to the check.
 
 The default desktop build already runs TypeScript checking; `desktop-typecheck` remains separately selectable.
 
+`desktop-tauri-bundle` also prepares and packages the existing browser native-host
+executable before the frontend/native build. It does not register a personal
+browser. The ordinary frontend build excludes operator-supplied local fonts;
+explicit `--mode local-candidate` is a local-only artifact, not the default
+candidate build.
+
+Bundled-host tests cover read-only previews, exact approval, fixed-user binary
+and manifest installation, ownership-aware reviewed upgrades, stale/conflicting
+registrations and query-only replay on synthetic homes. To additionally run the
+actual prepared executable from its installed manifest and parse native frames:
+
+```sh
+npm --prefix apps/desktop run prepare:browser-host
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml built_host_runs_from_installed_manifest_and_returns_native_frames -- --ignored
+```
+
+This requires a host build on the current platform. It proves the bundled
+executable/installer/native framing boundary, not a personal browser connection,
+extension installation or real `runtime.onStartup` acceptance.
+After a Tauri build, set `LINTEL_TEST_BROWSER_HOST_RESOURCES` to the resulting
+App's `Contents/Resources/browser-host` directory to run the same ignored test
+against the packaged artifact. This variable is read only by that synthetic test,
+not by production IPC. The host packaging helper currently rejects cross-target
+and universal App builds; use a matching native macOS architecture.
+
 ### Categories
 
 `rust`, `js`, `python`, `desktop`, `journey`, `independent`.

@@ -13,6 +13,7 @@
 - Desktop remote.rs owns the finite native SSH bridge; runner submit owns durable ACK and detached execution. Remote execute must use submit, and reconnect only queries the original job.
 - Removing an SSH alias changes only the Lintel registry; retain durable task records and query-only recovery. Never erase deduplication state to retry a submission.
 - Desktop resources.rs opens only named documentation resources in the system browser. Keep its fixed HTTPS targets in sync with Resources.tsx; do not expose arbitrary URL or shell execution.
+- Desktop bundled_browser_host.rs owns App-supplied browser-host preview and installation. Approve the complete frozen plan; recheck resources and current registration before writing current-user stable storage. Only installer-owned registrations may receive reviewed upgrades. Manual host-path operations remain independent CLI-only. prepare-browser-host.mjs generates ignored App resources from the existing native-host crate; never stage the binary/manifest.
 - Browser clear is preparation only until a real runtime.onStartup generation and separately approved finishClear. Do not substitute extension worker restart or synthetic generation for browser restart evidence.
 
 - `crates/core/src/policy.rs` owns versioned variable semantics and Remote Control conditions. Identify versions through static installed metadata; never execute Claude to inspect its version. Product/rule changes after approval invalidate a policy plan.
