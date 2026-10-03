@@ -24,9 +24,9 @@
 | Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。重排后 Home 的 Day/Night、900×640布局、工作入口、口袋展开不挤动操作框、连续戳戳／躲藏／拖甩、鼠标／滚轮／模拟触摸、焦点返回和减少动态已验证；四画收星、等比例缩放、翻页，游戏跳跃／暂停／碰撞／重开与本机最高分通过。网络面板经 synthetic native-response harness 验证延迟响应隔离和停止／编辑／重启。新增安装卡合成 native bridge 验证预览前不上传、显式批准、丢回包后的状态同步、原安装只读查询、关闭／重开／迟到响应隔离与连接管理；安装卡 Day/Night 和 900×640 长路径详情已实际渲染检查，视觉仍待用户接受。F04 界面使用真实合成 CLI 完成计划／批准／解除／回执／组织条件往返；新增 SSH 合成 native-response harness 验证具体错误／摘要复制、显式重连、移除／撤销／失败保留、当前主机回本机、原任务查询和关闭面板后的迟到响应隔离；帮助链接 ID 与 900×640 长命令排版通过。其后完成纸上晨光/夜里月光环境光、首页问候纵向重排、统一柔影刻度、clay tint 选中态的 Day/Night/窄屏截图 QA；浏览器面板移除独立「允许扩展 ID」按钮（扩展授权并入用户确认的安装路径），经合成空间复核；概览「已设置关闭」计数使用各变量解析后的 configured 状态。视觉稿仍属候选 |
 | macOS | arm64 App 本地构建成功，约 16.72 MiB，含本轮策略界面与两种静态 Linux runner；typecheck、Vite 与 Tauri release 构建通过。此前已观察原生 WebKit 首页和 Clawd，本轮 SSH 界面使用浏览器合成 bridge 验证，未完成新 native runtime／真实 VPS 交互验收；没有自动重启已打开的旧窗口。无 Developer ID、公证、正式分发或 Applications 安装验收 |
 
-统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与四条合成 journey；浏览器与 native bundle 显式 opt-in。macOS 本轮默认 11 个检查通过；入口证据记录检查时的 HEAD 与工作树状态。CI 提供 macOS/Linux 合成 matrix，其结果与真实目标 runtime 验收分别记录。两种 Linux musl ELF 已交叉构建并打包，但未在 Linux runtime 执行。
+统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与四条合成 journey；浏览器与 native bundle 显式 opt-in。macOS 本轮默认 11 个检查通过；入口证据记录检查时的 HEAD 与工作树状态。CI 提供 macOS/Linux 合成 matrix，其结果与真实目标 runtime 验收分别记录。[首次 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37119853055) 的 clean HEAD `1654211` 已在 macOS 与 Ubuntu 分别完成 11/11（无跳过）；包括 Linux 源码 runner 的合成 CLI／detached submission 旅程。两种 Linux musl ELF 已交叉构建并打包，但 App 内置的这两份 musl ELF 尚未在目标 Linux 主机执行。
 
-实际主机为 macOS arm64。Linux runner 执行、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
+实际主机为 macOS arm64。App 内置 Linux musl runner 执行、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
 
 ## 完整目标仍缺少
 

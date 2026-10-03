@@ -19,7 +19,7 @@
 ## 在 App 中准备 Linux 运行器
 
 1. 登记已经由系统 SSH 核验身份的 alias，选择“检查并准备运行器”。固定脚本只读取系统、CPU、UID、home 与 machine-id，检查基础工具和 PATH 中是否已有 runner；不会读取 Claude 文件。
-2. 预览显示目标系统、App 内版本、大小和影响范围。展开“安装与校验详情”可查看准确安装位置、UID 与 SHA-256。只支持 Linux x86_64 / aarch64（arm64）；缺少基础工具或 machine-id 时返回明确限制。
+2. 预览显示目标系统、SSH 登录用户、App 内版本、大小和影响范围。展开“安装与校验详情”可查看准确安装位置与 SHA-256。只支持 Linux x86_64 / aarch64（arm64）；缺少基础工具或 machine-id 时返回明确限制。
 3. 点击“批准并安装这个运行器”。App 上传本地内置的静态 musl ELF，不下载远端脚本，不在 VPS 上编译；远端不需要 Rust、Node、Python 或 sudo。
 4. 文件放入当前 SSH 用户的 `$HOME/.local/share/lintel/runners/<sha256>/lintel`，权限为 700。安装卡直接显示登录用户的 UID（UID 0 显示为 root），runner 的环境发现和管理范围也属于该用户。若 Claude 由另一用户运行，应使用那个用户的 SSH alias；当前用户的非交互 PATH 找不到 Claude，不能证明其他用户也未安装。专用目录须归此用户所有，路径中的符号链接拒绝；同名文件仅在字节和执行权限均匹配时复用，冲突文件保留。PATH、shell rc、sshd、系统服务和 Claude 配置不更改，旧版本保留。
 5. SHA-256 与可执行文件核验通过后，调用真实 `discover`，确认 `detached_submission` 能力，才更新 Lintel 的 alias→runner 绑定。然后点击“连接并管理”。完整 VPS 操作、Linux logout/cgroup 或主机重启验收仍是独立关口。

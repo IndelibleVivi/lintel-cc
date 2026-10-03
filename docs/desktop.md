@@ -41,7 +41,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 ## SSH 工作空间
 
-顶部主机入口或设置中的“主机与 SSH 连接”读取系统 SSH Host alias，保存连接引用，并由用户发起连接。远端需已有 **Lintel runner**，安装 Claude Code 不等于安装 runner；“连接前需要什么？”提供准备说明和 SSH 排障链接。桌面不自动安装、更新软件或改 SSH 配置，不收集密码或私钥。严格 host key 核验失败时应先通过系统 SSH 核对主机。
+顶部主机入口或设置中的“主机与 SSH 连接”读取系统 SSH Host alias，保存连接引用，并由用户发起连接。远端连接需要 **Lintel runner**，安装 Claude Code 不等于安装 runner；缺少 runner 的 Linux 主机可先在下述安装卡预览并批准准备。“连接前需要什么？”提供准备说明和 SSH 排障链接。登记或连接本身不安装、更新软件或改 SSH 配置，不收集密码或私钥。严格 host key 核验失败时应先通过系统 SSH 核对主机。
 
 每个已登记 alias 旁提供“移除”，成功后可“撤销移除”。这里只改 Lintel 登记，不修改 `~/.ssh/config`、known_hosts 或远端文件。移除当前工作空间会回到本机，原来的持久提交记录仍可查询；重新登记不会重提原任务。移除失败时保留列表项，并显示原因。
 
