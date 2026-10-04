@@ -614,11 +614,9 @@ impl Engine {
                 return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
             }
             if p["kind"] == "archive" {
-                // An explicit frozen destination must still be free. The private
-                // state path is chosen fresh per plan and need not pre-exist.
-                if let Some(dest) = p["extra"]["output_path"].as_str() {
-                    work::freeze_output_path(Path::new(dest))?;
-                }
+                // Explicit output must remain free in the same approved directory.
+                // The private state path is chosen fresh per plan.
+                work::check_output_path(&p)?;
             }
         } else if p["kind"] == "cleanup" {
             self.block_managed(&e)?;

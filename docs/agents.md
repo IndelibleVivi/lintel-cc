@@ -104,7 +104,7 @@ lintel job wait <archive-plan-id> --timeout 30s
 lintel work archive list
 ```
 
-output_path 可省略以保存在 Lintel state；填写路径时父目录须存在且目的地尚未使用。archive-only 不建立环境、不处理登录、不改变源文件。`work preserve plan --environment ID --categories ... [--name NAME]` 另行表示归档并准备新环境，成功为完成，outcome=preserved；旧登录保留，接着选新环境保护方案、正常登录与启动。归档仍为 `lintel.work/1`，包含类别、相对路径、原字节和文件 digest，不复制 credentials/settings/hooks/MCP。
+output_path 可省略以保存在 Lintel state；填写路径时父目录须存在且目的地尚未使用。计划冻结父目录的 device/inode，在接受和发布前复查；目录被替换返回 `stale_plan`，没有这份身份的旧显式输出计划也须重新预览。原任务回执继续只查询、不重跑。archive-only 不建立环境、不处理登录、不改变源文件。`work preserve plan --environment ID --categories ... [--name NAME]` 另行表示归档并准备新环境，成功为完成，outcome=preserved；旧登录保留，接着选新环境保护方案、正常登录与启动。归档仍为 `lintel.work/1`，包含类别、相对路径、原字节和文件 digest，不复制 credentials/settings/hooks/MCP。
 
 把**密文**复制到新机器/独立安装后，不需要源 inventory 或源 job：
 

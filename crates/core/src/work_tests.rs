@@ -100,6 +100,59 @@ fn archive_only_does_not_create_or_change_environment() {
 }
 
 #[test]
+fn archive_output_directory_replacement_rejects_before_publication() {
+    let (_temp, engine, environment, root) = fixture();
+    seed_work(&root);
+    let directory = root.parent().unwrap().join("output");
+    fs::create_dir(&directory).unwrap();
+    let output = directory.join("carried.age");
+    let plan = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":environment["id"],"categories":["instructions"],"output_path":output}),
+    );
+    fs::rename(&directory, directory.with_file_name("original-output")).unwrap();
+    fs::create_dir(&directory).unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS})
+        ),
+        "stale_plan"
+    );
+    assert!(!output.exists());
+    assert!(!directory
+        .with_file_name("original-output")
+        .join("carried.age")
+        .exists());
+    assert!(!engine.path("jobs", plan["id"].as_str().unwrap()).exists());
+    assert_eq!(
+        fs::read(root.join("CLAUDE.md")).unwrap(),
+        b"Synthetic instruction only."
+    );
+    // The common writer must recheck the same identity at publication, even
+    // when replacement occurs after the acceptance-time check.
+    let frozen = load(&engine.path("plans", plan["id"].as_str().unwrap())).unwrap();
+    let journal = engine.path("jobs", plan["id"].as_str().unwrap());
+    let mut receipt = json!({"steps":[]});
+    let failure = engine
+        .write_archive(
+            &environment,
+            &frozen,
+            &json!({"archive_passphrase":PASS}),
+            &output,
+            &mut receipt,
+            &journal,
+        )
+        .unwrap_err();
+    assert_eq!(failure.code, "stale_plan");
+    assert!(!output.exists());
+    assert!(!directory
+        .with_file_name("original-output")
+        .join("carried.age")
+        .exists());
+}
+
+#[test]
 fn archive_output_path_freezes_and_refuses_overwrite() {
     let (_t, engine, e, root) = fixture();
     seed_work(&root);
@@ -109,6 +162,26 @@ fn archive_output_path_freezes_and_refuses_overwrite() {
         json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":out.to_str().unwrap()}),
     );
     assert_eq!(p["output_path"], out.to_str().unwrap());
+    let plan_path = engine.path("plans", p["id"].as_str().unwrap());
+    let frozen = load(&plan_path).unwrap();
+    let mut legacy = frozen.clone();
+    legacy["extra"]
+        .as_object_mut()
+        .unwrap()
+        .remove("output_parent_identity");
+    legacy.as_object_mut().unwrap().remove("hash");
+    legacy["hash"] = json!(digest(&serde_json::to_vec(&legacy).unwrap()));
+    save(&plan_path, &legacy).unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"execute","plan_id":p["id"],"approval":legacy["hash"],"archive_passphrase":PASS})
+        ),
+        "stale_plan"
+    );
+    assert!(!out.exists());
+    assert!(!engine.path("jobs", p["id"].as_str().unwrap()).exists());
+    save(&plan_path, &frozen).unwrap();
     let j = ok(
         &engine,
         json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),

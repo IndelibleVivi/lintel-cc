@@ -12,10 +12,10 @@ const MAX_FILES: usize = 10000;
 
 /// Absolute-path guard for an explicit archive destination: parent must already
 /// exist (we never create directories outside the frozen path), the path must be
-/// absolute without parent-directory hops, must not itself be a symlink, and if
-/// it already exists it must be a regular single-link file owned by this user.
-/// Existing content is never a valid target: callers reject before writing.
-pub(crate) fn freeze_output_path(path: &Path) -> Result<PathBuf> {
+/// absolute without parent-directory hops and contain no symlinks. Existing
+/// content is never a valid target. Freeze the parent's device/inode so the
+/// same pathname cannot select a replacement directory after approval.
+pub(crate) fn freeze_output_path(path: &Path) -> Result<(PathBuf, [u64; 2])> {
     guard(path)?;
     if path.file_name().is_none() {
         return Err(err("invalid_output_path", "请给出一个完整的归档文件名"));
@@ -39,7 +39,21 @@ pub(crate) fn freeze_output_path(path: &Path) -> Result<PathBuf> {
     if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
         return Err(err("symlink_target", "归档目标不能是符号链接"));
     }
-    Ok(path.to_path_buf())
+    let metadata = fs::metadata(parent)?;
+    Ok((path.to_path_buf(), [metadata.dev(), metadata.ino()]))
+}
+
+pub(crate) fn check_output_path(plan: &Value) -> Result<()> {
+    if let Some(destination) = plan["extra"]["output_path"].as_str() {
+        let (_, identity) = freeze_output_path(Path::new(destination))?;
+        if json!(identity) != plan["extra"]["output_parent_identity"] {
+            return Err(err(
+                "stale_plan",
+                "归档输出目录的实际对象已变化或旧计划未冻结身份，请重新预览",
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Read back an encrypted archive package from an explicit frozen path and
@@ -532,6 +546,7 @@ impl Engine {
         let archive_digest = digest(&encrypted);
         j["archive_intent_digest"] = json!(archive_digest);
         save(journal, j)?;
+        check_output_path(p)?;
         atomic_new(dest, &encrypted, 0o600)?;
         if read(dest, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
             return Err(err("archive_readback_failed", "归档写后校验未通过"));
@@ -568,11 +583,12 @@ impl Engine {
         let e = self.env(r)?;
         let categories = categories(r)?;
         let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
-        let output = match r.get("output_path") {
+        let (output, output_parent_identity) = match r.get("output_path") {
             Some(Value::String(s)) if !s.is_empty() => {
-                Some(stringify_path(freeze_output_path(Path::new(s))?))
+                let (path, identity) = freeze_output_path(Path::new(s))?;
+                (Some(stringify_path(path)), Some(identity))
             }
-            _ => None,
+            _ => (None, None),
         };
         let actions = json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false}]);
         self.plan(
@@ -582,7 +598,7 @@ impl Engine {
             json!([]),
             vec!["原环境全部内容（不注销、不删除、不新建）", "settings、hooks、MCP 与插件文件"],
             actions,
-            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"output_path":output,"outcome":"archive_only"}),
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"output_path":output,"output_parent_identity":output_parent_identity,"outcome":"archive_only"}),
         )
     }
 
