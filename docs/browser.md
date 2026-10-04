@@ -111,6 +111,8 @@ host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户�
 
 ## Native bridge 接口
 
+CLI 的静态 browser catalog/schema 与 host validator 共用 ID 长度和身份常量：instance/operation/challenge/receipt ID 为 8–80 个 ASCII 字母、数字、`-` 或 `_`；安装时 Chrome/Edge 只接受 32 个 `a`–`p` 的 extension ID，Firefox 只接受 `lintel@lintel.local`。纯 manifest helper 支持 `chromium` 名称，固定路径注册 installer 不支持该名称；不能从 helper 的支持推导一个安装入口。
+
 `extensions/browser/native-host` 有自己的 Cargo workspace。桌面可直接依赖 package `lintel-browser-host`，不需要 shell 或 subprocess：
 
 ```rust

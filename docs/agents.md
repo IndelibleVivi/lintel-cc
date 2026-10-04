@@ -142,6 +142,8 @@ JSON
 
 profile 未配对、离线、等待浏览器批准、awaiting-browser-restart、uncertain/rejected/completed 分别处理。clear 先隔离准备；真正关闭整个浏览器并观察原生 runtime.onStartup 后，另行批准 finishClear。不能重启扩展 worker 或制造世代来替代真实 browser restart。不得自动重发 uncertain 的删除。
 
+browser schema 的 instance/operation/challenge/receipt ID 与 runtime 一致：8–80 个 ASCII 字母、数字、`-` 或 `_`。Chrome/Edge 扩展 ID 为 32 个 `a`–`p` 字符，Firefox 为固定 `lintel@lintel.local`，安装 schema 按 browser 约束对应身份。manifest helper 的 `chromium` 名称不代表已有 Chromium 注册路径；当前 installer 只接受 Chrome/Edge/Firefox。
+
 ## Network：明确的前台 owner
 
 ```sh

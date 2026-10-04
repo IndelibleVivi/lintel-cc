@@ -2,6 +2,7 @@
 """Finite CLI adapter owners in disposable state; no real SSH or browser."""
 import json
 import os
+import re
 from pathlib import Path
 import selectors
 import signal
@@ -47,6 +48,40 @@ def run():
         if sys.platform == 'darwin':
             catalog = call('browser', 'operations')
             assert not (base / 'browser').exists(), 'Static browser catalog opened state'
+            schemas = {item['id']: item['request_schema'] for item in catalog['operations']}
+            query = schemas['browser.query']
+            samples = [('abcdefgh', True), ('_' * 80, True), ('abcdefg', False),
+                       ('a' * 81, False), ('abc/defgh', False), ('abcdefgh\n', False), ('中文abcdefgh', False)]
+            for field in ['instance_id', 'operation_id']:
+                pattern = query['properties'][field]['pattern']
+                for value, accepted in samples:
+                    assert bool(re.search(pattern, value)) is accepted, (field, value, pattern)
+                    payload = {'op': 'query', 'instance_id': 'synthetic-instance', 'operation_id': 'synthetic-operation'}
+                    payload[field] = value
+                    error = call('browser', 'control', payload=payload, good=False)
+                    expected = 'unknown_operation' if accepted else 'invalid_id'
+                    assert error['code'] == expected, (field, value, error)
+                    if not accepted:
+                        assert error['message'] == field, error
+            install = schemas['browser.installation_plan']
+            assert install['properties']['browser']['enum'] == ['chrome', 'edge', 'firefox']
+            condition = install['allOf'][0]
+            for browser_name, extension, accepted in [
+                ('chrome', 'a' * 32, True), ('edge', 'a' * 32, True),
+                ('firefox', 'lintel@lintel.local', True), ('chrome', 'lintel@lintel.local', False),
+                ('firefox', 'a' * 32, False), ('chrome', 'a' * 32 + '\n', False),
+            ]:
+                branch = condition['then'] if browser_name == condition['if']['properties']['browser']['const'] else condition['else']
+                rule = branch['properties']['extension_id']
+                schema_accepts = extension == rule['const'] if 'const' in rule else bool(re.search(rule['pattern'], extension))
+                assert schema_accepts is accepted, (browser_name, extension, rule)
+                result = call('browser', 'control', payload={'op': 'installation_plan', 'browser': browser_name,
+                              'extension_id': extension, 'host_path': '/synthetic-host'}, good=accepted)
+                if not accepted:
+                    assert result['code'] == 'invalid_extension_id', result
+            unsupported = call('browser', 'control', payload={'op': 'installation_plan', 'browser': 'chromium',
+                               'extension_id': 'a' * 32, 'host_path': '/synthetic-host'}, good=False)
+            assert unsupported['code'] == 'unsupported_browser_platform', unsupported
             assert any(op['id'] == 'browser.submit' for op in catalog['operations'])
             assert call('browser', 'instances') == []
             assert call('browser', 'operations', '--instance', 'missing-profile', good=False)['code'] == 'browser_instance_missing'
