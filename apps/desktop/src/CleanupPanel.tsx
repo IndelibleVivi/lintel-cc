@@ -38,7 +38,8 @@ export default function CleanupPanel({ send = request, environment, refreshKey, 
       {!logout && <Notice tone="warning">本次仅处理预览内的本地文件；未执行官方注销，Keychain 与目录外认证未知，结果会保留“部分完成”。</Notice>}
     </>
     {recipe !== 'repair_login' && <section className="surface work-selection"><div className="surface-heading"><h2>{recipe === 'retire' ? '归档哪些工作内容' : '迁入哪些工作内容'}</h2><span className="small-label">执行前设置加密口令</span></div>{classes.map(([id,title,detail]) => <label className="checkbox-row" key={id}><span><strong>{title}</strong><span>{detail}</span></span><input type="checkbox" checked={categories.includes(id)} onChange={event => setCategories(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/></label>)}</section>}
+    {recipe !== 'repair_login' && categories.length === 0 && <Notice>至少选择一种要保全的工作类别，才能预览清理或退役计划。</Notice>}
     <div className="inline-route"><ResourceLink resource="cleanup-guide">注销、精确清理与服务恢复</ResourceLink></div><div className="inline-route"><span>还需要处理浏览器登录与站点数据？</span><button className="text-button" onClick={onBrowser}>浏览器工作空间<Icon name="arrow" size={14}/></button></div>
-    <div className="action-bar"><div><strong>{environment.name}</strong><span>精确文件范围与不可恢复动作会在计划中展开</span></div><button className="primary" disabled={!!busy || (!stopped || !inspection || inspection.writers.length > 0) || environment.status === 'retired'} onClick={() => void preview()}>{busy === 'plan' ? '正在生成计划…' : '预览这份计划'}<Icon name="arrow" size={16}/></button></div>
+    <div className="action-bar"><div><strong>{environment.name}</strong><span>精确文件范围与不可恢复动作会在计划中展开</span></div><button className="primary" disabled={!!busy || (!stopped || !inspection || inspection.writers.length > 0) || (recipe !== 'repair_login' && categories.length === 0) || environment.status === 'retired'} onClick={() => void preview()}>{busy === 'plan' ? '正在生成计划…' : '预览这份计划'}<Icon name="arrow" size={16}/></button></div>
   </>;
 }
