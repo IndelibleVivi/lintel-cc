@@ -188,6 +188,15 @@ impl Engine {
             .ok_or_else(|| err("environment_missing", "没有找到此环境"))
     }
     fn register(&self, name: &str, root: &Path, owned: bool) -> Result<Value> {
+        self.register_with_id(name, root, owned, &id())
+    }
+    fn register_with_id(
+        &self,
+        name: &str,
+        root: &Path,
+        owned: bool,
+        environment_id: &str,
+    ) -> Result<Value> {
         let root = physical(root)?;
         guard(&root)?;
         if !root.is_dir() || root == Path::new("/") || root == self.home {
@@ -201,17 +210,25 @@ impl Engine {
             return Ok(e.clone());
         }
         let env = policy::environment(
-            json!({"id":id(),"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
+            json!({"id":environment_id,"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
             self.executable(),
         );
         all.push(env.clone());
         save(&self.state.join("inventory.json"), &json!(all))?;
         Ok(env)
     }
-    fn create(&self, name: &str) -> Result<Value> {
+    fn create(&self, name: &str, journal: Option<(&mut Value, &Path)>) -> Result<Value> {
         let root = self.state.join("environments").join(id());
+        let environment_id = id();
+        if let Some((receipt, path)) = journal {
+            receipt["new_environment_id"] = json!(environment_id);
+            receipt["new_root"] = json!(root);
+            // These are intent until registration succeeds. A failed journal
+            // prevents creation; a failed registration retains the exact path.
+            save(path, receipt)?;
+        }
         private_dir(&root)?;
-        self.register(name, &root, true)
+        self.register_with_id(name, &root, true, &environment_id)
     }
     fn settings(&self, e: &Value) -> Result<(PathBuf, Value, Value)> {
         let root = PathBuf::from(string(e, "root")?);
@@ -344,7 +361,7 @@ impl Engine {
                 )
             }
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
-            "create_environment" => self.create(string(r, "name")?),
+            "create_environment" => self.create(string(r, "name")?, None),
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
@@ -1085,7 +1102,7 @@ mod tests {
             engine.request(json!({"command":"drift","environment_id":e["id"]}))["data"]["status"],
             "changed"
         );
-        let absent = engine.create("absent settings").unwrap();
+        let absent = engine.create("absent settings", None).unwrap();
         let response = engine.request(
             json!({"command":"plan_policy","environment_id":absent["id"],"preset":"custom"}),
         );

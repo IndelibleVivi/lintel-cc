@@ -68,6 +68,10 @@ try{
   const modeled=(await data({command:'jobs'})).jobs[0],probe=modeled.migration_probe.path;
   await mkdir(probe);await writeFile(path.join(probe,'placeholder'),'');
   modeled.title='Synthetic retained probe receipt';modeled.status='needs_reconciliation';modeled.migration_probe.status='retained';
+  // A recorded create intent is not a registered environment. Preserve both
+  // recovery paths, but offer policy editing only for actual inventory entries.
+  modeled.new_environment_id='11111111-2222-4333-8444-555555555555';
+  modeled.new_root=path.join(fixture,'unregistered-new-root');
   modeled.steps=[{id:'migration_preflight',label:'模拟路径检查中断',status:'executing',message:'Synthetic retained probe fixture.'}];
   await writeFile(path.join(context.LINTEL_STATE_DIR,'jobs',`${modeled.id}.json`),JSON.stringify(modeled));
   const executeCount=calls.filter(command=>command==='execute').length;
@@ -77,6 +81,7 @@ try{
     await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
     await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
     await dialog.getByText(probe,{exact:true}).waitFor();
+    assert.equal(await dialog.getByRole('button',{name:'为新环境选择保护方案'}).count(),0);
     await page.screenshot({path:path.join(fixture,`probe-recovery-${theme}.png`)});
   }
   assert.equal(calls.filter(command=>command==='execute').length,executeCount);

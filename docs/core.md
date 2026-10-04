@@ -112,7 +112,7 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 
 独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以原子新名称发布（不会替换已出现的文件），完成后恢复单硬链接状态并读回。import 在预览和正文写入前核对整批实际目标的祖先：path guard 拒绝非目录／链接，批准 root 内的现有目录必须属于当前执行器 UID，实际权限须允许访问和在最近现有父目录写入。已知错误分别为 `path_unreadable`、`wrong_owner`、`migration_destination_unwritable`，在整批正文写入前拒绝；Lintel 不更改已有权限。共同迁入路径只将新建父目录设为 `0700`，已有目标根和父目录权限保留，文件为 `0600`。目的地文件系统需支持同目录 hard link；不支持时返回具体写入失败，保留原数据与原任务，不退回覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。
 
-接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建和整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
+接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建在 mkdir 前分配并持久保存准确 new_root/new_environment_id 与执行中步骤；登记失败或中断后原任务仍能定位目录，意图不证明登记成功。整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
 
 归档发布前先持久记录执行中的 archive 步骤、`archive_path` 与 `archive_intent_digest`，后者绑定待发布的准确密文；写后读回成功才记录完成和 `archive_digest`。中断回执中的路径不表示包已完成：查询原任务核对产物，包存在时可用原 job 解锁，尚不存在时返回具体读错误。job 读取先采用完成 digest，没有完成 digest 时核对 intent digest；旧回执两者都没有才沿用兼容行为。
 

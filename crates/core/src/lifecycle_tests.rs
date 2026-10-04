@@ -206,7 +206,7 @@ fn archive_reopens_imports_and_refuses_existing_or_escaping_targets() {
     assert_eq!(content["text"], "Synthetic instructions");
     let wrong=engine.request(json!({"command":"archive_inspect","job_id":j["id"],"archive_passphrase":"incorrect synthetic password"}));
     assert_eq!(wrong["error"]["code"], "archive_locked");
-    let dest = engine.create("destination").unwrap();
+    let dest = engine.create("destination", None).unwrap();
     let import = data(
         &engine,
         json!({"command":"plan_import","environment_id":dest["id"],"job_id":j["id"],"categories":["instructions"],"archive_passphrase":PASS}),

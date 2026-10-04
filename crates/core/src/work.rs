@@ -730,7 +730,10 @@ impl Engine {
         preflight_migration_paths(&self.state.join("environments"), &targets, j, journal)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
-        let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
+        let new = self.create(
+            &format!("{} · {}", string(e, "name")?, label),
+            Some((j, journal)),
+        )?;
         j["new_environment_id"] = new["id"].clone();
         j["new_root"] = new["root"].clone();
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"});
@@ -810,6 +813,94 @@ fn stringify_path(path: PathBuf) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_root_intent_survives_registration_failure() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home.clone(), base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let job_id = crate::id();
+        let journal = engine.path("jobs", &job_id);
+        let mut receipt = json!({"id":job_id,"status":"executing","warnings":[],"steps":[]});
+        // Registration will fail after the fresh directory has been created.
+        // Only this synthetic inventory is changed.
+        save(&engine.state.join("inventory.json"), &json!({})).unwrap();
+        let failure = engine
+            .migrate_files(&environment, "synthetic", &[], &mut receipt, &journal)
+            .unwrap_err();
+        assert_eq!(failure.code, "invalid_inventory");
+        let stored = load(&journal).unwrap();
+        assert!(
+            stored["new_root"].is_string(),
+            "Orphaned root is absent from original job: {stored}"
+        );
+        let destination = Path::new(stored["new_root"].as_str().unwrap());
+        assert!(destination.is_dir());
+        assert_eq!(
+            destination.parent().unwrap(),
+            engine.state.join("environments")
+        );
+        uuid::Uuid::parse_str(stored["new_environment_id"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            stored["steps"].as_array().unwrap().last().unwrap()["status"],
+            "executing"
+        );
+        let reopened = Engine::new(home, engine.state.clone()).unwrap();
+        let query = reopened.request(json!({"command":"job","job_id":job_id}));
+        assert_eq!(query["ok"], true, "{query}");
+        assert_eq!(query["data"]["status"], "needs_reconciliation");
+        assert_eq!(query["data"]["new_root"], stored["new_root"]);
+        assert_eq!(
+            query["data"]["new_environment_id"],
+            stored["new_environment_id"]
+        );
+        assert_eq!(
+            fs::read_dir(engine.state.join("environments"))
+                .unwrap()
+                .count(),
+            1
+        );
+        assert_eq!(
+            query,
+            reopened.request(json!({"command":"job","job_id":job_id}))
+        );
+    }
+
+    #[test]
+    fn new_root_journal_failure_prevents_creation_and_success_registers_intended_id() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let blocked_journal = engine.path("jobs", &crate::id());
+        fs::create_dir(&blocked_journal).unwrap();
+        let mut failed = json!({"steps":[]});
+        assert!(engine
+            .create("synthetic", Some((&mut failed, &blocked_journal)))
+            .is_err());
+        assert!(!Path::new(failed["new_root"].as_str().unwrap()).exists());
+        assert_eq!(
+            fs::read_dir(engine.state.join("environments"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert!(engine.inventory().unwrap().is_empty());
+        let journal = engine.path("jobs", &crate::id());
+        let mut receipt = json!({"steps":[]});
+        let created = engine
+            .create("synthetic", Some((&mut receipt, &journal)))
+            .unwrap();
+        let stored = load(&journal).unwrap();
+        assert_eq!(stored["new_root"], created["root"]);
+        assert_eq!(stored["new_environment_id"], created["id"]);
+        assert_eq!(engine.inventory().unwrap(), vec![created]);
+    }
 
     #[test]
     fn archive_space_check_uses_destination_before_publication() {

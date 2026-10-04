@@ -119,6 +119,8 @@ python3 -c 'import getpass,json; print(json.dumps({"archive_passphrase":getpass.
 
 inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）或 `--archive-path PATH`（目标主机已有文件）。import 预览和执行先核对整批实际父目录的当前 UID 归属与有效访问／写入权限，已知障碍在任何正文写入前拒绝，不自动 chmod/chown。计划冻结密文字节 digest 与目标文件状态；approved execute 再通过秘密 stdin 给同一口令，包改变、损坏、错误口令、超限或同名目标冲突返回具体错误，不覆盖原文件。跨主机传输由显式系统 SSH/SFTP/scp 或可移动存储完成，见 [人类迁移步骤](operator-guide.md#work)；Lintel 不自动跨主机 transfer，也不上传整个 state。
 
+保全／重建回执的 `new_root` 与 `new_environment_id` 在创建目录前持久保存；它们是 intent，只有 create 步骤完成才证明登记成功。创建或登记失败时只查询原 job，保留准确路径／ID，不因意图存在而重建或自动清理。
+
 <a id="browser-adapter"></a>
 
 `categories` 在 named/finite 请求中必须至少选择一项；空 JSON 数组和 `--categories ''` 都拒绝。protocol-1 raw request 保留历史兼容默认。
