@@ -81,6 +81,8 @@ try{
     await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
     await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
     await dialog.getByText(probe,{exact:true}).waitFor();
+    await dialog.getByText('新配置目录（待核对）',{exact:true}).waitFor();
+    await dialog.getByText(modeled.new_root,{exact:true}).waitFor();
     assert.equal(await dialog.getByRole('button',{name:'为新环境选择保护方案'}).count(),0);
     await page.screenshot({path:path.join(fixture,`probe-recovery-${theme}.png`)});
   }
