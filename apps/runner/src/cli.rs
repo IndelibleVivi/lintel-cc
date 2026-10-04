@@ -57,8 +57,11 @@ pub fn dispatch(request: Value) -> Value {
                 "not_in_this_build"
             });
             if let Some(id) = request.get("environment_id") {
-                let inspection =
-                    lintel_core::handle_request(json!({"command":"inspect","environment_id":id}));
+                let inspection_request = json!({"command":"inspect","environment_id":id});
+                if let Err(e) = lintel_operations::validate(&inspection_request) {
+                    return error("invalid_request", e);
+                }
+                let inspection = lintel_core::handle_request(inspection_request);
                 if inspection["ok"] != true {
                     return inspection;
                 }

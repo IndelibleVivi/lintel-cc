@@ -2,6 +2,7 @@
 """Discoverable CLI contract and portable work, only in disposable homes."""
 import json
 import os
+import pty
 import re
 from pathlib import Path
 import shutil
@@ -41,6 +42,20 @@ def run():
         operations = {operation['id']: operation for operation in catalog['operations']}
         assert operations['discover']['effects']['lintel_state'] == 'update_inventory'
         assert operations['archive_read']['secret_fields'] == ['archive_passphrase']
+        for identity in ['plan-secret', '00000000000040008000000000000001']:
+            master, slave = pty.openpty()
+            try:
+                proc = subprocess.run([str(BINARY), 'launch', identity], stdin=slave,
+                                      stdout=slave, stderr=slave, env=env, timeout=55)
+                rejected = json.loads(os.read(master, 65536).decode().strip())
+                assert proc.returncode != 0 and rejected['error']['code'] == 'invalid_request', rejected
+                assert not state.exists(), 'Invalid TTY launch UUID initialized core state'
+            finally:
+                os.close(slave)
+                os.close(master)
+            rejected = command('capabilities', '--environment', identity, good=False)
+            assert rejected['error']['code'] == 'invalid_request', rejected
+            assert not state.exists(), 'Invalid capabilities UUID initialized core state'
         for identity in ['plan-secret', '00000000000040008000000000000001']:
             rejected = command('job', 'wait', identity, '--timeout', '0s', good=False)
             assert rejected['error']['code'] == 'invalid_request', rejected

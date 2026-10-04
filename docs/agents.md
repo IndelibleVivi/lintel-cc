@@ -41,9 +41,11 @@ Named CLI 与有限 SSH 的 `environment_id`、`plan_id`、`job_id` 按 schema �
 
 外层 `remote.execute` / `remote.reconnect` 的 `plan_id` 与 `remote.launch` 的 `environment_id` 也共用这条 UUID 规则，在本地记录或 SSH 前检查。`install_id` 属于安装 controller 的独立受限标识规则，使用安装预览返回值。
 
+专用真实 TTY `lintel launch ID` 与 `capabilities --environment ID` 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 `invalid_request`，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。
+
 `env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
 
-普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。
+普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。专用 `launch` 是交互进程接管入口，启动失败诊断写 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。
 
 ## 完整的计划、批准、查询与恢复
 

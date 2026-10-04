@@ -48,9 +48,10 @@ fn launch_command(environment_id: &str) -> Result<std::process::Command, String>
                 .into(),
         );
     }
-    let response = lintel_core::handle_request(
-        json!({"command":"launch_context","environment_id":environment_id}),
-    );
+    let request = json!({"command":"launch_context","environment_id":environment_id});
+    lintel_operations::validate(&request)
+        .map_err(|e| cli::error("invalid_request", e).to_string())?;
+    let response = lintel_core::handle_request(request);
     if response["ok"] != true {
         return Err(response.to_string());
     }
