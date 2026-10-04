@@ -206,6 +206,24 @@ fn read_service_properties(
     Ok(p)
 }
 
+fn condition_content(job_id: &str, path: &Path) -> Result<String> {
+    let argument = path
+        .to_str()
+        .filter(|s| s.starts_with('/') && !s.chars().any(char::is_control))
+        .ok_or_else(|| {
+            err(
+                "service_condition_path_unsupported",
+                "服务 hold 的 state 路径必须是无控制字符的 UTF-8 绝对路径；未生成 blocker",
+            )
+        })?
+        .replace('%', "%%");
+    // v255 config_parse_unit_condition_path does not unquote or C-unescape.
+    // Quotes, spaces and backslashes inside the absolute path are literal;
+    // only percent specifiers need escaping. The fixed suffix prevents a
+    // trailing backslash from becoming a config-file line continuation.
+    Ok(format!("# Lintel owned hold; restore through original job {job_id}\n[Unit]\nConditionPathExists={argument}\n"))
+}
+
 impl Engine {
     fn service_platform(&self) -> Result<()> {
         #[cfg(test)]
@@ -635,16 +653,15 @@ impl Engine {
             .state
             .join("jobs")
             .join(format!("{pid}.service-resume-permit"));
-        let argument = journal.to_string_lossy().replace('%', "%%");
         if journal.exists() {
             return Err(err(
                 "service_hold_conflict",
                 "启动 permit 路径已存在，未生成 hold",
             ));
         }
-        let quoted = serde_json::to_string(&argument)?;
+        let content = condition_content(pid, &journal)?;
         p["extra"]["service"]["hold"] = json!({"path":path,"persistent":true,"condition_path":journal,
-            "content":format!("# Lintel owned hold; restore through original job {pid}\n[Unit]\nConditionPathExists={quoted}\n")});
+            "content":content});
         Ok(())
     }
     fn check_service_hold(
@@ -739,6 +756,19 @@ impl Engine {
         }
         let current = self.service_snapshot(manager, unit, string(s, "root")?)?;
         if p["kind"] == "service_quiesce" {
+            let pid = string(p, "id")?;
+            let condition = self
+                .state
+                .join("jobs")
+                .join(format!("{pid}.service-resume-permit"));
+            if s["hold"]["condition_path"] != json!(condition)
+                || s["hold"]["content"] != condition_content(pid, &condition)?
+            {
+                return Err(err(
+                    "stale_service_plan",
+                    "服务 blocker 生成规则已变化；原批准不再有效，请重新预览",
+                ));
+            }
             if current != s["before"] {
                 return Err(err(
                     "stale_service_plan",
@@ -788,15 +818,28 @@ impl Engine {
                                 .unwrap()
                                 .push(hold["path"].clone());
                         }
-                        let condition = json!([
-                            "ConditionPathExists",
-                            false,
-                            false,
-                            hold["condition_path"],
-                            0
-                        ]);
-                        if !p["Conditions"].as_array().unwrap().contains(&condition) {
-                            p["Conditions"].as_array_mut().unwrap().push(condition);
+                        // Read the actual owned text instead of manufacturing
+                        // the expected tuple from plan metadata. Like v255's
+                        // condition parser, quotes are literal, not delimiters.
+                        p["Conditions"]
+                            .as_array_mut()
+                            .unwrap()
+                            .retain(|v| v[3] != hold["condition_path"]);
+                        let content = fs::read_to_string(string(hold, "path")?)?;
+                        if let Some(argument) = content.lines().find_map(|line| {
+                            line.strip_prefix("ConditionPathExists=")
+                                .filter(|value| value.starts_with('/'))
+                        }) {
+                            let condition = json!([
+                                "ConditionPathExists",
+                                false,
+                                false,
+                                argument.replace("%%", "%"),
+                                0
+                            ]);
+                            if !p["Conditions"].as_array().unwrap().contains(&condition) {
+                                p["Conditions"].as_array_mut().unwrap().push(condition);
+                            }
                         }
                     } else {
                         p["DropInPaths"]
@@ -862,8 +905,6 @@ impl Engine {
             f.write_all(string(hold, "content")?.as_bytes())?;
             f.sync_all()?;
             fs::File::open(directory)?.sync_all()?;
-            j["steps"][0]["status"] = json!("completed");
-            save(journal, j)?;
             self.service_mutation(manager, unit, "daemon-reload", Some(hold))?;
             let loaded = self.service_snapshot(manager, unit, root)?;
             // Check blocker before issuing stop, including resets from later drop-ins.
@@ -874,6 +915,7 @@ impl Engine {
                     "写入 blocker 时 unit 配置变化；保留当前文件并查询原任务",
                 ));
             }
+            j["steps"][0]["status"] = json!("completed");
             j["steps"].as_array_mut().unwrap().push(json!({"id":"service_stop","label":"停止精确目标服务","status":"executing","message":"只提交原计划 unit 的 stop，不重复提交"}));
             save(journal, j)?;
             self.service_mutation(manager, unit, "stop", Some(hold))?;
@@ -1348,6 +1390,123 @@ mod tests {
             assert_eq!(interface, expected);
             parse_service_property(&serde_json::to_vec(&bus[key]).unwrap(), signature)
         })
+    }
+    #[test]
+    fn condition_path_is_literal_unquoted_and_old_approved_text_is_stale() {
+        let (_temp, mut engine, e, _root) = fixture(true);
+        let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+        let pid = plan["id"].as_str().unwrap();
+        let plan_path = engine.path("plans", pid);
+        let mut stored_plan = load(&plan_path).unwrap();
+        let hold = &stored_plan["extra"]["service"]["hold"];
+        let condition = hold["condition_path"].as_str().unwrap();
+        assert_eq!(hold["content"], format!("# Lintel owned hold; restore through original job {pid}\n[Unit]\nConditionPathExists={condition}\n"));
+        let special = Path::new(
+            "/synthetic/state space%literal/quote\"and\\slash/jobs/job.service-resume-permit",
+        );
+        assert_eq!(condition_content("job", special).unwrap(), "# Lintel owned hold; restore through original job job\n[Unit]\nConditionPathExists=/synthetic/state space%%literal/quote\"and\\slash/jobs/job.service-resume-permit\n");
+        for path in [
+            "/synthetic/state\nConditionPathExists=/tmp",
+            "/synthetic/state\r",
+            "/synthetic/state\t",
+            "relative/path",
+        ] {
+            assert_eq!(
+                condition_content("job", Path::new(path)).unwrap_err().code,
+                "service_condition_path_unsupported"
+            );
+        }
+        // Reproduce a validly hashed plan approved under the old generator.
+        // Integrity is intact; the changed blocker semantics must reject it.
+        stored_plan["extra"]["service"]["hold"]["content"] = json!(format!("# Lintel owned hold; restore through original job {pid}\n[Unit]\nConditionPathExists={}\n", serde_json::to_string(condition).unwrap()));
+        stored_plan.as_object_mut().unwrap().remove("hash");
+        stored_plan["hash"] = json!(digest(&serde_json::to_vec(&stored_plan).unwrap()));
+        save(&plan_path, &stored_plan).unwrap();
+        let result = execute(&engine, &stored_plan);
+        assert_eq!(result["error"]["code"], "stale_service_plan", "{result}");
+        assert_eq!(log(&engine), "");
+        assert!(!Path::new(
+            stored_plan["extra"]["service"]["hold"]["path"]
+                .as_str()
+                .unwrap()
+        )
+        .exists());
+        assert_eq!(load(&stored(&engine)).unwrap()["ActiveState"], "active");
+        // Exercise full hold/restore with literal spaces, percent, quote and
+        // backslash in state; the loaded tuple must remain the exact path.
+        let special_state = engine
+            .state
+            .parent()
+            .unwrap()
+            .join("state space%literal\"and\\slash");
+        fs::rename(&engine.state, &special_state).unwrap();
+        engine.state = special_state;
+        let fresh = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+        let paused = execute(&engine, &fresh);
+        assert_eq!(paused["data"]["status"], "completed", "{paused}");
+        assert_eq!(
+            request(&engine, &e, "service_inspect")["data"]["quiesced"],
+            true
+        );
+        let resume =
+            engine.request(json!({"command":"plan_service_resume","job_id":paused["data"]["id"]}));
+        assert_eq!(
+            execute(&engine, &resume["data"])["data"]["status"],
+            "completed"
+        );
+    }
+    #[test]
+    fn quoted_or_wrong_loaded_condition_never_submits_stop() {
+        let (_temp, engine, e, _root) = fixture(true);
+        let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+        let stored_plan = load(&engine.path("plans", plan["id"].as_str().unwrap())).unwrap();
+        let hold = &stored_plan["extra"]["service"]["hold"];
+        let path = Path::new(hold["path"].as_str().unwrap());
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // A real text parser ignores the old quoted absolute path. The
+        // synthetic manager must not invent its expected tuple from metadata.
+        fs::write(
+            path,
+            format!(
+                "[Unit]\nConditionPathExists={}\n",
+                serde_json::to_string(&hold["condition_path"]).unwrap()
+            ),
+        )
+        .unwrap();
+        engine
+            .service_mutation("user", "target.service", "daemon-reload", Some(hold))
+            .unwrap();
+        let p = engine.service_properties("user", "target.service").unwrap();
+        assert!(p["DropInPaths"].as_array().unwrap().contains(&hold["path"]));
+        assert!(p["Conditions"].as_array().unwrap().is_empty());
+        assert_eq!(
+            ensure_condition(&p, hold).unwrap_err().code,
+            "service_hold_not_loaded"
+        );
+        let mut wrong = p.clone();
+        wrong["Conditions"] = json!([[
+            "ConditionPathExists",
+            false,
+            false,
+            "/synthetic/wrong-permit",
+            0
+        ]]);
+        assert_eq!(
+            ensure_condition(&wrong, hold).unwrap_err().code,
+            "service_hold_not_loaded"
+        );
+        assert_eq!(p["ActiveState"], "active");
+        assert!(!log(&engine).contains("stop:"));
+        // The exact raw absolute value now loads; retain the strict readback.
+        fs::write(path, hold["content"].as_str().unwrap()).unwrap();
+        engine
+            .service_mutation("user", "target.service", "daemon-reload", Some(hold))
+            .unwrap();
+        ensure_condition(
+            &engine.service_properties("user", "target.service").unwrap(),
+            hold,
+        )
+        .unwrap();
     }
     #[test]
     fn systemd255_empty_complex_arrays_and_direct_property_values_are_supported() {

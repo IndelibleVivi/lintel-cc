@@ -82,6 +82,12 @@ class Journey:
 
     def execute(self, plan):
         receipt = self.request('execute', plan_id=plan['id'], approval=plan['hash'])
+        if receipt['status'] != 'completed':
+            self.report['failed_service_receipt'] = receipt
+            try:
+                self.hold_failure_evidence(plan)
+            except Exception as error:
+                self.report['hold_evidence_error'] = type(error).__name__
         assert receipt['status'] == 'completed', receipt
         return receipt
 
@@ -89,26 +95,57 @@ class Journey:
         out = self.systemctl('show', '--all', '--property=ActiveState,MainPID,NRestarts,InvocationID,ControlGroup', unit).stdout
         return dict(line.split('=', 1) for line in out.splitlines())
 
-    def property_wire_evidence(self):
-        # These exact owned fixtures contain no EnvironmentFile or stop commands.
-        # Keep their limited raw wire evidence if the production inspect fails.
+    def bus_property(self, key, interface='org.freedesktop.systemd1.Service'):
         path = '/org/freedesktop/systemd1/unit/' + ''.join(
             c if c.isascii() and (c.isalpha() or (i > 0 and c.isdigit())) else '_%02x' % ord(c)
             for i, c in enumerate(self.target))
+        return subprocess.run(['/usr/bin/busctl', '--system', '--no-pager',
+                               '--allow-interactive-authorization=no', '--json=short', 'get-property',
+                               'org.freedesktop.systemd1', path, interface, key],
+                              text=True, capture_output=True, timeout=30)
+
+    def property_wire_evidence(self):
+        # These exact owned fixtures contain no EnvironmentFile or stop commands.
+        # Keep their limited raw wire evidence if the production inspect fails.
         evidence = self.report['property_wire_evidence'] = dict(busctl={})
         evidence['systemctl_show'] = self.systemctl(
             'show', '--all', '--property=EnvironmentFiles,ExecStop,ExecStopPost', '--', self.target).stdout
         assert len(evidence['systemctl_show']) <= 8192
         for key, signature in [('EnvironmentFiles', 'a(sb)'), ('ExecStop', 'a(sasbttttuii)'),
                                ('ExecStopPost', 'a(sasbttttuii)')]:
-            proc = subprocess.run(['/usr/bin/busctl', '--system', '--no-pager',
-                                   '--allow-interactive-authorization=no', '--json=short', 'get-property',
-                                   'org.freedesktop.systemd1', path, 'org.freedesktop.systemd1.Service', key],
-                                  text=True, capture_output=True, timeout=30)
+            proc = self.bus_property(key)
             evidence['busctl'][key] = dict(returncode=proc.returncode, stdout=proc.stdout[:8192], stderr=proc.stderr[:4096])
             assert proc.returncode == 0 and len(proc.stdout) <= 8192, (key, evidence['busctl'][key])
             assert json.loads(proc.stdout) == dict(type=signature, data=[]), (key, evidence['busctl'][key])
         self.report['checks'].append('typed_empty_service_arrays_observed')
+
+    def hold_failure_evidence(self, plan):
+        self.check_ownership()
+        evidence = self.report['hold_failure_evidence'] = dict(busctl={})
+        path = Path(plan['service']['hold']['path'])
+        assert path.parent == Path('/etc/systemd/system') / (self.target + '.d')
+        assert path.name.startswith('90-lintel-') and path.name.endswith('.conf')
+        owner_job = str(uuid.UUID(path.name[len('90-lintel-'):-len('.conf')]))
+        evidence['hold_path'] = str(path)
+        if path.is_file() and not path.is_symlink():
+            with path.open('rb') as source:
+                text = source.read(8193)
+            assert len(text) <= 8192
+            permit = str(self.state / 'jobs' / (owner_job + '.service-resume-permit')).replace('%', '%%')
+            prefix = '# Lintel owned hold; restore through original job ' + owner_job + '\n[Unit]\nConditionPathExists='
+            owned_contents = [prefix + permit + '\n', prefix + json.dumps(permit, ensure_ascii=False) + '\n']
+            decoded = text.decode()
+            if decoded in owned_contents:
+                evidence['hold_text'] = decoded
+            else:
+                evidence['hold_text_withheld'] = 'file differs from either exact owned generator format'
+        for key in ['Conditions', 'DropInPaths']:
+            proc = self.bus_property(key, 'org.freedesktop.systemd1.Unit')
+            evidence['busctl'][key] = dict(returncode=proc.returncode, stdout=proc.stdout[:8192], stderr=proc.stderr[:4096])
+        evidence['service_state'] = self.properties(self.target)
+        proc = subprocess.run(['/usr/bin/journalctl', '--system', '--no-pager', '--unit=' + self.target,
+                               '--lines=30', '--output=short'], text=True, capture_output=True, timeout=30)
+        evidence['unit_journal'] = dict(returncode=proc.returncode, stdout=proc.stdout[-16384:], stderr=proc.stderr[:4096])
 
     def pulse(self, root):
         path = root / 'synthetic-pulse.jsonl'
