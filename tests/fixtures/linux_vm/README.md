@@ -23,7 +23,9 @@ OS image cache must be outside the Git tree. Image integrity uses Ubuntu's
 signed `SHA256SUMS`, the installed public cloud-image keyring and the exact image
 and package manifest checksums. Overlay, seed, keys and all synthetic guest
 data are deleted after the owned QEMU process stops, including failure and
-ordinary CI cancellation paths.
+ordinary CI cancellation paths. When the service suite fails, its saved fixture
+wire report is copied into the host VM report before guest cleanup; failure stays
+a failed acceptance.
 
 `status: evidence_complete` means the named runtime observations finished. The
 report separately records whether a `setsid` worker survived each recorded

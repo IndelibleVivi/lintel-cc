@@ -350,16 +350,24 @@ def logout_case(guest, kill):
             "submitted_once": True, "reexecuted": False}
 
 
-def services(guest, phase=None):
+def services(guest, evidence, phase=None):
     output = {None: SERVICE_SUITE_REPORT, "prepare": SERVICE_PREPARE_REPORT, "recover": SERVICE_RECOVER_REPORT}[phase]
     args = ["sudo", "-n", "python3", SERVICE, "--runner", RUNNER, "--json", output]
     if phase is not None:
         args += ["--phase", phase]
     if phase == "recover":
         args += ["--previous-report", SERVICE_PREPARE_REPORT]
-    response = guest.shell(shlex.join(args), timeout=240)
+    response = guest.shell(shlex.join(args), timeout=240, check=False)
     print(response.stdout.decode(errors="replace"), end="", flush=True)
-    return json.loads(guest.shell(shlex.join(["sudo", "-n", "cat", output])).stdout)
+    saved = guest.shell(shlex.join(["sudo", "-n", "cat", output]), check=False)
+    if response.returncode:
+        evidence["services_failure"] = {"phase": phase or "full", "exit_code": response.returncode,
+                                        "stderr": response.stderr.decode(errors="replace")[-8192:]}
+        if saved.returncode == 0:
+            evidence["services_failure"]["report"] = json.loads(saved.stdout)
+        raise RuntimeError("Real service lifecycle failed: " + evidence["services_failure"]["stderr"])
+    require(saved.returncode == 0, "Service lifecycle did not save its evidence report")
+    return json.loads(saved.stdout)
 
 
 def journey(guest, process, args, report):
@@ -373,8 +381,8 @@ def journey(guest, process, args, report):
     require(facts["pid1"] == "systemd" and facts["logind_active"] == "active", "VM did not boot real systemd/logind")
     require(facts["sshd_use_pam"] and facts["pam_systemd_configured"] and facts["pam_sshd_includes_common_session"], "VM SSH does not use real PAM/systemd sessions")
     report["runtime_before"] = facts
-    report["services_full_suite"] = services(guest)
-    report["services_before_reboot"] = services(guest, "prepare")
+    report["services_full_suite"] = services(guest, report)
+    report["services_before_reboot"] = services(guest, report, "prepare")
     report["logout"] = [logout_case(guest, False), logout_case(guest, True)]
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")
@@ -396,7 +404,7 @@ def journey(guest, process, args, report):
         report["reboot"] = {"before_boot_id": old_boot, "after_boot_id": new_boot, "worker_before": stopped,
                             "original_job_after": interrupted, "repeated_query": again, "submitted_once": True, "reexecuted": False}
         report["runtime_after"] = guest.probe("facts")
-        report["services_after_reboot"] = services(guest, "recover")
+        report["services_after_reboot"] = services(guest, report, "recover")
     finally:
         if child.poll() is None:
             child.terminate()

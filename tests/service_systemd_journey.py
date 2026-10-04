@@ -89,6 +89,27 @@ class Journey:
         out = self.systemctl('show', '--all', '--property=ActiveState,MainPID,NRestarts,InvocationID,ControlGroup', unit).stdout
         return dict(line.split('=', 1) for line in out.splitlines())
 
+    def property_wire_evidence(self):
+        # These exact owned fixtures contain no EnvironmentFile or stop commands.
+        # Keep their limited raw wire evidence if the production inspect fails.
+        path = '/org/freedesktop/systemd1/unit/' + ''.join(
+            c if c.isascii() and (c.isalpha() or (i > 0 and c.isdigit())) else '_%02x' % ord(c)
+            for i, c in enumerate(self.target))
+        evidence = self.report['property_wire_evidence'] = dict(busctl={})
+        evidence['systemctl_show'] = self.systemctl(
+            'show', '--all', '--property=EnvironmentFiles,ExecStop,ExecStopPost', '--', self.target).stdout
+        assert len(evidence['systemctl_show']) <= 8192
+        for key, signature in [('EnvironmentFiles', 'a(sb)'), ('ExecStop', 'a(sasbttttuii)'),
+                               ('ExecStopPost', 'a(sasbttttuii)')]:
+            proc = subprocess.run(['/usr/bin/busctl', '--system', '--no-pager',
+                                   '--allow-interactive-authorization=no', '--json=short', 'get-property',
+                                   'org.freedesktop.systemd1', path, 'org.freedesktop.systemd1.Service', key],
+                                  text=True, capture_output=True, timeout=30)
+            evidence['busctl'][key] = dict(returncode=proc.returncode, stdout=proc.stdout[:8192], stderr=proc.stderr[:4096])
+            assert proc.returncode == 0 and len(proc.stdout) <= 8192, (key, evidence['busctl'][key])
+            assert json.loads(proc.stdout) == dict(type=signature, data=[]), (key, evidence['busctl'][key])
+        self.report['checks'].append('typed_empty_service_arrays_observed')
+
     def pulse(self, root):
         path = root / 'synthetic-pulse.jsonl'
         return len(path.read_text().splitlines()) if path.exists() else 0
@@ -149,6 +170,7 @@ while True:
 
     def prepare(self):
         self.setup()
+        self.property_wire_evidence()
         observed = self.service('service_inspect')
         assert observed['bound'] and observed['active_state'] == 'active'
         assert observed['restart'] == 'always'
@@ -307,7 +329,10 @@ def main():
         if args.json:
             args.json.write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
-    except Exception:
+    except Exception as error:
+        if args.json and journey.report:
+            journey.report.update(status='failed', failure_type=type(error).__name__)
+            args.json.write_text(json.dumps(journey.report, indent=2) + '\n')
         if args.phase != 'prepare':
             journey.cleanup()
         raise

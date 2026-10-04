@@ -12,6 +12,8 @@ alias、glob、裸 service 前缀、未实例化 template、transient/generated/
 
 CLI JSON、计划、回执与清理检查只保留 root 绑定及必要 service 状态，不保存或导出整套进程环境、API key 或 unit 文件原文。计划冻结 unit 文件与 drop-in 的原对象、字节摘要、manager 配置和启动状态，以判断预览后的外部改动。
 
+适配器通过带准确签名的 D-Bus 查询核验 `EnvironmentFiles`、`ExecStop` 与 `ExecStopPost` 数组，只有明确返回空数组才通过；属性缺失、未知格式或非空值仍拒绝。systemd 255 的 `systemctl show --all` 会省略这类空数组的整行，因此缺行不能作为空值证据。`busctl get-property --json=short` 的 `data` 是属性值本身；root 环境、drop-in、condition 与 unit 搜索目录均按这个结构读取。
+
 ## 操作与批准
 
 先登记实际配置 root。以下示例的 UUID 是待替换的已登记环境 ID；所有 unit 名称和状态目录由操作者明确选择。
@@ -77,6 +79,6 @@ python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel -
 python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel --json /var/tmp/service-recover.json --phase recover --previous-report /var/tmp/service-prepare.json
 ```
 
-prepare 报告保存 synthetic fixture 标识、home/state/root、unit 名、原 quiesce job、preboot inspect、hold 路径与 boot ID。recover 先查询同一个 job，核验目标跨 reboot 未回写、blocker 仍实际加载且邻居运行，再独立批准恢复。只有 boot ID 实际变化才报告 `persistent_hold_survived_real_reboot`。脚本不自行 reboot、不修改 login policy，也不把服务验收等同于完整 G03 的 SSH/PAM/logout/任务存活验收。
+prepare 报告保存 synthetic fixture 标识、home/state/root、unit 名、原 quiesce job、preboot inspect、hold 路径与 boot ID。首次 inspect 前还记录自有 fixture 的 `EnvironmentFiles`、`ExecStop` 与 `ExecStopPost` 有限原始 show/JSON 输出，失败时也写入 `--json` 报告，便于诊断属性读取。recover 先查询同一个 job，核验目标跨 reboot 未回写、blocker 仍实际加载且邻居运行，再独立批准恢复。只有 boot ID 实际变化才报告 `persistent_hold_survived_real_reboot`。脚本不自行 reboot、不修改 login policy，也不把服务验收等同于完整 G03 的 SSH/PAM/logout/任务存活验收。
 
-机制依据：[systemd unit conditions](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html)、[systemd service Restart](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)、[systemctl stop/mask](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)、[systemd D-Bus Conditions 与依赖属性](https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html)。runtime mask 对高优先级本地 unit 的限制是选用独立持久 drop-in 的原因。
+机制依据：[systemd unit conditions](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html)、[systemd service Restart](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)、[systemctl stop/mask](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)、[systemd D-Bus Conditions 与依赖属性](https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html)。空数组与 JSON 读取行为依据官方 v255 的 [systemctl 属性打印实现](https://github.com/systemd/systemd/blob/v255/src/systemctl/systemctl-show.c#L1168-L1309)及 [busctl get-property 实现](https://github.com/systemd/systemd/blob/v255/src/busctl/busctl.c#L1983-L2019)。runtime mask 对高优先级本地 unit 的限制是选用独立持久 drop-in 的原因。

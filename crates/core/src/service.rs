@@ -10,7 +10,9 @@ use std::{
     process::Command,
 };
 
-const PROPERTIES: &[&str] = &[
+// Only properties whose systemctl --all printer emits one line even when empty.
+// v255 omits empty EnvironmentFiles and Exec* arrays entirely; query those on D-Bus.
+const SHOW_PROPERTIES: &[&str] = &[
     "Id",
     "LoadState",
     "ActiveState",
@@ -26,7 +28,6 @@ const PROPERTIES: &[&str] = &[
     "KillMode",
     "Delegate",
     "User",
-    "EnvironmentFiles",
     "PassEnvironment",
     "UnsetEnvironment",
     "RefuseManualStop",
@@ -41,8 +42,6 @@ const PROPERTIES: &[&str] = &[
     "SuccessAction",
     "FailureAction",
     "StartLimitAction",
-    "ExecStop",
-    "ExecStopPost",
     "Job",
     "Type",
     "SourcePath",
@@ -52,6 +51,11 @@ const PROPERTIES: &[&str] = &[
     "Wants",
     "Upholds",
     "Conflicts",
+];
+const COMPLEX_PROPERTIES: &[(&str, &str)] = &[
+    ("EnvironmentFiles", "a(sb)"),
+    ("ExecStop", "a(sasbttttuii)"),
+    ("ExecStopPost", "a(sasbttttuii)"),
 ];
 const VOLATILE: &[&str] = &[
     "ActiveState",
@@ -133,6 +137,73 @@ fn config_only(properties: &Value) -> Value {
 fn view(properties: &Value) -> Value {
     json!({"active_state":properties["ActiveState"],"sub_state":properties["SubState"],
         "unit_file_state":properties["UnitFileState"],"restart":properties["Restart"]})
+}
+
+fn parse_service_property(bytes: &[u8], signature: &str) -> Result<Value> {
+    let v = parse(bytes).map_err(|_| {
+        err(
+            "service_schema_unsupported",
+            "systemd D-Bus 属性格式不受支持；没有据此批准变更",
+        )
+    })?;
+    // busctl get-property prints a variant's value directly in data. A method
+    // reply has a different outer argument array and must not be unwrapped here.
+    let data = v["data"]
+        .as_array()
+        .filter(|a| signature != "as" || a.iter().all(Value::is_string));
+    if v["type"] != signature || data.is_none() {
+        return Err(err(
+            "service_schema_unsupported",
+            "systemd D-Bus 属性格式不受支持；没有据此批准变更",
+        ));
+    }
+    Ok(v["data"].clone())
+}
+
+fn read_service_properties(
+    bytes: &[u8],
+    mut property: impl FnMut(&str, &str, &str) -> Result<Value>,
+) -> Result<Value> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| err("service_schema_unsupported", "systemd 返回了未知属性格式"))?;
+    let mut p = json!({});
+    for line in text.lines() {
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| err("service_schema_unsupported", "systemd 返回了未知属性格式"))?;
+        if !SHOW_PROPERTIES.contains(&key) || p.get(key).is_some() {
+            return Err(err("service_schema_unsupported", "systemd 属性缺失或重复"));
+        }
+        p[key] = json!(value);
+    }
+    for key in SHOW_PROPERTIES {
+        if p.get(key).is_none() {
+            return Err(err(
+                "service_schema_unsupported",
+                &format!("systemd 未提供 {key}；此版本不支持精确服务维护"),
+            ));
+        }
+    }
+    for (key, signature) in COMPLEX_PROPERTIES {
+        let value = property("org.freedesktop.systemd1.Service", key, signature)?;
+        let array = value.as_array().ok_or_else(|| {
+            err(
+                "service_schema_unsupported",
+                "systemd D-Bus 数组属性格式不受支持",
+            )
+        })?;
+        // Freeze only presence: every nonempty array is unsupported, and raw
+        // environment-file paths or stop argv must not enter a durable plan.
+        // Keep the existing snapshot representation for supported empty arrays.
+        p[key] = json!(if array.is_empty() { "" } else { "[configured]" });
+    }
+    p["Environment"] = property("org.freedesktop.systemd1.Service", "Environment", "as")?;
+    retain_root_environment(&mut p)?;
+    p["DropInPaths"] = property("org.freedesktop.systemd1.Unit", "DropInPaths", "as")?;
+    p["Conditions"] = property("org.freedesktop.systemd1.Unit", "Conditions", "a(sbbsi)")?;
+    // Condition status is runtime state, not part of the frozen configuration.
+    normalize_conditions(&mut p)?;
+    Ok(p)
 }
 
 impl Engine {
@@ -250,14 +321,7 @@ impl Engine {
                 property,
             ],
         )?;
-        let v = parse(&bytes)?;
-        if v["type"] != signature || !v["data"].as_array().is_some_and(|a| a.len() == 1) {
-            return Err(err(
-                "service_schema_unsupported",
-                "systemd D-Bus 属性格式不受支持；没有据此批准变更",
-            ));
-        }
-        Ok(v["data"][0].clone())
+        parse_service_property(&bytes, signature)
     }
     fn service_properties(&self, manager: &str, unit: &str) -> Result<Value> {
         self.service_platform()?;
@@ -269,57 +333,15 @@ impl Engine {
             retain_root_environment(&mut properties)?;
             return Ok(properties);
         }
-        let selection = format!("--property={}", PROPERTIES.join(","));
+        let selection = format!("--property={}", SHOW_PROPERTIES.join(","));
         let bytes = self.service_command(
             "systemctl",
             manager,
             &["show", "--all", &selection, "--", unit],
         )?;
-        let text = std::str::from_utf8(&bytes)
-            .map_err(|_| err("service_schema_unsupported", "systemd 返回了未知属性格式"))?;
-        let mut p = json!({});
-        for line in text.lines() {
-            let (key, value) = line
-                .split_once('=')
-                .ok_or_else(|| err("service_schema_unsupported", "systemd 返回了未知属性格式"))?;
-            if !PROPERTIES.contains(&key) || p.get(key).is_some() {
-                return Err(err("service_schema_unsupported", "systemd 属性缺失或重复"));
-            }
-            p[key] = json!(value);
-        }
-        for property in PROPERTIES {
-            if p.get(property).is_none() {
-                return Err(err(
-                    "service_schema_unsupported",
-                    &format!("systemd 未提供 {property}；此版本不支持精确服务维护"),
-                ));
-            }
-        }
-        p["Environment"] = self.service_property(
-            manager,
-            unit,
-            "org.freedesktop.systemd1.Service",
-            "Environment",
-            "as",
-        )?;
-        retain_root_environment(&mut p)?;
-        p["DropInPaths"] = self.service_property(
-            manager,
-            unit,
-            "org.freedesktop.systemd1.Unit",
-            "DropInPaths",
-            "as",
-        )?;
-        p["Conditions"] = self.service_property(
-            manager,
-            unit,
-            "org.freedesktop.systemd1.Unit",
-            "Conditions",
-            "a(sbbsi)",
-        )?;
-        // Condition status is runtime state, not part of the frozen configuration.
-        normalize_conditions(&mut p)?;
-        Ok(p)
+        read_service_properties(&bytes, |interface, property, signature| {
+            self.service_property(manager, unit, interface, property, signature)
+        })
     }
     fn service_directory(&self, manager: &str, unit: &str) -> Result<PathBuf> {
         #[cfg(test)]
@@ -1238,7 +1260,11 @@ mod tests {
             let source = adapter.join(format!("{unit}.unit"));
             fs::write(&source, "[Service]\nRestart=always\n").unwrap();
             let mut p = json!({});
-            for key in PROPERTIES {
+            for key in SHOW_PROPERTIES
+                .iter()
+                .copied()
+                .chain(COMPLEX_PROPERTIES.iter().map(|(key, _)| *key))
+            {
                 p[key] = json!("");
             }
             for (key, value) in [
@@ -1294,6 +1320,161 @@ mod tests {
                 .join("mutations.log"),
         )
         .unwrap_or_default()
+    }
+    fn wire_outputs(p: &Value) -> (String, Value) {
+        // Match systemd v255's printers: empty complex arrays have no show line,
+        // and get-property JSON data is the value, without a reply-argument layer.
+        let show = SHOW_PROPERTIES
+            .iter()
+            .map(|key| format!("{key}={}\n", p[key].as_str().unwrap()))
+            .collect();
+        let bus = json!({
+            "EnvironmentFiles":{"type":"a(sb)","data":[]},
+            "ExecStop":{"type":"a(sasbttttuii)","data":[]},
+            "ExecStopPost":{"type":"a(sasbttttuii)","data":[]},
+            "Environment":{"type":"as","data":p["Environment"]},
+            "DropInPaths":{"type":"as","data":p["DropInPaths"]},
+            "Conditions":{"type":"a(sbbsi)","data":p["Conditions"]}
+        });
+        (show, bus)
+    }
+    fn read_wire(show: &str, bus: &Value) -> Result<Value> {
+        read_service_properties(show.as_bytes(), |interface, key, signature| {
+            let expected = if ["DropInPaths", "Conditions"].contains(&key) {
+                "org.freedesktop.systemd1.Unit"
+            } else {
+                "org.freedesktop.systemd1.Service"
+            };
+            assert_eq!(interface, expected);
+            parse_service_property(&serde_json::to_vec(&bus[key]).unwrap(), signature)
+        })
+    }
+    #[test]
+    fn systemd255_empty_complex_arrays_and_direct_property_values_are_supported() {
+        let (_temp, engine, _e, root) = fixture(true);
+        let mut p = load(&stored(&engine)).unwrap();
+        p["Environment"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("SYNTHETIC_API_KEY=do-not-export"));
+        p["DropInPaths"] = json!(["/synthetic/external.conf", "/synthetic/owned.conf"]);
+        p["Conditions"] = json!([["ConditionPathExists", false, false, "/synthetic/permit", -1]]);
+        let (show, bus) = wire_outputs(&p);
+        for key in ["EnvironmentFiles", "ExecStop", "ExecStopPost"] {
+            assert!(!show.contains(&format!("{key}=")));
+        }
+        let observed = read_wire(&show, &bus).unwrap();
+        validate_properties(&observed, "target.service", root.to_str().unwrap()).unwrap();
+        assert_eq!(
+            observed["Environment"],
+            json!([format!("CLAUDE_CONFIG_DIR={}", root.display())])
+        );
+        assert_eq!(observed["DropInPaths"], p["DropInPaths"]);
+        assert_eq!(
+            observed["Conditions"],
+            json!([["ConditionPathExists", false, false, "/synthetic/permit", 0]])
+        );
+        assert!(!observed.to_string().contains("do-not-export"));
+        assert_eq!(
+            parse_service_property(br#"{"type":"as","data":["/etc/systemd/system"]}"#, "as")
+                .unwrap(),
+            json!(["/etc/systemd/system"])
+        );
+        // No fixture-independent Engine or real manager access is involved.
+        assert_eq!(log(&engine), "");
+    }
+    #[test]
+    fn systemd_wire_missing_unknown_or_configured_properties_never_allow_mutation() {
+        let (_temp, engine, _e, root) = fixture(true);
+        let p = load(&stored(&engine)).unwrap();
+        let (show, bus) = wire_outputs(&p);
+        for bad_show in [
+            show.replace("Id=target.service\n", ""),
+            format!("{show}Id=target.service\n"),
+            format!("{show}EnvironmentFiles=\n"),
+        ] {
+            assert_eq!(
+                read_wire(&bad_show, &bus).unwrap_err().code,
+                "service_schema_unsupported"
+            );
+        }
+        for (key, value) in [
+            ("EnvironmentFiles", json!({"type":"as","data":[]})),
+            ("EnvironmentFiles", json!({"type":"a(sb)"})),
+            ("EnvironmentFiles", json!({"type":"a(sb)","data":""})),
+            ("ExecStop", json!({"type":"a(sasbttttuii)","data":null})),
+            ("ExecStopPost", json!({"type":"a(sasbttttuii)","data":{}})),
+            (
+                "Environment",
+                json!({"type":"as","data":[p["Environment"]]}),
+            ),
+            ("DropInPaths", json!({"type":"as","data":[[]]})),
+            ("Conditions", json!({"type":"a(sbbsi)","data":[[]]})),
+        ] {
+            let mut bad = bus.clone();
+            bad[key] = value;
+            assert_eq!(
+                read_wire(&show, &bad).unwrap_err().code,
+                "service_schema_unsupported",
+                "{key}"
+            );
+        }
+        for (key, data, code) in [
+            (
+                "EnvironmentFiles",
+                json!([
+                    ["/synthetic/override.env", false],
+                    ["/synthetic/other.env", true]
+                ]),
+                "service_root_unbound",
+            ),
+            (
+                "ExecStop",
+                json!([[
+                    "/synthetic/stop",
+                    ["/synthetic/stop", "SYNTHETIC_SECRET"],
+                    false,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]]),
+                "service_shared_stop_scope",
+            ),
+            (
+                "ExecStopPost",
+                json!([[
+                    "/synthetic/after-stop",
+                    ["/synthetic/after-stop"],
+                    false,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]]),
+                "service_shared_stop_scope",
+            ),
+        ] {
+            let mut configured = bus.clone();
+            configured[key]["data"] = data;
+            let observed = read_wire(&show, &configured).unwrap();
+            assert_eq!(
+                validate_properties(&observed, "target.service", root.to_str().unwrap())
+                    .unwrap_err()
+                    .code,
+                code,
+                "{key}"
+            );
+            assert!(!observed.to_string().contains("SYNTHETIC_SECRET"));
+            assert!(!observed.to_string().contains("override.env"));
+        }
+        assert_eq!(log(&engine), "");
     }
     #[test]
     fn exact_hold_resume_and_replay_leave_neighbor_and_settings_untouched() {
