@@ -98,9 +98,8 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
                 "recipe",
                 "writers_confirmed_stopped",
                 "official_logout",
-                "categories",
             ],
-            &[],
+            &["categories"],
         ),
         "service_inspect" | "plan_service_quiesce" => (&["environment_id", "manager", "unit"], &[]),
         "plan_restore" | "plan_service_resume" => (&["job_id"], &[]),
@@ -163,6 +162,12 @@ pub fn schema(command: &str) -> Option<Value> {
             "recipe".into(),
             choice(&["repair_login", "reset_client", "retire"]),
         );
+        properties
+            .get_mut("categories")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove("minItems");
     }
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
@@ -177,6 +182,9 @@ pub fn schema(command: &str) -> Option<Value> {
     }
     if command == "plan_policy" {
         value["allOf"] = json!([{"if":{"properties":{"preset":{"const":"custom"}}},"then":{"properties":{"release_settings":{"maxItems":0}}},"else":{"not":{"required":["custom_settings"]}}}]);
+    }
+    if command == "plan_cleanup" {
+        value["allOf"] = json!([{"if":{"properties":{"recipe":{"const":"repair_login"}}},"then":{},"else":{"required":["categories"],"properties":{"categories":{"minItems":1}}}}]);
     }
     Some(value)
 }
@@ -282,6 +290,14 @@ pub fn validate(request: &Value) -> Result<(), String> {
         {
             return Err("custom 不接受非空 release_settings".into());
         }
+    }
+    if command == "plan_cleanup"
+        && request["recipe"] != "repair_login"
+        && !request["categories"]
+            .as_array()
+            .is_some_and(|categories| !categories.is_empty())
+    {
+        return Err("reset_client/retire 需要至少一种工作类别".into());
     }
     Ok(())
 }
@@ -425,6 +441,40 @@ mod tests {
             assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"]})).is_ok());
         }
         assert!(validate(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
+    }
+    #[test]
+    fn cleanup_work_selection_follows_the_recipe() {
+        let base = json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false});
+        assert!(
+            validate(&base).is_ok(),
+            "Category-free repair-login is rejected"
+        );
+        let mut request = base.clone();
+        request["categories"] = json!([]);
+        assert!(validate(&request).is_ok());
+        for recipe in ["reset_client", "retire"] {
+            request["recipe"] = json!(recipe);
+            assert!(validate(&request).is_err());
+            request.as_object_mut().unwrap().remove("categories");
+            assert!(validate(&request).is_err());
+            request["categories"] = json!(["instructions"]);
+            assert!(validate(&request).is_ok());
+            request["categories"] = json!([]);
+        }
+        let schema = schema("plan_cleanup").unwrap();
+        assert!(!schema["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("categories")));
+        assert!(schema["properties"]["categories"]["minItems"].is_null());
+        assert_eq!(
+            schema["allOf"][0]["else"]["required"],
+            json!(["categories"])
+        );
+        assert_eq!(
+            schema["allOf"][0]["else"]["properties"]["categories"]["minItems"],
+            1
+        );
     }
     #[test]
     fn schemas_validate_exact_sources_and_secret_fields() {

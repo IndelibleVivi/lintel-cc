@@ -117,6 +117,19 @@ def run():
         (root / 'settings.json').write_text(original)
         (root / '.credentials.json').write_text('{"synthetic":"must-remain"}\n')
         identity = command('env', 'register', '--name', 'Synthetic source', '--root', str(root))['id']
+        repair = {'environment_id': identity, 'recipe': 'repair_login',
+                  'writers_confirmed_stopped': True, 'official_logout': False}
+        for selection in [None, []]:
+            request = dict(repair)
+            if selection is not None:
+                request['categories'] = selection
+            plan = command('call', 'plan_cleanup', payload=request)
+            assert plan['kind'] == 'cleanup'
+            assert not any(step['id'] == 'archive' for step in plan['actions'])
+        for recipe in ['reset_client', 'retire']:
+            request = dict(repair, recipe=recipe, categories=[])
+            assert command('call', 'plan_cleanup', payload=request, good=False)['error']['code'] == 'invalid_request'
+        assert (root / '.credentials.json').read_text() == '{"synthetic":"must-remain"}\n'
         a = command('discover')
         b = command('request', payload={'command': 'discover'})
         assert {c['name'] for c in a['capabilities']} == {c['name'] for c in b['capabilities']}

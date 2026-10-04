@@ -1690,6 +1690,8 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         let (temp, controller) =
             fixture("printf '%s' '{\"ok\":true,\"data\":'; cat input; printf '}\\n'");
         let requests = [
+            json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}),
+            json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"categories":[]}),
             json!({"command":"plan_show","plan_id":"00000000-0000-4000-8000-000000000002"}),
             json!({"command":"job","plan_id":"00000000-0000-4000-8000-000000000002"}),
             json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"output_path":"/synthetic/export; touch bad.lintel-work"}),

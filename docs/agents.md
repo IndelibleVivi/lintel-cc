@@ -125,7 +125,7 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 <a id="browser-adapter"></a>
 
-`categories` 在 named/finite 请求中必须至少选择一项；空 JSON 数组和 `--categories ''` 都拒绝。protocol-1 raw request 保留历史兼容默认。
+工作保全、归档、迁入、旧重建及 cleanup 的 reset_client/retire 在 named/finite 请求中必须至少选择一种类别；空 JSON 数组和 `--categories ''` 拒绝。repair_login 不处理工作内容，categories 可省略或为空，schema 按 recipe 条件表达同一规则。protocol-1 raw request 保留历史兼容默认。
 
 ## Browser：有限适配与人类等待
 
