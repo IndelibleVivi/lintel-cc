@@ -257,10 +257,7 @@ while True:
         self.report['quiesce_job_id'] = plan['id']
         self.report['quiesce_plan'] = plan
         receipt = self.execute(plan)
-        current = self.service('service_inspect')
-        assert current['quiesced'] and current['active_state'] == 'inactive' and current['main_pid'] == 0, current
-        self.report.update(quiesce_receipt=receipt, held_inspect=current)
-        self.report['checks'].append('target_cgroup_stopped')
+        self.report['quiesce_receipt'] = receipt
         count = self.pulse(self.root)
         neighbor_count = self.pulse(self.home / 'synthetic-neighbor')
         # Restart=always and a running timer must not restore the target writer.
@@ -275,6 +272,14 @@ while True:
         assert self.properties(self.neighbor)['InvocationID'] == neighbor_before['InvocationID'], 'neighbor was restarted'
         assert self.properties(self.target)['ActiveState'] == 'inactive'
         self.report['checks'] += ['restart_and_timer_blocked', 'neighbor_keeps_running_without_restart']
+        # The live timer can queue another skipped start between property reads.
+        # Complete its activation proof first, then settle only this fixture's
+        # timer before asking the product for a stable hold/source inspection.
+        self.settle_owned_timer('external_edit')
+        current = self.service('service_inspect')
+        assert current['quiesced'] and current['active_state'] == 'inactive' and current['main_pid'] == 0, current
+        self.report['held_inspect'] = current
+        self.report['checks'].append('target_cgroup_stopped')
         assert self.request('execute', plan_id=plan['id'], approval=plan['hash'])['id'] == receipt['id']
         assert self.request('job', job_id=receipt['id'])['id'] == receipt['id']
         assert self.pulse(self.root) == count, 'replay mutated the original job'
@@ -282,7 +287,6 @@ while True:
         assert (self.root / '.credentials.json').read_text() == 'SYNTHETIC_NOT_A_REAL_CREDENTIAL\n'
         assert (self.root / 'settings.json').read_text() == '{}\n'
         self.report['checks'].append('credentials_and_settings_untouched')
-        self.settle_owned_timer('external_edit')
         # A real external unit edit must survive a rejected restoration.
         unit_path = Path('/etc/systemd/system') / self.target
         original = unit_path.read_text()

@@ -79,6 +79,8 @@ python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel -
 
 完整模式核验普通 `/etc/systemd/system` 本地 unit、Restart=always、实际 timer 与 manual activation、精确 root 与 alias 拒绝、邻居持续写入且 InvocationID 不变、durable query/replay、unit 外部编辑冲突、独立恢复与原 inactive 状态。已完成的检查立即保存在报告中。timer/manual 阻止验证通过后，脚本停止唯一自有的 200ms trigger timer，保持其 enablement 与源文件，等待目标 inactive/dead、MainPID 为零且 Job 为空，随后独立核验外部编辑冲突；恢复阶段也在 held manual activation 观察后停止同一自有 timer，核验稳定状态再请求产品 inspect/resume。报告保留 activation、timer phase 和外部编辑请求前后的有限状态及准确错误。脚本不会把 pending/failed 拒绝改判为外部编辑冲突，也不 reset-failed 或重发 Lintel mutation。结束后只清理脚本自有 fixtures。
 
+首次暂停后的稳定 `service_inspect` 同样安排在 live timer/manual activation 证明和自有 timer 结算之后，避免 fixture 连续排队的 skipped start 与稳定读取竞争。暂停回执先保存在报告中，即使随后 inspect 失败也保留原完成事实和失败；生产 pending/failed 状态仍明确拒绝，不据此重发 mutation。
+
 为真实 reboot 保留 fixtures：
 
 ```sh
