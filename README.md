@@ -15,13 +15,13 @@
 - 在桌面环境详情中启动 loopback 代理、设置默认允许／阻止与确切主机／端口规则、读回当前生效配置、查看通道连接，再明确请求通过此通道打开 Claude。它只覆盖经过代理的连接。
 - 在首页“浏览器”入口准备伴随扩展、安装本地连接、配对和查看实例。App 自带 Chromium / Firefox 扩展与 Native Messaging host，无需源码或终端构建。选择浏览器，预览并批准准备固定扩展目录，按页面说明在目标 profile 加载；随后填入准确扩展 ID，另行预览并批准本地连接。受管版本更新也需核对并批准，冲突目录不覆盖。扩展仍需开发加载，Firefox 临时加载会在退出后移除，签名或商店发布尚未完成；站点清理分隔离准备、完整浏览器重启、再次确认删除两步，独立 Chromium 的真实持久安装／完整重启 smoke 已通过，正式 Chrome/Edge/Firefox 与 AdsPower 尚未验收。安装流程与各浏览器限制见 [浏览器指南](docs/browser.md)。
 
-桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
+桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重；真实 Linux VM 中两种 logout policy 都观察到 worker 被终止，原任务查询正确进入 `needs_reconciliation`，没有重新提交。主机真实重启后的原任务核对也已通过，**不能承诺退出登录后继续执行**；生产 VPS 行为仍需独立验收，见 [远程指南](docs/remote.md)。
 
 App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；项目仓库保留完整目标、实际验收证据与当前限制。
 
 ## 本地构建与试用
 
-需要 Rust stable、Node.js 与 npm；macOS 桌面构建还需要 Xcode Command Line Tools。当前实际构建与测试主机为 macOS arm64，Linux 源码已在 Ubuntu CI 通过合成旅程；独立 OpenSSH runtime 检查见[验证指南](docs/verification.md)，真实认证和生产 VPS 状态分别验收。
+需要 Rust stable、Node.js 与 npm；macOS 桌面构建还需要 Xcode Command Line Tools。当前本地构建与测试主机为 macOS arm64，Linux 源码已在 Ubuntu CI 通过合成旅程、独立 OpenSSH 与真实 systemd/PAM/reboot VM 检查；具体范围见[验证指南](docs/verification.md)，真实认证和生产 VPS 状态分别验收。
 
 ```sh
 cargo build --workspace

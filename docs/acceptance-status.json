@@ -374,7 +374,8 @@
       "required": "先处理已批准重启来源，再清理；不留下立即回写窗口",
       "status": "partial",
       "evidence": [
-        "crates/core/src/service.rs: 21 synthetic regressions pass for exact root/unit pause, persistent owned blocker, live hold cleanup, neighbor preservation, shared stop/start scope rejection, separate resume approval, original inactive state, external edits and interrupted query-only replay. Built App service-ui passes with a synthetic manager. Real systemd/PAM/reboot VM and other supervisors remain unverified."
+        "crates/core/src/service.rs: 21 synthetic regressions pass for exact root/unit pause, persistent owned blocker, live hold cleanup, neighbor preservation, shared stop/start scope rejection, separate resume approval, original inactive state, external edits and interrupted query-only replay. Built App service-ui passes with a synthetic manager. Real system-manager VM evidence follows; user-manager lifecycle, other supervisors and production VPS remain unverified.",
+        "Clean 8c9d85c Ubuntu 24.04.4/systemd 255 root system-manager VM passed exact live hold, Restart=always/timer/manual-start blocking, unchanged neighbor InvocationID, external-edit service_restore_conflict, separate resume, original inactive state and replay without restart. Changed kernel boot ID verifies persistent loaded hold recovery and the same original quiesce job. Other/shared supervisors remain partial. CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828"
       ]
     },
     {
@@ -383,7 +384,8 @@
       "required": "不全局 stop，计划揭示完整影响或改变操作方式",
       "status": "partial",
       "evidence": [
-        "crates/core/src/service.rs: 21 synthetic regressions pass for exact root/unit pause, persistent owned blocker, live hold cleanup, neighbor preservation, shared stop/start scope rejection, separate resume approval, original inactive state, external edits and interrupted query-only replay. Built App service-ui passes with a synthetic manager. Real systemd/PAM/reboot VM and other supervisors remain unverified."
+        "crates/core/src/service.rs: 21 synthetic regressions pass for exact root/unit pause, persistent owned blocker, live hold cleanup, neighbor preservation, shared stop/start scope rejection, separate resume approval, original inactive state, external edits and interrupted query-only replay. Built App service-ui passes with a synthetic manager. Real system-manager VM evidence follows; user-manager lifecycle, other supervisors and production VPS remain unverified.",
+        "Clean 8c9d85c Ubuntu 24.04.4/systemd 255 root system-manager VM passed exact live hold, Restart=always/timer/manual-start blocking, unchanged neighbor InvocationID, external-edit service_restore_conflict, separate resume, original inactive state and replay without restart. Changed kernel boot ID verifies persistent loaded hold recovery and the same original quiesce job. Other/shared supervisors remain partial. CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828"
       ]
     },
     {
@@ -476,7 +478,7 @@
       "required": "客户端可查询同一 idempotency key；不假定已执行",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md."
       ]
     },
     {
@@ -486,7 +488,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof.",
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md.",
         "tests/remote_linux_ssh_journey.py: actual Linux loopback OpenSSH + static x86_64 musl runner, durable accepted ACK deliberately discarded, reopened native Controller queries original job; exactly one submit and one remote job. CI clean 1276c84: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37123017551 . Production VPS logout/cgroup remains unverified.",
         "Clean 1fb9ab6 CI 37125403657 passed actual Linux OpenSSH/static-musl custom keep/disable/remove plan execution and frozen receipt through lost ACK recovery; exactly one upload, submit and original job. Production VPS session/logout/cgroup remains unverified."
       ]
@@ -498,7 +500,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md."
       ]
     },
     {
@@ -507,7 +509,8 @@
       "required": "job 从 journal 恢复，已完成步骤不重复；不确定步骤独立核对",
       "status": "partial",
       "evidence": [
-        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "Clean 8c9d85c real Linux VM reboot changed kernel boot ID. An accepted interrupted worker remained the original needs_reconciliation job on repeated query, submitted once without reexecution. Completed service quiesce recovered the same job and loaded persistent hold, then separately approved resume; complete per-action crash recovery and production-host behavior remain unverified. CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828"
       ]
     },
     {
@@ -541,7 +544,8 @@
       "required": "被实际检测；未验证存活时不承诺断线继续",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md.",
+        "Clean 8c9d85c VM uses real OpenSSH/PAM/logind sessions and records worker session cgroups. Both effective KillUserProcesses=no and yes observed session exit and worker termination; original job query returned needs_reconciliation, with one submission and no reexecution each. Reliable logout-surviving execution is not established; user-manager and production VPS remain unverified. CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828"
       ]
     },
     {
@@ -550,7 +554,7 @@
       "required": "停止并重新确认；不使用自动忽略模式",
       "status": "partial",
       "evidence": [
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md."
       ]
     },
     {
@@ -643,7 +647,7 @@
       "status": "partial",
       "evidence": [
         "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
-        "platform/ssh/tests/test_transport.py: 11 fake-SSH subprocess tests passed; native desktop bridge also implemented. No real remote host or Linux logout/cgroup proof."
+        "platform/ssh/tests/test_transport.py: 13 fake-SSH subprocess tests passed; native desktop bridge also implemented. These transport checks do not establish production-host behavior; isolated OpenSSH/VM evidence is recorded separately in docs/current-state.md."
       ]
     },
     {
@@ -763,5 +767,5 @@
   ],
   "updated": "2026-10-04",
   "evidence_semantics": "partial means bounded executed synthetic/unit or isolated real-runtime evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-04: App candidate supplies non-fixture Chromium/Firefox files and native host through frozen preview/approval, stable current-user directories and owned update/recovery. Prior clean 67f8549 CI37142533163 passed macOS/Ubuntu defaults 12/12 each and independent Linux OpenSSH static-musl runtime 1/1, 0 ignored. Local packaged-resource opt-ins, rendered UI and 17.17 MiB arm64 App build are separate evidence. Current full real Chromium two-stage browser-smoke passes all 11 original assertions on macOS arm64 / Playwright Chromium 155.0.8059.12 after browser-native persistent fixture install, actual old-process exit/new startup without extension-loading flags and real production onStartup generation; active writers, five storage categories/neighbor preservation, duplicate operation safety and real Native Messaging receipts pass. App copies the actual 12-hex pairing code; rendered-page-to-real-host regression passes with synthetic invoke/clipboard. Clean 93c3f74 CI37163091952 passed macOS/Ubuntu defaults 12/12 and explicitly selected browser checks 2/2 each, plus Ubuntu OpenSSH runtime 1/1 with 0 ignored; all five entrypoint artifacts record the same clean HEAD. Detailed Chromium 151.0.7922.34 reports from both platforms verify all 11 original assertions, actual process replacement, changed production onStartup generation, no relaunch extension-loading flags and retained identity; both App pairing reports pass. Local Chromium 155, packaged-resource opt-ins and App build remain separate evidence. Formal Chrome/Edge/Firefox/AdsPower, native WebKit/OS clipboard, signed/non-developer distribution, real Claude/auth/model effects, production VPS and aarch64 runtime remain unverified. No personal browser installation or activation; full SPEC and G01-G04/U01 remain incomplete. 2026-10-04 service/identity candidate: finite Linux systemd inspect/quiesce/resume reaches core, App, native SSH, Python CLI and TUI. Clean 8c9d85c macOS CI core 52 tests including 21 synthetic service regressions passed. Prior local desktop 56 passed/3 independent ignored, Python SSH 13 and default entrypoint 12/12 passed. Built service-ui and real-host pairing-ui pass separately. Disposable Ubuntu guest boot provides real systemd/OpenSSH PAM/logind facts; real inspection and planning pass; wire parsing and literal condition-path errors are source-fixed with four regressions, including stale approval rejection before writes. Actual VM configuration diagnostics subsequently isolated a Requires member permutation with identical source files; the reading boundary now normalizes the 13 queried unordered relationship properties while preserving source and membership conflicts, with three additional regressions. Clean 639f6dd CI37175679361 passed macOS/Ubuntu defaults 12/12 each, browser/UI 3/3 each and Ubuntu OpenSSH 1/1. Its actual VM completed exact quiesce, timer/manual-start blocking, neighbor preservation and original-job replay/query; the external-unit-edit resume preview returned service_state_unsupported while its fixture timer remained running; the old report did not capture the exact SubState/Job. The fixture now separates its live timer/manual proof from stable-state source conflict/resume checks, retaining enabled timer sources for reboot; latest service regressions 21/21 passed without changing the production state gate. Complete service resume/logout/reboot runtime evidence remains pending. New supplied icon exports and theme-aware mark retain the sidebar lintel_ slow blink, static under reduced motion; native arm64 App rebuilt from 639f6dd at 17.76 MiB with both musl runner bytes/digests and supplied icon verified. Production VPS, personal browser, real Claude and full G03 remain unverified."
+  "implementation_update": "2026-10-04: Repository is PUBLIC, with anonymous main/README readback verified; original-material public-reuse license remains unselected and no product release is implied. Clean 8c9d85c CI37177180828 passed macOS/Ubuntu defaults 12/12 each and browser/UI 3/3 each, plus Ubuntu static-musl OpenSSH 1/1 and real Linux VM 1/1. All six entrypoint reports record the same clean HEAD; core 52/52 each includes 21 finite service regressions, desktop defaults 56 passed/3 independent ignored, Python SSH 13 passed. Full Chromium two-stage smoke retains all 11 original assertions and verifies persistent fixture install, actual old-process exit/new startup without loading flags, real production onStartup generation, active writers, five storage categories/neighbor preservation, duplicate-operation safety and Native Messaging receipts. Rendered App pairing copies the actual 12-hex code to real host processes with synthetic invoke/clipboard. App prepares bundled non-fixture Chromium/Firefox files and native host through frozen approval, stable current-user storage and owned update/recovery; formal browsers and developer-free installation remain unverified. Finite systemd inspect/quiesce/resume is connected to core/App/native SSH/Python CLI/TUI. The real Ubuntu 24.04.4/systemd 255 root system-manager VM completed live hold, timer/manual-start blocking, neighbor preservation, exact external-edit conflict, separate resume, original inactive state and query/replay. Changed kernel boot ID, persistent loaded hold and same original quiesce job verify real reboot recovery. Both effective KillUserProcesses=no/yes PAM logout cases terminated workers; original query returned needs_reconciliation, with one submission/no reexecution. A separate accepted job likewise reconciled after reboot without reexecution. This is executed interruption observation, not reliable logout-surviving execution. The VM and overlay/seed/keys were removed. Supplied identity exports and theme-aware mark retain sidebar lintel_ and its 2.6-second slow blink, static under reduced motion. Local e5ba805 arm64 App candidate is 17.76 MiB with both musl runner bytes/digests and supplied icon verified; production runner code matches the tested implementation, while candidate build remains separate evidence. Formal Chrome/Edge/Firefox/AdsPower, native WebKit/OS clipboard, signed/non-developer distribution, real Claude/auth/model effects, production VPS, user-manager lifecycle and aarch64 runtime remain unverified. No personal browser installation or activation; full SPEC and G01-G04/U01 remain incomplete. Latest CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828"
 }

@@ -226,6 +226,19 @@ cleanup or establish a production VPS policy. Missing VM/systemd/PAM or a failed
 boot is a failed run. Runtime versions, boot IDs, observed survival/termination,
 original receipts and VM cleanup are retained in the detailed JSON.
 
+Clean `8c9d85c` [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828)
+passed macOS/Ubuntu defaults 12/12 each, browser/UI checks 3/3 each, Ubuntu
+OpenSSH 1/1 and this VM check 1/1. All six entrypoint reports record the same
+clean source HEAD. The detailed VM report is `evidence_complete`: Ubuntu
+24.04.4, systemd 255, real OpenSSH PAM sessions, complete root system-manager
+service suite, changed kernel boot ID, persistent hold recovery and original-job
+query without reexecution. Both effective `KillUserProcesses=no` and `yes`
+cases observed worker termination on logout; original receipts became
+`needs_reconciliation`, with one submission each. This is executed observation
+and reconciliation evidence, **not reliable logout-surviving execution**.
+The VM and its overlay/seed/keys were cleaned up; production VPS and
+user-manager behavior remain unverified.
+
 The built service UI can be checked separately with
 `python3 tests/verify.py --checks service-ui`. Set `LINTEL_SERVICE_UI_REPORT` for
 its JSON and `LINTEL_SERVICE_UI_ARTIFACTS` for optional Git-external screenshots.

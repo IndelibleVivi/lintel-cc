@@ -65,7 +65,7 @@
 
 一个本地 core operation lock 串行化 Lintel 的 mutation。锁文件位于 state 目录下，只互斥**同一 state 目录**的 core 进程；两个指向同一配置根、却使用不同 state 目录的实例不会被这把锁串行化，此时仍靠计划快照与执行前复查兜底，不要把多 state 部署当作已互斥。执行期间 `jobs` / `job` 可以读取已原子落盘的 journal；锁被实际 writer 持有时，不将运行中任务标成中断。没有 writer 时查询非终态任务会转为 `needs_reconciliation`。receipt ID 等于 plan ID，重复 execute 返回原记录，不重做动作。
 
-任务先持久接收，再记录执行、验证、结果。异常状态需要查询原任务，不能因 ACK 丢失就再次删除。`lintel request` 在前台执行；`lintel submit` 仅接受 execute，将请求通过 stdin 交给独立会话 worker，在 accepted journal 已落盘后返回 ACK。断线后用原 ID 查询，不自动重发。父进程退出后的完成已在合成环境验证；真实 Linux logout/cgroup、主机重启与逐副作用恢复未验证。
+任务先持久接收，再记录执行、验证、结果。异常状态需要查询原任务，不能因 ACK 丢失就再次删除。`lintel request` 在前台执行；`lintel submit` 仅接受 execute，将请求通过 stdin 交给独立会话 worker，在 accepted journal 已落盘后返回 ACK。断线后用原 ID 查询，不自动重发。父进程退出后的完成已在合成环境验证；真实 Linux VM 的 PAM logout 和 reboot 后原任务核对已通过。两种 `KillUserProcesses` policy 都观察到 worker 被终止，原任务查询进入 `needs_reconciliation`，没有重新提交；不能据 `setsid` 承诺存活。生产 VPS、user-manager 生命周期与完整逐副作用恢复仍未验证，见 [当前状态](current-state.md)。
 
 设置恢复只处理 Lintel 修改过的字段：当前值必须仍等于原任务写入值，否则拒绝。无关的后续编辑保留。当前文件写入路径提供快照复查与原子替换，但**不与不合作的外部编辑器构成原子 compare-and-swap**；最后复查与 rename 之间仍有竞争窗口。有限 [systemd 服务暂停](services.md) 可核对特定绑定 unit 与启动阻止项；它不覆盖全部 Claude、IDE、交互终端或其他 supervisor，因此不能宣称完整并发清场保障。
 

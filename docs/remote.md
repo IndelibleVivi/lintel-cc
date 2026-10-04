@@ -22,7 +22,7 @@
 2. 预览显示目标系统、SSH 登录用户、App 内版本、大小和影响范围。展开“安装与校验详情”可查看准确安装位置与 SHA-256。只支持 Linux x86_64 / aarch64（arm64）；缺少基础工具或 machine-id 时返回明确限制。
 3. 点击“批准并安装这个运行器”。App 上传本地内置的静态 musl ELF，不下载远端脚本，不在 VPS 上编译；远端不需要 Rust、Node、Python 或 sudo。
 4. 文件放入当前 SSH 用户的 `$HOME/.local/share/lintel/runners/<sha256>/lintel`，权限为 700。安装卡直接显示登录用户的 UID（UID 0 显示为 root），runner 的环境发现和管理范围也属于该用户。若 Claude 由另一用户运行，应使用那个用户的 SSH alias；当前用户的非交互 PATH 找不到 Claude，不能证明其他用户也未安装。专用目录须归此用户所有，路径中的符号链接拒绝；同名文件仅在字节和执行权限均匹配时复用，冲突文件保留。PATH、shell rc、sshd、系统服务和 Claude 配置不更改，旧版本保留。
-5. SHA-256 与可执行文件核验通过后，调用真实 `discover`，确认 `detached_submission` 能力，才更新 Lintel 的 alias→runner 绑定。然后点击“连接并管理”。完整 VPS 操作、Linux logout/cgroup 或主机重启验收仍是独立关口。
+5. SHA-256 与可执行文件核验通过后，调用真实 `discover`，确认 `detached_submission` 能力，才更新 Lintel 的 alias→runner 绑定。然后点击“连接并管理”。隔离 Linux VM 的 logout/cgroup 与重启后原任务核对已通过下述独立检查；完整生产 VPS 操作仍是独立关口，不能承诺退出登录后的任务存活。
 
 主视图显示当前状态与一个主要动作，技术标识放在可展开详情。安装记录跨窗口和 App 重启保留；移除 alias 不删除记录或远端文件。
 
@@ -235,4 +235,4 @@ python3 -m unittest discover -s platform/ssh/tests -v
 
 这些验证证明控制端 transport 与恢复边界，不代表 runner 已部署、真实 VPS session 存活、目标 service 隔离或完整 G03 已完成验收。
 
-`linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。它只观察所记录 policy 下 worker 的存活或死亡，重启后只查询原 accepted job，不重新 execute。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。生产 VPS 与完整 G03 的状态以 [当前状态](current-state.md) 为准。
+`linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。clean `8c9d85c` 的 [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828) 已完成这套观察：精确 system-manager 服务暂停、邻居保留、外部编辑冲突、独立恢复与真实 reboot 后 loaded hold 通过。`KillUserProcesses=no` 和 `yes` 下 worker 都被实际 logout 终止，原任务查询得到 `needs_reconciliation`；真实 reboot 后同样查询原 accepted job，不重新 execute。它验证了发现中断和保留原任务的行为，未验证退出登录后可靠继续执行。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。生产 VPS、user-manager 生命周期与完整 G03 仍未验收。
