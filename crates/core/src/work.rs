@@ -327,10 +327,13 @@ impl Engine {
             .iter()
             .map(|v| v["bytes"].as_u64().unwrap_or(0))
             .sum();
-        if fs2::available_space(&self.state)? < size * 6 + 1024 * 1024 {
+        let destination_dir = dest
+            .parent()
+            .ok_or_else(|| err("invalid_output_path", "归档路径缺少父目录"))?;
+        if fs2::available_space(destination_dir)? < size * 6 + 1024 * 1024 {
             return Err(err(
                 "insufficient_space",
-                "恢复存储空间不足；原始内容尚未删除",
+                "归档目标所在存储空间不足；原始内容尚未删除",
             ));
         }
         let mut files = vec![];
@@ -563,4 +566,50 @@ impl Engine {
 
 fn stringify_path(path: PathBuf) -> String {
     path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn archive_space_check_uses_destination_before_publication() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let root = home.join("source");
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let parent = base.join("export-volume");
+        fs::create_dir(&parent).unwrap();
+        let destination = parent.join("work.age");
+        let preview = engine
+            .plan_archive(&json!({"environment_id":environment["id"],"categories":["instructions"],"output_path":destination}))
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        // Isolate the shared writer's volume check. The state volume stays
+        // usable; an unavailable destination must fail before encryption or
+        // publishing an archive step/journal, rather than querying state.
+        fs::remove_dir(&parent).unwrap();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let result = engine.write_archive(
+            &environment,
+            &plan,
+            &json!({"archive_passphrase":"synthetic passphrase only"}),
+            &destination,
+            &mut receipt,
+            &journal,
+        );
+        assert!(result.is_err());
+        assert_eq!(receipt["steps"], json!([]), "{receipt}");
+        assert!(!journal.exists());
+        assert_eq!(
+            fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+            "synthetic instruction"
+        );
+    }
 }
