@@ -115,3 +115,5 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建和整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
 
 归档发布前先持久记录执行中的 archive 步骤、`archive_path` 与 `archive_intent_digest`，后者绑定待发布的准确密文；写后读回成功才记录完成和 `archive_digest`。中断回执中的路径不表示包已完成：查询原任务核对产物，包存在时可用原 job 解锁，尚不存在时返回具体读错误。job 读取先采用完成 digest，没有完成 digest 时核对 intent digest；旧回执两者都没有才沿用兼容行为。
+
+批准后的迁入先在实际目标文件系统的私有临时目录里，以空文件验证整批路径。preserve/reset 使用新根所在的 environments 目录，import 使用已批准的目标 root；这一步不写归档正文，正常返回清理自身创建的空文件和目录，不递归删除额外内容。大小写折叠或 Unicode 规范化等仍使路径等价时，返回 migration_path_conflict，在新环境创建或任何正文迁入前整批拒绝。包仍可检查与阅读；整理源内容重新归档，或选择可区分这些路径的文件系统。此检查只在已批准执行中运行，预览保持无目标写入。

@@ -184,3 +184,5 @@ lintel remote job approved-alias <original-remote-plan-id>
 install 的 prepare_runner → install_runner → query_install 与 App 共用实现和准确计划批准，资源、原注册和 runner 绑定都再核对，提交不明时只 query_install；操作字段见当前 `remote` schema 和 [remote.md](remote.md)。原 Python stdlib controller 保留其已有 caller/subset，作为 legacy compatibility 入口；新增功能以共享 Rust controller 为 canonical，不再平行扩展 Python。
 
 这些路径的合成测试不替代真实 Claude 认证、正式浏览器、native WebKit、生产 VPS 或 Linux logout/reboot 验收。当前证据与完整未交付目标继续在 [current-state.md](current-state.md) 和 [SPEC.md](SPEC.md)。
+
+迁入的 `migration_path_conflict` 表示实际目标文件系统把包内路径视为同名或文件／目录冲突。批准执行中的空文件 preflight 在新根创建／正文写入前整批拒绝，预览不写目标。包可继续 inspect/read；整理源内容重新归档，或选择能区分这些路径的文件系统。不要重发原任务来绕过名称冲突。

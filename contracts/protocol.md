@@ -52,3 +52,5 @@ Browser native and network modules use explicit Tauri `browser_request` and `net
 迁入整批工作时，共同路径分配保留已有 `lintel-imports` 逻辑位置；活跃 `projects` 与待用区同名或出现文件／目录冲突时，为冲突的文件项选择未被本批原名称、父目录或已分配名称占用的 `lintel-N-` 文件名前缀，保留文件后缀与类别。preserve/reset_client 与独立 plan_import 共用此分配；import 预览冻结实际 destination，执行在任何写入前复核整批目标，旧的歧义目标计划返回 stale_plan 并要求重新预览。已有目标内容仍返回 import_conflict，不被覆盖。
 
 archive 发布前持久记录执行中的步骤、archive_path 和 archive_intent_digest（准确待发布密文）；完成和 archive_digest 仅在写后读回成功时记录。中断后 job-scoped inspect/read/import 使用完成 digest，缺少完成 digest 时使用 intent digest，从而可读取真实已发布包而不误归属后来替换的包；两个 digest 均无的旧回执保留兼容。路径记录不宣称完成或文件必然存在，未发布文件返回具体读错误。
+
+Approved preserve/reset/import execution preflights the whole destination batch with zero-byte placeholders in a private scratch directory on that actual filesystem. Case/normalization-equivalent paths return migration_path_conflict before creating a new environment or copying any archived contents. Preview does not perform this write. Normal return removes only created files/empty directories; the original package and source contents remain available for inspection/read.

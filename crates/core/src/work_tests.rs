@@ -647,3 +647,50 @@ fn cleanup_reopen_rejects_replacement_before_new_root_or_migration() {
     );
     assert!(root.join(".credentials.json").exists());
 }
+
+#[test]
+fn portable_import_case_equivalence_rejects_before_content_writes() {
+    let (_temp, engine, environment, root) = fixture();
+    let marker = root.parent().unwrap().join("filesystem-case-check");
+    fs::write(&marker, b"synthetic").unwrap();
+    let folds_case = marker.with_file_name("FILESYSTEM-CASE-CHECK").exists();
+    let package = json!({"schema":"lintel.work/1","files": [
+        {"path":"projects/foo.jsonl","category":"sessions","data":b"lower","digest":digest(b"lower")},
+        {"path":"projects/Foo.jsonl","category":"sessions","data":b"upper","digest":digest(b"upper")}
+    ]});
+    let archive_path = root.parent().unwrap().join("portable-case.age");
+    atomic_new(
+        &archive_path,
+        &archive::seal(&package, PASS).unwrap(),
+        0o600,
+    )
+    .unwrap();
+    let plan = ok(
+        &engine,
+        json!({"command":"plan_import","environment_id":environment["id"],"archive_path":archive_path,"categories":["sessions"],"archive_passphrase":PASS}),
+    );
+    let receipt = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    if folds_case {
+        assert_eq!(receipt["error"]["code"], "migration_path_conflict");
+        assert_eq!(receipt["status"], "needs_reconciliation");
+        assert!(!root.join("lintel-imports").exists());
+    } else {
+        assert_eq!(receipt["status"], "completed");
+        assert_eq!(
+            fs::read(root.join("lintel-imports/projects/foo.jsonl")).unwrap(),
+            b"lower"
+        );
+        assert_eq!(
+            fs::read(root.join("lintel-imports/projects/Foo.jsonl")).unwrap(),
+            b"upper"
+        );
+    }
+    assert!(fs::read_dir(&root).unwrap().all(|entry| !entry
+        .unwrap()
+        .file_name()
+        .to_string_lossy()
+        .starts_with(".lintel-path-check-")));
+}

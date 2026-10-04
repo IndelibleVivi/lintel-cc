@@ -2,7 +2,8 @@ use crate::{archive, err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
-    fs,
+    fs::{self, OpenOptions},
+    os::unix::fs::OpenOptionsExt,
     path::{Component, Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -206,6 +207,80 @@ pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
         targets.push(target);
     }
     Ok(targets)
+}
+
+/// Check this batch against the actual destination filesystem's name rules.
+/// Runs only inside approved execution. The private scratch tree contains zero
+/// byte placeholders, never archived content; cleanup removes only names we
+/// created, and leaves any unexpected extra entry intact.
+pub(crate) fn preflight_migration_paths(root: &Path, paths: &[PathBuf]) -> Result<()> {
+    struct Probe {
+        files: Vec<PathBuf>,
+        directories: Vec<PathBuf>,
+    }
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            for file in self.files.iter().rev() {
+                let _ = fs::remove_file(file);
+            }
+            for directory in self.directories.iter().rev() {
+                let _ = fs::remove_dir(directory);
+            }
+        }
+    }
+    let scratch = root.join(format!(".lintel-path-check-{}", uuid::Uuid::new_v4()));
+    guard(&scratch)?;
+    fs::create_dir(&scratch)?;
+    let mut probe = Probe {
+        files: vec![],
+        directories: vec![scratch.clone()],
+    };
+    private_dir(&scratch)?;
+    let conflict = || {
+        err("migration_path_conflict", "目标文件系统将所选路径视为同名或文件／目录冲突；未新建环境或迁入正文，请整理源内容后重新归档，或使用能区分这些路径的文件系统目标")
+    };
+    for relative in paths {
+        let mut parent = scratch.clone();
+        for component in relative.parent().unwrap_or(Path::new("")).components() {
+            parent.push(component);
+            match fs::create_dir(&parent) {
+                Ok(()) => {
+                    probe.directories.push(parent.clone());
+                    private_dir(&parent)?;
+                }
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::AlreadyExists && parent.is_dir() => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
+                    ) =>
+                {
+                    return Err(conflict())
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        let target = scratch.join(relative);
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&target)
+        {
+            Ok(_) => probe.files.push(target),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                return Err(conflict())
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
 }
 
 pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
@@ -544,6 +619,7 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let targets = migration_paths(files)?;
+        preflight_migration_paths(&self.state.join("environments"), &targets)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
         let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
@@ -852,5 +928,46 @@ mod tests {
             fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
             "synthetic instruction"
         );
+    }
+
+    #[test]
+    fn migration_case_equivalence_is_checked_before_creating_a_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        fs::write(base.join("filesystem-case-check"), b"synthetic").unwrap();
+        let folds_case = base.join("FILESYSTEM-CASE-CHECK").exists();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let files: Vec<_> = [("projects/foo.jsonl", b"lower".as_slice()), ("projects/Foo.jsonl", b"upper".as_slice())]
+            .into_iter().map(|(path, bytes)| json!({"path":path,"category":"sessions","digest":digest(bytes),"data":bytes})).collect();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let result =
+            engine.migrate_files(&environment, "synthetic", &files, &mut receipt, &journal);
+        if folds_case {
+            assert_eq!(result.unwrap_err().code, "migration_path_conflict");
+            assert!(receipt["new_root"].is_null());
+            assert_eq!(engine.inventory().unwrap().len(), 1);
+            assert_eq!(
+                fs::read_dir(engine.state.join("environments"))
+                    .unwrap()
+                    .count(),
+                0
+            );
+        } else {
+            result.unwrap();
+            let new_root = Path::new(receipt["new_root"].as_str().unwrap());
+            assert_eq!(
+                fs::read(new_root.join("lintel-imports/projects/foo.jsonl")).unwrap(),
+                b"lower"
+            );
+            assert_eq!(
+                fs::read(new_root.join("lintel-imports/projects/Foo.jsonl")).unwrap(),
+                b"upper"
+            );
+        }
     }
 }
