@@ -130,6 +130,10 @@ exit 9
     let p = clean_plan(&engine, &e, "repair_login", true);
     let shared = engine.home.join(".config/anthropic");
     fs::create_dir_all(&shared).unwrap();
+    // An unrelated malformed service receipt would make service enumeration
+    // fail. Known shared auth must reject before reading it or running Claude.
+    let unreadable_service = engine.state.join("jobs/unrelated-service.json");
+    fs::write(&unreadable_service, "not JSON").unwrap();
     let blocked =
         engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
     assert_eq!(blocked["error"]["code"], "shared_auth_scope");
@@ -137,6 +141,7 @@ exit 9
         root.join(".credentials.json").exists(),
         "logout must not run after scope changes"
     );
+    fs::remove_file(&unreadable_service).unwrap();
     fs::remove_dir(&shared).unwrap();
     let j = run(&engine, &p);
     assert_eq!(j["status"], "completed");

@@ -152,7 +152,7 @@ class Guest:
             argv = ["sudo", "-n"] + argv
         return json.loads(self.shell(shlex.join(argv), user=user).stdout)
 
-    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None, expected_error=None):
+    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None, expected_error=None, timeout=60):
         user = user or (ADMIN if case.get("as_root") else TARGET)
         prefix = ["sudo", "-n"] if case.get("as_root") else []
         env = {"HOME": case["home"], "LINTEL_TEST_HOME": case["home"], "LINTEL_STATE_DIR": case["state"]}
@@ -166,7 +166,7 @@ class Guest:
         if submit:
             session_command = shlex.join(prefix + ["python3", PROBE, "session"]) + ' "$XDG_SESSION_ID" ' + shlex.join(["--json", case["session"]])
             command = session_command + " && exec " + command
-        result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=60)
+        result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=timeout)
         response = json.loads(result.stdout)
         if expected_error:
             require(response.get("ok") is False and response.get("error", {}).get("code") == expected_error,
@@ -532,11 +532,21 @@ def journey(guest, process, args, report):
     # The original shell gains a shared profile AFTER an otherwise valid preview.
     # A manager worker must preserve that presence and refuse official logout
     # before durable accept. The fake Claude is inert and never makes requests.
+    report["managed_auth_scope"] = {"stage": "prepare"}
     auth = guest.probe("prepare", "supervised-auth-scope")
     auth["as_root"] = True
+    report["managed_auth_scope"]["stage"] = "register"
     environment = guest.request(auth, {"command": "register", "name": "Synthetic managed auth scope", "root": auth["root"]})
+    report["managed_auth_scope"]["stage"] = "preview"
+    # Unbound cleanup previews inspect every system service; under TCG the
+    # read-only scan exceeded the generic 60s SSH budget. Use the same finite
+    # extended test budget family as the existing real service suite.
+    preview_started = time.monotonic()
     auth_plan = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
-                                     "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True})
+                                     "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True}, timeout=180)
+    preview_seconds = round(time.monotonic() - preview_started, 3)
+    report["managed_auth_scope"]["preview_seconds"] = preview_seconds
+    report["managed_auth_scope"]["stage"] = "submit"
     refused = guest.request(auth, {"command": "execute", "plan_id": auth_plan["id"], "approval": auth_plan["hash"]},
                             submit=True, extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"},
                             expected_error="shared_auth_scope")
@@ -544,7 +554,7 @@ def journey(guest, process, args, report):
     require(evidence == {"credentials_preserved": True, "logout_called": False,
                          "job_accepted": False, "environment_value_persisted": False},
             f"Managed auth context violated pre-accept/refuse/no-secret-persistence: {evidence}")
-    report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], **evidence,
+    report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], "preview_seconds": preview_seconds, **evidence,
                                     "caller_environment_preserved": True, "real_claude_or_network_requests": False}
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")

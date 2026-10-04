@@ -206,14 +206,16 @@ impl Engine {
                 "先关闭目标终端、IDE 与自动重启来源，再预览清理",
             ));
         }
+        let logout = r["official_logout"].as_bool().unwrap_or(false);
+        // Known shared authentication already forbids this operation. Reject it
+        // before any slower process/service reads or external auth command.
+        if logout {
+            self.check_auth_scope()?;
+        }
         if !self.known_writers(&e)?.is_empty() {
             return Err(err("writers_active","仍检测到 Claude 进程且无法确认所属 root；请核对并关闭目标写入者，Lintel 不会全局杀进程"));
         }
         let services = self.check_cleanup_services(&e)?;
-        let logout = r["official_logout"].as_bool().unwrap_or(false);
-        if logout {
-            self.check_auth_scope()?;
-        }
         let auth = if logout {
             let a = self.auth_probe(r)?;
             if a["auth_method"] != "claude.ai" && a["auth_method"] != "none" {
@@ -272,6 +274,9 @@ impl Engine {
     }
 
     pub(crate) fn check_cleanup(&self, e: &Value, p: &Value, r: &Value) -> Result<()> {
+        if p["extra"]["official_logout"] == true {
+            self.check_auth_scope()?;
+        }
         if json!(self.check_cleanup_services(e)?) != p["extra"]["services"] {
             return Err(err(
                 "stale_service_plan",
@@ -291,7 +296,6 @@ impl Engine {
             work::check_passphrase(r)?;
         }
         if p["extra"]["official_logout"] == true {
-            self.check_auth_scope()?;
             if self.executable().as_deref() != e["executable"].as_str() {
                 #[cfg(not(test))]
                 return Err(err("executable_changed", "Claude 启动来源改变，请重新检查"));
