@@ -264,17 +264,28 @@ def vm(base_image, args, tools, report):
 
 def wait_boot(guest, process, timeout, previous_boot=None):
     deadline, last = time.monotonic() + timeout, "not contacted"
-    while time.monotonic() < deadline:
+    while (remaining := deadline - time.monotonic()) > 0:
         require(process.poll() is None, "The owned QEMU process exited before the guest was ready")
-        response = guest.shell("cat /proc/sys/kernel/random/boot_id", timeout=10, check=False)
-        if response.returncode == 0:
-            boot = response.stdout.decode().strip()
-            if boot and boot != previous_boot:
-                done = guest.shell("cloud-init status --wait", timeout=timeout, check=False)
-                require(done.returncode == 0, "Cloud-init failed: " + done.stdout.decode() + done.stderr.decode())
-                return boot
-        last = response.stderr.decode(errors="replace")
-        time.sleep(1)
+        try:
+            response = guest.shell("cat /proc/sys/kernel/random/boot_id", timeout=min(10, remaining), check=False)
+            if response.returncode == 0:
+                boot = response.stdout.decode().strip()
+                if boot and boot != previous_boot:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        last = "Boot ID was observed after the overall readiness deadline"
+                        break
+                    done = guest.shell("cloud-init status --wait", timeout=remaining, check=False)
+                    require(done.returncode == 0, "Cloud-init failed: " + done.stdout.decode() + done.stderr.decode())
+                    return boot
+            last = response.stderr.decode(errors="replace")
+        except subprocess.TimeoutExpired as error:
+            # Socket activation/cloud-init under TCG can outlast one SSH probe.
+            # Keep the same guest and QEMU, but never reset their boot deadline.
+            last = str(error)
+            if error.stderr:
+                last += ": " + error.stderr.decode(errors="replace")
+        time.sleep(min(1, max(0, deadline - time.monotonic())))
     raise RuntimeError("Guest did not complete its real boot/SSH boundary: " + last)
 
 

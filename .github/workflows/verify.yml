@@ -67,8 +67,10 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
-      - name: Verify entrypoint self-test
-        run: python3 tests/verify.py --self-test
+      - name: Verification control self-tests
+        run: |
+          python3 tests/verify.py --self-test
+          python3 tests/fixtures/linux_vm/test_wait_boot.py -v
 
       - name: Synthetic verification
         run: python3 tests/verify.py --json "$RUNNER_TEMP/lintel-verify/evidence.json"

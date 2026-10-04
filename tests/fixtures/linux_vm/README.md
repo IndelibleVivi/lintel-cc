@@ -30,3 +30,13 @@ report separately records whether a `setsid` worker survived each recorded
 logout policy after the originating PAM session leaves its active state. It
 never promises survival on a VPS; absence of VM/PAM/runtime
 prerequisites is a failed run, not a skipped green result.
+
+The host readiness-loop regression can run without QEMU:
+
+```sh
+python3 tests/fixtures/linux_vm/test_wait_boot.py -v
+```
+
+It checks that a transient SSH timeout keeps the same guest and the original
+overall deadline. CI runs it with the verification control self-tests; it does
+not produce Linux runtime evidence.
