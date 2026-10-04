@@ -100,15 +100,24 @@ impl Engine {
     /// Job-scoped reads also confirm the recorded path matches the frozen one.
     fn archive_package(&self, r: &Value) -> Result<(Value, String, PathBuf)> {
         let path = self.archive_source(r)?;
-        if let Some(jid) = r.get("job_id").and_then(Value::as_str) {
+        let recorded_digest = if let Some(jid) = r.get("job_id").and_then(Value::as_str) {
             let record = load(&self.path("jobs", jid))?;
             if record["archive_path"].as_str() != path.to_str() {
                 return Err(err("archive_missing", "此任务的归档来源已经变化"));
             }
-        }
+            record["archive_digest"].as_str().map(str::to_owned)
+        } else {
+            None
+        };
         let pass = work::check_passphrase(r)?;
         let (package, archive_digest) = work::read_package(&path, pass)?;
         validated_files(&package)?;
+        if recorded_digest.is_some_and(|expected| expected != archive_digest) {
+            return Err(err(
+                "stale_archive",
+                "归档字节与原任务记录不一致；请核对原任务和归档来源",
+            ));
+        }
         Ok((package, archive_digest, path))
     }
 
@@ -116,7 +125,7 @@ impl Engine {
         let (package, _, path) = self.archive_package(r)?;
         let files: Vec<Value> = validated_files(&package)?.iter().map(|f| json!({"path":f["path"],"category":f["category"],"bytes":f["data"].as_array().map_or(0,Vec::len),"digest":f["digest"]})).collect();
         Ok(
-            json!({"job_id":r["job_id"],"archive_path":path,"created_at":package["created_at"],"generator":"Lintel","schema":package["schema"],"categories":category_summary(&files),"files":files,"notes":"指令可迁入原位置；会话与记忆保留在 lintel-imports，不自动激活 hooks/MCP，也不保证原会话可以续聊。此清单只描述包本身，不代表来源安装或来源 job 仍存在。"}),
+            json!({"job_id":r["job_id"],"archive_path":path,"created_at":package["created_at"],"generator":package["generator"].as_str(),"schema":package["schema"],"categories":category_summary(&files),"files":files,"notes":"指令可迁入原位置；会话与记忆保留在 lintel-imports，不自动激活 hooks/MCP，也不保证原会话可以续聊。generator 是包内自声明元数据，缺失时为 null，不是来源认证。此清单只描述包本身，不代表来源安装或来源 job 仍存在。"}),
         )
     }
 

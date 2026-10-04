@@ -344,7 +344,7 @@ impl Engine {
             }
             files.push(json!({"path":entry["path"],"category":entry["category"],"digest":entry["digest"],"data":data}));
         }
-        let package = json!({"schema":"lintel.work/1","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
+        let package = json!({"schema":"lintel.work/1","generator":"Lintel","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
         let encrypted = archive::seal(&package, pass)?;
         // Recheck the frozen destination, then atomically publish without replacement.
         if dest.exists() {
@@ -491,12 +491,16 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
+        save(journal, j)?;
         let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
         j["new_environment_id"] = new["id"].clone();
         j["new_root"] = new["root"].clone();
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"}));
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"});
         save(journal, j)?;
         let destination = PathBuf::from(string(&new, "root")?);
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"executing","message":"正在迁入并核验工作内容；失败时新 root 可能已有部分文件，请核对原任务。"}));
+        save(journal, j)?;
         for f in files {
             let relative = Path::new(string(f, "path")?);
             // Only the one supported text instruction location is active. Session/memory formats are preserved for inspection, not falsely claimed resumable.
@@ -519,7 +523,8 @@ impl Engine {
                 return Err(err("migration_failed", "迁入文件校验失败"));
             }
         }
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"}));
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"});
+        save(journal, j)?;
         Ok(())
     }
 
@@ -611,5 +616,44 @@ mod tests {
             fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
             "synthetic instruction"
         );
+    }
+
+    #[test]
+    fn partial_migration_keeps_active_step_and_created_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let first = b"synthetic instruction";
+        let second = b"synthetic session";
+        let files = vec![
+            json!({"path":"CLAUDE.md","category":"instructions","data":first,"digest":digest(first)}),
+            // Model a failed readback after the second file was published.
+            json!({"path":"projects/example/session.jsonl","category":"sessions","data":second,"digest":digest(b"different readback")}),
+        ];
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let failure = engine
+            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .unwrap_err();
+        assert_eq!(failure.code, "migration_failed");
+        let stored = load(&journal).unwrap();
+        let active = stored["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|step| step["status"] == "executing")
+            .unwrap();
+        assert_eq!(active["id"], "migrate");
+        let destination = Path::new(stored["new_root"].as_str().unwrap());
+        assert_eq!(fs::read(destination.join("CLAUDE.md")).unwrap(), first);
+        assert_eq!(
+            fs::read(destination.join("lintel-imports/projects/example/session.jsonl")).unwrap(),
+            second
+        );
+        assert!(stored["new_environment_id"].is_string());
     }
 }

@@ -144,6 +144,8 @@ fn encrypted_package_travels_to_independent_install() {
         &engine,
         json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
     );
+    let package = archive::unseal(&fs::read(&out).unwrap(), PASS).unwrap();
+    assert_eq!(package["generator"], "Lintel");
     let temp = tempfile::tempdir().unwrap();
     let base = temp.path().canonicalize().unwrap();
     let other_home = base.join("home");
@@ -508,5 +510,74 @@ fn publishing_new_files_keeps_concurrent_target_and_single_link() {
         fs::read_dir(&base).unwrap().count(),
         2,
         "temporary publication files remain"
+    );
+}
+
+#[test]
+fn portable_archive_generator_is_declared_metadata_or_unknown() {
+    let (_temp, engine, _environment, root) = fixture();
+    for (name, generator) in [("legacy", None), ("external", Some("Compatible exporter"))] {
+        let mut package = json!({"schema":"lintel.work/1","files":[]});
+        if let Some(generator) = generator {
+            package["generator"] = json!(generator);
+        }
+        let path = root.join(format!("{name}.age"));
+        atomic_new(&path, &archive::seal(&package, PASS).unwrap(), 0o600).unwrap();
+        let inspected = ok(
+            &engine,
+            json!({"command":"archive_inspect","archive_path":path,"archive_passphrase":PASS}),
+        );
+        assert_eq!(inspected["generator"], json!(generator));
+    }
+}
+
+#[test]
+fn job_archive_rejects_replacement_but_explicit_path_remains_independent() {
+    let (_temp, engine, environment, root) = fixture();
+    seed_work(&root);
+    let out = root.parent().unwrap().join("export.age");
+    let plan = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":environment["id"],"categories":["instructions"],"output_path":out}),
+    );
+    let receipt = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    let mut replacement = archive::unseal(&fs::read(&out).unwrap(), PASS).unwrap();
+    let bytes: &[u8] = b"synthetic replacement instruction";
+    replacement["files"][0]["data"] = json!(bytes);
+    replacement["files"][0]["digest"] = json!(digest(bytes));
+    atomic(&out, &archive::seal(&replacement, PASS).unwrap(), 0o600).unwrap();
+    let destination = root.parent().unwrap().join("destination");
+    fs::create_dir(&destination).unwrap();
+    let target = engine
+        .register("synthetic target", &destination, false)
+        .unwrap();
+    for command in ["archive_inspect", "archive_read", "plan_import"] {
+        let mut request =
+            json!({"command":command,"job_id":receipt["id"],"archive_passphrase":PASS});
+        if command == "archive_read" {
+            request["path"] = json!("CLAUDE.md");
+        }
+        if command == "plan_import" {
+            request["environment_id"] = target["id"].clone();
+            request["categories"] = json!(["instructions"]);
+        }
+        assert_eq!(err_code(&engine, request), "stale_archive", "{command}");
+    }
+    let explicit = ok(
+        &engine,
+        json!({"command":"archive_read","archive_path":out,"archive_passphrase":PASS,"path":"CLAUDE.md"}),
+    );
+    assert_eq!(explicit["text"], "synthetic replacement instruction");
+    // Legacy receipts without a digest retain their documented compatibility.
+    let record_path = engine.path("jobs", receipt["id"].as_str().unwrap());
+    let mut legacy = load(&record_path).unwrap();
+    legacy.as_object_mut().unwrap().remove("archive_digest");
+    save(&record_path, &legacy).unwrap();
+    ok(
+        &engine,
+        json!({"command":"archive_inspect","job_id":receipt["id"],"archive_passphrase":PASS}),
     );
 }

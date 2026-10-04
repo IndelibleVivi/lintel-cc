@@ -79,7 +79,7 @@
 
 当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。枚举预算为单文件 8 MiB、总量 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
-工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path`；外部来源仅凭包内容判断。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
+工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
 
 工作包与状态备份仅在归档完成后才创建新根。`CLAUDE.md` 迁入新根，会话/记忆资料进入 `lintel-imports`；不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的记忆与会话按原逻辑路径重新计入 manifest，不会遗漏。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
@@ -112,4 +112,4 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 
 独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以原子新名称发布（不会替换已出现的文件），完成后恢复单硬链接状态并读回。目的地文件系统需支持同目录 hard link；不支持时返回具体写入失败，保留原数据与原任务，不退回覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。
 
-接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
+接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建和整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
