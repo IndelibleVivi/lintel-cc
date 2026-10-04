@@ -43,19 +43,6 @@ fn validated_files(package: &Value) -> Result<Vec<Value>> {
     work::validate_package_files(package)
 }
 
-fn target(root: &Path, f: &Value) -> Result<PathBuf> {
-    let relative = Path::new(string(f, "path")?);
-    // Archives produced by a later generation may already carry lintel-imports
-    // paths; those keep their logical location instead of being re-wrapped.
-    let p = if f["category"] == "instructions" || relative.starts_with("lintel-imports") {
-        root.join(relative)
-    } else {
-        root.join("lintel-imports").join(relative)
-    };
-    guard(&p)?;
-    Ok(p)
-}
-
 impl Engine {
     /// Resolve the frozen archive source for a read/inspect/import request.
     ///
@@ -151,11 +138,13 @@ impl Engine {
         let cats = work::categories(r)?;
         let root = Path::new(string(&e, "root")?);
         let mut files = vec![];
-        for f in validated_files(&package)? {
-            if !cats.iter().any(|c| f["category"] == *c) {
-                continue;
-            }
-            let p = target(root, &f)?;
+        let selected: Vec<_> = validated_files(&package)?
+            .into_iter()
+            .filter(|file| cats.iter().any(|category| file["category"] == *category))
+            .collect();
+        for (f, relative) in selected.iter().zip(work::migration_paths(&selected)?) {
+            let p = root.join(relative);
+            guard(&p)?;
             if p.exists() {
                 return Err(err(
                     "import_conflict",
@@ -194,6 +183,20 @@ impl Engine {
         let planned = p["extra"]["manifest"]
             .as_array()
             .ok_or_else(|| err("invalid_plan", "缺少迁入清单"))?;
+        let selected: Vec<Value> = planned
+            .iter()
+            .map(|entry| {
+                files
+                    .iter()
+                    .find(|file| file["path"] == entry["path"] && file["digest"] == entry["digest"])
+                    .cloned()
+                    .ok_or_else(|| err("stale_archive", "归档与计划不匹配"))
+            })
+            .collect::<Result<_>>()?;
+        let targets: Vec<_> = work::migration_paths(&selected)?
+            .into_iter()
+            .map(|relative| root.join(relative))
+            .collect();
         let total: u64 = planned
             .iter()
             .map(|v| v["bytes"].as_u64().unwrap_or(0))
@@ -201,17 +204,16 @@ impl Engine {
         if fs2::available_space(root)? < total + 1024 * 1024 {
             return Err(err("insufficient_space", "目标空间不足；未覆盖原文件"));
         }
-        for entry in planned {
-            if target(root, entry)?.exists() {
+        for (entry, target) in planned.iter().zip(&targets) {
+            guard(target)?;
+            if entry["destination"].as_str() != target.to_str() {
+                return Err(err("stale_plan", "迁入目标与冻结清单不一致；请重新预览"));
+            }
+            if target.exists() {
                 return Err(err("import_conflict", "预览后出现同名内容；没有覆盖"));
             }
         }
-        for entry in planned {
-            let f = files
-                .iter()
-                .find(|f| f["path"] == entry["path"] && f["digest"] == entry["digest"])
-                .ok_or_else(|| err("stale_archive", "归档与计划不匹配"))?;
-            let pth = target(root, f)?;
+        for ((entry, f), pth) in planned.iter().zip(&selected).zip(&targets) {
             private_dir(pth.parent().unwrap())?;
             let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
             j["steps"].as_array_mut().unwrap().push(json!({"id":entry["path"],"label":entry["path"],"status":"executing","message":"正在发布并核验迁入文件；不替换已有内容。"}));

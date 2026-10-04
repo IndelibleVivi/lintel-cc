@@ -157,6 +157,49 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     }
     None
 }
+
+/// Map one selected batch into the inactive work area. Reserve every original
+/// name first, then disambiguate only colliding names without changing suffixes
+/// or wrapping already imported paths. Preserve and portable import share this.
+pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
+    let preferred: Vec<PathBuf> = files
+        .iter()
+        .map(|file| {
+            let relative = Path::new(string(file, "path")?);
+            Ok(
+                if file["category"] == "instructions" || relative.starts_with("lintel-imports") {
+                    relative.to_path_buf()
+                } else {
+                    Path::new("lintel-imports").join(relative)
+                },
+            )
+        })
+        .collect::<Result<_>>()?;
+    let reserved: HashSet<_> = preferred.iter().cloned().collect();
+    let mut used = HashSet::new();
+    let mut targets = Vec::with_capacity(files.len());
+    for path in preferred {
+        let mut target = path.clone();
+        if used.contains(&target) {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| err("invalid_path", "迁入文件名无效"))?;
+            let mut index = 1;
+            loop {
+                target.set_file_name(format!("lintel-{index}-{name}"));
+                if !reserved.contains(&target) && !used.contains(&target) {
+                    break;
+                }
+                index += 1;
+            }
+        }
+        used.insert(target.clone());
+        targets.push(target);
+    }
+    Ok(targets)
+}
+
 pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
     guard(root)?;
     let start = Instant::now();
@@ -491,6 +534,7 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
+        let targets = migration_paths(files)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
         let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
@@ -501,17 +545,8 @@ impl Engine {
         let destination = PathBuf::from(string(&new, "root")?);
         j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"executing","message":"正在迁入并核验工作内容；失败时新 root 可能已有部分文件，请核对原任务。"}));
         save(journal, j)?;
-        for f in files {
-            let relative = Path::new(string(f, "path")?);
-            // Only the one supported text instruction location is active. Session/memory formats are preserved for inspection, not falsely claimed resumable.
-            // Content already held in lintel-imports keeps its logical path; it
-            // must not be wrapped into lintel-imports/lintel-imports.
-            let target =
-                if f["category"] == "instructions" || relative.starts_with("lintel-imports") {
-                    destination.join(relative)
-                } else {
-                    destination.join("lintel-imports").join(relative)
-                };
+        for (f, relative) in files.iter().zip(targets) {
+            let target = destination.join(relative);
             private_dir(
                 target
                     .parent()
@@ -661,5 +696,81 @@ mod tests {
             second
         );
         assert!(stored["new_environment_id"].is_string());
+    }
+
+    #[test]
+    fn migration_preserves_active_and_previously_imported_names() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let entries = [
+            (
+                "lintel-imports/projects/example/session.jsonl",
+                "sessions",
+                b"older session".as_slice(),
+            ),
+            (
+                "projects/example/session.jsonl",
+                "sessions",
+                b"active session".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/example/lintel-1-session.jsonl",
+                "sessions",
+                b"reserved name".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/example/memory/notes.md",
+                "memory",
+                b"older memory".as_slice(),
+            ),
+            (
+                "projects/example/memory/notes.md",
+                "memory",
+                b"active memory".as_slice(),
+            ),
+        ];
+        let files: Vec<Value> = entries.iter().map(|(path, category, bytes)|
+            json!({"path":path,"category":category,"data":bytes,"digest":digest(bytes)})).collect();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        engine
+            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .unwrap();
+        let destination = Path::new(receipt["new_root"].as_str().unwrap());
+        for (relative, bytes) in [
+            ("session.jsonl", b"older session".as_slice()),
+            ("lintel-2-session.jsonl", b"active session".as_slice()),
+            ("lintel-1-session.jsonl", b"reserved name".as_slice()),
+            ("memory/notes.md", b"older memory".as_slice()),
+            ("memory/lintel-1-notes.md", b"active memory".as_slice()),
+        ] {
+            assert_eq!(
+                fs::read(
+                    destination
+                        .join("lintel-imports/projects/example")
+                        .join(relative)
+                )
+                .unwrap(),
+                bytes
+            );
+        }
+        let again = manifest(destination, &["sessions".to_string(), "memory".to_string()]).unwrap();
+        assert_eq!(again.len(), entries.len());
+        assert!(again.iter().all(|file| !file["path"]
+            .as_str()
+            .unwrap()
+            .contains("lintel-imports/lintel-imports")));
+        assert_eq!(
+            migration_paths(&again).unwrap(),
+            again
+                .iter()
+                .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
+                .collect::<Vec<_>>()
+        );
     }
 }

@@ -136,6 +136,8 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertNotIn("snapshot", shown)
 
     def test_package_imports_into_independent_install(self) -> None:
+        self.write("lintel-imports/projects/example/session.jsonl", b"Earlier preserved session.\n")
+        self.write("lintel-imports/projects/example/memory/MEMORY.md", b"Earlier preserved memory.\n")
         environment_id = self.source.register(self.root)
         out = self.base / "carried.age"
         plan = self.source.data(
@@ -151,7 +153,7 @@ class PortableWorkJourney(unittest.TestCase):
         path = str(out)
         manifest = target.data("archive_inspect", archive_path=path, archive_passphrase=PASSPHRASE)
         self.assertEqual(manifest["generator"], "Lintel")
-        self.assertEqual(len(manifest["files"]), 3)
+        self.assertEqual(len(manifest["files"]), 5)
         read = target.data("archive_read", archive_path=path, archive_passphrase=PASSPHRASE, path="CLAUDE.md")
         self.assertEqual(read["text"], "Synthetic instruction only.\n")
         import_plan = target.data(
@@ -161,7 +163,10 @@ class PortableWorkJourney(unittest.TestCase):
         receipt = target.execute(import_plan)
         self.assertEqual(receipt["status"], "completed")
         self.assertEqual((dest / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n")
-        self.assertTrue((dest / "lintel-imports/projects/example/session.jsonl").exists())
+        self.assertEqual((dest / "lintel-imports/projects/example/session.jsonl").read_bytes(), b"Earlier preserved session.\n")
+        self.assertEqual((dest / "lintel-imports/projects/example/lintel-1-session.jsonl").read_bytes(), b'{"synthetic":true}\n')
+        self.assertEqual((dest / "lintel-imports/projects/example/memory/MEMORY.md").read_bytes(), b"Earlier preserved memory.\n")
+        self.assertEqual((dest / "lintel-imports/projects/example/memory/lintel-1-MEMORY.md").read_bytes(), b"Synthetic memory only.\n")
         # Wrong passphrase and corrupt packages are refused.
         wrong = target.call("archive_inspect", archive_path=path, archive_passphrase="definitely-wrong-synthetic")
         self.assertEqual(wrong["error"]["code"], "archive_locked")
@@ -177,6 +182,8 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertEqual(conflict["error"]["code"], "import_conflict")
 
     def test_preserve_completes_and_legacy_reset_is_partial(self) -> None:
+        self.write("lintel-imports/projects/example/session.jsonl", b"Earlier preserved session.\n")
+        self.write("lintel-imports/projects/example/memory/MEMORY.md", b"Earlier preserved memory.\n")
         environment_id = self.source.register(self.root)
         preserve = self.source.data(
             "plan_preserve", environment_id=environment_id,
@@ -188,6 +195,10 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertEqual(receipt["outcome"], "preserved")
         new_root = Path(receipt["new_root"])
         self.assertEqual((new_root / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n")
+        self.assertEqual((new_root / "lintel-imports/projects/example/session.jsonl").read_bytes(), b"Earlier preserved session.\n")
+        self.assertEqual((new_root / "lintel-imports/projects/example/lintel-1-session.jsonl").read_bytes(), b'{"synthetic":true}\n')
+        self.assertEqual((new_root / "lintel-imports/projects/example/memory/MEMORY.md").read_bytes(), b"Earlier preserved memory.\n")
+        self.assertEqual((new_root / "lintel-imports/projects/example/memory/lintel-1-MEMORY.md").read_bytes(), b"Synthetic memory only.\n")
         # The retained old environment is a desired outcome, not an outstanding
         # task: the step is reported as `preserved` with explicit coverage.
         retained = next(step for step in receipt["steps"] if step["id"] == "status")
