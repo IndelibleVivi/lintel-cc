@@ -29,6 +29,9 @@ REQUEST_FIELDS = {
     "plan_policy": {"environment_id": str, "preset": str, "keep_remote_control": bool},
     "plan_reset": {"environment_id": str, "recipe": str, "categories": list},
     "plan_restore": {"job_id": str}, "jobs": {}, "job": {"job_id": str},
+    "service_inspect": {"environment_id": str, "manager": str, "unit": str},
+    "plan_service_quiesce": {"environment_id": str, "manager": str, "unit": str},
+    "plan_service_resume": {"job_id": str},
     "drift": {"environment_id": str}, "export_support": {},
 }
 OPTIONAL_FIELDS = {
@@ -119,6 +122,9 @@ def validate_request(payload: dict) -> dict:
     if payload["command"] == "plan_reset":
         if payload["recipe"] != "rebuild" or not all(type(v) is str and len(v) <= 128 for v in payload["categories"]):
             raise ControllerError("invalid_request", "The rebuild recipe/categories are invalid.")
+    if payload["command"] in {"service_inspect", "plan_service_quiesce"}:
+        if payload["manager"] not in {"user", "system"} or len(payload["unit"]) > 240 or payload["unit"].endswith("@.service") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@-]*\.service", payload["unit"]):
+            raise ControllerError("invalid_request", "Choose an exact service unit and user/system manager; no shell or patterns.")
     return payload
 
 

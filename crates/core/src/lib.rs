@@ -4,6 +4,7 @@ mod cleanup;
 #[cfg(test)]
 mod lifecycle_tests;
 mod policy;
+mod service;
 mod storage;
 mod work;
 use fs2::FileExt;
@@ -87,6 +88,8 @@ pub struct Engine {
     home: PathBuf,
     state: PathBuf,
     accept_hook: Option<fn(&Value)>,
+    #[cfg(test)]
+    service_fixture: Option<PathBuf>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -103,6 +106,8 @@ impl Engine {
             home,
             state,
             accept_hook: None,
+            #[cfg(test)]
+            service_fixture: None,
         })
     }
     fn executable(&self) -> Option<String> {
@@ -286,6 +291,9 @@ impl Engine {
             warnings.push("仅删除预览中显式选择的 user settings 字段；删除后此来源不再提供该开关，不保证功能开启。外部 shell/项目/组织配置不受修改，已有进程中的变量需重新启动才会重新读取。".into());
         }
         let mut p = json!({"id":id(),"environment_id":e["id"],"kind":kind,"title":title,"changes":changes,"preserves":preserves,"warnings":warnings,"actions":actions,"created_at":now(),"status":"planned","rule_version":RULE,"root":e["root"],"root_identity":[rm.dev(),rm.ino()],"snapshot":snap,"extra":extra});
+        if kind == "service_quiesce" {
+            self.freeze_service_hold(&mut p)?;
+        }
         p["hash"] = json!(digest(&serde_json::to_vec(&p)?));
         save(&self.path("plans", string(&p, "id")?), &p)?;
         Ok(public_plan(p))
@@ -304,7 +312,7 @@ impl Engine {
                 }
                 save(&self.state.join("inventory.json"), &json!(all))?;
                 Ok(
-                    json!({"environments":all,"capabilities":[{"name":"Claude Code 配置","status":"available","reason":"精确字段预览、读回与恢复；运行时效果另行验证"},{"name":"工作内容迁入","status":"available","reason":"加密归档与选择性迁入；不会注销共享凭据"},{"name":"浏览器伴随扩展","status":"separate_module","reason":"需要安装并配对对应 profile"},{"name":"网络强约束","status":"not_delivered","reason":"未安装或验证平台高权限组件"},{"name":"Claude Desktop / IDE / service","status":"not_delivered","reason":"当前不修改这些入口"}]}),
+                    json!({"environments":all,"capabilities":[{"name":"Claude Code 配置","status":"available","reason":"精确字段预览、读回与恢复；运行时效果另行验证"},{"name":"工作内容迁入","status":"available","reason":"加密归档与选择性迁入；不会注销共享凭据"},{"name":"浏览器伴随扩展","status":"separate_module","reason":"需要安装并配对对应 profile"},{"name":"网络强约束","status":"not_delivered","reason":"未安装或验证平台高权限组件"},{"name":"Linux systemd service","status":if cfg!(target_os="linux"){"requires_explicit_target"}else{"linux_runner_only"},"reason":"精确 root 绑定、独立批准暂停/恢复与持久 blocker；user manager/logout 与 reboot 需实时复查"},{"name":"Claude Desktop / IDE","status":"not_delivered","reason":"当前不修改这些入口"}]}),
                 )
             }
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
@@ -394,6 +402,9 @@ impl Engine {
                 let manifest = work::manifest(Path::new(string(&e, "root")?), &categories)?;
                 self.plan(&e,"rebuild","保留内容，准备新环境",json!([]),vec!["原环境全部内容（尚未注销或删除）","未选中的实例与项目文件"],json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false},{"id":"create","label":"创建新的配置目录","reversible":false},{"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false},{"id":"credentials","label":"旧登录及客户端状态尚需独立处理","reversible":false}]),json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true}))
             }
+            "service_inspect" => self.service_inspect(r),
+            "plan_service_quiesce" => self.plan_service_quiesce(r),
+            "plan_service_resume" => self.plan_service_resume(r),
             "cleanup_inspect" => self.cleanup_inspect(r),
             "auth_probe" => self.auth_probe(r),
             "plan_cleanup" => self.plan_cleanup(r),
@@ -535,7 +546,7 @@ impl Engine {
         // settings bytes; an unparseable settings file must not block them.
         // Settings-writing plans still require a fully parsed document.
         let (path, mut doc, snap) = match p["kind"].as_str() {
-            Some("rebuild" | "cleanup" | "import") => {
+            Some("rebuild" | "cleanup" | "import" | "service_quiesce" | "service_resume") => {
                 let path = root.join("settings.json");
                 let snap = snapshot(&path)?;
                 (path, Value::Null, snap)
@@ -567,6 +578,8 @@ impl Engine {
             self.check_cleanup(&e, &p, r)?;
         } else if p["kind"] == "import" {
             work::check_passphrase(r)?;
+        } else if p["kind"] == "service_quiesce" || p["kind"] == "service_resume" {
+            self.check_service_plan(&p)?;
         } else {
             self.block_managed(&e)?;
         }
@@ -581,6 +594,9 @@ impl Engine {
         j["status"] = json!("executing");
         save(&jp, &j)?;
         let result = (|| -> Result<()> {
+            if p["kind"] == "service_quiesce" || p["kind"] == "service_resume" {
+                return self.execute_service(&p, &mut j, &jp);
+            }
             if p["kind"] == "rebuild" {
                 self.rebuild(&e, &p, r, &mut j, &jp)?;
                 return Ok(());
@@ -727,6 +743,10 @@ impl Engine {
     }
 }
 fn public_plan(mut p: Value) -> Value {
+    if p["extra"]["service"].is_object() {
+        p["service"] =
+            service::public_service(&p["extra"]["service"], p["kind"] == "service_resume");
+    }
     if p["extra"]["policy"].is_object() {
         p["policy"] = p["extra"]["policy"].clone();
     }

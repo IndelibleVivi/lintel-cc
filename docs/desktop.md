@@ -98,6 +98,10 @@ App 图标 master 是 `src/brand.svg`，Tauri 使用提供的五个 exports（PN
 
 ## 开发与验证
 
+在“清理与重建”选择修复登录、清理并重建或退役时，可展开“目标后台服务”。输入准确 `.service` 名称，选择当前用户管理器或系统管理器（runner 须为 root），点击“检查服务”；该动作只读取绑定与状态。确认 unit 确实属于选定配置根后，预览暂停计划，再批准执行。暂停回执或再次检查已暂停的 unit 可准备独立恢复计划；外部 unit 编辑冲突会阻止恢复并保留修改。服务操作完成后返回清理范围，仍需关闭交互终端／IDE 并核对其他写入者。
+
+此能力限于 Linux systemd 的明确绑定服务，不自动 sudo、不修改邻居服务或 enablement。具体来源、暂停项、限制与 CLI 操作见 [服务指南](services.md)。任务回包丢失时只查询原 ID，不能通过再次提交恢复连接。当前 UI 的合成 manager 旅程证明操作与布局；真实 Linux VM、生产 VPS和 native WebKit 证据分别记录。
+
 ```sh
 cargo build -p lintel-runner
 cd apps/desktop

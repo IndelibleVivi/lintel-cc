@@ -24,17 +24,34 @@ export interface Plan {
   preserves: string[]; warnings: string[]; actions: { id: string; label: string; reversible: boolean }[];
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
   policy?: PolicyAssessment;
+  service?: ServicePlan;
 }
 export interface Receipt {
   id: string; plan_id: string; environment_id: string; title: string; status: string;
   steps: { id: string; label: string; status: string; message: string }[];
   created_at: string; restorable: boolean; warnings: string[];
   policy?: PolicyAssessment;
+  service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
+  service_restorable?: boolean;
   local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
 }
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }
 export interface ArchiveManifest { job_id: string; created_at: string; files: {path: string; category: string; bytes: number; digest: string}[]; notes: string }
 export interface Drift { changes: Setting[]; status: string }
+export type ServiceManager = 'user' | 'system';
+export interface ServicePlan {
+  manager: ServiceManager; unit: string; root: string;
+  before: { active_state: string; sub_state: string; unit_file_state: string; restart: string };
+  after: { active_state: string; hold: boolean };
+  hold: { path: string; persistent: true }; original_job: string | null;
+}
+export interface ServiceInspection {
+  environment_id: string; manager: ServiceManager; unit: string; root: string;
+  active_state: string; sub_state: string; unit_file_state: string; restart: string;
+  main_pid: number; control_group: string; triggered_by: string[];
+  bound: boolean; quiesced: boolean; quiesce_job_id: string | null;
+  hold: { path: string; persistent: true } | null; limitations: string[];
+}
 export interface Api {
   discover: { request: {}; response: { environments: Environment[]; capabilities: Capability[] } };
   register: { request: { name: string; root: string }; response: Environment };
@@ -45,6 +62,9 @@ export interface Api {
   plan_restore: { request: { job_id: string }; response: Plan };
   execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
   cleanup_inspect: { request: { environment_id: string }; response: CleanupInspection };
+  service_inspect: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: ServiceInspection };
+  plan_service_quiesce: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: Plan };
+  plan_service_resume: { request: { job_id: string }; response: Plan };
   auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; remote_revocation: string } };
   plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[] }; response: Plan };
   reactivate_environment: { request: { environment_id: string }; response: { status: string } };

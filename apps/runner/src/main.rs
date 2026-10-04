@@ -186,7 +186,7 @@ fn archive_tui() {
 fn tui() {
     println!("  ▐▛███▜▌  Lintel\n ▝▜█████▛▘ 环境整理，先预览再执行。\n   ▘▘ ▝▝");
     loop {
-        println!("\n1 环境清单   2 登记环境   3 新建环境   4 应用方案\n5 恢复配置   6 任务记录   7 检查漂移   8 清理与重建\n9 工作归档   i 检查环境   a 认证检查   r 重新启用   o 打开 Claude   q 退出");
+        println!("\n1 环境清单   2 登记环境   3 新建环境   4 应用方案\n5 恢复配置   6 任务记录   7 检查漂移   8 清理与重建\n9 工作归档   i 检查环境   a 认证检查   r 重新启用   o 打开 Claude   s 精确服务暂停/恢复   q 退出");
         let choice = read_line("> ");
         let request = match choice.as_str() {
             "q" => return,
@@ -251,6 +251,16 @@ fn tui() {
                 }
                 request
             }
+            "s" => {
+                let operation = read_line("服务操作 inspect / quiesce / resume: ");
+                if operation == "resume" {
+                    json!({"command":"plan_service_resume","job_id":read_line("原暂停任务 ID: ")})
+                } else if ["inspect", "quiesce"].contains(&operation.as_str()) {
+                    json!({"command":if operation=="inspect" {"service_inspect"}else{"plan_service_quiesce"},"environment_id":read_line("环境 ID: "),"manager":read_line("systemd manager user / system（不会 sudo）: "),"unit":read_line("精确完整 unit 名称（例如 example.service）: ")})
+                } else {
+                    continue;
+                }
+            }
             "5" => json!({"command":"plan_restore","job_id":read_line("原任务 ID: ")}),
             "6" => {
                 let id = read_line("原任务 ID（空=全部记录）: ");
@@ -303,7 +313,7 @@ fn tui() {
             _ => continue,
         };
         let response = lintel_core::handle_request(request);
-        if ["4", "5", "8"].contains(&choice.as_str()) {
+        if ["4", "5", "8", "s"].contains(&choice.as_str()) && response["data"]["hash"].is_string() {
             approve_plan(response, None);
         } else {
             show(&response);

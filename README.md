@@ -57,7 +57,9 @@ npm run desktop:build
 
 配置目录隔离不等于 OS sandbox，也不证明登录凭据相互独立。代理环境变量不等于进程网络强约束。浏览器删除不能撤销；设置恢复会核对当前值，不能“恢复全部”掩盖后续改动。Lintel 不承诺改变服务端账户状态或解除账号关联。
 
-当前 core 使用本地锁、冻结快照与写入前复查，但不能把外部编辑器的并发写入称为已获得原子 CAS。未暂停实际 Claude 写入者；真实使用前需评估这些 [具体限制](docs/core.md#并发与恢复边界)。
+Linux systemd 服务可在“清理与重建”选择非重建配方后，展开“目标后台服务”，核对准确 unit 与配置目录绑定，再独立批准暂停或恢复。暂停添加只属于原任务的持久启动阻止项并停止目标，恢复核对外部编辑、移除该项，按原先状态启动；不改变邻居服务或 enablement。当前用户管理器与 root 登录下的系统管理器均有有限范围，其他 supervisor / 容器 / macOS 服务不支持；见 [服务指南](docs/services.md)。
+
+当前 core 使用本地锁、冻结快照与写入前复查，但不能把外部编辑器的并发写入称为已获得原子 CAS。有限 systemd 暂停不能代表所有 Claude、IDE 或交互写入者已停；真实使用前需评估这些 [具体限制](docs/core.md#并发与恢复边界)。
 
 ## 开发与文档
 
@@ -70,7 +72,7 @@ python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 - [产品目标](docs/SPEC.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
 - [统一验证与独立 runtime 关口](docs/verification.md)
 - [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)、[视觉身份与源资产](docs/visual-language.md)
-- [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)
+- [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)、[Linux 服务暂停与恢复](docs/services.md)
 - [目标架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
 
 源码：`crates/core` 为计划与文件操作权威，`apps/runner` 提供 CLI，`apps/desktop` 为 Tauri + React，`extensions/browser` 为扩展和 Native Messaging host，`crates/egress` 为受控代理，桌面的 `src-tauri/src/remote.rs` 是 native SSH bridge；`platform/ssh` 保留可选 Python stdlib CLI controller。

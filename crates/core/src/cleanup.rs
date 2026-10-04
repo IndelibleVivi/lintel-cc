@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-fn bounded(mut command: Command) -> Result<(i32, Vec<u8>)> {
+pub(crate) fn bounded(mut command: Command) -> Result<(i32, Vec<u8>)> {
     use std::os::unix::process::CommandExt;
     command
         .stdin(Stdio::null())
@@ -127,13 +127,16 @@ impl Engine {
             .collect()
     }
 
-    fn known_writers(&self) -> Result<Vec<Value>> {
+    fn known_writers(&self, e: &Value) -> Result<Vec<Value>> {
         #[cfg(test)]
         {
+            let _ = e;
             return Ok(vec![]);
         }
         #[cfg(not(test))]
         {
+            #[cfg(not(target_os = "linux"))]
+            let _ = e;
             let mut cmd = Command::new("/bin/ps");
             cmd.args([
                 "-U",
@@ -159,6 +162,19 @@ impl Engine {
                     .and_then(|s| s.to_str())
                     .unwrap_or("");
                 if ["claude", "Claude", "claude-code"].contains(&name) {
+                    #[cfg(target_os = "linux")]
+                    if let Ok(bytes) = fs::read(format!("/proc/{pid}/environ")) {
+                        let bindings: Vec<_> = bytes
+                            .split(|b| *b == 0)
+                            .filter(|v| v.starts_with(b"CLAUDE_CONFIG_DIR="))
+                            .collect();
+                        if bindings.len() == 1
+                            && bindings[0]
+                                != format!("CLAUDE_CONFIG_DIR={}", string(e, "root")?).as_bytes()
+                        {
+                            continue; // A verified different root is a neighbor, not this writer.
+                        }
+                    }
                     out.push(json!({"pid":pid,"name":name,"scope":"not_attributed"}));
                 }
             }
@@ -170,9 +186,10 @@ impl Engine {
         let e = self.env(r)?;
         let files = self.cleanup_files(&e, "reset_client")?;
         let visible:Vec<Value>=files.iter().map(|f|json!({"path":f["path"],"category":f["category"],"present":!f["snapshot"].is_null()})).collect();
+        let services = self.check_cleanup_services(&e);
         let profiles = self.home.join(".config/anthropic");
         Ok(
-            json!({"environment_id":e["id"],"files":visible,"writers":self.known_writers()?,"shared_profile_present":profiles.exists(),"official_logout_available":e["executable"].is_string(),"coverage":"Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理"}),
+            json!({"environment_id":e["id"],"files":visible,"writers":self.known_writers(&e)?,"services":services.as_ref().map(|v|json!(v)).unwrap_or_else(|error|json!({"code":error.code,"message":error.message})),"shared_profile_present":profiles.exists(),"official_logout_available":e["executable"].is_string(),"coverage":"Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理"}),
         )
     }
 
@@ -189,9 +206,10 @@ impl Engine {
                 "先关闭目标终端、IDE 与自动重启来源，再预览清理",
             ));
         }
-        if !self.known_writers()?.is_empty() {
+        if !self.known_writers(&e)?.is_empty() {
             return Err(err("writers_active","仍检测到 Claude 进程且无法确认所属 root；请核对并关闭目标写入者，Lintel 不会全局杀进程"));
         }
+        let services = self.check_cleanup_services(&e)?;
         let logout = r["official_logout"].as_bool().unwrap_or(false);
         if logout {
             self.check_auth_scope()?;
@@ -237,7 +255,7 @@ impl Engine {
         if recipe == "retire" {
             actions.push(json!({"id":"retire","label":"从可启动环境中退役；保留原工作目录","reversible":true}));
         }
-        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"official_logout":logout,"auth":auth,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"]}))
+        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"]}))
     }
 
     fn check_auth_scope(&self) -> Result<()> {
@@ -254,7 +272,13 @@ impl Engine {
     }
 
     pub(crate) fn check_cleanup(&self, e: &Value, p: &Value, r: &Value) -> Result<()> {
-        if !self.known_writers()?.is_empty() {
+        if json!(self.check_cleanup_services(e)?) != p["extra"]["services"] {
+            return Err(err(
+                "stale_service_plan",
+                "预览后 service hold 证据变化；未开始清理",
+            ));
+        }
+        if !self.known_writers(&e)?.is_empty() {
             return Err(err(
                 "writers_active",
                 "预览后出现 Claude 写入进程；未开始清理",

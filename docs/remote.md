@@ -196,6 +196,12 @@ stderr 最多在内存保留 64 KiB，显示片段最多 4096 字节并按 UTF-8
 
 桌面与 Python CLI 的 `plan_policy` 都接受 `preset: "custom"` 及有限的 `custom_settings`，字段与三种 action 见 [core 合同](core.md)。请求只放在 JSON stdin；不是任意 env 写入或 shell 入口。新 App 根据远端 assessment 的 `supported_presets` 判断可用性：旧 runner 的自定义编辑被禁用，需通过批准的运行器准备流程更新并重新检查。已有任务继续使用它们冻结的 runner，不会为了新方案改写原任务版本。Python 也接受 inspect/plan 的用户声明 `trusted_devices` 和 preset 的 `release_settings`，提交仍必须使用准确 plan/hash 与 durable execute。
 
+## 精确暂停远端服务
+
+在“清理与重建”的登录修复、客户端重建或退役配方中，可展开“目标后台服务”，明确选择 user/system manager 与完整 unit 名，再只读检查 root 绑定。检查和预览不停止服务；批准暂停才写入该 unit 的持久启动 blocker、核验实际加载并停止目标。随后清理仍须独立预览和批准。清理检查会拒绝已识别但没有 live hold 的直接绑定服务，手工勾选 stopped 不能替代这一证据。
+
+恢复使用原暂停 job 独立预览、再次批准，只移除原任务拥有的 blocker，并恢复原 active/inactive 状态。外部 unit 编辑冲突会保留修改和 blocker。远端执行仍走 `submit`，丢回包只查原任务。system manager 要求当前 SSH 用户本身是 root；App 不执行 sudo，也不调整 login policy、linger 或其他 supervisor。支持条件与准确 JSON 示例见 [服务操作指南](services.md)。旧 runner 未提供这三个请求时会返回具体限制，需批准更新运行器后重新检查。
+
 ## 可选 Python CLI
 
 CLI 保留静态 alias import、普通请求、一次提交与查询。以下只使用 synthetic 标识；实际命令会连接所选 host，必须属于用户已授权的远程操作。
@@ -208,7 +214,7 @@ python3 platform/ssh/lintel_ssh.py execute synthetic-host --plan-id 00000000-000
 python3 platform/ssh/lintel_ssh.py reconnect synthetic-host --plan-id 00000000-0000-4000-8000-000000000002
 ```
 
-Python CLI 保留原有 stderr 丢弃行为；上述结构化连接诊断与移除登记 API 属于桌面 native bridge。CLI 的普通请求保持已有范围：`discover`、`inspect`、`plan_policy`、`plan_reset`、`plan_restore`、`jobs`、`job`、`drift`、`export_support`。桌面的附加 cleanup/archive 表单走 Rust native bridge。CLI 的旧默认 state 目录是 `.local/state/lintel/ssh-controller`，可通过 `--state-dir` 指定其他私有目录；它与桌面 state 独立，远端 core 仍以同一 plan/job 标识作为唯一执行权威。
+Python CLI 保留原有 stderr 丢弃行为；上述结构化连接诊断与移除登记 API 属于桌面 native bridge。CLI 的普通请求提供 `discover`、`inspect`、`plan_policy`、`plan_reset`、`plan_restore`、`service_inspect`、`plan_service_quiesce`、`plan_service_resume`、`jobs`、`job`、`drift`、`export_support`。桌面的附加 cleanup/archive 表单走 Rust native bridge。CLI 的旧默认 state 目录是 `.local/state/lintel/ssh-controller`，可通过 `--state-dir` 指定其他私有目录；它与桌面 state 独立，远端 core 仍以同一 plan/job 标识作为唯一执行权威。
 
 归档执行使用 `--ask-archive-passphrase` 进入不回显终端输入；不要把口令放进参数或 shell history。不能安全关闭回显时，CLI 拒绝提交。实际 plan ID 和 approval 必须使用 runner 返回的值。
 
@@ -228,3 +234,5 @@ python3 -m unittest discover -s platform/ssh/tests -v
 测试仅使用临时 home/state 和 fake SSH executable，不连接真实 host、不读取真实凭据、不改 known_hosts。native 检查 host 持久化、alias 静态扫描、严格 host checking、固定 request/submit argv、stdin 数据隔离、提交意图先于 SSH、并发只提交一次、ACK 丢失后从磁盘恢复查询、缺失 / 错配 receipt 不重放、口令不持久化、超时 / 输出上限，有限 cleanup/archive schema、移除登记后保留未决任务与去重、已移除 alias 的原任务查询、SSH/runner/响应失败分类、stderr 大输出并发排空、ANSI/控制字符清理与请求值去敏、诊断命令仅做 alias 只读核验，以及查询错误保留 runner 诊断且不重放。Python 检查其现有 CLI 路径、归档口令输入、固定 submit 命令与相同的不重放边界。
 
 这些验证证明控制端 transport 与恢复边界，不代表 runner 已部署、真实 VPS session 存活、目标 service 隔离或完整 G03 已完成验收。
+
+`linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。它只观察所记录 policy 下 worker 的存活或死亡，重启后只查询原 accepted job，不重新 execute。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。生产 VPS 与完整 G03 的状态以 [当前状态](current-state.md) 为准。

@@ -54,7 +54,8 @@ jobs:
             librsvg2-dev \
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev \
-            openssh-server openssh-client musl-tools
+            openssh-server openssh-client musl-tools \
+            qemu-system-x86 qemu-utils cloud-image-utils gpgv ubuntu-keyring
 
       - name: Desktop dependencies
         working-directory: apps/desktop
@@ -85,8 +86,15 @@ jobs:
       - name: Independent browser runtime and App pairing
         env:
           LINTEL_PAIRING_UI_REPORT: ${{ runner.temp }}/lintel-verify/browser-pairing-ui.json
+          LINTEL_SERVICE_UI_REPORT: ${{ runner.temp }}/lintel-verify/service-ui.json
         run: |
-          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
+          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui,service-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
+
+      - name: Disposable Linux VM lifecycle acceptance
+        if: runner.os == 'Linux'
+        env:
+          LINTEL_VM_REPORT: ${{ runner.temp }}/lintel-verify/linux-vm-runtime.json
+        run: python3 tests/verify.py --checks linux-vm-runtime --json "$RUNNER_TEMP/lintel-verify/linux-vm-entry.json"
 
       - name: Collect browser startup evidence
         if: always()

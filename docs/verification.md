@@ -135,6 +135,8 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and desktop build prerequisites; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
+| `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
+| `linux-vm-runtime` | Linux x86_64, static musl runner, QEMU, cloud-image-utils, OpenSSH client, gpgv and Ubuntu cloud-image public keyring. Creates a disposable Ubuntu guest with real systemd/PAM, synthetic services and users; host policy and production VPS remain outside the test. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
 
 Browser runtime and App pairing have a separate opt-in entrypoint (repository root):
@@ -144,7 +146,7 @@ npm --prefix apps/desktop ci
 npm --prefix apps/desktop run build
 npm --prefix extensions/browser ci
 (cd extensions/browser && npx playwright install chromium)
-python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/lintel-browser-runtime.json
+          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/lintel-browser-runtime.json
 ```
 
 CI explicitly selects both checks on macOS and Ubuntu after the default checks;
@@ -185,6 +187,51 @@ system sshd or services.
 
 Actual VPS logout/cgroup, host reboot, aarch64 runtime and the complete macOS Terminal-to-VPS GUI journey remain
 independent gaps; this Linux fixture does not prove those behaviors.
+
+### Disposable systemd / PAM / reboot VM
+
+The separate VM check boots a signed official Ubuntu 24.04 LTS cloud image
+(release build `20260801`), with its own kernel boot ID, systemd PID 1, packaged
+OpenSSH and real PAM sessions. Downloaded image/manifest checksums are verified
+against Ubuntu's signed `SHA256SUMS` using the installed public cloud-image
+keyring; the cache stays outside Git. This is a test prerequisite, not an App
+dependency or VPS installation path.
+
+```sh
+# On an Ubuntu x86_64 test host; these are test-only prerequisites.
+sudo apt-get install -y qemu-system-x86 qemu-utils cloud-image-utils openssh-client gpgv ubuntu-keyring
+cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
+python3 tests/verify.py --checks linux-vm-runtime --json /tmp/lintel-vm-entry.json
+```
+
+Set `LINTEL_VM_REPORT` to choose the detailed Git-external report path (default
+`/tmp/lintel-vm-runtime.json`). The launcher never changes host login policy or
+starts host services. It binds the guest SSH forwarding to `127.0.0.1`, denies
+guest external networking and destroys its own VM overlay, seed and keys after
+QEMU stops, including failures.
+
+The canonical service journey supplies real Restart=always / timer / manual
+start, neighbor preservation, exact approval, replay, external-edit conflicts
+and original inactive-state restoration. Its prepare/recover phases also verify
+that the owned persistent hold remains effective across a real guest reboot.
+Separate runner cases observe both guest `KillUserProcesses` policies, the
+worker's real PAM session/cgroup and post-reboot original-job reconciliation.
+The synthetic-only `LINTEL_TEST_ACCEPT_BARRIER` records a marker inside
+`LINTEL_TEST_HOME` and pauses the worker after durable acceptance/ACK so the
+interruption is reproducible; it does not modify normal submissions.
+
+`evidence_complete` means those observations finished, including an observed
+logout limitation. It does **not** promise `setsid` survives arbitrary cgroup
+cleanup or establish a production VPS policy. Missing VM/systemd/PAM or a failed
+boot is a failed run. Runtime versions, boot IDs, observed survival/termination,
+original receipts and VM cleanup are retained in the detailed JSON.
+
+The built service UI can be checked separately with
+`python3 tests/verify.py --checks service-ui`. Set `LINTEL_SERVICE_UI_REPORT` for
+its JSON and `LINTEL_SERVICE_UI_ARTIFACTS` for optional Git-external screenshots.
+It uses real headless Chromium with synthetic service state, not real systemd
+or native WebKit. Both new independent checks are explicitly selected in CI;
+their actual current results are recorded in [current-state](current-state.md).
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)
 and the [acceptance status](acceptance-status.json). Passing the default checks

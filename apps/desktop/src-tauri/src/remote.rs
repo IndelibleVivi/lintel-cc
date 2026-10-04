@@ -878,7 +878,10 @@ fn validate_request(request: &Value) -> Result<()> {
             &["trusted_devices", "release_settings", "custom_settings"],
         ),
         "plan_reset" => (&["command", "environment_id", "recipe", "categories"], &[]),
-        "plan_restore" | "job" => (&["command", "job_id"], &[]),
+        "plan_restore" | "plan_service_resume" | "job" => (&["command", "job_id"], &[]),
+        "service_inspect" | "plan_service_quiesce" => {
+            (&["command", "environment_id", "manager", "unit"], &[])
+        }
         "plan_cleanup" => (
             &[
                 "command",
@@ -910,6 +913,33 @@ fn validate_request(request: &Value) -> Result<()> {
         }
     };
     exact_fields(request, required, optional)?;
+    if ["service_inspect", "plan_service_quiesce"]
+        .contains(&request["command"].as_str().unwrap_or(""))
+    {
+        if !["user", "system"].contains(&field(request, "manager")?) {
+            return Err(failure(
+                "invalid_request",
+                "systemd manager 只能是 user 或 system",
+            ));
+        }
+        let unit = field(request, "unit")?;
+        if unit.len() > 240
+            || !unit.ends_with(".service")
+            || unit.ends_with("@.service")
+            || !unit
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphanumeric)
+            || !unit
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"_.@-".contains(&c))
+        {
+            return Err(failure(
+                "invalid_request",
+                "需要单一完整 service unit 名称；不接受 shell、路径或 glob",
+            ));
+        }
+    }
     if request.get("trusted_devices").is_some_and(|v| {
         !v.as_str()
             .is_some_and(|s| ["unknown", "required", "not_required"].contains(&s))
@@ -1642,6 +1672,42 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
                 .is_err());
         }
         assert!(!temp.path().join("args").exists());
+    }
+    #[test]
+    fn services_use_finite_preview_schema_and_never_send_shell_or_mutation_bypass() {
+        let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
+        let inspect = json!({"command":"service_inspect","environment_id":"env-1","manager":"user","unit":"synthetic-target.service"});
+        for unit in [
+            "*.service",
+            "../target.service",
+            "--all.service",
+            "x.service; touch /tmp/x",
+            "target@.service",
+        ] {
+            let mut invalid = inspect.clone();
+            invalid["unit"] = json!(unit);
+            assert!(controller
+                .dispatch(json!({"op":"request","alias":"synthetic-host","request":invalid}))
+                .is_err());
+        }
+        let mut invalid = inspect.clone();
+        invalid["manager"] = json!("other-manager");
+        assert!(validate_request(&invalid).is_err());
+        invalid = inspect.clone();
+        invalid["shell"] = json!("stop");
+        assert!(validate_request(&invalid).is_err());
+        assert!(validate_request(&json!({"command":"service_stop","environment_id":"env-1","manager":"user","unit":"synthetic-target.service"})).is_err());
+        assert!(!temp.path().join("args").exists());
+        assert!(controller
+            .dispatch(json!({"op":"request","alias":"synthetic-host","request":inspect}))
+            .is_ok());
+        assert!(validate_request(&json!({"command":"plan_service_quiesce","environment_id":"env-1","manager":"system","unit":"synthetic-target.service"})).is_ok());
+        assert!(validate_request(
+            &json!({"command":"plan_service_resume","job_id":"original-job"})
+        )
+        .is_ok());
+        let args = fs::read_to_string(temp.path().join("args")).unwrap();
+        assert!(!args.lines().any(|line| line == "submit"));
     }
     #[test]
     fn custom_policy_crosses_finite_schema_without_arbitrary_env() {

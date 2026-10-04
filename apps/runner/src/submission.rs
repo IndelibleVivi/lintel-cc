@@ -13,7 +13,53 @@ fn emit(v: &Value) {
 }
 fn accepted(job: &Value) {
     ACK_SENT.store(true, Ordering::SeqCst);
+    let pause = acceptance_barrier(job);
     emit(&json!({"ok":true,"data":job}));
+    if pause {
+        unsafe {
+            libc::raise(libc::SIGSTOP);
+        }
+    }
+}
+// A stopped worker makes logout/cgroup/reboot tests reproducible. Only an
+// explicitly synthetic HOME can opt in; normal submissions never stop here.
+fn acceptance_barrier(job: &Value) -> bool {
+    let (Some(home), Some(marker)) = (
+        std::env::var_os("LINTEL_TEST_HOME"),
+        std::env::var_os("LINTEL_TEST_ACCEPT_BARRIER"),
+    ) else {
+        return false;
+    };
+    let (home, marker) = (
+        std::path::PathBuf::from(home),
+        std::path::PathBuf::from(marker),
+    );
+    let Ok(home) = home.canonicalize() else {
+        return false;
+    };
+    let Some(parent) = marker.parent() else {
+        return false;
+    };
+    let Ok(parent) = parent.canonicalize() else {
+        return false;
+    };
+    if !marker.is_absolute() || !parent.starts_with(&home) {
+        return false;
+    }
+    use std::os::unix::fs::OpenOptionsExt;
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&marker)
+    else {
+        return false;
+    };
+    let evidence = json!({"pid":std::process::id(),"plan_id":job["plan_id"],
+        "cgroup":std::fs::read_to_string("/proc/self/cgroup").ok(),
+        "boot_id":std::fs::read_to_string("/proc/sys/kernel/random/boot_id").ok().map(|s|s.trim().to_owned())});
+    writeln!(file, "{evidence}").is_ok() && file.sync_all().is_ok()
 }
 pub fn capability(response: &mut Value) {
     if let Some(c) = response["data"]["capabilities"].as_array_mut() {

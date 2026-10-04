@@ -219,6 +219,22 @@ class TransportTests(unittest.TestCase):
                 self.controller.request("synthetic-host", payload)
         self.assertFalse((self.root / "calls.jsonl").exists())
 
+    def test_service_requests_are_finite_and_stay_on_stdin(self):
+        request = {"command": "plan_service_quiesce", "environment_id": "synthetic-env",
+                   "manager": "user", "unit": "claude-work.service"}
+        for changed in ({"manager": "sudo"}, {"unit": "*.service"},
+                        {"unit": "target.service; id"}, {"unit": "../target.service"},
+                        {"script": "id"}):
+            with self.assertRaises(ssh.ControllerError):
+                self.controller.request("synthetic-host", dict(request, **changed))
+        self.assertFalse((self.root / "calls.jsonl").exists())
+        self.controller.request("synthetic-host", request)
+        self.controller.request("synthetic-host", {"command": "plan_service_resume", "job_id": "synthetic-job"})
+        calls = self.calls()
+        self.assertEqual(calls[0]["request"], request)
+        self.assertEqual(calls[1]["request"]["command"], "plan_service_resume")
+        self.assertNotIn("claude-work.service", " ".join(calls[0]["args"]))
+
 
 if __name__ == "__main__":
     unittest.main()
