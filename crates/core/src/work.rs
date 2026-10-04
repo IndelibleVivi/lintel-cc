@@ -543,7 +543,13 @@ impl Engine {
             .as_str()
             .ok_or_else(|| err("archive_missing", "此任务没有工作归档"))?
             .to_owned();
-        let (package, _) = read_package(Path::new(&path), check_passphrase(r)?)?;
+        let (package, archive_digest) = read_package(Path::new(&path), check_passphrase(r)?)?;
+        if j["archive_digest"].as_str() != Some(archive_digest.as_str()) {
+            return Err(err(
+                "stale_archive",
+                "工作归档与本任务写入时的记录不一致；未新建环境、迁入或继续清理",
+            ));
+        }
         let files = validate_package_files(&package)?;
         self.migrate_files(e, "重建", &files, j, journal)
     }

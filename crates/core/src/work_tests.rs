@@ -581,3 +581,41 @@ fn job_archive_rejects_replacement_but_explicit_path_remains_independent() {
         json!({"command":"archive_inspect","job_id":receipt["id"],"archive_passphrase":PASS}),
     );
 }
+
+#[test]
+fn cleanup_reopen_rejects_replacement_before_new_root_or_migration() {
+    let (_temp, engine, environment, root) = fixture();
+    seed_work(&root);
+    let preview = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":false,"categories":["instructions"]}),
+    );
+    let plan = load(&engine.path("plans", preview["id"].as_str().unwrap())).unwrap();
+    let journal = engine.path("jobs", preview["id"].as_str().unwrap());
+    let mut receipt = json!({"id":preview["id"],"steps":[]});
+    let request = json!({"archive_passphrase":PASS});
+    engine
+        .archive_work(&environment, &plan, &request, &mut receipt, &journal)
+        .unwrap();
+    let path = PathBuf::from(receipt["archive_path"].as_str().unwrap());
+    let mut replacement = archive::unseal(&fs::read(&path).unwrap(), PASS).unwrap();
+    let bytes: &[u8] = b"synthetic replacement instruction";
+    replacement["files"][0]["data"] = json!(bytes);
+    replacement["files"][0]["digest"] = json!(digest(bytes));
+    atomic(&path, &archive::seal(&replacement, PASS).unwrap(), 0o600).unwrap();
+    let failure = engine
+        .migrate_to_new_root(&environment, &plan, &request, &mut receipt, &journal)
+        .unwrap_err();
+    assert_eq!(failure.code, "stale_archive");
+    assert!(receipt.get("new_root").is_none());
+    assert!(!receipt["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|step| step["id"] == "create" || step["id"] == "migrate"));
+    assert_eq!(
+        fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+        "Synthetic instruction only."
+    );
+    assert!(root.join(".credentials.json").exists());
+}

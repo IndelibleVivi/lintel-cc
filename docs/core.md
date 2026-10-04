@@ -89,7 +89,7 @@
 
 `plan_cleanup` 接受 `repair_login`、`reset_client`、`retire`，要求 `writers_confirmed_stopped: true`，可选 `official_logout`。默认根的混合状态是 home 下 `.claude.json`；专用根使用其 `.claude.json`。修复登录只处理 `.credentials.json`；其余两类还处理预览中的混合状态文件。工作、settings、hooks、MCP 与插件文件不会被通配删除。
 
-reset_client 的冻结 `actions` 与 receipt 有序 `steps` 采用同一 canonical 顺序：复查写入者 → 状态备份 + 工作加密归档 → 新根创建与迁入 → 官方注销（如选）→ 精确移除旧文件。任何破坏性动作都不早于保全；官方注销失败时保留已生成的归档、新根与 create/migrate 完成步骤，后续旧文件移除与 retire 不执行，同 ID 查询原任务不重跑。retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
+reset_client 的冻结 `actions` 与 receipt 有序 `steps` 采用同一 canonical 顺序：复查写入者 → 状态备份 + 工作加密归档 → 新根创建与迁入 → 官方注销（如选）→ 精确移除旧文件。任何破坏性动作都不早于保全；reset_client 重读刚生成的工作包时核对本任务的 archive_digest，包被替换返回 stale_archive，在新根创建／迁入／注销／删除前停止。官方注销失败时保留已生成的归档、新根与 create/migrate 完成步骤，后续旧文件移除与 retire 不执行，同 ID 查询原任务不重跑。retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
 
 执行被持久接受后失败时，receipt 额外写入结构化 `error: {code,message,phase,recovery}`：`phase` 记录失败发生的真实 receipt 状态（如 `verifying`），`recovery` 指向以同一 ID 查询原任务，机器不必猜中文 warnings；已完成的步骤与产物（归档、新根）保留，不可逆步骤不重放。
 
