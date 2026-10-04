@@ -84,17 +84,7 @@ const VOLATILE: &[&str] = &[
 ];
 
 fn unit_name(unit: &str) -> Result<()> {
-    if unit.len() > 240
-        || !unit.ends_with(".service")
-        || unit.ends_with("@.service")
-        || !unit
-            .as_bytes()
-            .first()
-            .is_some_and(u8::is_ascii_alphanumeric)
-        || !unit
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || b"_.@-".contains(&c))
-    {
+    if !lintel_operations::valid_service_unit(unit) {
         return Err(err(
             "invalid_service_unit",
             "只接受单一完整 service unit 名称；不接受 alias、路径、template、glob 或命令",

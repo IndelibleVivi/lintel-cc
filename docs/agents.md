@@ -35,6 +35,8 @@ lintel capabilities --environment <environment-id>
 
 静态 help/version/capabilities/describe/schema 不运行 Claude、不发现个人目录、不初始化 state。`describe` 返回稳定 operation ID、有限 transports、JSON Schema、平台/目标条件、目标与 Lintel state 副作用、批准方式、秘密字段、结果和恢复语义。显式目标 capabilities 附带该环境的真实 inspection；service 的准确 unit/manager 继续用 `service_inspect`，browser 继续用 profile inspection。
 
+Service unit 只接受准确 `.service` 名称，例如 `claude.service` 或 `claude@synthetic.service`；模板 `claude@.service`、路径、glob 与命令不受支持。schema 与 named CLI/core 共用的名称规则保持一致；named 输入在初始化目标 state 前检查，实际 unit 身份、绑定与 manager 状态仍由 core 核对。
+
 `env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
 
 普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。

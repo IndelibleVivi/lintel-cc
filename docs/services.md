@@ -6,6 +6,8 @@ Lintel 的 Linux runner 可以预览并暂停明确绑定到一个登记配置 r
 
 请求必须明确提供环境 ID、`manager: "user" | "system"` 与完整 service unit 名称，例如 `example.service`。`user` 只操作当前 UID 的 user manager；`system` 变更要求 runner 当前已以 root 身份执行。Lintel 不执行 sudo，不调整 linger、PAM、login policy，也不停止 manager、全局 supervisor 或 SSH。
 
+名称 schema 与 named CLI/core 共用 `crates/operations` 的有限规则：允许完整实例名如 `example@synthetic.service`，拒绝未实例化的 `example@.service`、路径、glob、换行与命令。通过名称检查仍需满足下列实际 unit 条件。
+
 支持直接 loaded 的持久 simple、exec 或 notify service，统一 cgroup v2、`KillMode=control-group`、无 cgroup delegation。unit 必须直接且唯一配置 `CLAUDE_CONFIG_DIR=<登记 root>`，不使用 EnvironmentFile、PassEnvironment 或 UnsetEnvironment 提供未知覆盖。active service 的 MainPID 和 cgroup 内每个进程必须属于当前 runner 用户，且 `/proc` 环境证据与该 root 一致。root 也必须属于当前用户。服务配置文件需是 root 或当前用户拥有、非共享可写且无路径 symlink 的普通文件。
 
 alias、glob、裸 service 前缀、未实例化 template、transient/generated/masked unit、自定义 unit 搜索目录、转换中或 failed 状态不受支持。带停止传播、其他 unit 对它的 Requires/BindsTo/PartOf 关系、自定义 stop/success/failure 动作、host action，以及可能启动或停止相邻 unit 的依赖关系会被明确拒绝。标准的 system/user slice 与基础 target 依赖可以保留。带 `Restart=always` 或精确 timer/socket 触发来源的独立 service 可以暂停；这些触发 unit 自身不会被停止。

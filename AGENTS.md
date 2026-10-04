@@ -31,3 +31,4 @@
 
 - Work preservation lives in crates/core/src/work.rs and archive.rs: independent archive-only/preserve plans, portable lintel.work/1 packages, exact-one job_id/archive_path sources, frozen package/target rechecks. Cleanup preserves archive/new-root/import before approved logout/removals. Retain old plan_reset/rebuild receipt semantics for existing TUI/raw callers; App uses distinct task outcomes.
 - Human workflow authority is docs/operator-guide.md; named CLI/install/secret input authority is docs/agents.md. Archive paths belong to the target host; ciphertext transfer is an explicit system-tool operation, not an implicit remote mutation endpoint.
+- crates/operations owns the shared finite service-unit name rule for named transports and core; service.rs still owns actual unit identity, ownership and manager evidence. State/work archive publication intents must record their exact path before atomic publication; only readback confirms completion.

@@ -33,7 +33,7 @@ fn property(name: &str) -> Value {
         "preset" => choice(&["preserve", "reduce", "custom"]),
         "manager" => choice(&["user", "system"]),
         "unit" => {
-            json!({"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.service$","maxLength":240})
+            json!({"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.service$","not":{"pattern":"@\\.service$|[^A-Za-z0-9_.@-]"},"maxLength":240})
         }
         "archive_passphrase" => {
             json!({"type":"string","minLength":12,"writeOnly":true,"description":"仅通过 stdin 临时输入；不进入 argv、日志或持久请求文件"})
@@ -54,6 +54,21 @@ fn property(name: &str) -> Value {
         "proxy_url" => json!({"type":"string","description":"只接受 loopback HTTP 地址"}),
         _ => text(),
     }
+}
+
+/// Shared finite service-name contract; the core still checks service identity,
+/// ownership and current systemd facts independently of input syntax.
+pub fn valid_service_unit(unit: &str) -> bool {
+    unit.len() <= 240
+        && unit.ends_with(".service")
+        && !unit.ends_with("@.service")
+        && unit
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && unit
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"_.@-".contains(&c))
 }
 
 /// Each row is an existing public operation, not an arbitrary RPC namespace.
@@ -215,6 +230,9 @@ pub fn validate(request: &Value) -> Result<(), String> {
         if !check_property(value, prop) {
             return Err(format!("字段 {key} 的类型或取值无效"));
         }
+        if key == "unit" && !valid_service_unit(value.as_str().unwrap()) {
+            return Err("unit 需要完整 service 名称；不接受 template、路径、glob 或命令".into());
+        }
         if ["root", "archive_path", "output_path"].contains(&key.as_str())
             && !value.as_str().unwrap().starts_with('/')
         {
@@ -318,6 +336,35 @@ pub fn catalog() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn service_units_exclude_templates_paths_and_commands() {
+        let unit_schema = &schema("service_inspect").unwrap()["properties"]["unit"];
+        assert_eq!(
+            unit_schema["not"]["pattern"],
+            r"@\.service$|[^A-Za-z0-9_.@-]"
+        );
+        for command in ["service_inspect", "plan_service_quiesce"] {
+            for unit in [
+                "claude.service",
+                "claude@synthetic.service",
+                "a-b_1.service",
+            ] {
+                assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":unit})).is_ok(), "{unit}");
+            }
+            for unit in [
+                "claude@.service",
+                "/tmp/claude.service",
+                "*.service",
+                "claude.service\n",
+                "claude.socket",
+                "claude;echo.service",
+                "猫.service",
+            ] {
+                assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":unit})).is_err(), "{unit}");
+            }
+            assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":format!("{}.service", "a".repeat(240))})).is_err());
+        }
+    }
     #[test]
     fn work_selection_requires_at_least_one_category() {
         assert_eq!(

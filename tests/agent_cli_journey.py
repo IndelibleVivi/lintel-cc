@@ -2,6 +2,7 @@
 """Discoverable CLI contract and portable work, only in disposable homes."""
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -54,6 +55,19 @@ def run():
                                   '00000000-0000-4000-8000-000000000000', '--categories', '', good=False)
         assert empty_selection['error']['code'] == 'invalid_request', empty_selection
         assert not state.exists(), 'Rejected launch/selection initialized core state'
+        for operation in ['service_inspect', 'plan_service_quiesce']:
+            unit_schema = command('schema', operation)['properties']['unit']
+            for unit in ['claude.service', 'claude@synthetic.service', 'claude@.service',
+                         '/tmp/claude.service', '*.service', 'claude.service\n', '猫.service']:
+                schema_accepts = (len(unit) <= unit_schema['maxLength']
+                                  and re.search(unit_schema['pattern'], unit) is not None
+                                  and re.search(unit_schema['not']['pattern'], unit) is None)
+                assert schema_accepts == (unit in ['claude.service', 'claude@synthetic.service']), unit
+                if not schema_accepts:
+                    rejected = command('call', operation, payload={'environment_id': '00000000-0000-4000-8000-000000000000',
+                                       'manager': 'user', 'unit': unit}, good=False)
+                    assert rejected['error']['code'] == 'invalid_request', rejected
+                    assert not state.exists(), 'Invalid service unit initialized core state'
         command('describe', 'does-not-exist', good=False)
 
         for payload in ['{', '{"command":"discover"}', '{"command":"execute"}']:

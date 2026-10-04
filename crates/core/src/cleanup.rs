@@ -348,9 +348,9 @@ impl Engine {
                 .join("archives")
                 .join(format!("{}-state.age", string(j, "id")?));
             j["steps"].as_array_mut().unwrap().push(json!({"id":"state_backup","label":"混合客户端状态备份","status":"executing","message":"正在写入加密状态备份；尚未注销或删除旧文件。"}));
+            j["state_archive_path"] = json!(backup);
             save(journal, j)?;
             atomic_new(&backup, &bytes, 0o600)?;
-            j["state_archive_path"] = json!(backup);
             if read(&backup, 64 * 1024 * 1024)? != bytes {
                 return Err(err("archive_readback_failed", "状态备份未能读回，未清理"));
             }
