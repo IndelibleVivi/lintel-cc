@@ -138,16 +138,28 @@ fn view(properties: &Value) -> Value {
 impl Engine {
     fn service_platform(&self) -> Result<()> {
         #[cfg(test)]
-        if self.service_fixture.is_some() {
-            return Ok(());
+        {
+            // Unit tests never inspect the host manager, including on Linux CI.
+            // Service lifecycle tests explicitly supply their synthetic adapter.
+            if self.service_fixture.is_some() {
+                Ok(())
+            } else {
+                Err(err(
+                    "service_test_fixture_required",
+                    "unit-test Engine 没有 synthetic service fixture；不访问真实 systemd manager",
+                ))
+            }
         }
-        if cfg!(target_os = "linux") {
-            Ok(())
-        } else {
-            Err(err(
-                "service_platform_unsupported",
-                "systemd 服务操作仅在 Linux runner 上可用；此主机未执行服务操作",
-            ))
+        #[cfg(not(test))]
+        {
+            if cfg!(target_os = "linux") {
+                Ok(())
+            } else {
+                Err(err(
+                    "service_platform_unsupported",
+                    "systemd 服务操作仅在 Linux runner 上可用；此主机未执行服务操作",
+                ))
+            }
         }
     }
     fn service_write_authority(&self, manager: &str) -> Result<()> {
@@ -807,7 +819,7 @@ impl Engine {
         j["service"] = public_service(s, p["kind"] == "service_resume");
         if p["kind"] == "service_quiesce" {
             j["service_restorable"] = json!(true);
-            j["steps"] = json!([{"id":"service_hold","status":"executing","message":"持久 blocker 写入意图已保存；中断后只查询原任务"}]);
+            j["steps"] = json!([{"id":"service_hold","label":"写入并核验服务启动阻止","status":"executing","message":"持久 blocker 写入意图已保存；中断后只查询原任务"}]);
             save(journal, j)?;
             let directory = path.parent().unwrap();
             guard(directory)?;
@@ -840,7 +852,7 @@ impl Engine {
                     "写入 blocker 时 unit 配置变化；保留当前文件并查询原任务",
                 ));
             }
-            j["steps"].as_array_mut().unwrap().push(json!({"id":"service_stop","status":"executing","message":"只提交原计划 unit 的 stop，不重复提交"}));
+            j["steps"].as_array_mut().unwrap().push(json!({"id":"service_stop","label":"停止精确目标服务","status":"executing","message":"只提交原计划 unit 的 stop，不重复提交"}));
             save(journal, j)?;
             self.service_mutation(manager, unit, "stop", Some(hold))?;
             let after = self.service_snapshot(manager, unit, root)?;
@@ -855,7 +867,7 @@ impl Engine {
                 &self.service_snapshot(manager, unit, root)?,
                 true,
             )?;
-            j["steps"] = json!([{"id":"service_unhold","status":"executing","message":"只移除原任务仍拥有的 blocker"}]);
+            j["steps"] = json!([{"id":"service_unhold","label":"移除原任务启动阻止","status":"executing","message":"只移除原任务仍拥有的 blocker"}]);
             save(journal, j)?;
             let held_file = s["held"]["files"]
                 .as_array()
@@ -884,7 +896,7 @@ impl Engine {
             j["steps"][0]["status"] = json!("completed");
             save(journal, j)?;
             let was_active = s["before"]["properties"]["ActiveState"] == "active";
-            j["steps"].as_array_mut().unwrap().push(json!({"id":"service_resume","status":"executing","message":if was_active{"按原状态仅启动此 unit"}else{"原先停止，保持 inactive"}}));
+            j["steps"].as_array_mut().unwrap().push(json!({"id":"service_resume","label":"恢复原服务启动状态","status":"executing","message":if was_active{"按原状态仅启动此 unit"}else{"原先停止，保持 inactive"}}));
             save(journal, j)?;
             if was_active && unheld["properties"]["ActiveState"] != "active" {
                 self.service_mutation(manager, unit, "start", None)?;
@@ -1428,6 +1440,18 @@ mod tests {
     }
     #[test]
     fn cleanup_requires_live_hold_even_when_writer_checkbox_is_true() {
+        {
+            let (_temp, mut engine, e, _root) = fixture(false);
+            engine.service_fixture = None;
+            assert!(engine.check_cleanup_services(&e).unwrap().is_empty());
+            assert_eq!(
+                engine
+                    .service_properties("system", "target.service")
+                    .unwrap_err()
+                    .code,
+                "service_test_fixture_required"
+            );
+        }
         let (_temp, engine, e, root) = fixture(false);
         fs::remove_file(root.join("settings.json")).unwrap();
         let request = json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"categories":[]});
