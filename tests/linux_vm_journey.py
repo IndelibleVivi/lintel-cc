@@ -152,10 +152,13 @@ class Guest:
             argv = ["sudo", "-n"] + argv
         return json.loads(self.shell(shlex.join(argv), user=user).stdout)
 
-    def request(self, case, payload, *, submit=False, barrier=False):
+    def request(self, case, payload, *, submit=False, barrier=None):
         env = {"HOME": case["home"], "LINTEL_TEST_HOME": case["home"], "LINTEL_STATE_DIR": case["state"]}
-        if barrier:
+        if barrier == "stopped":
             env["LINTEL_TEST_ACCEPT_BARRIER"] = case["barrier"]
+        elif barrier == "running":
+            env["LINTEL_TEST_WAIT_BARRIER"] = case["barrier"]
+            env["LINTEL_TEST_WAIT_RELEASE"] = case["release"]
         command = shlex.join(["env"] + [f"{key}={value}" for key, value in env.items()] + [RUNNER, "submit" if submit else "request"])
         if submit:
             command = shlex.join(["python3", PROBE, "session", "--json", case["session"]]) + " && exec " + command
@@ -164,8 +167,12 @@ class Guest:
         require(response.get("ok") is True, f"Canonical runner rejected {payload['command']}: {response}")
         return response["data"]
 
-    def kept_submission(self, case, payload):
-        env = [f"HOME={case['home']}", f"LINTEL_TEST_HOME={case['home']}", f"LINTEL_STATE_DIR={case['state']}", f"LINTEL_TEST_ACCEPT_BARRIER={case['barrier']}"]
+    def kept_submission(self, case, payload, *, barrier="stopped"):
+        env = [f"HOME={case['home']}", f"LINTEL_TEST_HOME={case['home']}", f"LINTEL_STATE_DIR={case['state']}"]
+        if barrier == "stopped":
+            env.append(f"LINTEL_TEST_ACCEPT_BARRIER={case['barrier']}")
+        else:
+            env += [f"LINTEL_TEST_WAIT_BARRIER={case['barrier']}", f"LINTEL_TEST_WAIT_RELEASE={case['release']}"]
         command = shlex.join(["python3", PROBE, "session", "--json", case["session"]]) + " && " + shlex.join(["env"] + env + [RUNNER, "submit"]) + "; sleep 600"
         child = subprocess.Popen(self.argv(TARGET, command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -297,57 +304,102 @@ def prepare_policy(guest, name):
     return case
 
 
-def barrier_process(guest, case, timeout=15):
+def barrier_process(guest, case, mode, timeout=15):
+    """Observe the worker after its durable ACK. In "stopped" mode a frozen worker
+    is the point; in "running" mode the worker must still be live (running or
+    sleeping, never stopped) so a later logout compares a live process. A worker
+    that is already gone is returned as observed termination, never looped on."""
     deadline = time.monotonic() + timeout
+    observed = None
     while time.monotonic() < deadline:
         response = guest.shell(shlex.join(["sudo", "-n", "python3", PROBE, "process", case["barrier"]]), check=False)
         if response.returncode == 0:
             observed = json.loads(response.stdout)
-            if observed["state"] in ("T", "t") or not observed["alive"]:
-                require(observed["marker"]["plan_id"] == case["plan"]["id"], "Barrier belongs to another job")
+            require(observed["marker"]["plan_id"] == case["plan"]["id"], "Barrier belongs to another job")
+            if mode == "stopped" and observed["state"] in ("T", "t"):
+                return observed
+            if mode == "running" and observed["alive"] and observed["state"] in ("R", "S"):
+                return observed
+            if not observed["alive"]:
                 return observed
         time.sleep(0.2)
-    raise RuntimeError("Synthetic after-accept barrier did not produce an observable stopped worker")
+    raise RuntimeError(f"Synthetic after-accept barrier produced no {mode} worker within {timeout}s: {observed}")
 
 
-def logout_case(guest, kill):
+def terminal_receipt(guest, case, timeout=30):
+    receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+    deadline = time.monotonic() + timeout
+    while receipt["status"] in ("accepted", "executing", "verifying") and time.monotonic() < deadline:
+        time.sleep(0.2)
+        receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+    return receipt
+
+def resume_survivor(guest, case, mode):
+    """Resume a worker that survived logout. A stopped worker is resumed with
+    SIGCONT; a running (held) worker is explicitly released. Both are valid
+    outcomes and both keep the original approved job, which the caller then
+    waits on for a terminal observation."""
+    if mode == "stopped":
+        guest.probe("continue", case["barrier"])
+    else:
+        guest.probe("release", case["release"])
+
+def logout_case(guest, kill, mode):
+    """One logout observation. mode "stopped" freezes the worker (SIGSTOP); mode
+    "running" keeps it live behind an explicit release. The two modes run under
+    the SAME effective KillUserProcesses policy so a live worker and a frozen one
+    are compared without the barrier itself being the variable."""
     policy = guest.probe("configure-logind", "yes" if kill else "no")
     require(policy["kill_user_processes"] == ("b true" if kill else "b false"), "Effective logind policy does not match the VM fixture")
-    case = prepare_policy(guest, "logout-kill" if kill else "logout-retain")
-    ack = guest.request(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]}, submit=True, barrier=True)
+    case = prepare_policy(guest, f"logout-{'kill' if kill else 'retain'}-{mode}")
+    ack = guest.request(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]}, submit=True, barrier=mode)
     require(ack["status"] == "accepted", "Submit did not return durable accepted ACK")
-    observed = barrier_process(guest, case)
+    observed = barrier_process(guest, case, mode)
     pam = guest.probe("read-json", case["session"])
     require(pam["present"] and pam["properties"].get("Remote") == "yes", "Submission did not traverse a real remote PAM session")
     scope = pam["properties"].get("Scope")
     require(scope and scope in observed["marker"]["cgroup"], "setsid worker left its originating PAM session cgroup unexpectedly")
     # Wait for logind's asynchronous session cleanup; do not open another target
-    # session until its original logout effect has actually been observed.
+    # session until its original logout effect has actually been observed. The
+    # observation loop watches the worker too, so a live worker is not declared
+    # surviving merely because the session record cleared first.
     deadline = time.monotonic() + 20
     after = guest.probe("session", pam["id"])
-    while time.monotonic() < deadline and (after["properties"].get("State") == "active" or (kill and observed["alive"])):
+    while time.monotonic() < deadline and (after["properties"].get("State") == "active" or observed["alive"]):
         time.sleep(0.3)
         after = guest.probe("session", pam["id"])
         observed = guest.probe("process", case["barrier"])
     require(not after["present"] or after["properties"].get("State") != "active",
             "Original PAM session stayed active; logout observation did not complete")
-    receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+    # The original session is gone now; a fresh observer session may read logind
+    # evidence without perturbing the observation above.
+    evidence = guest.probe("session-evidence", pam["id"])
+    receipt_once = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+    receipt = receipt_once
     if observed["alive"]:
-        require(receipt["status"] == "accepted", "Live stopped worker lost its operation ownership")
-        guest.probe("continue", case["barrier"])
-        deadline = time.monotonic() + 30
-        while receipt["status"] in ("accepted", "executing", "verifying") and time.monotonic() < deadline:
-            time.sleep(0.2)
-            receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
-        require(receipt["status"] in ("completed", "needs_reconciliation"), f"Continued original job has no terminal observation: {receipt}")
+        # A surviving worker keeps its operation ownership. A stopped worker is
+        # resumed with SIGCONT; a running (held) worker is explicitly released.
+        # Only then may the original approved synthetic plan run to completion.
+        require(receipt["status"] == "accepted", "Surviving worker lost its operation ownership before release")
+        resume_survivor(guest, case, mode)
+        receipt = terminal_receipt(guest, case)
+        require(receipt["status"] in ("completed", "partially_completed", "needs_reconciliation"),
+                f"Continued original job has no terminal observation: {receipt}")
     else:
+        require(observed["classification"] in ("missing", "zombie", "identity_mismatch"),
+                f"Non-alive worker was classified as {observed['classification']}, not an observed termination")
         require(receipt["status"] == "needs_reconciliation", "Dead worker must not remain presented as live or completed")
+    repeated = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+    require(repeated["id"] == receipt["id"] and repeated["status"] == receipt["status"],
+            "Repeated query changed/replayed the original job")
     require(receipt["plan_id"] == case["plan"]["id"], "Query returned a different job")
-    return {"kill_user_processes": kill, "effective_policy": policy, "pam_session": pam,
+    return {"kill_user_processes": kill, "mode": mode, "effective_policy": policy, "pam_session": pam,
             "original_session_after_logout": after, "worker_after_logout": observed,
+            "session_evidence": evidence,
             "survival": "observed_survived" if observed["alive"] else "observed_terminated",
-            "survival_guaranteed": False, "receipt_after_query_or_continue": receipt,
-            "submitted_once": True, "reexecuted": False}
+            "classification": observed["classification"], "survival_guaranteed": False,
+            "receipt_after_query_or_continue": receipt, "receipt_first_query": receipt_once,
+            "repeated_query": repeated, "submitted_once": True, "reexecuted": False}
 
 
 def services(guest, evidence, phase=None):
@@ -383,13 +435,16 @@ def journey(guest, process, args, report):
     report["runtime_before"] = facts
     report["services_full_suite"] = services(guest, report)
     report["services_before_reboot"] = services(guest, report, "prepare")
-    report["logout"] = [logout_case(guest, False), logout_case(guest, True)]
+    # Compare a frozen worker and a live (held) worker under both effective
+    # logind policies, so termination cannot be blamed on the barrier alone.
+    report["logout"] = [logout_case(guest, kill, mode)
+                        for kill in (False, True) for mode in ("running", "stopped")]
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")
     child, ack = guest.kept_submission(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]})
     try:
         require(ack["status"] == "accepted", "Reboot scenario did not receive durable ACK")
-        stopped = barrier_process(guest, case)
+        stopped = barrier_process(guest, case, "stopped")
         require(stopped["alive"] and stopped["state"] in ("T", "t"), "Reboot scenario requires a real stopped worker before boot changes")
         old_boot = facts["boot_id"]
         require(stopped["marker"]["boot_id"] == old_boot, "Worker boot identity differs before reboot")
@@ -447,8 +502,11 @@ def main():
         with vm(base_image, args, tools, report) as (guest, process):
             journey(guest, process, args, report)
         report["status"] = "evidence_complete"
-        report["limitations"] = ["Observed survival or termination applies only to the recorded VM/PAM/logind policy; setsid is not a cgroup escape or survival guarantee.",
-                                 "VM evidence does not prove any production VPS logout, guest boot, user-manager or account policy."]
+        report["limitations"] = [
+            "Observed survival or termination applies only to the recorded VM/PAM/logind policy; setsid is not a cgroup escape or survival guarantee.",
+            "A terminated worker is reported with its observed /proc classification (missing/zombie/stopped/identity_mismatch); absence is never relabeled as a signal-confirmed death.",
+            "Live-worker and frozen-worker logout cases only remove the synthetic barrier as a confound; they do not attribute the terminating signal.",
+            "VM evidence does not prove any production VPS logout, guest boot, user-manager or account policy."]
         code = 0
         print("PASS: disposable real Linux VM lifecycle evidence complete; logout survival remains an observed limitation", flush=True)
     except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as error:

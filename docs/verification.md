@@ -34,6 +34,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `native-host-rust-test` | rust | `cargo test --manifest-path extensions/browser/native-host/Cargo.toml` (standalone crate) |
 | `runner-build` | rust | `cargo build -p lintel-runner` |
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
+| `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |
 | `desktop-build` | desktop | `npm run build` in `apps/desktop` (tsc + Vite) |

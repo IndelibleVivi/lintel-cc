@@ -10,6 +10,24 @@ Service changes use that journey's approved core plans. These probes only change
 the disposable guest's logout policy for its synthetic `lintel-fixture` user and observe/continue the exact
 runner process recorded by the synthetic after-accept barrier.
 
+Logout is observed twice per effective `KillUserProcesses` policy: once with a
+worker frozen by `LINTEL_TEST_ACCEPT_BARRIER` (SIGSTOP) and once with a worker
+kept live by `LINTEL_TEST_WAIT_BARRIER`/`LINTEL_TEST_WAIT_RELEASE`, which blocks
+between the durable ACK and the original approved plan body until the harness
+writes an explicitly released marker under the same synthetic home. Running the
+two modes under both policies separates "the synthetic barrier was frozen" from
+"the host ended the worker". The probe records finite `/proc` identity
+(pid/ppid/pgrp/session/starttime/state/cgroup) and a classification
+(`running`/`stopped`/`zombie`/`missing`/`identity_mismatch`); a vanished pid is
+reported as `missing` and is never presented as signal-confirmed death. A zombie
+has no `/proc/<pid>/exe` by kernel design, so it is classified from its `stat`
+state and never collapsed into `missing`. `session-evidence` is bounded to the
+exact original session: its `session-<id>.scope` unit journal and logind lines
+naming that session id, never the observer's user unit list. A surviving worker
+is resumed (SIGCONT for a stopped worker, explicit release for a running one) and
+must then finish the same original approved plan; a terminated worker must
+reconcile to `needs_reconciliation`.
+
 Run the independent acceptance explicitly on an Ubuntu x86_64 host:
 
 ```sh

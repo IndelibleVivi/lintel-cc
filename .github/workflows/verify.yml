@@ -70,7 +70,6 @@ jobs:
       - name: Verification control self-tests
         run: |
           python3 tests/verify.py --self-test
-          python3 tests/fixtures/linux_vm/test_wait_boot.py -v
 
       - name: Synthetic verification
         run: python3 tests/verify.py --json "$RUNNER_TEMP/lintel-verify/evidence.json"

@@ -4,6 +4,10 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## SSH 生命周期调查（源码候选）
+
+新增正常等待与 SIGSTOP 两种 after-ACK barrier，在 disposable VM 对两种有效 logout policy 做 2×2 对照；记录进程身份、真实 session scope 和有限原 session journal。此前证据来自 SIGSTOP worker 的终止观察，尚未归因到信号或 logind；正常运行 worker 的结果待新 Linux runtime。进程探测区分 missing、zombie、identity mismatch，不把缺失等同于确认被某信号杀死。控制流程测试纳入统一验证入口 `linux-vm-control-test`；没有改变生产 supervisor 或主机登录政策。
+
 ## 精确服务生命周期与视觉身份（候选）
 
 Linux runner、App 和 CLI/TUI 已接通明确 root 绑定的 systemd service 检查、批准暂停与独立批准恢复。持久 owned drop-in 阻止重新启动，实际加载 condition、inactive/MainPID/cgroup 读回才认定暂停；清理预览和执行复查 live hold，手工 stopped 确认不能替代它。恢复核对原 root 对象与 unit 来源，只移除原任务拥有的 blocker，原 active 才启动，原 inactive 保持停止；外部编辑、共享停止传播和可能影响邻居的启动依赖拒绝。当前 UID user manager 或已为 root 的 system manager 有限支持，不自动 sudo、不改 login policy。见 [服务指南](services.md)。
