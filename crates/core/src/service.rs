@@ -2089,6 +2089,36 @@ mod tests {
         assert!(!log(&engine).contains("start:"));
     }
     #[test]
+    fn pending_or_failed_target_refuses_resume_before_mutation() {
+        for failed in [false, true] {
+            let (_temp, engine, e, _root) = fixture(true);
+            let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+            let paused = execute(&engine, &plan);
+            assert_eq!(paused["data"]["status"], "completed", "{paused}");
+            let mut properties = load(&stored(&engine)).unwrap();
+            if failed {
+                properties["ActiveState"] = json!("failed");
+                properties["SubState"] = json!("failed");
+            } else {
+                properties["Job"] = json!("7 /org/freedesktop/systemd1/job/7");
+            }
+            save(&stored(&engine), &properties).unwrap();
+            let before = log(&engine);
+            let resume = engine
+                .request(json!({"command":"plan_service_resume","job_id":paused["data"]["id"]}));
+            assert_eq!(
+                resume["error"]["code"], "service_state_unsupported",
+                "{resume}"
+            );
+            assert!(Path::new(plan["service"]["hold"]["path"].as_str().unwrap()).exists());
+            assert_eq!(log(&engine), before);
+            assert_eq!(
+                engine.request(json!({"command":"job","job_id":paused["data"]["id"]}))["data"],
+                paused["data"]
+            );
+        }
+    }
+    #[test]
     fn root_alias_shared_stop_and_live_process_binding_are_rejected_before_mutation() {
         for (key, value, code) in [
             ("Id", json!("alias.service"), "service_unit_unsupported"),

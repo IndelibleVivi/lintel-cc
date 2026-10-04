@@ -92,8 +92,29 @@ class Journey:
         return receipt
 
     def properties(self, unit):
-        out = self.systemctl('show', '--all', '--property=ActiveState,MainPID,NRestarts,InvocationID,ControlGroup', unit).stdout
+        out = self.systemctl('show', '--all', '--property=ActiveState,SubState,Job,MainPID,NRestarts,InvocationID,ControlGroup', unit).stdout
         return dict(line.split('=', 1) for line in out.splitlines())
+
+    def settle_owned_timer(self, phase):
+        # After the live activation proof, this test's 200ms timer must stop
+        # submitting jobs during the independent source-conflict/resume check.
+        # Its enablement and source remain intact for the separately run reboot.
+        self.check_ownership()
+        evidence = dict(timer_before=self.properties(self.timer), target_before=self.properties(self.target))
+        self.report.setdefault('fixture_timer_phases', {})[phase] = evidence
+        self.systemctl('stop', self.timer)
+        evidence['timer_after'] = self.properties(self.timer)
+        assert evidence['timer_after']['ActiveState'] == 'inactive' and evidence['timer_after']['SubState'] == 'dead', evidence
+        assert evidence['timer_after']['Job'] == '', evidence
+        deadline = time.monotonic() + 5
+        while True:
+            target = evidence['target_after'] = self.properties(self.target)
+            if target['ActiveState'] == 'inactive' and target['SubState'] == 'dead' and target['MainPID'] == '0' and target['Job'] == '':
+                break
+            assert target['ActiveState'] != 'failed', ('owned target failed after timer stop; no reset/retry', evidence)
+            assert time.monotonic() < deadline, ('owned target did not settle after timer stop', evidence)
+            time.sleep(.05)  # Read only: finish an already queued native job, never repeat a Lintel mutation.
+        self.report['checks'].append('owned_timer_settled_for_' + phase)
 
     def bus_property(self, key, interface='org.freedesktop.systemd1.Service'):
         path = '/org/freedesktop/systemd1/unit/' + ''.join(
@@ -212,60 +233,75 @@ while True:
         assert observed['bound'] and observed['active_state'] == 'active'
         assert observed['restart'] == 'always'
         assert self.timer in observed['triggered_by']
+        self.report['checks'].append('ordinary_local_unit')
         wrong_root = self.home / 'different-root'
         wrong_root.mkdir()
         other = self.request('register', name='Synthetic wrong binding', root=str(wrong_root))
         unbound = self.request('plan_service_quiesce', good=False, environment_id=other['id'], manager='system', unit=self.target)
         assert unbound['code'] == 'service_root_unbound', unbound
+        self.report['checks'].append('exact_root_binding')
         alias = self.request('plan_service_quiesce', good=False, environment_id=self.report['environment_id'], manager='system', unit=self.alias)
         assert alias['code'] == 'service_unit_unsupported', alias
+        self.report['checks'].append('alias_rejected')
         cleanup = self.request('plan_cleanup', good=False, environment_id=self.report['environment_id'], recipe='repair_login',
                                writers_confirmed_stopped=True, official_logout=False, categories=[])
         assert cleanup['code'] == 'service_quiescence_required', cleanup
+        self.report['checks'].append('cleanup_checkbox_requires_live_hold')
         neighbor_before = self.properties(self.neighbor)
         plan = self.service('plan_service_quiesce')
         assert not Path(plan['service']['hold']['path']).exists()
         mismatch = self.request('execute', good=False, plan_id=plan['id'], approval='not-approved')
         assert mismatch['code'] == 'approval_mismatch'
         assert self.properties(self.target)['MainPID'] == str(observed['main_pid'])
+        self.report['checks'].append('wrong_approval_no_mutation')
         self.report['quiesce_job_id'] = plan['id']
         self.report['quiesce_plan'] = plan
         receipt = self.execute(plan)
         current = self.service('service_inspect')
         assert current['quiesced'] and current['active_state'] == 'inactive' and current['main_pid'] == 0, current
+        self.report.update(quiesce_receipt=receipt, held_inspect=current)
+        self.report['checks'].append('target_cgroup_stopped')
         count = self.pulse(self.root)
         neighbor_count = self.pulse(self.home / 'synthetic-neighbor')
         # Restart=always and a running timer must not restore the target writer.
+        activation = self.report['held_activation_evidence'] = dict(timer_before=self.properties(self.timer))
+        assert activation['timer_before']['ActiveState'] == 'active', activation
         self.systemctl('start', self.target)  # native start succeeds with a skipped condition, never writes.
         time.sleep(1)
+        activation.update(timer_after=self.properties(self.timer), target_after=self.properties(self.target))
+        assert activation['timer_after']['ActiveState'] == 'active', activation
         assert self.pulse(self.root) == count, 'target rewrote synthetic state while held'
         assert self.pulse(self.home / 'synthetic-neighbor') > neighbor_count, 'neighbor stopped'
         assert self.properties(self.neighbor)['InvocationID'] == neighbor_before['InvocationID'], 'neighbor was restarted'
         assert self.properties(self.target)['ActiveState'] == 'inactive'
+        self.report['checks'] += ['restart_and_timer_blocked', 'neighbor_keeps_running_without_restart']
         assert self.request('execute', plan_id=plan['id'], approval=plan['hash'])['id'] == receipt['id']
         assert self.request('job', job_id=receipt['id'])['id'] == receipt['id']
         assert self.pulse(self.root) == count, 'replay mutated the original job'
+        self.report['checks'].append('same_job_query_and_replay')
         assert (self.root / '.credentials.json').read_text() == 'SYNTHETIC_NOT_A_REAL_CREDENTIAL\n'
         assert (self.root / 'settings.json').read_text() == '{}\n'
+        self.report['checks'].append('credentials_and_settings_untouched')
+        self.settle_owned_timer('external_edit')
         # A real external unit edit must survive a rejected restoration.
         unit_path = Path('/etc/systemd/system') / self.target
         original = unit_path.read_text()
         external = original.replace('Description=Lintel disposable inert writer', 'Description=External synthetic edit')
         unit_path.write_text(external)
         self.systemctl('daemon-reload')
+        evidence = self.report['external_edit_evidence'] = dict(target_before_request=self.properties(self.target),
+                                                               timer_before_request=self.properties(self.timer))
         conflict = self.request('plan_service_resume', good=False, job_id=receipt['id'])
+        evidence.update(error=conflict, target_after_request=self.properties(self.target))
         assert conflict['code'] == 'service_restore_conflict', conflict
         assert unit_path.read_text() == external and Path(plan['service']['hold']['path']).exists()
+        self.report['checks'].append('unit_edit_conflict_retained')
         unit_path.write_text(original)  # Only restores this script's own synthetic fixture.
         self.systemctl('daemon-reload')
         current = self.service('service_inspect')
         assert current['quiesced'], current
         self.report.update(prebootinspect=current, hold=current['hold'], target_pulse_before_reboot=count,
                            quiesce_receipt=receipt, phase='prepared')
-        self.report['checks'] += ['ordinary_local_unit', 'exact_root_binding', 'alias_rejected', 'wrong_approval_no_mutation',
-                                  'cleanup_checkbox_requires_live_hold', 'target_cgroup_stopped', 'restart_and_timer_blocked',
-                                  'neighbor_keeps_running_without_restart', 'same_job_query_and_replay', 'unit_edit_conflict_retained',
-                                  'credentials_and_settings_untouched']
         return self.report
 
     def recover(self):
@@ -273,12 +309,23 @@ while True:
         jid = self.report['quiesce_job_id']
         receipt = self.request('job', job_id=jid)
         assert receipt['id'] == jid
+        new_boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+        recovery_activation = self.report['recovery_activation_evidence'] = dict(timer_before=self.properties(self.timer))
+        if new_boot != self.report['boot_id']:
+            assert recovery_activation['timer_before']['ActiveState'] == 'active', recovery_activation
+        assert self.pulse(self.root) == self.report['target_pulse_before_reboot'], 'target restarted before approved recovery'
+        # The enabled owned timer is running again after an actual reboot.
+        # Observe a manual skipped start while still held, then settle that
+        # exact timer before the stable product inspect and resume preview.
+        self.systemctl('start', self.target)
+        time.sleep(1)
+        recovery_activation.update(timer_after=self.properties(self.timer), target_after=self.properties(self.target))
+        assert self.pulse(self.root) == self.report['target_pulse_before_reboot'], 'held target rewrote state during recovery activation proof'
+        self.settle_owned_timer('resume')
         observed = self.service('service_inspect')
         assert observed['quiesced'] and observed['active_state'] == 'inactive' and observed['main_pid'] == 0, observed
         assert observed['quiesce_job_id'] == jid
         assert self.pulse(self.root) == self.report['target_pulse_before_reboot'], 'target restarted before approved recovery'
-        self.systemctl('start', self.target)
-        assert self.properties(self.target)['ActiveState'] == 'inactive'
         self.wait_pulse(self.home / 'synthetic-neighbor')
         before = self.properties(self.neighbor)
         plan = self.request('plan_service_resume', job_id=jid)
@@ -302,7 +349,6 @@ while True:
         self.execute(resume)
         assert self.properties(self.target)['ActiveState'] == 'inactive'
         assert (self.root / '.credentials.json').read_text() == 'SYNTHETIC_NOT_A_REAL_CREDENTIAL\n'
-        new_boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
         self.report.update(postbootinspect=observed, resume_receipt=restored, reboot_observed=new_boot != self.report['boot_id'],
                            recovered_boot_id=new_boot, phase='recovered', status='passed')
         self.report['checks'] += ['persistent_hold_loaded_on_recovery', 'original_job_recovered_without_reexecute',
