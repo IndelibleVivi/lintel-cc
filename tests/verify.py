@@ -128,6 +128,12 @@ CHECKS: List[Check] = [
                Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
                ROOT / "apps/desktop/dist/index.html"), loopback=True,
            independent=True, reason="headless Chromium UI evidence; service manager and invoke are synthetic"),
+    _check("remote-task-ui", "built App original SSH task/reopen/conflict/separate restore (synthetic transport)",
+           "independent", *(NODE or "node", "tests/remote_task_ui_journey.mjs"),
+           tools=("node",), paths=(
+               Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
+               ROOT / "apps/desktop/dist/index.html"), loopback=True,
+           independent=True, reason="headless Chromium recovery UI evidence; SSH/invoke/registry are synthetic"),
     _check("linux-vm-control-test", "disposable VM launcher and barrier control-flow tests (no VM)", "python",
            PYTHON, "-m", "unittest", "discover", "-s", "tests/fixtures/linux_vm", "-v"),
     _check("linux-vm-runtime", "disposable Ubuntu VM systemd/PAM/logout/cgroup/reboot journey", "independent",

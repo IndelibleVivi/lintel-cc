@@ -17,6 +17,8 @@
 
 桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重；真实 Linux VM 中两种 logout policy 都观察到 worker 被终止，原任务查询正确进入 `needs_reconciliation`，没有重新提交。主机真实重启后的原任务核对也已通过，**不能承诺退出登录后继续执行**；生产 VPS 行为仍需独立验收，见 [远程指南](docs/remote.md)。
 
+桌面重开后，可在主机面板的持久提交记录“查询原任务”，再选择“查看完整回执与恢复”，进入该 alias 和环境的结果页。配置恢复与服务恢复仍各自预览并批准；移除主机后只保留原任务查询，重新登记后才可准备恢复。
+
 App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；项目仓库保留完整目标、实际验收证据与当前限制。
 
 ## 本地构建与试用

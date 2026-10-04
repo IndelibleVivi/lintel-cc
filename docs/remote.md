@@ -185,7 +185,7 @@ stderr 最多在内存保留 64 KiB，显示片段最多 4096 字节并按 UTF-8
 1. 先持久保存原 `plan_id`、`lookup_id` 与 `submission_unknown`，再启动 SSH。记录不包含 approval、archive passphrase、远端路径、设置或完整 receipt。
 2. 每个本地计划记录最多发送一次 `lintel submit`。runner 必须在远端 journal 持久接受后才返回 accepted Receipt，不能仅凭收到 stdin 宣称 accepted。连接的 `discover` capabilities 提供 detached submission 能力说明。
 3. 只有有效 Envelope 与匹配 `plan_id`、`id` 的 Receipt 才更新本地观察到的状态。`accepted` 与 `completed` 是不同状态；执行结果仍以远端逐步 journal 为准。
-4. ACK 丢失、deadline、SSH 断开、桌面重开或重复点击执行，都转向原 plan/job 的查询。`hosts.tasks` 让桌面重开后仍能显示这些待核对任务。查询不带口令，也不会创建第二份清理。
+4. ACK 丢失、deadline、SSH 断开、桌面重开或重复点击执行，都转向原 plan/job 的查询。`hosts.tasks` 让桌面重开后仍能显示这些待核对任务。“查询原任务”后可选“查看完整回执与恢复”，只读核对该 alias 的原环境，再打开完整结果与记录。查询不带口令，也不会创建第二份清理。配置恢复／服务恢复仍需各自的新预览与批准；已移除 alias 保留 query-only，重新登记后才能准备恢复。关闭查询面板后，迟到响应不重新打开结果。
 5. 原 job 不可获得时返回 `reconciliation_required`。查不到记录不能证明副作用没有发生；应核对远端 journal 和目标状态，不要通过删除控制端记录恢复“执行”按钮。后续操作应基于核对结果生成新计划。
 
 本地 intent 持久化不代表远端已 durable accept。提交在发送前就失败时，同样保留保守的查询路径；工具不会为便利假设无副作用。

@@ -4,6 +4,10 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## SSH 原任务与恢复入口（候选）
+
+主机面板查询原任务后可直接查看完整回执与恢复，进入准确 alias／环境的记录；已移除主机保留 query-only。恢复依旧独立预览和批准。TypeScript/Vite 与 `remote-task-ui`、`service-ui` 本机渲染检查通过，涵盖丢 ACK 后 App reload、一次原提交、查询更新、关闭面板后的迟到响应、后续编辑冲突、独立恢复和 Day/Night 1120／900 布局。`remote-task-ui` 的 SSH/invoke/持久 registry 为合成；不代表 native WebKit、真实 SSH 或生产 VPS。CI 的既有独立 browser owner 已接统一入口；新 CI 结果待核对。
+
 ## SSH 生命周期调查（源码候选）
 
 新增正常等待与 SIGSTOP 两种 after-ACK barrier，在 disposable VM 对两种有效 logout policy 做 2×2 对照；记录进程身份、真实 session scope 和有限原 session journal。此前证据来自 SIGSTOP worker 的终止观察，尚未归因到信号或 logind；正常运行 worker 的结果待新 Linux runtime。进程探测区分 missing、zombie、identity mismatch，不把缺失等同于确认被某信号杀死。控制流程测试纳入统一验证入口 `linux-vm-control-test`；没有改变生产 supervisor 或主机登录政策。
