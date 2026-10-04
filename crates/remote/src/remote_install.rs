@@ -630,13 +630,13 @@ eval "$last"
     }
     #[test]
     fn finite_policy_schema_accepts_version_conditions_but_rejects_unmodeled_fields() {
-        assert!(validate_request(&json!({"command":"inspect","environment_id":"synthetic","trusted_devices":"not_required"})).is_ok());
-        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":true,"trusted_devices":"unknown","release_settings":["DISABLE_TELEMETRY"]})).is_ok());
+        assert!(validate_request(&json!({"command":"inspect","environment_id":"00000000-0000-4000-8000-000000000001","trusted_devices":"not_required"})).is_ok());
+        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":true,"trusted_devices":"unknown","release_settings":["DISABLE_TELEMETRY"]})).is_ok());
         assert!(validate_request(
-            &json!({"command":"inspect","environment_id":"synthetic","trusted_devices":"maybe"})
+            &json!({"command":"inspect","environment_id":"00000000-0000-4000-8000-000000000001","trusted_devices":"maybe"})
         )
         .is_err());
-        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":true,"release_settings":["UNMODELED_ENV"]})).is_err());
+        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":true,"release_settings":["UNMODELED_ENV"]})).is_err());
     }
     #[test]
     fn task_queries_use_original_digest_after_update() {

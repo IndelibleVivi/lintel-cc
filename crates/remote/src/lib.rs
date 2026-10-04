@@ -1277,7 +1277,7 @@ mod tests {
             .unwrap();
         (temp, controller)
     }
-    const RECEIPT: &str = r#"printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"completed"}}'"#;
+    const RECEIPT: &str = r#"printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","plan_id":"00000000-0000-4000-8000-000000000002","status":"completed"}}'"#;
 
     #[test]
     fn static_aliases_do_not_execute_config_or_expose_contents() {
@@ -1361,9 +1361,9 @@ mod tests {
     #[test]
     fn execute_persists_intent_and_secret_only_crosses_stdin() {
         let (temp, controller) = fixture(&format!(
-            "test -f state/remote/tasks/synthetic-host/plan-1.json || exit 7\n{RECEIPT}"
+            "test -f state/remote/tasks/synthetic-host/00000000-0000-4000-8000-000000000002.json || exit 7\n{RECEIPT}"
         ));
-        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"SECRET_APPROVAL","archive_passphrase":"SECRET_ARCHIVE_PASSPHRASE"});
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"SECRET_APPROVAL","archive_passphrase":"SECRET_ARCHIVE_PASSPHRASE"});
         let response = controller.dispatch(request.clone()).unwrap();
         assert_eq!(response["data"]["status"], "completed");
         assert!(fs::read_to_string(temp.path().join("args"))
@@ -1371,15 +1371,19 @@ mod tests {
             .ends_with("lintel\nsubmit\n"));
         let input = fs::read_to_string(temp.path().join("input")).unwrap();
         assert!(input.contains("SECRET_ARCHIVE_PASSPHRASE"));
-        let record =
-            fs::read_to_string(controller.state.join("tasks/synthetic-host/plan-1.json")).unwrap();
+        let record = fs::read_to_string(
+            controller
+                .state
+                .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000002.json"),
+        )
+        .unwrap();
         assert!(!record.contains("SECRET"));
         assert!(!record.contains("approval"));
         controller.dispatch(request).unwrap();
         let input = fs::read_to_string(temp.path().join("input")).unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&input).unwrap(),
-            json!({"command":"job","job_id":"plan-1"})
+            json!({"command":"job","job_id":"00000000-0000-4000-8000-000000000002"})
         );
         let tasks = controller.dispatch(json!({"op":"hosts"})).unwrap();
         assert_eq!(tasks["data"]["tasks"][0]["alias"], "synthetic-host");
@@ -1390,15 +1394,19 @@ mod tests {
     fn ack_loss_and_reopen_query_same_job_without_resubmitting() {
         let (temp, controller) = fixture(
             r#"if test ! -f called; then touch called; printf 'private path/key/account' >&2; exit 255; fi
-printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"completed"}}'"#,
+printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","plan_id":"00000000-0000-4000-8000-000000000002","status":"completed"}}'"#,
         );
-        let request =
-            json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"secret"});
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"secret"});
         let error = envelope(controller.dispatch(request.clone()));
         assert_eq!(error["error"]["code"], "transport_unknown");
         assert!(!error.to_string().contains("private path"));
         assert_eq!(
-            load(&controller.state.join("tasks/synthetic-host/plan-1.json")).unwrap()["status"],
+            load(
+                &controller
+                    .state
+                    .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000002.json")
+            )
+            .unwrap()["status"],
             "submission_unknown"
         );
         let reopened = Controller {
@@ -1418,7 +1426,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         let input = fs::read_to_string(temp.path().join("input")).unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(&input).unwrap(),
-            json!({"command":"job","job_id":"plan-1"})
+            json!({"command":"job","job_id":"00000000-0000-4000-8000-000000000002"})
         );
     }
 
@@ -1436,8 +1444,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
                 interpreter: controller.transport.interpreter.clone(),
             },
         };
-        let request =
-            json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"secret"});
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"secret"});
         std::thread::scope(|scope| {
             let first = scope.spawn(|| controller.dispatch(request.clone()));
             let second = scope.spawn(|| other.dispatch(request.clone()));
@@ -1454,14 +1461,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         let (temp, controller) = fixture(
             r#"printf '%s\n' '{"ok":false,"error":{"code":"job_not_found","message":"synthetic missing job"}}'; exit 1"#,
         );
-        let response = controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"plan-1"}})).unwrap();
+        let response = controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"00000000-0000-4000-8000-000000000002"}})).unwrap();
         assert_eq!(response["error"]["code"], "job_not_found");
-        let request = json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-1"});
+        let request = json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002"});
         assert_eq!(
             envelope(controller.dispatch(request))["error"]["code"],
             "reconciliation_required"
         );
-        assert_eq!(envelope(controller.dispatch(json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"secret"})))["error"]["code"], "reconciliation_required");
+        assert_eq!(envelope(controller.dispatch(json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"secret"})))["error"]["code"], "reconciliation_required");
         assert!(!fs::read_to_string(temp.path().join("args"))
             .unwrap()
             .lines()
@@ -1473,8 +1480,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         let (temp, controller) = fixture(
             r#"printf '%s\n' '{"ok":true,"data":{"id":"other-id","plan_id":"other-plan","status":"completed"}}'"#,
         );
-        let request =
-            json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"secret"});
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"secret"});
         assert_eq!(
             envelope(controller.dispatch(request.clone()))["error"]["code"],
             "receipt_mismatch"
@@ -1484,8 +1490,13 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             "receipt_mismatch"
         );
         assert_eq!(
-            load(&controller.state.join("tasks/synthetic-host/plan-1.json")).unwrap()["lookup_id"],
-            "plan-1"
+            load(
+                &controller
+                    .state
+                    .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000002.json")
+            )
+            .unwrap()["lookup_id"],
+            "00000000-0000-4000-8000-000000000002"
         );
         assert_eq!(
             fs::read_to_string(temp.path().join("args"))
@@ -1523,10 +1534,13 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     fn finite_schema_blocks_arbitrary_commands_and_mutation_bypass() {
         let (temp, controller) = fixture(RECEIPT);
         for request in [
+            json!({"command":"inspect","environment_id":"malformed"}),
+            json!({"command":"plan_show","plan_id":"malformed"}),
+            json!({"command":"job","job_id":"malformed"}),
             json!({"command":"execute","plan_id":"x","approval":"x"}),
             json!({"command":"shell","argv":["bad"]}),
             json!({"command":"discover","shell":"bad"}),
-            json!({"command":"plan_policy","environment_id":"x","preset":"reduce","keep_remote_control":"false"}),
+            json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":"false"}),
         ] {
             assert!(controller
                 .dispatch(json!({"op":"request","alias":"synthetic-host","request":request}))
@@ -1537,7 +1551,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     #[test]
     fn services_use_finite_preview_schema_and_never_send_shell_or_mutation_bypass() {
         let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
-        let inspect = json!({"command":"service_inspect","environment_id":"env-1","manager":"user","unit":"synthetic-target.service"});
+        let inspect = json!({"command":"service_inspect","environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":"synthetic-target.service"});
         for unit in [
             "*.service",
             "../target.service",
@@ -1557,14 +1571,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         invalid = inspect.clone();
         invalid["shell"] = json!("stop");
         assert!(validate_request(&invalid).is_err());
-        assert!(validate_request(&json!({"command":"service_stop","environment_id":"env-1","manager":"user","unit":"synthetic-target.service"})).is_err());
+        assert!(validate_request(&json!({"command":"service_stop","environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":"synthetic-target.service"})).is_err());
         assert!(!temp.path().join("args").exists());
         assert!(controller
             .dispatch(json!({"op":"request","alias":"synthetic-host","request":inspect}))
             .is_ok());
-        assert!(validate_request(&json!({"command":"plan_service_quiesce","environment_id":"env-1","manager":"system","unit":"synthetic-target.service"})).is_ok());
+        assert!(validate_request(&json!({"command":"plan_service_quiesce","environment_id":"00000000-0000-4000-8000-000000000001","manager":"system","unit":"synthetic-target.service"})).is_ok());
         assert!(validate_request(
-            &json!({"command":"plan_service_resume","job_id":"original-job"})
+            &json!({"command":"plan_service_resume","job_id":"00000000-0000-4000-8000-000000000003"})
         )
         .is_ok());
         let args = fs::read_to_string(temp.path().join("args")).unwrap();
@@ -1573,7 +1587,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     #[test]
     fn custom_policy_crosses_finite_schema_without_arbitrary_env() {
         let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
-        let request = json!({"command":"plan_policy","environment_id":"env-1","preset":"custom","keep_remote_control":true,"trusted_devices":"not_required","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DISABLE_GROWTHBOOK":"remove","DISABLE_TELEMETRY":"keep"}});
+        let request = json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"custom","keep_remote_control":true,"trusted_devices":"not_required","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DISABLE_GROWTHBOOK":"remove","DISABLE_TELEMETRY":"keep"}});
         for choices in [
             json!(null),
             json!([]),
@@ -1612,13 +1626,13 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         let (temp, controller) =
             fixture("printf '%s' '{\"ok\":true,\"data\":'; cat input; printf '}\\n'");
         let requests = [
-            json!({"command":"plan_show","plan_id":"plan-1"}),
-            json!({"command":"job","plan_id":"plan-1"}),
-            json!({"command":"plan_archive","environment_id":"env-1","categories":["memory"],"output_path":"/synthetic/export; touch bad.lintel-work"}),
-            json!({"command":"plan_preserve","environment_id":"env-1","categories":["instructions","sessions"],"name":"Synthetic $(touch bad)"}),
+            json!({"command":"plan_show","plan_id":"00000000-0000-4000-8000-000000000002"}),
+            json!({"command":"job","plan_id":"00000000-0000-4000-8000-000000000002"}),
+            json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"output_path":"/synthetic/export; touch bad.lintel-work"}),
+            json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions","sessions"],"name":"Synthetic $(touch bad)"}),
             json!({"command":"archive_inspect","archive_path":"/synthetic/import; touch bad.lintel-work","archive_passphrase":"SECRET_PORTABLE_ARCHIVE_PASSPHRASE"}),
             json!({"command":"archive_read","archive_path":"/synthetic/import; touch bad.lintel-work","archive_passphrase":"SECRET_PORTABLE_ARCHIVE_PASSPHRASE","path":"memory/notes.md"}),
-            json!({"command":"plan_import","environment_id":"env-1","archive_path":"/synthetic/import; touch bad.lintel-work","categories":["memory"],"archive_passphrase":"SECRET_PORTABLE_ARCHIVE_PASSPHRASE"}),
+            json!({"command":"plan_import","environment_id":"00000000-0000-4000-8000-000000000001","archive_path":"/synthetic/import; touch bad.lintel-work","categories":["memory"],"archive_passphrase":"SECRET_PORTABLE_ARCHIVE_PASSPHRASE"}),
         ];
         for request in &requests {
             lintel_operations::validate(request).unwrap();
@@ -1642,8 +1656,8 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             "touch",
             "memory",
             "archive_path",
-            "plan-1",
-            "env-1",
+            "00000000-0000-4000-8000-000000000002",
+            "00000000-0000-4000-8000-000000000001",
             "submit",
         ] {
             assert!(
@@ -1671,14 +1685,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
                 request["path"] = json!("memory/notes.md");
             }
             if command == "plan_import" {
-                request["environment_id"] = json!("env-1");
+                request["environment_id"] = json!("00000000-0000-4000-8000-000000000001");
                 request["categories"] = json!(["memory"]);
             }
             // Neither source, both sources, and a relative path all violate the
             // same operation schema used by the named local CLI.
             for source in [
                 json!({}),
-                json!({"job_id":"job-1","archive_path":"/synthetic/archive"}),
+                json!({"job_id":"00000000-0000-4000-8000-000000000003","archive_path":"/synthetic/archive"}),
                 json!({"archive_path":"relative/archive"}),
             ] {
                 let mut invalid = request.clone();
@@ -1694,14 +1708,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         }
         for request in [
             json!({"command":"job"}),
-            json!({"command":"job","job_id":"job-1","plan_id":"plan-1"}),
-            json!({"command":"plan_policy","environment_id":"env-1","preset":"reduce"}),
-            json!({"command":"plan_archive","environment_id":"env-1","categories":["memory"],"output_path":"relative/archive"}),
-            json!({"command":"plan_archive","environment_id":"env-1","categories":[]}),
-            json!({"command":"plan_preserve","environment_id":"env-1","categories":["memory"],"shell":"bad"}),
-            json!({"command":"execute","plan_id":"plan-1","approval":"secret"}),
-            json!({"command":"launch","environment_id":"env-1"}),
-            json!({"command":"launch_context","environment_id":"env-1"}),
+            json!({"command":"job","job_id":"00000000-0000-4000-8000-000000000003","plan_id":"00000000-0000-4000-8000-000000000002"}),
+            json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce"}),
+            json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"output_path":"relative/archive"}),
+            json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":[]}),
+            json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"shell":"bad"}),
+            json!({"command":"execute","plan_id":"00000000-0000-4000-8000-000000000002","approval":"secret"}),
+            json!({"command":"launch","environment_id":"00000000-0000-4000-8000-000000000001"}),
+            json!({"command":"launch_context","environment_id":"00000000-0000-4000-8000-000000000001"}),
         ] {
             assert!(controller
                 .dispatch(json!({"op":"request","alias":"synthetic-host","request":request}))
@@ -1775,10 +1789,10 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
     fn cleanup_and_archive_payloads_keep_data_on_stdin_without_persistence() {
         let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
         for request in [
-            json!({"command":"plan_cleanup","environment_id":"env-1","recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":false,"categories":["memory"]}),
-            json!({"command":"archive_inspect","job_id":"plan-1","archive_passphrase":"SECRET_SYNTHETIC_PHRASE"}),
-            json!({"command":"archive_read","job_id":"plan-1","archive_passphrase":"SECRET_SYNTHETIC_PHRASE","path":"memory/notes.md"}),
-            json!({"command":"plan_import","environment_id":"env-1","job_id":"plan-1","categories":["memory"],"archive_passphrase":"SECRET_SYNTHETIC_PHRASE"}),
+            json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":false,"categories":["memory"]}),
+            json!({"command":"archive_inspect","job_id":"00000000-0000-4000-8000-000000000002","archive_passphrase":"SECRET_SYNTHETIC_PHRASE"}),
+            json!({"command":"archive_read","job_id":"00000000-0000-4000-8000-000000000002","archive_passphrase":"SECRET_SYNTHETIC_PHRASE","path":"memory/notes.md"}),
+            json!({"command":"plan_import","environment_id":"00000000-0000-4000-8000-000000000001","job_id":"00000000-0000-4000-8000-000000000002","categories":["memory"],"archive_passphrase":"SECRET_SYNTHETIC_PHRASE"}),
         ] {
             assert!(controller
                 .dispatch(json!({"op":"request","alias":"synthetic-host","request":request}))
@@ -1805,12 +1819,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         .unwrap();
         let known_hosts = controller.config.parent().unwrap().join("known_hosts");
         fs::write(&known_hosts, "synthetic untouched host key").unwrap();
-        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-1","approval":"private-approval"});
+        let request = json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002","approval":"private-approval"});
         assert_eq!(
             envelope(controller.dispatch(request.clone()))["error"]["code"],
             "transport_unknown"
         );
-        let task = controller.state.join("tasks/synthetic-host/plan-1.json");
+        let task = controller
+            .state
+            .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000002.json");
         let before = fs::read(&task).unwrap();
         controller
             .dispatch(json!({"op":"add_host","alias":"other-host"}))
@@ -1837,7 +1853,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             "host_not_registered"
         );
         let queried = controller
-            .dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-1"}))
+            .dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002"}))
             .unwrap();
         assert_eq!(queried["data"]["status"], "completed");
         assert_eq!(
@@ -1866,7 +1882,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
         );
         assert!(controller
             .state
-            .join("tasks/synthetic-host/plan-1.lock")
+            .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000002.lock")
             .exists());
     }
 
@@ -2072,14 +2088,14 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             ("printf '%s' '{\"ok\":false,\"error\":{\"code\":\"synthetic_rejected\",\"message\":\"synthetic error\"}}'; exit 1", true),
         ] {
             let (temp, controller) = fixture(body);
-            let payload = if submit { json!({"command":"execute","plan_id":"plan-1","approval":"SENSITIVE_APPROVAL"}) } else { json!({"command":"discover"}) };
+            let payload = if submit { json!({"command":"execute","plan_id":"00000000-0000-4000-8000-000000000002","approval":"SENSITIVE_APPROVAL"}) } else { json!({"command":"discover"}) };
             let response = envelope(controller.transport.call("synthetic-host", &payload, submit));
             let command = response["error"]["diagnostic"]["command"].as_str().unwrap();
             assert!(command.ends_with("synthetic-host 'command -v lintel'"));
             assert!(!command.contains("submit"));
             assert!(!command.contains("request"));
             assert!(!command.contains("SENSITIVE"));
-            assert!(!command.contains("plan-1"));
+            assert!(!command.contains("00000000-0000-4000-8000-000000000002"));
             let args = fs::read_to_string(temp.path().join("args")).unwrap();
             for flag in args.lines().filter(|arg| arg.starts_with('-')) { assert!(command.contains(flag), "missing {flag}: {command}"); }
         }

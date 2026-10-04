@@ -55,6 +55,11 @@ def run():
                                   '00000000-0000-4000-8000-000000000000', '--categories', '', good=False)
         assert empty_selection['error']['code'] == 'invalid_request', empty_selection
         assert not state.exists(), 'Rejected launch/selection initialized core state'
+        for operation, field in [('inspect', 'environment_id'), ('plan_show', 'plan_id'), ('job', 'job_id')]:
+            for identity in ['synthetic-invalid-id', '00000000000040008000000000000001']:
+                rejected = command('call', operation, payload={field: identity}, good=False)
+                assert rejected['error']['code'] == 'invalid_request', rejected
+                assert not state.exists(), 'Invalid UUID initialized core state'
         for operation in ['service_inspect', 'plan_service_quiesce']:
             unit_schema = command('schema', operation)['properties']['unit']
             for unit in ['claude.service', 'claude@synthetic.service', 'claude@.service',

@@ -186,6 +186,15 @@ fn check_property(value: &Value, schema: &Value) -> bool {
         Some("string") => value.as_str().is_some_and(|s| {
             s.chars().count() >= schema["minLength"].as_u64().unwrap_or(0) as usize
                 && s.chars().count() <= schema["maxLength"].as_u64().unwrap_or(u64::MAX) as usize
+                && (schema["format"] != "uuid"
+                    || (s.len() == 36
+                        && s.bytes().enumerate().all(|(index, byte)| {
+                            if [8, 13, 18, 23].contains(&index) {
+                                byte == b'-'
+                            } else {
+                                byte.is_ascii_hexdigit()
+                            }
+                        })))
         }),
         Some("boolean") => value.is_boolean(),
         Some("array") => value.as_array().is_some_and(|items| {
@@ -337,6 +346,40 @@ pub fn catalog() -> Value {
 mod tests {
     use super::*;
     #[test]
+    fn strict_ids_match_the_published_uuid_format() {
+        for (command, field) in [
+            ("inspect", "environment_id"),
+            ("plan_show", "plan_id"),
+            ("job", "job_id"),
+        ] {
+            assert_eq!(
+                schema(command).unwrap()["properties"][field]["format"],
+                "uuid"
+            );
+            for id in [
+                "00000000-0000-4000-8000-000000000001",
+                "ABCDEF01-2345-4678-9ABC-DEF012345678",
+            ] {
+                assert!(
+                    validate(&json!({"command":command,field:id})).is_ok(),
+                    "{field}: {id}"
+                );
+            }
+            for id in [
+                "synthetic",
+                "00000000000040008000000000000001",
+                "00000000-0000-4000-8000-00000000000g",
+                "00000000_0000-4000-8000-000000000001",
+                "00000000-0000-4000-8000-000000000001\n",
+            ] {
+                assert!(
+                    validate(&json!({"command":command,field:id})).is_err(),
+                    "{field}: {id}"
+                );
+            }
+        }
+    }
+    #[test]
     fn service_units_exclude_templates_paths_and_commands() {
         let unit_schema = &schema("service_inspect").unwrap()["properties"]["unit"];
         assert_eq!(
@@ -349,7 +392,7 @@ mod tests {
                 "claude@synthetic.service",
                 "a-b_1.service",
             ] {
-                assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":unit})).is_ok(), "{unit}");
+                assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":unit})).is_ok(), "{unit}");
             }
             for unit in [
                 "claude@.service",
@@ -360,9 +403,9 @@ mod tests {
                 "claude;echo.service",
                 "猫.service",
             ] {
-                assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":unit})).is_err(), "{unit}");
+                assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":unit})).is_err(), "{unit}");
             }
-            assert!(validate(&json!({"command":command,"environment_id":"synthetic","manager":"user","unit":format!("{}.service", "a".repeat(240))})).is_err());
+            assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":format!("{}.service", "a".repeat(240))})).is_err());
         }
     }
     #[test]
@@ -373,23 +416,23 @@ mod tests {
         );
         for command in ["plan_archive", "plan_preserve"] {
             assert!(validate(
-                &json!({"command":command,"environment_id":"synthetic","categories":[]})
+                &json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":[]})
             )
             .is_err());
-            assert!(validate(&json!({"command":command,"environment_id":"synthetic","categories":["instructions"]})).is_ok());
+            assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"]})).is_ok());
         }
-        assert!(validate(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
+        assert!(validate(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
     }
     #[test]
     fn schemas_validate_exact_sources_and_secret_fields() {
         assert!(validate(
-            &json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce"})
+            &json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce"})
         )
         .is_err());
-        assert!(validate(&json!({"command":"job","job_id":"a","plan_id":"b"})).is_err());
+        assert!(validate(&json!({"command":"job","job_id":"00000000-0000-4000-8000-000000000003","plan_id":"00000000-0000-4000-8000-000000000002"})).is_err());
         assert!(validate(&json!({"command":"archive_inspect","archive_path":"/tmp/synthetic.age","archive_passphrase":"synthetic-only"})).is_ok());
         assert!(validate(
-            &json!({"command":"plan_preserve","environment_id":"a","categories":["credentials"]})
+            &json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["credentials"]})
         )
         .is_err());
         assert_eq!(

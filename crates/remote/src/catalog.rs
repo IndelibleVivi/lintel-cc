@@ -355,7 +355,7 @@ mod tests {
             assert!(!branches
                 .iter()
                 .any(|branch| branch["properties"]["command"]["const"] == command));
-            assert!(validate_request(&json!({"command":command,"plan_id":"plan-1","environment_id":"env-1","approval":"synthetic"})).is_err());
+            assert!(validate_request(&json!({"command":command,"plan_id":"00000000-0000-4000-8000-000000000002","environment_id":"00000000-0000-4000-8000-000000000001","approval":"synthetic"})).is_err());
         }
         let archive = branches
             .iter()
@@ -374,7 +374,7 @@ mod tests {
             service["properties"]["unit"]["not"]["anyOf"][0]["pattern"],
             "@\\.service$"
         );
-        assert!(validate_request(&json!({"command":"service_inspect","environment_id":"env-1","manager":"user","unit":"synthetic@.service"})).is_err());
+        assert!(validate_request(&json!({"command":"service_inspect","environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":"synthetic@.service"})).is_err());
     }
 
     #[test]
