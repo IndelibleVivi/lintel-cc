@@ -219,7 +219,7 @@ FIXTURE_CASES = (
     # Supervised selection cases: the runner picks a transient systemd service
     # (root system manager), a user manager (non-root with Linger already on), or
     # the setsid route with an explicit limitation.
-    "supervised-system", "supervised-user", "supervised-setsid", "supervised-system-reboot",
+    "supervised-system", "supervised-user", "supervised-setsid", "supervised-system-reboot", "supervised-auth-scope",
 )
 
 def prepare(case, uid=None, username=None, home=None, base=None):
@@ -229,7 +229,7 @@ def prepare(case, uid=None, username=None, home=None, base=None):
         username = pwd.getpwuid(uid).pw_name
     # Ordinary cases require the synthetic target user. The system-manager case is
     # prepared by the fixture observer running as root for a root-owned home.
-    allowed_user = username == TARGET or (username == "root" and case in ("supervised-system", "supervised-system-reboot"))
+    allowed_user = username == TARGET or (username == "root" and case in ("supervised-system", "supervised-system-reboot", "supervised-auth-scope"))
     if not allowed_user or case not in FIXTURE_CASES:
         raise RuntimeError("Case preparation requires the VM's synthetic target user")
     if home is None:
@@ -246,20 +246,43 @@ def prepare(case, uid=None, username=None, home=None, base=None):
     root = base / "root"
     root.mkdir()
     (root / "settings.json").write_text(json.dumps({"env": {"SYNTHETIC_VM_NEIGHBOR": "keep"}}))
+    if case == "supervised-auth-scope":
+        binary = home / ".local/bin/claude"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("""#!/bin/sh
+case "$1:$2" in
+auth:status) printf '{"configDirectory":"%s","authMethod":"claude.ai"}' "$CLAUDE_CONFIG_DIR"; exit 0;;
+auth:logout) touch "$CLAUDE_CONFIG_DIR/unexpected-logout"; exit 0;;
+*) exit 9;;
+esac
+""")
+        binary.chmod(0o700)
+        (root / ".credentials.json").write_text(json.dumps({"synthetic": "preserved"}))
     return {"home": str(home), "base": str(base), "root": str(root),
             "state": str(base / "state"), "barrier": str(base / "barrier.json"),
             "release": str(base / "release.json"), "session": str(base / "session.json")}
+
+
+def auth_scope_evidence():
+    base = synthetic(BASE / "supervised-auth-scope")
+    marker = "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"
+    return {"credentials_preserved": json.loads((base / "root/.credentials.json").read_text()) == {"synthetic": "preserved"},
+            "logout_called": (base / "root/unexpected-logout").exists(),
+            "job_accepted": (base / "state/jobs").exists() and any((base / "state/jobs").glob("*.json")),
+            "environment_value_persisted": any(marker in path.read_text() for path in (base / "state").rglob("*.json"))}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("facts", "session", "session-evidence", "configure-logind",
                                               "linger", "unit-state",
-                                              "prepare", "process", "continue", "release", "read-json"))
+                                              "prepare", "process", "continue", "release", "read-json", "auth-scope-evidence"))
     parser.add_argument("value", nargs="?")
     parser.add_argument("--json", type=Path)
     args = parser.parse_args()
-    if args.operation == "facts":
+    if args.operation == "auth-scope-evidence":
+        result = auth_scope_evidence()
+    elif args.operation == "facts":
         result = facts()
     elif args.operation == "session":
         result = session(args.value)

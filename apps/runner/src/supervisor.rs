@@ -245,15 +245,14 @@ pub fn cgroup_text_matches_unit(cgroup: &str, unit: &str) -> bool {
 }
 
 /// Build the `systemd-run` command for a validated selection plus the exact
-/// worker invocation. Only non-secret identity/PATH configuration is exported;
-/// the request JSON travels on stdin and the archive passphrase never enters
-/// argv, the environment, a spool file or the journal.
+/// worker invocation. Unit properties contain only non-secret execution identity.
+/// The exact original environment and request use a private stdin pipe, keeping
+/// credentials out of D-Bus properties/argv/spool/journal and preserving auth and
+/// proxy checks. The request's archive passphrase never enters the environment.
 pub fn manager_command(
     selection: &Selection,
     executable: &Path,
-    home: &Path,
-    state: &Path,
-    path_env: &str,
+    cwd: &Path,
     context: &str,
 ) -> Option<Command> {
     let unit = selection.unit.as_deref()?;
@@ -275,23 +274,9 @@ pub fn manager_command(
         .arg("--property=Restart=no")
         .arg("--property=UMask=0077")
         .arg("--property=StandardError=null")
-        .arg(format!("--setenv=HOME={}", home.display()))
-        .arg(format!("--setenv=LINTEL_STATE_DIR={}", state.display()))
-        .arg(format!("--setenv=PATH={path_env}"))
+        .arg(format!("--property=WorkingDirectory={}", cwd.display()))
         .env("LC_ALL", "C")
         .env("SYSTEMD_COLORS", "0");
-    if std::env::var_os("LINTEL_TEST_HOME").is_some() {
-        for name in [
-            "LINTEL_TEST_HOME",
-            "LINTEL_TEST_ACCEPT_BARRIER",
-            "LINTEL_TEST_WAIT_BARRIER",
-            "LINTEL_TEST_WAIT_RELEASE",
-        ] {
-            if let Some(value) = std::env::var_os(name) {
-                command.arg(format!("--setenv={name}={}", value.to_string_lossy()));
-            }
-        }
-    }
     command
         .arg("--")
         .arg(executable)
@@ -402,8 +387,6 @@ mod tests {
             &selection,
             &PathBuf::from("/opt/lintel/lintel"),
             &PathBuf::from("/home/synthetic"),
-            &PathBuf::from("/home/synthetic/state"),
-            "/usr/bin",
             r#"{"mode":"system_manager","unit":"lintel-344e11f2-f95b-40d0-bc69-4034aa1fcd13.service"}"#,
         )
         .unwrap();
@@ -412,6 +395,8 @@ mod tests {
             .map(|a| a.to_string_lossy().into_owned())
             .collect();
         assert!(args.contains(&"--pipe".to_string()));
+        assert!(!args.iter().any(|arg| arg.starts_with("--setenv=")));
+        assert!(args.contains(&"--property=WorkingDirectory=/home/synthetic".to_string()));
         assert!(args.contains(&"--property=Restart=no".to_string()));
         assert!(
             args.contains(&"lintel-344e11f2-f95b-40d0-bc69-4034aa1fcd13.service".to_string())

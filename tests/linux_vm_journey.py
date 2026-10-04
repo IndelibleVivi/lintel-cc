@@ -152,7 +152,7 @@ class Guest:
             argv = ["sudo", "-n"] + argv
         return json.loads(self.shell(shlex.join(argv), user=user).stdout)
 
-    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None):
+    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None, expected_error=None):
         user = user or (ADMIN if case.get("as_root") else TARGET)
         prefix = ["sudo", "-n"] if case.get("as_root") else []
         env = {"HOME": case["home"], "LINTEL_TEST_HOME": case["home"], "LINTEL_STATE_DIR": case["state"]}
@@ -168,6 +168,10 @@ class Guest:
             command = session_command + " && exec " + command
         result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=60)
         response = json.loads(result.stdout)
+        if expected_error:
+            require(response.get("ok") is False and response.get("error", {}).get("code") == expected_error,
+                    f"Expected {expected_error}, got {response}")
+            return response
         require(response.get("ok") is True, f"Canonical runner rejected {payload['command']}: {response}")
         return response["data"]
 
@@ -301,7 +305,7 @@ def wait_boot(guest, process, timeout, previous_boot=None):
 
 
 def prepare_policy(guest, name):
-    as_root = name in ("supervised-system", "supervised-system-reboot")
+    as_root = name in ("supervised-system", "supervised-system-reboot", "supervised-auth-scope")
     case = guest.probe("prepare", name, user=ADMIN if as_root else TARGET)
     case["as_root"] = as_root
     environment = guest.request(case, {"command": "register", "name": "Synthetic VM " + name, "root": case["root"]})
@@ -525,6 +529,23 @@ def journey(guest, process, args, report):
     # route. KillUserProcesses=yes is the strict policy that matters for survival.
     report["supervised"] = [supervised_case(guest, kind, True)
                             for kind in ("system", "user", "setsid")]
+    # The original shell gains a shared profile AFTER an otherwise valid preview.
+    # A manager worker must preserve that presence and refuse official logout
+    # before durable accept. The fake Claude is inert and never makes requests.
+    auth = guest.probe("prepare", "supervised-auth-scope")
+    auth["as_root"] = True
+    environment = guest.request(auth, {"command": "register", "name": "Synthetic managed auth scope", "root": auth["root"]})
+    auth_plan = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
+                                     "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True})
+    refused = guest.request(auth, {"command": "execute", "plan_id": auth_plan["id"], "approval": auth_plan["hash"]},
+                            submit=True, extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"},
+                            expected_error="shared_auth_scope")
+    evidence = guest.probe("auth-scope-evidence")
+    require(evidence == {"credentials_preserved": True, "logout_called": False,
+                         "job_accepted": False, "environment_value_persisted": False},
+            f"Managed auth context violated pre-accept/refuse/no-secret-persistence: {evidence}")
+    report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], **evidence,
+                                    "caller_environment_preserved": True, "real_claude_or_network_requests": False}
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")
     child, ack = guest.kept_submission(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]})

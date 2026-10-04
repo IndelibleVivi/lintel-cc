@@ -152,13 +152,49 @@ fn exec_context_arg(args: &[String]) -> Option<Value> {
 }
 
 pub fn run(mode: &str, args: &[String]) {
+    let mut input = io::BufReader::new(io::stdin());
+    if mode == "__worker" {
+        // Match the original caller's environment without putting credentials in
+        // D-Bus unit properties, argv, a spool file or the journal. This first
+        // private pipe frame is runner-internal; public request JSON cannot set it.
+        use std::os::unix::ffi::OsStringExt;
+        let mut header = vec![];
+        if input
+            .by_ref()
+            .take(1024 * 1024 + 1)
+            .read_until(b'\n', &mut header)
+            .is_err()
+            || header.len() > 1024 * 1024
+            || header.last() != Some(&b'\n')
+        {
+            emit(
+                &json!({"ok":false,"error":{"code":"worker_environment_invalid","message":"worker 调用环境未能完整接收；未持久接受，请查询原任务"}}),
+            );
+            return;
+        }
+        let environment: Vec<(Vec<u8>, Vec<u8>)> = match serde_json::from_slice(&header) {
+            Ok(value) => value,
+            Err(_) => {
+                emit(
+                    &json!({"ok":false,"error":{"code":"worker_environment_invalid","message":"worker 调用环境无效；未持久接受，请查询原任务"}}),
+                );
+                return;
+            }
+        };
+        // Before any worker threads/core work, replace manager-inherited values
+        // with the exact submitting process context (including non-UTF8 bytes).
+        for (key, _) in std::env::vars_os() {
+            std::env::remove_var(key);
+        }
+        for (key, value) in environment {
+            std::env::set_var(
+                std::ffi::OsString::from_vec(key),
+                std::ffi::OsString::from_vec(value),
+            );
+        }
+    }
     let mut bytes = vec![];
-    if io::stdin()
-        .take(1024 * 1024 + 1)
-        .read_to_end(&mut bytes)
-        .is_err()
-        || bytes.len() > 1024 * 1024
-    {
+    if input.take(1024 * 1024 + 1).read_to_end(&mut bytes).is_err() || bytes.len() > 1024 * 1024 {
         emit(
             &json!({"ok":false,"error":{"code":"request_limit","message":"提交请求超过 1 MiB 或读取失败"}}),
         );
@@ -220,12 +256,25 @@ fn launch(
     bytes: &[u8],
     request: &Value,
 ) -> Result<Value, String> {
+    use std::os::unix::ffi::OsStrExt;
+    let environment: Vec<(Vec<u8>, Vec<u8>)> = std::env::vars_os()
+        .map(|(key, value)| (key.as_bytes().to_vec(), value.as_bytes().to_vec()))
+        .collect();
+    let mut header = serde_json::to_vec(&environment).map_err(|_| "无法传递原调用环境")?;
+    header.push(b'\n');
+    if header.len() > 1024 * 1024 {
+        return Err("原调用环境超过 worker pipe 上限；未启动 worker".into());
+    }
     let mut child = match selection.mode {
         Mode::SystemManager | Mode::UserManager => manager_child(selection, context, request)?,
         Mode::Setsid => setsid_child(context)?,
     };
     let mut input = child.stdin.take().ok_or("worker stdin 不可用")?;
-    if input.write_all(bytes).is_err() {
+    if input
+        .write_all(&header)
+        .and_then(|_| input.write_all(bytes))
+        .is_err()
+    {
         return Err("后台提交未能写入 worker stdin；查询原 plan_id，不能据此认定尚未执行".into());
     }
     drop(input);
@@ -253,23 +302,9 @@ fn manager_child(
     request: &Value,
 ) -> Result<std::process::Child, String> {
     let exe = std::env::current_exe().map_err(|_| "无法定位当前 runner".to_string())?;
-    let (home, state) = lintel_core::runtime_paths().map_err(|e| e.message)?;
     let cwd = std::env::current_dir().map_err(|_| "无法定位当前工作目录")?;
-    let state = if state.is_absolute() {
-        state
-    } else {
-        cwd.join(state)
-    };
-    let path_env = std::env::var("PATH").unwrap_or_default();
-    let mut command = supervisor::manager_command(
-        selection,
-        &exe,
-        &home,
-        &state,
-        &path_env,
-        &context_arg(context),
-    )
-    .ok_or("所选执行上下文缺少 unit 名称")?;
+    let mut command = supervisor::manager_command(selection, &exe, &cwd, &context_arg(context))
+        .ok_or("所选执行上下文缺少 unit 名称")?;
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

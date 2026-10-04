@@ -12,7 +12,7 @@
 
 clean `200aaed` 的 [CI37209110177](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37209110177) 已通过 macOS／Ubuntu 默认各 13/13、浏览器／界面各 3/3、Ubuntu OpenSSH 与真实 VM。正常等待／SIGSTOP × 两种有效 `KillUserProcesses` 的四次 logout 都观察到 worker 消失、原 session scope 停止；`setsid` 虽脱离进程 session，仍留在原登录 cgroup。原任务均进入 `needs_reconciliation`，每次只提交一次。正常运行也失败，因此不能把 SIGSTOP 当唯一原因；未捕获终止信号，不归因为某个 signal 或仅由 logind policy 导致。
 
-新 runner 已接入有限单任务 transient service：already-root system manager，或已有 `Linger=yes` 且当前 UID user bus 可用的 user manager；不改主机政策，不提权。worker 实际 cgroup 核验与 core 的持久 `execution` 在 ACK 前完成；manager 启动不确定时不 fallback。macOS／无 systemd／条件不满足的用户保留 setsid，并显示明确续跑限制，重启存活不作承诺。本机 core 52、runner 8、控制流程 26、真实 synthetic submission 与默认 state／错误 cgroup 检查通过；新的 managed logout／重启 runtime 等待 fresh Linux CI，不据源码或合成证明生产 VPS。
+新 runner 已接入有限单任务 transient service：already-root system manager，或已有 `Linger=yes` 且当前 UID user bus 可用的 user manager；不改主机政策，不提权。worker 经同机私有 pipe 保留原环境与工作目录，认证来源／proxy 复查不失真；环境值不进入 unit 属性、argv、回执或磁盘。实际 cgroup 核验与 core 的持久 `execution` 在 ACK 前完成；manager 启动不确定时不 fallback。macOS／无 systemd／条件不满足的用户保留 setsid，并显示明确续跑限制，重启存活不作承诺。本机 core 52、runner 8、控制流程 26、真实 synthetic submission 与默认 state／错误 cgroup 检查通过；新的 managed logout／重启 runtime 等待 fresh Linux CI，不据源码或合成证明生产 VPS。
 
 ## 精确服务生命周期与视觉身份（候选）
 

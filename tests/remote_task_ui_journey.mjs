@@ -115,6 +115,9 @@ try{
   await dialog.locator('.receipt-id').getByText(original,{exact:true}).waitFor();
   await dialog.getByText('任务已交给主机后台管理',{exact:true}).waitFor();
   await dialog.getByText('查看任务托管详情',{exact:true}).click();await dialog.getByText(`lintel-${original}.service`,{exact:true}).waitFor();
+  assert.equal(await dialog.evaluate(el=>el.scrollWidth>el.clientWidth),false);
+  const artifacts=process.env.LINTEL_REMOTE_TASK_UI_ARTIFACTS;
+  if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'remote-task-day-managed.png')});}
   report.checks.push('persisted execution facts and limitation are visible on reopened receipt; query latest updates the displayed original accepted receipt to completed without executing');conflict=true;
   await dialog.getByRole('button',{name:'预览恢复',exact:true}).click();await dialog.getByText(/Synthetic external edit conflict/).waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
@@ -123,7 +126,7 @@ try{
   await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByText('Synthetic original values restored; external edits preserved').waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,2);
   report.checks.push('external-edit conflict never executes; restore requires its own fresh preview and approval');
-  const artifacts=process.env.LINTEL_REMOTE_TASK_UI_ARTIFACTS;if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'remote-task-day-receipt.png')});}
+  if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'remote-task-day-receipt.png')});}
   await dialog.getByRole('button',{name:'查看记录',exact:true}).click();await page.getByRole('button',{name:'深色 Night',exact:true}).click();await page.setViewportSize({width:900,height:640});
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:`从 Lintel 移除 ${alias}`,exact:true}).click();
   await dialog.locator('.remote-task').filter({hasText:original}).getByRole('button',{name:'查询原任务',exact:true}).click();

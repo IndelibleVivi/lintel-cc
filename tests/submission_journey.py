@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-") as tmp:
     np = request(dict(command="plan_policy", environment_id=e["id"], preset="reduce"))
     negative = subprocess.run([str(binary), "__worker", "--exec-context", json.dumps({
         "mode": "system_manager", "unit": f'lintel-{np["id"]}.service'})],
-        input=json.dumps(dict(command="execute", plan_id=np["id"], approval=np["hash"])),
+        input=json.dumps([(list(os.fsencode(k)), list(os.fsencode(v))) for k,v in env.items()]) + "\n" + json.dumps(dict(command="execute", plan_id=np["id"], approval=np["hash"])),
         text=True, capture_output=True, env=env, timeout=25)
     rejected = json.loads(negative.stdout)
     assert rejected["error"]["code"] == "execution_context_mismatch", rejected
@@ -167,4 +167,33 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-default-") as tmp:
     wait_until(lambda: default_call("request", dict(command="job", plan_id=plan["id"]))["status"] == "completed", 25,
                "Default-state original job did not complete")
     assert default_call("request", dict(command="job", plan_id=plan["id"]))["execution"] == ack["execution"]
-    print("PASS: trusted execution facts persist through ACK/final query; wrong cgroup rejects before accept; platform default state works")
+    fake = home / ".local/bin/claude"
+    fake.parent.mkdir(parents=True)
+    fake.write_text("""#!/bin/sh
+case "$1:$2" in
+auth:status) printf '{"configDirectory":"%s","authMethod":"claude.ai"}' "$CLAUDE_CONFIG_DIR"; exit 0;;
+auth:logout) touch "$CLAUDE_CONFIG_DIR/unexpected-logout"; exit 0;;
+*) exit 9;;
+esac
+""")
+    fake.chmod(0o700)
+    auth_root = home / "auth-cc"
+    auth_root.mkdir()
+    (auth_root / ".credentials.json").write_text('{"synthetic":"preserved"}')
+    environment = default_call("request", dict(command="register", name="Synthetic pipe auth context", root=str(auth_root)))
+    auth_plan = default_call("request", dict(command="plan_cleanup", environment_id=environment["id"], recipe="repair_login",
+                                            writers_confirmed_stopped=True, official_logout=True))
+    # Simulate a manager's stripped environment while the private input frame
+    # carries the original caller's changed auth scope. No real Claude is used.
+    original_env = dict(env, ANTHROPIC_PROFILE="SYNTHETIC_PIPE_PRIVATE_SCOPE")
+    header = json.dumps([(list(os.fsencode(k)),list(os.fsencode(v))) for k,v in original_env.items()])
+    response = subprocess.run([str(binary), "__worker", "--exec-context", json.dumps({"mode":"setsid","unit":None})],
+        input=header + "\n" + json.dumps(dict(command="execute", plan_id=auth_plan["id"], approval=auth_plan["hash"])),
+        capture_output=True, text=True, env=env, timeout=45)
+    refused = json.loads(response.stdout)
+    assert refused["error"]["code"] == "shared_auth_scope", refused
+    assert (auth_root / ".credentials.json").read_text() == '{"synthetic":"preserved"}'
+    assert not (auth_root / "unexpected-logout").exists()
+    assert not (default_state / "jobs" / f'{auth_plan["id"]}.json').exists()
+    assert all("SYNTHETIC_PIPE_PRIVATE_SCOPE" not in path.read_text() for path in default_state.rglob("*.json"))
+    print("PASS: trusted execution facts/default state/wrong cgroup; private worker environment restores auth checks before accept without persisting values")

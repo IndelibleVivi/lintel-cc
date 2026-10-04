@@ -773,8 +773,8 @@ fn public_plan(mut p: Value) -> Value {
 }
 
 /// Canonical runner/core configuration paths, including the platform default.
-/// A manager-launched worker receives these same paths explicitly.
-pub fn runtime_paths() -> Result<(PathBuf, PathBuf)> {
+/// Workers preserve the caller environment and working directory.
+fn runtime_paths() -> Result<(PathBuf, PathBuf)> {
     let home = std::env::var_os("LINTEL_TEST_HOME")
         .or_else(|| std::env::var_os("HOME"))
         .ok_or_else(|| err("home_missing", "找不到用户目录"))?;

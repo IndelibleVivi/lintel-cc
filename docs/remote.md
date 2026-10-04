@@ -196,7 +196,7 @@ stderr 最多在内存保留 64 KiB，显示片段最多 4096 字节并按 UTF-8
 - 非 root：只有该用户已有 `Linger=yes` 和可用的准确 UID user bus，才使用 user manager 的单任务 transient service。
 - macOS、无 systemd 或普通用户条件不满足：保留 `setsid`，回执明确表示退出登录后继续执行未获保证。
 
-每个 unit 由原 plan UUID 派生，固定 `Restart=no`，不安装持久 daemon、不执行 sudo、不启用 linger、不改 PAM／login policy。请求与归档口令只走 stdin，托管详情只含非秘密身份；worker 核验实际 unit cgroup 后，core 先持久写入 `execution` 再 ACK。manager 启动结果不确定时只查询原任务，不能自动改用第二种方式重提。App 的简明提示与可展开 unit 详情呈现这些事实；旧 runner／旧回执缺少字段时不补造结论。
+每个 unit 由原 plan UUID 派生，固定 `Restart=no`，不安装持久 daemon、不执行 sudo、不启用 linger、不改 PAM／login policy。原调用环境先经同机私有 stdin pipe 传入，worker 保留其认证／proxy 与工作目录语义；环境值不进 unit 的 D-Bus 属性、命令参数、磁盘或回执。随后请求与归档口令只走 stdin，归档口令不进环境；托管详情只含非秘密身份。worker 核验实际 unit cgroup 后，core 先持久写入 `execution` 再 ACK。manager 启动结果不确定时只查询原任务，不能自动改用第二种方式重提。App 的简明提示与可展开 unit 详情呈现这些事实；旧 runner／旧回执缺少字段时不补造结论。
 
 SSH 断开、执行完成和机器重启是不同事件。transient service 不承诺重启后自动恢复执行；主机重启、不可逆 action 的不确定结果与恢复冲突仍由原 journal/reconciliation 处理。实际主机必须按 [G03 / J01–J10](ACCEPTANCE.md) 验证，不能从当前用户有 user bus 就推断 logout 后存活。
 

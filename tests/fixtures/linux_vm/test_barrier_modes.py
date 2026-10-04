@@ -141,7 +141,7 @@ class PrepareCaseTests(TempBase):
         self.assertTrue(Path(prepared["root"]).is_dir())
 
     def test_root_cases_keep_markers_inside_the_synthetic_home(self):
-        for name in ("supervised-system", "supervised-system-reboot"):
+        for name in ("supervised-system", "supervised-system-reboot", "supervised-auth-scope"):
             case = self.case(name, uid=0, username="root")
             self.assertTrue(Path(case["barrier"]).is_relative_to(case["home"]))
             self.assertTrue(Path(case["session"]).is_relative_to(case["home"]))

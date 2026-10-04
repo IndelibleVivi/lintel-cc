@@ -226,6 +226,10 @@ approved policy task after explicit barrier release; lost workers fail the
 check. The same real reboot also interrupts one system-managed original job,
 which must reconcile on repeated query without resubmission. Only this guest
 fixture can enable/restore the synthetic user's linger; production code cannot.
+An inert auth fixture adds a shared profile after preview; a system-managed
+worker must preserve the submitting environment and reject before acceptance,
+without calling logout, deleting its synthetic credentials or persisting the
+environment value. No real Claude or network request is made.
 The synthetic-only `LINTEL_TEST_ACCEPT_BARRIER` records a marker inside
 `LINTEL_TEST_HOME` and pauses the worker after durable acceptance/ACK so the
 interruption is reproducible. `LINTEL_TEST_WAIT_BARRIER` and
