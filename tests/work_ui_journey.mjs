@@ -15,8 +15,15 @@ for(const [name,content] of [['CLAUDE.md','# Synthetic instructions\n'],['projec
 const sourceBytes=await readFile(path.join(root,'settings.json'));
 let context={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:path.join(fixture,'source-state')};
 const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],resources=[];
-async function core(payload){calls.push(payload.command);return new Promise((resolve,reject)=>{
-  const child=spawn(runner,['request'],{env:context,stdio:['pipe','pipe','pipe']});let output='',errors='';
+// Fixture-side assertions and the rendered window share one synthetic actor.
+// Serialize their real core requests, as the App transport does, and retain
+// the original home's context even if the next journey switches installation.
+let coreQueue=Promise.resolve();
+function core(payload){calls.push(payload.command);const requestContext=context;
+  const result=coreQueue.then(()=>runCore(payload,requestContext));coreQueue=result.catch(()=>undefined);return result;
+}
+async function runCore(payload,requestContext){return new Promise((resolve,reject)=>{
+  const child=spawn(runner,['request'],{env:requestContext,stdio:['pipe','pipe','pipe']});let output='',errors='';
   const timer=setTimeout(()=>{child.kill();reject(new Error('synthetic core timeout'));},55000);
   child.stdout.on('data',d=>output+=d);child.stderr.on('data',d=>errors+=d);child.once('error',reject);
   child.once('close',()=>{clearTimeout(timer);assert.ok(!output.includes(password)&&!errors.includes(password),'Secret in process output');try{resolve(JSON.parse(output));}catch{reject(new Error('Invalid core envelope: '+errors));}});
