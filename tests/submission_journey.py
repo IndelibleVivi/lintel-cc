@@ -51,12 +51,16 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-") as tmp:
     e = request(dict(command="register", name="Synthetic detached", root=str(root)))
     (root / "CLAUDE.md").write_text("Only synthetic work is archived.")
     p = request(dict(command="plan_reset", environment_id=e["id"], recipe="rebuild", categories=["instructions"]))
-    payload = dict(command="execute", plan_id=p["id"], approval=p["hash"], archive_passphrase="synthetic transient passphrase")
+    payload = dict(command="execute", plan_id=p["id"], approval=p["hash"], archive_passphrase="synthetic transient passphrase", execution={"mode": "forged"})
     submitted = subprocess.run([str(binary), "submit"], input=json.dumps(payload), text=True,
                                capture_output=True, env=env, timeout=45, start_new_session=True)
     ack = json.loads(submitted.stdout)
     assert ack["ok"] and ack["data"]["status"] == "accepted", ack
     assert (state / "jobs" / f'{p["id"]}.json').exists(), "ACK preceded durable journal"
+    execution = ack["data"]["execution"]
+    assert execution["mode"] in ("setsid", "system_manager", "user_manager"), execution
+    assert execution["reboot_survival"] is False
+    assert execution != payload["execution"], "Request JSON forged execution evidence"
     deadline = time.monotonic() + 45
     while True:
         job = request(dict(command="job", plan_id=p["id"]))
@@ -64,6 +68,7 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-") as tmp:
             break
         assert time.monotonic() < deadline, job
         time.sleep(.15)
+    assert job["execution"] == execution, "Final query lost durable execution facts"
     assert job["status"] == "partially_completed", job
     assert Path(job["new_root"]).joinpath("CLAUDE.md").read_text() == "Only synthetic work is archived."
     again = subprocess.run([str(binary), "submit"], input=json.dumps(payload), text=True,
@@ -74,6 +79,16 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-") as tmp:
         assert payload["archive_passphrase"] not in path.read_text(), f"Persisted secret in {path}"
     cap = request(dict(command="discover"))["capabilities"]
     assert any(x["name"] == "detached_submission" for x in cap)
+
+    # A worker outside the selected unit MUST reject before any durable accept.
+    np = request(dict(command="plan_policy", environment_id=e["id"], preset="reduce"))
+    negative = subprocess.run([str(binary), "__worker", "--exec-context", json.dumps({
+        "mode": "system_manager", "unit": f'lintel-{np["id"]}.service'})],
+        input=json.dumps(dict(command="execute", plan_id=np["id"], approval=np["hash"])),
+        text=True, capture_output=True, env=env, timeout=25)
+    rejected = json.loads(negative.stdout)
+    assert rejected["error"]["code"] == "execution_context_mismatch", rejected
+    assert not (state / "jobs" / f'{np["id"]}.json').exists(), "Wrong cgroup produced durable acceptance"
 
     # --- RUNNING wait barrier: live worker held between ACK and plan body ---
     hold_root = home / "hold-cc"
@@ -129,3 +144,27 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-") as tmp:
             "Barrier armed outside the synthetic home"
     print("PASS: durable ACK, parent exit, query original task, replay dedup, no stored passphrase; "
           "RUNNING wait barrier bounded/live/releasable and synthetic-home-only")
+
+# The manager and direct core must share the platform default state path. No
+# explicit state configuration is needed for a real submission.
+with tempfile.TemporaryDirectory(prefix="lintel-submit-default-") as tmp:
+    home = Path(tmp).resolve()
+    root = home / "cc"
+    root.mkdir()
+    env = dict(os.environ, HOME=str(home), LINTEL_TEST_HOME=str(home))
+    env.pop("LINTEL_STATE_DIR", None)
+    def default_call(mode, payload):
+        response = subprocess.run([str(binary), mode], input=json.dumps(payload), text=True,
+                                  capture_output=True, env=env, timeout=45)
+        value = json.loads(response.stdout)
+        assert value["ok"], value
+        return value["data"]
+    environment = default_call("request", dict(command="register", name="Synthetic default state", root=str(root)))
+    plan = default_call("request", dict(command="plan_policy", environment_id=environment["id"], preset="reduce"))
+    ack = default_call("submit", dict(command="execute", plan_id=plan["id"], approval=plan["hash"]))
+    default_state = home / ("Library/Application Support/Lintel" if os.uname().sysname == "Darwin" else ".local/share/lintel")
+    assert (default_state / "jobs" / f'{plan["id"]}.json').is_file(), "Submission did not use canonical default state"
+    wait_until(lambda: default_call("request", dict(command="job", plan_id=plan["id"]))["status"] == "completed", 25,
+               "Default-state original job did not complete")
+    assert default_call("request", dict(command="job", plan_id=plan["id"]))["execution"] == ack["execution"]
+    print("PASS: trusted execution facts persist through ACK/final query; wrong cgroup rejects before accept; platform default state works")

@@ -33,6 +33,7 @@ export interface Receipt {
   policy?: PolicyAssessment;
   service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
   service_restorable?: boolean;
+  execution?: { mode: 'setsid' | 'system_manager' | 'user_manager'; manager: 'system' | 'user' | null; unit: string | null; continuation: string; limitation: string | null; reboot_survival: false };
   local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
 }
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }

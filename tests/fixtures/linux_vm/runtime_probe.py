@@ -7,6 +7,7 @@ from pathlib import Path
 import pwd
 import signal
 import subprocess
+import time
 
 TARGET = "lintel-fixture"
 BASE = Path("/home") / TARGET / "vm-journey"
@@ -168,6 +169,45 @@ def configure_logind(kill):
     command(["systemctl", "restart", "systemd-logind"])
     return facts()
 
+def linger(action):
+    """Read/set/restore linger for ONLY the disposable synthetic target user. This
+    is a fixture-policy change guarded by the guest marker; it never touches the
+    host, a real account, or another user, and the launcher restores it after."""
+    if os.geteuid() != 0 or not Path("/etc/lintel-vm-fixture").is_file():
+        raise RuntimeError("Linger changes are allowed only inside the disposable fixture VM")
+    if action not in ("read", "enable", "disable"):
+        raise RuntimeError("Expected one explicit fixture linger action")
+    if action != "read":
+        command(["loginctl", action + "-linger", TARGET])
+        if action == "enable":
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                result = user_manager_command(["is-system-running"])
+                if result.stdout.strip() in ("running", "degraded"):
+                    break
+                time.sleep(0.2)
+            else:
+                raise RuntimeError("Synthetic persistent user manager did not become usable")
+    value = properties(command(["loginctl", "show-user", TARGET, "-p", "Linger"], check=False).stdout).get("Linger")
+    return {"action": action, "linger": value}
+
+def user_manager_command(args):
+    uid = pwd.getpwnam(TARGET).pw_uid
+    runtime = f"/run/user/{uid}"
+    return command(["sudo", "-n", "-u", TARGET, "env", f"XDG_RUNTIME_DIR={runtime}",
+                    f"DBUS_SESSION_BUS_ADDRESS=unix:path={runtime}/bus", "systemctl", "--user"] + args, check=False)
+
+
+def unit_state(selection):
+    """Observer reads only the original unit, without a target-user PAM login."""
+    manager, unit = selection.split(":", 1)
+    if manager not in ("system", "user") or not unit.startswith("lintel-") or not unit.endswith(".service"):
+        raise RuntimeError("Expected one selected fixture manager and Lintel unit")
+    args = ["show", unit, "--no-pager", "-p", "LoadState", "-p", "ActiveState", "-p", "SubState", "-p", "ControlGroup"]
+    result = user_manager_command(args) if manager == "user" else command(["systemctl"] + args, check=False)
+    return {"unit": unit, "manager": manager, "present": result.returncode == 0,
+            "properties": properties(result.stdout)}
+
 
 # The finite set of synthetic cases the launcher may prepare. Each logout policy
 # is observed with a frozen worker and with a live (held) worker, so all four
@@ -176,6 +216,10 @@ FIXTURE_CASES = (
     "logout-retain-running", "logout-retain-stopped",
     "logout-kill-running", "logout-kill-stopped",
     "reboot-interrupt",
+    # Supervised selection cases: the runner picks a transient systemd service
+    # (root system manager), a user manager (non-root with Linger already on), or
+    # the setsid route with an explicit limitation.
+    "supervised-system", "supervised-user", "supervised-setsid", "supervised-system-reboot",
 )
 
 def prepare(case, uid=None, username=None, home=None, base=None):
@@ -183,7 +227,10 @@ def prepare(case, uid=None, username=None, home=None, base=None):
         uid = os.getuid()
     if username is None:
         username = pwd.getpwuid(uid).pw_name
-    if username != TARGET or case not in FIXTURE_CASES:
+    # Ordinary cases require the synthetic target user. The system-manager case is
+    # prepared by the fixture observer running as root for a root-owned home.
+    allowed_user = username == TARGET or (username == "root" and case in ("supervised-system", "supervised-system-reboot"))
+    if not allowed_user or case not in FIXTURE_CASES:
         raise RuntimeError("Case preparation requires the VM's synthetic target user")
     if home is None:
         home = Path.home()
@@ -191,6 +238,11 @@ def prepare(case, uid=None, username=None, home=None, base=None):
         base = BASE / case
     base.mkdir(parents=True, exist_ok=False)
     base.chmod(0o700)
+    # The system-manager case runs as root but must still keep its synthetic home
+    # and barrier inside the disposable fixture, so the barrier guard and the
+    # probe's synthetic-file guard agree on the same subtree.
+    if username == "root":
+        home = base
     root = base / "root"
     root.mkdir()
     (root / "settings.json").write_text(json.dumps({"env": {"SYNTHETIC_VM_NEIGHBOR": "keep"}}))
@@ -202,6 +254,7 @@ def prepare(case, uid=None, username=None, home=None, base=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("facts", "session", "session-evidence", "configure-logind",
+                                              "linger", "unit-state",
                                               "prepare", "process", "continue", "release", "read-json"))
     parser.add_argument("value", nargs="?")
     parser.add_argument("--json", type=Path)
@@ -217,6 +270,10 @@ def main():
         if args.value not in ("yes", "no"):
             raise RuntimeError("Expected one explicit fixture logout policy")
         result = configure_logind(args.value)
+    elif args.operation == "linger":
+        result = linger(args.value)
+    elif args.operation == "unit-state":
+        result = unit_state(args.value)
     elif args.operation == "prepare":
         result = prepare(args.value)
     elif args.operation == "process":

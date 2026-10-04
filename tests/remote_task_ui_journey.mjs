@@ -48,7 +48,7 @@ async function core(p,isRemote){
     case 'execute':{
       assert.ok(isRemote);const restore=p.plan_id===restoreId;
       assert.equal(p.approval,plan(restore).hash);assert.ok(!receipts.some(r=>r.id===p.plan_id),'duplicate submission');
-      const receipt={id:p.plan_id,plan_id:p.plan_id,environment_id:remote.id,title:plan(restore).title,status:restore?'completed':'accepted',created_at:new Date().toISOString(),restorable:false,warnings:[],steps:restore?[{id:'settings',label:'恢复本任务原值',status:'completed',message:'Synthetic original values restored; external edits preserved'}]:[]};
+      const receipt={id:p.plan_id,plan_id:p.plan_id,environment_id:remote.id,title:plan(restore).title,status:restore?'completed':'accepted',created_at:new Date().toISOString(),restorable:false,warnings:[],execution:{mode:'setsid',manager:null,unit:null,continuation:'Synthetic host: logout continuation unverified; reboot interrupts',limitation:'Synthetic existing user manager has no linger',reboot_survival:false},steps:restore?[{id:'settings',label:'恢复本任务原值',status:'completed',message:'Synthetic original values restored; external edits preserved'}]:[]};
       receipts.push(receipt);tasks.push({alias,plan_id:p.plan_id,lookup_id:p.plan_id,status:receipt.status});
       if(!restore)throw new Error('Synthetic ACK lost after durable acceptance');return {...receipt};
     }
@@ -88,6 +88,7 @@ try{
   await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).focus();await page.keyboard.press('Enter');
   await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();
   await dialog.locator('.receipt-id').getByText(original,{exact:true}).waitFor();
+  await dialog.getByText('断线后的继续执行未获保证',{exact:true}).waitFor();
   assert.match(await dialog.locator('.plan-target').innerText(),new RegExp(alias));
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
   report.checks.push('ACK loss then App reload queries same original task; keyboard opens full receipt on exact alias/environment; no resubmit');
@@ -108,11 +109,13 @@ try{
 
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
   await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();
-  receipts[0]={...receipts[0],status:'completed',restorable:true,steps:[{id:'settings',label:'当前环境设置',status:'completed',message:'Synthetic write read back; neighbor preserved'}]};tasks[0].status='completed';
+  receipts[0]={...receipts[0],execution:{mode:'user_manager',manager:'user',unit:`lintel-${original}.service`,continuation:'Synthetic selected persistent user manager; reboot interrupts',limitation:null,reboot_survival:false},status:'completed',restorable:true,steps:[{id:'settings',label:'当前环境设置',status:'completed',message:'Synthetic write read back; neighbor preserved'}]};tasks[0].status='completed';
   await dialog.getByRole('button',{name:'查询最新结果',exact:true}).click();
   await dialog.getByRole('button',{name:'预览恢复',exact:true}).waitFor();
   await dialog.locator('.receipt-id').getByText(original,{exact:true}).waitFor();
-  report.checks.push('query latest updates the displayed original accepted receipt to completed without executing');conflict=true;
+  await dialog.getByText('任务已交给主机后台管理',{exact:true}).waitFor();
+  await dialog.getByText('查看任务托管详情',{exact:true}).click();await dialog.getByText(`lintel-${original}.service`,{exact:true}).waitFor();
+  report.checks.push('persisted execution facts and limitation are visible on reopened receipt; query latest updates the displayed original accepted receipt to completed without executing');conflict=true;
   await dialog.getByRole('button',{name:'预览恢复',exact:true}).click();await dialog.getByText(/Synthetic external edit conflict/).waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
   conflict=false;await dialog.getByRole('button',{name:'预览恢复',exact:true}).click();

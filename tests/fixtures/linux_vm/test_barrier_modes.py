@@ -140,6 +140,13 @@ class PrepareCaseTests(TempBase):
         prepared = self.case("reboot-interrupt")
         self.assertTrue(Path(prepared["root"]).is_dir())
 
+    def test_root_cases_keep_markers_inside_the_synthetic_home(self):
+        for name in ("supervised-system", "supervised-system-reboot"):
+            case = self.case(name, uid=0, username="root")
+            self.assertTrue(Path(case["barrier"]).is_relative_to(case["home"]))
+            self.assertTrue(Path(case["session"]).is_relative_to(case["home"]))
+            self.assertEqual(Path(case["home"]).stat().st_mode & 0o777, 0o700)
+
     def test_unknown_case_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "synthetic target user"):
             self.case("logout-maybe")
@@ -240,6 +247,42 @@ class ProbeClassificationTests(TempBase):
         seen = probe.process(self.marker(4242), self.proc, self.boot)
         self.assertFalse(seen["runner_identity_matches"])
         self.assertEqual(seen["classification"], "identity_mismatch")
+
+
+class SupervisedAcceptanceTests(unittest.TestCase):
+    def test_dead_eligible_worker_fails_before_any_reconnect(self):
+        guest = Mock()
+        seen = observation(None, False, "missing", cgroup="0::/system.slice/lintel-p1.service")
+        responds = probe_responder(seen, kill=True)
+        def respond(operation, *args, **kwargs):
+            if operation == "linger":
+                return {"linger": "no"}
+            if operation == "unit-state":
+                return {"properties": {"ActiveState": "active"}}
+            return responds(operation, *args, **kwargs)
+        guest.probe.side_effect = respond
+        guest.request.return_value = {"status": "accepted", "execution": {
+            "mode": "system_manager", "unit": "lintel-p1.service", "reboot_survival": False}}
+        case = {"plan": {"id": "p1", "hash": "h1"}, "session": "/x/session", "barrier": "/x/barrier"}
+        clock = iter(range(10000))
+        with patch.object(journey, "prepare_policy", return_value=case), \
+             patch.object(journey, "barrier_process", return_value=seen), \
+             patch.object(journey.time, "monotonic", lambda: next(clock)), \
+             patch.object(journey.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "lost its original worker"):
+                journey.supervised_case(guest, "system", True)
+        self.assertEqual(guest.request.call_count, 1, "A reconnect must not hide the worker loss")
+        guest.probe.assert_any_call("linger", "disable")
+
+    def test_root_request_uses_fixture_sudo_and_original_pam_id(self):
+        guest = journey.Guest(Path("/tmp"), 1234, {"ssh": "ssh"})
+        case = {"home": "/x", "state": "/x/state", "as_root": True, "session": "/x/session"}
+        with patch.object(guest, "shell", return_value=Mock(stdout=b'{"ok":true,"data":{}}')) as shell:
+            guest.request(case, {"command": "execute"}, submit=True)
+        command = shell.call_args.args[0]
+        self.assertIn('session "$XDG_SESSION_ID"', command)
+        self.assertIn("exec sudo -n env", command)
+        self.assertEqual(shell.call_args.kwargs["user"], journey.ADMIN)
 
 
 class LogoutSurvivorTests(unittest.TestCase):

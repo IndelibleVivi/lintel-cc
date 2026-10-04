@@ -1,3 +1,4 @@
+use crate::supervisor::{self, Mode, Selection};
 use serde_json::{json, Value};
 use std::{
     io::{self, BufRead, Read, Write},
@@ -129,12 +130,28 @@ fn hold_until_released(release: &Path) {
         std::thread::sleep(Duration::from_millis(100));
     }
 }
+// Truthful capability: selection depends on the current host, and the setsid
+// route never claims logout continuation.
 pub fn capability(response: &mut Value) {
     if let Some(c) = response["data"]["capabilities"].as_array_mut() {
-        c.push(json!({"name":"detached_submission","status":"available","reason":"lintel submit 在 journal 持久接收后返回；worker 独立 session，主机 logout/cgroup 政策仍须实际验证"}));
+        c.push(json!({"name":"detached_submission","status":"available","reason":"lintel submit 在 journal 持久接收后返回；仅当当前主机已满足 system manager 或已启用 Linger 的 user manager 时由 transient service 持有，否则为 setsid 且 logout 后继续执行未经验证"}));
     }
 }
-pub fn run(mode: &str) {
+
+// Parse the runner-internal worker argument. The selected execution context is
+// not secret (mode/manager/unit/continuation) and is never part of the request
+// JSON a caller could forge.
+fn exec_context_arg(args: &[String]) -> Option<Value> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--exec-context" {
+            return iter.next().and_then(|raw| serde_json::from_str(raw).ok());
+        }
+    }
+    None
+}
+
+pub fn run(mode: &str, args: &[String]) {
     let mut bytes = vec![];
     if io::stdin()
         .take(1024 * 1024 + 1)
@@ -161,53 +178,132 @@ pub fn run(mode: &str) {
         return;
     }
     if mode == "__worker" {
-        let response = lintel_core::handle_request_with_accept(request, accepted);
+        // A manager-launched worker must already live in its exact selected unit's
+        // cgroup. If the service failed to move outside the login scope, this is a
+        // specific failure BEFORE durable acceptance, never a false success.
+        let context = exec_context_arg(args);
+        if let Some(unit) = context.as_ref().and_then(|c| c["unit"].as_str()) {
+            if !supervisor::cgroup_matches_unit(unit) {
+                emit(
+                    &json!({"ok":false,"error":{"code":"execution_context_mismatch","message":"worker 实际 cgroup 不属于所选 unit；未写入持久接收，请查询原 plan_id"}}),
+                );
+                return;
+            }
+        }
+        let response = lintel_core::handle_request_with_execution(request, context, Some(accepted));
         if !ACK_SENT.load(Ordering::SeqCst) {
             emit(&response);
         }
         return;
     }
-    let result = (|| -> io::Result<Value> {
-        use std::os::unix::process::CommandExt;
-        let mut command = Command::new(std::env::current_exe()?);
-        command
-            .arg("__worker")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null());
-        // Only the new worker leaves this SSH/terminal session. Its stdin closes
-        // after one request; passphrases never enter arguments or a spool file.
-        unsafe {
-            command.pre_exec(|| {
-                if libc::setsid() < 0 {
-                    return Err(io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-        let mut child = command.spawn()?;
-        let mut input = child.stdin.take().unwrap();
-        input.write_all(&bytes)?;
-        drop(input);
-        let output = child.stdout.take().unwrap();
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let mut line = String::new();
-            let result = io::BufReader::new(output.take(128 * 1024)).read_line(&mut line);
-            let _ = tx.send((result, line));
-        });
-        match rx.recv_timeout(Duration::from_secs(40)) {
-            Ok((Ok(_), line)) => serde_json::from_str(&line)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "worker response invalid")),
-            _ => Ok(
-                json!({"ok":false,"error":{"code":"submission_uncertain","message":"尚未收到持久接收回执；请查询原 plan_id，不要重提"},"plan_id":request["plan_id"]}),
-            ),
-        }
-    })();
-    match result {
+    // Select the exact execution context for this original plan. Selection is
+    // read-only; a manager is used only when this session can legitimately own the
+    // transient unit, otherwise setsid records an explicit limitation. The context
+    // is persisted into the accepted receipt before the durable ACK hook fires.
+    let plan_id = request["plan_id"].as_str().unwrap_or_default().to_owned();
+    let selection = supervisor::select(&plan_id);
+    let context = supervisor::execution_context(&selection);
+    match launch(&selection, &context, &bytes, &request) {
         Ok(v) => emit(&v),
-        Err(_) => emit(
-            &json!({"ok":false,"error":{"code":"submission_uncertain","message":"后台提交未能确认；查询原 plan_id，不能据此认定尚未执行"},"plan_id":request["plan_id"]}),
+        Err(message) => emit(
+            &json!({"ok":false,"error":{"code":"submission_uncertain","message":message},"plan_id":request["plan_id"]}),
         ),
     }
+}
+
+// Launch the worker for the selected context and read back exactly one durable
+// ACK line. Manager launch failures return uncertainty; the caller must query the
+// original plan and never fall back to a second launch.
+fn launch(
+    selection: &Selection,
+    context: &Value,
+    bytes: &[u8],
+    request: &Value,
+) -> Result<Value, String> {
+    let mut child = match selection.mode {
+        Mode::SystemManager | Mode::UserManager => manager_child(selection, context, request)?,
+        Mode::Setsid => setsid_child(context)?,
+    };
+    let mut input = child.stdin.take().ok_or("worker stdin 不可用")?;
+    if input.write_all(bytes).is_err() {
+        return Err("后台提交未能写入 worker stdin；查询原 plan_id，不能据此认定尚未执行".into());
+    }
+    drop(input);
+    let output = child.stdout.take().ok_or("worker stdout 不可用")?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let result = io::BufReader::new(output.take(128 * 1024)).read_line(&mut line);
+        let _ = tx.send((result, line));
+    });
+    match rx.recv_timeout(Duration::from_secs(40)) {
+        Ok((Ok(_), line)) => serde_json::from_str(&line)
+            .map_err(|_| "worker 回执无法解析；查询原 plan_id，不能据此认定尚未执行".to_string()),
+        _ => Err("尚未收到持久接收回执；请查询原 plan_id，不要重提".into()),
+    }
+}
+
+fn context_arg(context: &Value) -> String {
+    serde_json::to_string(context).unwrap_or_else(|_| "{}".into())
+}
+
+fn manager_child(
+    selection: &Selection,
+    context: &Value,
+    request: &Value,
+) -> Result<std::process::Child, String> {
+    let exe = std::env::current_exe().map_err(|_| "无法定位当前 runner".to_string())?;
+    let (home, state) = lintel_core::runtime_paths().map_err(|e| e.message)?;
+    let cwd = std::env::current_dir().map_err(|_| "无法定位当前工作目录")?;
+    let state = if state.is_absolute() {
+        state
+    } else {
+        cwd.join(state)
+    };
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    let mut command = supervisor::manager_command(
+        selection,
+        &exe,
+        &home,
+        &state,
+        &path_env,
+        &context_arg(context),
+    )
+    .ok_or("所选执行上下文缺少 unit 名称")?;
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    command.spawn().map_err(|_| {
+        format!(
+            "无法启动所选 manager unit；查询原 plan_id {}",
+            request["plan_id"]
+        )
+    })
+}
+
+fn setsid_child(context: &Value) -> Result<std::process::Child, String> {
+    use std::os::unix::process::CommandExt;
+    let exe = std::env::current_exe().map_err(|_| "无法定位当前 runner".to_string())?;
+    let mut command = Command::new(exe);
+    command
+        .arg("__worker")
+        .arg("--exec-context")
+        .arg(context_arg(context))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    // Only the new worker leaves this SSH/terminal session. Its stdin closes
+    // after one request; passphrases never enter arguments or a spool file.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    command
+        .spawn()
+        .map_err(|_| "无法启动后台 worker".to_string())
 }

@@ -218,12 +218,23 @@ and original inactive-state restoration. Its prepare/recover phases also verify
 that the owned persistent hold remains effective across a real guest reboot.
 Separate runner cases observe both guest `KillUserProcesses` policies, the
 worker's real PAM session/cgroup and post-reboot original-job reconciliation.
+A further strict `KillUserProcesses=yes` comparison checks already-root system
+manager, the fixture user with pre-existing linger/user bus, and ineligible
+setsid. The observer must see the original PAM session end before reconnecting
+as the target user. Eligible workers MUST remain alive and complete the original
+approved policy task after explicit barrier release; lost workers fail the
+check. The same real reboot also interrupts one system-managed original job,
+which must reconcile on repeated query without resubmission. Only this guest
+fixture can enable/restore the synthetic user's linger; production code cannot.
 The synthetic-only `LINTEL_TEST_ACCEPT_BARRIER` records a marker inside
 `LINTEL_TEST_HOME` and pauses the worker after durable acceptance/ACK so the
-interruption is reproducible; it does not modify normal submissions.
+interruption is reproducible. `LINTEL_TEST_WAIT_BARRIER` and
+`LINTEL_TEST_WAIT_RELEASE` instead hold a live worker to separate a stopped
+process from ordinary execution. Markers/releases must belong to the synthetic
+home; neither barrier modifies normal submissions.
 
-`evidence_complete` means those observations finished, including an observed
-logout limitation. It does **not** promise `setsid` survives arbitrary cgroup
+`evidence_complete` means those observations finished, including the limited setsid route and
+required eligible-manager survival/completion. It does **not** promise `setsid` survives arbitrary cgroup
 cleanup or establish a production VPS policy. Missing VM/systemd/PAM or a failed
 boot is a failed run. Runtime versions, boot IDs, observed survival/termination,
 original receipts and VM cleanup are retained in the detailed JSON.
@@ -238,14 +249,15 @@ query without reexecution. Both effective `KillUserProcesses=no` and `yes`
 cases observed worker termination on logout; original receipts became
 `needs_reconciliation`, with one submission each. This is executed observation
 and reconciliation evidence, **not reliable logout-surviving execution**.
-The VM and its overlay/seed/keys were cleaned up; production VPS and
-user-manager behavior remain unverified.
+The VM and its overlay/seed/keys were cleaned up. This historical run used
+setsid and is not evidence for the new manager path; its fresh results and
+production VPS limits are recorded in [current-state](current-state.md).
 
 The built service UI can be checked separately with
 `python3 tests/verify.py --checks service-ui`. Set `LINTEL_SERVICE_UI_REPORT` for
 its JSON and `LINTEL_SERVICE_UI_ARTIFACTS` for optional Git-external screenshots.
 It uses real headless Chromium with synthetic service state, not real systemd
-or native WebKit. Both new independent checks are explicitly selected in CI;
+or native WebKit. Independent browser, pairing, service and remote-task UI checks are explicitly selected in CI;
 their actual current results are recorded in [current-state](current-state.md).
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)

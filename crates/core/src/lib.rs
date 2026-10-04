@@ -88,6 +88,10 @@ pub struct Engine {
     home: PathBuf,
     state: PathBuf,
     accept_hook: Option<fn(&Value)>,
+    // The runner's factual selected execution context for this submission. It is
+    // set only through the internal builder below, never from request JSON, so a
+    // caller cannot forge a systemd-grade survival claim.
+    execution_context: Option<Value>,
     #[cfg(test)]
     service_fixture: Option<PathBuf>,
 }
@@ -106,6 +110,7 @@ impl Engine {
             home,
             state,
             accept_hook: None,
+            execution_context: None,
             #[cfg(test)]
             service_fixture: None,
         })
@@ -587,6 +592,12 @@ impl Engine {
         if p["extra"]["policy"].is_object() {
             j["policy"] = p["extra"]["policy"].clone();
         }
+        // Persist the runner's factual selected execution context (mode/manager/
+        // unit/continuation) before the durable ACK hook fires, so every later
+        // query/reopen reports the same facts without re-deriving them.
+        if let Some(context) = &self.execution_context {
+            j["execution"] = context.clone();
+        }
         save(&jp, &j)?;
         if let Some(hook) = self.accept_hook {
             hook(&j);
@@ -761,33 +772,48 @@ fn public_plan(mut p: Value) -> Value {
     p
 }
 
+/// Canonical runner/core configuration paths, including the platform default.
+/// A manager-launched worker receives these same paths explicitly.
+pub fn runtime_paths() -> Result<(PathBuf, PathBuf)> {
+    let home = std::env::var_os("LINTEL_TEST_HOME")
+        .or_else(|| std::env::var_os("HOME"))
+        .ok_or_else(|| err("home_missing", "找不到用户目录"))?;
+    let home = PathBuf::from(home);
+    let state = std::env::var_os("LINTEL_STATE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            if cfg!(target_os = "macos") {
+                home.join("Library/Application Support/Lintel")
+            } else {
+                home.join(".local/share/lintel")
+            }
+        });
+    Ok((home, state))
+}
+
 pub fn handle_request(request: Value) -> Value {
-    handle_request_inner(request, None)
+    handle_request_inner(request, None, None)
 }
-/// Runner-only callback after durable acceptance; never a second execution path.
-pub fn handle_request_with_accept(request: Value, hook: fn(&Value)) -> Value {
-    handle_request_inner(request, Some(hook))
+/// Runner-only entry point that carries the runner's factual selected execution
+/// context into the accepted receipt. `context` is trusted internal data chosen
+/// by the runner (never request JSON), so a caller cannot forge a survival claim;
+/// `hook` runs only after the context is durably written with the receipt.
+pub fn handle_request_with_execution(
+    request: Value,
+    context: Option<Value>,
+    hook: Option<fn(&Value)>,
+) -> Value {
+    handle_request_inner(request, context, hook)
 }
-fn handle_request_inner(request: Value, hook: Option<fn(&Value)>) -> Value {
+fn handle_request_inner(request: Value, context: Option<Value>, hook: Option<fn(&Value)>) -> Value {
     let result = (|| {
-        let home = std::env::var_os("LINTEL_TEST_HOME")
-            .or_else(|| std::env::var_os("HOME"))
-            .ok_or_else(|| err("home_missing", "找不到用户目录"))?;
-        let home = PathBuf::from(home);
-        let state = std::env::var_os("LINTEL_STATE_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                if cfg!(target_os = "macos") {
-                    home.join("Library/Application Support/Lintel")
-                } else {
-                    home.join(".local/share/lintel")
-                }
-            });
+        let (home, state) = runtime_paths()?;
         Engine::new(home, state)
     })();
     match result {
         Ok(mut engine) => {
             engine.accept_hook = hook;
+            engine.execution_context = context;
             engine.request(request)
         }
         Err(e) => json!({"ok":false,"error":{"code":e.code,"message":e.message}}),

@@ -1,4 +1,5 @@
 mod submission;
+mod supervisor;
 use serde_json::json;
 use std::io::{self, IsTerminal, Read, Write};
 fn main() {
@@ -8,7 +9,7 @@ fn main() {
         return;
     }
     if ["submit", "__worker"].contains(&args[0].as_str()) {
-        submission::run(&args[0]);
+        submission::run(&args[0], &args[1..]);
         return;
     }
     if args[0] == "tui" {

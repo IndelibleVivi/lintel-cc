@@ -152,17 +152,21 @@ class Guest:
             argv = ["sudo", "-n"] + argv
         return json.loads(self.shell(shlex.join(argv), user=user).stdout)
 
-    def request(self, case, payload, *, submit=False, barrier=None):
+    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None):
+        user = user or (ADMIN if case.get("as_root") else TARGET)
+        prefix = ["sudo", "-n"] if case.get("as_root") else []
         env = {"HOME": case["home"], "LINTEL_TEST_HOME": case["home"], "LINTEL_STATE_DIR": case["state"]}
         if barrier == "stopped":
             env["LINTEL_TEST_ACCEPT_BARRIER"] = case["barrier"]
         elif barrier == "running":
             env["LINTEL_TEST_WAIT_BARRIER"] = case["barrier"]
             env["LINTEL_TEST_WAIT_RELEASE"] = case["release"]
-        command = shlex.join(["env"] + [f"{key}={value}" for key, value in env.items()] + [RUNNER, "submit" if submit else "request"])
+        env.update(extra_env or {})
+        command = shlex.join(prefix + ["env"] + [f"{key}={value}" for key, value in env.items()] + [RUNNER, "submit" if submit else "request"])
         if submit:
-            command = shlex.join(["python3", PROBE, "session", "--json", case["session"]]) + " && exec " + command
-        result = self.shell(command, user=TARGET, data=json.dumps(payload).encode(), timeout=60)
+            session_command = shlex.join(prefix + ["python3", PROBE, "session"]) + ' "$XDG_SESSION_ID" ' + shlex.join(["--json", case["session"]])
+            command = session_command + " && exec " + command
+        result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=60)
         response = json.loads(result.stdout)
         require(response.get("ok") is True, f"Canonical runner rejected {payload['command']}: {response}")
         return response["data"]
@@ -297,14 +301,16 @@ def wait_boot(guest, process, timeout, previous_boot=None):
 
 
 def prepare_policy(guest, name):
-    case = guest.probe("prepare", name, user=TARGET)
+    as_root = name in ("supervised-system", "supervised-system-reboot")
+    case = guest.probe("prepare", name, user=ADMIN if as_root else TARGET)
+    case["as_root"] = as_root
     environment = guest.request(case, {"command": "register", "name": "Synthetic VM " + name, "root": case["root"]})
     plan = guest.request(case, {"command": "plan_policy", "environment_id": environment["id"], "preset": "reduce", "keep_remote_control": False})
     case["plan"] = plan
     return case
 
 
-def barrier_process(guest, case, mode, timeout=15):
+def barrier_process(guest, case, mode, timeout=15, user=ADMIN):
     """Observe the worker after its durable ACK. In "stopped" mode a frozen worker
     is the point; in "running" mode the worker must still be live (running or
     sleeping, never stopped) so a later logout compares a live process. A worker
@@ -312,7 +318,8 @@ def barrier_process(guest, case, mode, timeout=15):
     deadline = time.monotonic() + timeout
     observed = None
     while time.monotonic() < deadline:
-        response = guest.shell(shlex.join(["sudo", "-n", "python3", PROBE, "process", case["barrier"]]), check=False)
+        prefix = ["sudo", "-n"] if user == ADMIN else []
+        response = guest.shell(shlex.join(prefix + ["python3", PROBE, "process", case["barrier"]]), user=user, check=False)
         if response.returncode == 0:
             observed = json.loads(response.stdout)
             require(observed["marker"]["plan_id"] == case["plan"]["id"], "Barrier belongs to another job")
@@ -402,6 +409,80 @@ def logout_case(guest, kill, mode):
             "repeated_query": repeated, "submitted_once": True, "reexecuted": False}
 
 
+def supervised_case(guest, kind, kill):
+    """Observe the original PAM logout before opening another target-user login.
+    Eligible units MUST remain live and complete the original approved plan;
+    losing one fails acceptance rather than relabeling reconciliation as success.
+    Linger changes apply only to this disposable VM's synthetic user.
+    """
+    policy = guest.probe("configure-logind", "yes" if kill else "no")
+    require(policy["kill_user_processes"] == ("b true" if kill else "b false"), "Effective logind policy does not match the VM fixture")
+    linger_before = guest.probe("linger", "read")
+    if kind == "user":
+        guest.probe("linger", "enable")
+    elif kind == "setsid" and linger_before["linger"] == "yes":
+        guest.probe("linger", "disable")
+    try:
+        case = prepare_policy(guest, f"supervised-{kind}")
+        expect = {"system": "system_manager", "user": "user_manager", "setsid": "setsid"}[kind]
+        ack = guest.request(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]},
+                            submit=True, barrier="running")
+        require(ack["status"] == "accepted", "Supervised submit did not return durable accepted ACK")
+        execution = ack["execution"]
+        require(execution["mode"] == expect, f"Receipt execution mode {execution} != {expect}")
+        require(execution["reboot_survival"] is False, "Receipt must not claim reboot survival")
+        before = barrier_process(guest, case, "running")
+        unit = execution["unit"]
+        unit_before = None
+        if kind in ("system", "user"):
+            require(unit and unit in before["marker"]["cgroup"], "Worker is outside the selected unit cgroup")
+            unit_before = guest.probe("unit-state", f"{kind}:{unit}")
+            require(unit_before["properties"].get("ActiveState") == "active", f"Selected unit not active: {unit_before}")
+            require("session-" not in before["marker"]["cgroup"], "Manager-launched worker stayed inside the login session scope")
+        else:
+            require(unit is None and execution["limitation"], "setsid must record an explicit limitation without a unit")
+        pam = guest.probe("read-json", case["session"])
+        require(pam["present"] and pam["properties"].get("Remote") == "yes", "Submission did not traverse a real remote PAM session")
+        # Only the separate observer reads /proc and the original session here.
+        # No target-user SSH reconnect is allowed until the observation ends.
+        deadline = time.monotonic() + 20
+        after = guest.probe("session", pam["id"])
+        observed = guest.probe("process", case["barrier"])
+        while time.monotonic() < deadline:
+            time.sleep(0.3)
+            after = guest.probe("session", pam["id"])
+            observed = guest.probe("process", case["barrier"])
+            if not observed["alive"] and (not after["present"] or after["properties"].get("State") != "active"):
+                break
+        require(not after["present"] or after["properties"].get("State") != "active", "Original PAM session stayed active")
+        evidence = guest.probe("session-evidence", pam["id"])
+        if kind in ("system", "user"):
+            require(observed["alive"] and observed["classification"] == "running",
+                    f"Eligible {kind} manager lost its original worker after logout: {observed}")
+        receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+        require(receipt["execution"] == execution, "Persisted execution context differs from ACK")
+        first_query = receipt
+        if observed["alive"]:
+            require(receipt["status"] == "accepted", "Surviving worker lost original ownership")
+            guest.probe("release", case["release"])
+            receipt = terminal_receipt(guest, case)
+            require(receipt["status"] == "completed", f"Released original policy task did not complete: {receipt}")
+        else:
+            require(receipt["status"] == "needs_reconciliation", "Lost worker must reconcile")
+        again = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
+        require(again["id"] == receipt["id"] and again["status"] == receipt["status"], "Repeated query changed/replayed original task")
+        require(again["execution"] == execution, "Final query lost persisted execution facts")
+        return {"kind": kind, "kill_user_processes": kill, "effective_policy": policy,
+                "expected_mode": expect, "linger_before": linger_before["linger"],
+                "receipt_execution": execution, "worker_before": before, "worker_after_logout": observed,
+                "unit_before": unit_before, "pam_session": pam, "original_session_after_logout": after,
+                "session_evidence": evidence, "survival": "observed_survived" if observed["alive"] else "observed_terminated",
+                "classification": observed["classification"], "receipt_first_query": first_query,
+                "receipt_after": receipt, "repeated_query": again, "submitted_once": True, "reexecuted": False}
+    finally:
+        guest.probe("linger", "enable" if linger_before["linger"] == "yes" else "disable")
+
+
 def services(guest, evidence, phase=None):
     output = {None: SERVICE_SUITE_REPORT, "prepare": SERVICE_PREPARE_REPORT, "recover": SERVICE_RECOVER_REPORT}[phase]
     args = ["sudo", "-n", "python3", SERVICE, "--runner", RUNNER, "--json", output]
@@ -439,12 +520,33 @@ def journey(guest, process, args, report):
     # logind policies, so termination cannot be blamed on the barrier alone.
     report["logout"] = [logout_case(guest, kill, mode)
                         for kill in (False, True) for mode in ("running", "stopped")]
+    # Supervised selection: root system manager, non-root user manager after the
+    # fixture enables Linger on ONLY the synthetic user, and the ineligible setsid
+    # route. KillUserProcesses=yes is the strict policy that matters for survival.
+    report["supervised"] = [supervised_case(guest, kind, True)
+                            for kind in ("system", "user", "setsid")]
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")
     child, ack = guest.kept_submission(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]})
+    # A supervised (system-manager) accepted job is also interrupted by the same
+    # reboot, so one reboot yields both the setsid and the supervised post-boot
+    # reconciliation evidence.
+    supervised_case_reboot = prepare_policy(guest, "supervised-system-reboot")
+    supervised_ack = guest.request(supervised_case_reboot,
+                                   {"command": "execute", "plan_id": supervised_case_reboot["plan"]["id"],
+                                    "approval": supervised_case_reboot["plan"]["hash"]},
+                                   submit=True, barrier="stopped", user=ADMIN)
     try:
         require(ack["status"] == "accepted", "Reboot scenario did not receive durable ACK")
+        require(supervised_ack["status"] == "accepted", "Supervised reboot scenario did not receive durable ACK")
+        supervised_receipt = guest.request(supervised_case_reboot,
+                                           {"command": "job", "plan_id": supervised_case_reboot["plan"]["id"]})
+        require(supervised_receipt["execution"]["mode"] == "system_manager",
+                f"Supervised reboot job was not system-managed: {supervised_receipt['execution']}")
         stopped = barrier_process(guest, case, "stopped")
+        supervised_stopped = barrier_process(guest, supervised_case_reboot, "stopped", user=ADMIN)
+        require(supervised_receipt["execution"]["unit"] in supervised_stopped["marker"]["cgroup"],
+                "Supervised reboot worker is not in its selected unit cgroup")
         require(stopped["alive"] and stopped["state"] in ("T", "t"), "Reboot scenario requires a real stopped worker before boot changes")
         old_boot = facts["boot_id"]
         require(stopped["marker"]["boot_id"] == old_boot, "Worker boot identity differs before reboot")
@@ -456,8 +558,20 @@ def journey(guest, process, args, report):
         require(interrupted["status"] == "needs_reconciliation" and interrupted["plan_id"] == case["plan"]["id"], "Interrupted original job did not reconcile after guest reboot")
         again = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
         require(again["id"] == interrupted["id"] and again["status"] == "needs_reconciliation", "Repeated post-boot query changed/replayed the original job")
+        supervised_after = guest.request(supervised_case_reboot,
+                                         {"command": "job", "plan_id": supervised_case_reboot["plan"]["id"]})
+        require(supervised_after["status"] == "needs_reconciliation"
+                and supervised_after["plan_id"] == supervised_case_reboot["plan"]["id"],
+                "Interrupted supervised job did not reconcile after guest reboot")
+        supervised_again = guest.request(supervised_case_reboot,
+                                         {"command": "job", "plan_id": supervised_case_reboot["plan"]["id"]})
+        require(supervised_again["id"] == supervised_after["id"]
+                and supervised_again["status"] == "needs_reconciliation",
+                "Repeated post-boot supervised query changed/replayed the original job")
         report["reboot"] = {"before_boot_id": old_boot, "after_boot_id": new_boot, "worker_before": stopped,
                             "original_job_after": interrupted, "repeated_query": again, "submitted_once": True, "reexecuted": False}
+        report["supervised_reboot"] = {"worker_before": supervised_stopped, "original_job_after": supervised_after,
+                                       "repeated_query": supervised_again, "submitted_once": True, "reexecuted": False}
         report["runtime_after"] = guest.probe("facts")
         report["services_after_reboot"] = services(guest, report, "recover")
     finally:
@@ -508,7 +622,7 @@ def main():
             "Live-worker and frozen-worker logout cases only remove the synthetic barrier as a confound; they do not attribute the terminating signal.",
             "VM evidence does not prove any production VPS logout, guest boot, user-manager or account policy."]
         code = 0
-        print("PASS: disposable real Linux VM lifecycle evidence complete; logout survival remains an observed limitation", flush=True)
+        print("PASS: real Linux VM lifecycle; eligible supervisor logout continuation and reboot reconciliation verified", flush=True)
     except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as error:
         report["error"] = {"type": type(error).__name__, "message": str(error)}
         print("FAIL: " + str(error), file=sys.stderr, flush=True)

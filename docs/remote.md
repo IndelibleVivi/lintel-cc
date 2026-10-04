@@ -190,7 +190,15 @@ stderr 最多在内存保留 64 KiB，显示片段最多 4096 字节并按 UTF-8
 
 本地 intent 持久化不代表远端已 durable accept。提交在发送前就失败时，同样保留保守的查询路径；工具不会为便利假设无副作用。
 
-`lintel submit` 的 detached worker 行为和 journal 由 runner/core 所有。`setsid` 脱离当前 SSH 会话与“机器登录策略允许 worker 长期存活”是不同事实：控制端不启用 linger、不改登录策略、不安装 systemd service，不能承诺所有 VPS 在退出登录后仍允许任务继续。实际 host 的 session/cgroup 或 user-manager 行为仍需按 [G03 / J01–J10](ACCEPTANCE.md) 验证。主机重启、不可逆 action 的不确定结果与恢复冲突由 core 的 journal/reconciliation 处理，不能靠控制端重新提交修复。
+`lintel submit` 的 worker 托管由 runner 的 `supervisor.rs` 所有，持久 journal 由 core 所有。选择只读当前主机条件：
+
+- Linux PID 1 为 systemd，当前 SSH 用户已经是 root：使用 system manager 的单任务 transient service。
+- 非 root：只有该用户已有 `Linger=yes` 和可用的准确 UID user bus，才使用 user manager 的单任务 transient service。
+- macOS、无 systemd 或普通用户条件不满足：保留 `setsid`，回执明确表示退出登录后继续执行未获保证。
+
+每个 unit 由原 plan UUID 派生，固定 `Restart=no`，不安装持久 daemon、不执行 sudo、不启用 linger、不改 PAM／login policy。请求与归档口令只走 stdin，托管详情只含非秘密身份；worker 核验实际 unit cgroup 后，core 先持久写入 `execution` 再 ACK。manager 启动结果不确定时只查询原任务，不能自动改用第二种方式重提。App 的简明提示与可展开 unit 详情呈现这些事实；旧 runner／旧回执缺少字段时不补造结论。
+
+SSH 断开、执行完成和机器重启是不同事件。transient service 不承诺重启后自动恢复执行；主机重启、不可逆 action 的不确定结果与恢复冲突仍由原 journal/reconciliation 处理。实际主机必须按 [G03 / J01–J10](ACCEPTANCE.md) 验证，不能从当前用户有 user bus 就推断 logout 后存活。
 
 ## 自定义远端方案
 
@@ -235,4 +243,4 @@ python3 -m unittest discover -s platform/ssh/tests -v
 
 这些验证证明控制端 transport 与恢复边界，不代表 runner 已部署、真实 VPS session 存活、目标 service 隔离或完整 G03 已完成验收。
 
-`linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。clean `8c9d85c` 的 [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828) 已完成这套观察：精确 system-manager 服务暂停、邻居保留、外部编辑冲突、独立恢复与真实 reboot 后 loaded hold 通过。`KillUserProcesses=no` 和 `yes` 下 worker 都被实际 logout 终止，原任务查询得到 `needs_reconciliation`；真实 reboot 后同样查询原 accepted job，不重新 execute。它验证了发现中断和保留原任务的行为，未验证退出登录后可靠继续执行。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。生产 VPS、user-manager 生命周期与完整 G03 仍未验收。
+`linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。clean `8c9d85c` 的 [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828) 已完成这套观察：精确 system-manager 服务暂停、邻居保留、外部编辑冲突、独立恢复与真实 reboot 后 loaded hold 通过。`KillUserProcesses=no` 和 `yes` 下 worker 都被实际 logout 终止，原任务查询得到 `needs_reconciliation`；真实 reboot 后同样查询原 accepted job，不重新 execute。它验证了发现中断和保留原任务的行为，未验证退出登录后可靠继续执行。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。新的 system/user transient service 路径另做严格 logout 存活与原任务完成检查，结果见 [当前状态](current-state.md)；生产 VPS 与完整 G03 仍未验收。

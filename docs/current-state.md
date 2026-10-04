@@ -8,9 +8,11 @@
 
 主机面板查询原任务后可直接查看完整回执与恢复，进入准确 alias／环境的记录；已移除主机保留 query-only。恢复依旧独立预览和批准。TypeScript/Vite 与 `remote-task-ui`、`service-ui` 本机渲染检查通过，涵盖丢 ACK 后 App reload、一次原提交、查询更新、关闭面板后的迟到响应、后续编辑冲突、独立恢复和 Day/Night 1120／900 布局。`remote-task-ui` 的 SSH/invoke/持久 registry 为合成；不代表 native WebKit、真实 SSH 或生产 VPS。CI 的既有独立 browser owner 已接统一入口；新 CI 结果待核对。
 
-## SSH 生命周期调查（源码候选）
+## SSH 任务托管与生命周期（源码候选）
 
-新增正常等待与 SIGSTOP 两种 after-ACK barrier，在 disposable VM 对两种有效 logout policy 做 2×2 对照；记录进程身份、真实 session scope 和有限原 session journal。此前证据来自 SIGSTOP worker 的终止观察，尚未归因到信号或 logind；正常运行 worker 的结果待新 Linux runtime。进程探测区分 missing、zombie、identity mismatch，不把缺失等同于确认被某信号杀死。控制流程测试纳入统一验证入口 `linux-vm-control-test`；没有改变生产 supervisor 或主机登录政策。
+clean `200aaed` 的 [CI37209110177](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37209110177) 已通过 macOS／Ubuntu 默认各 13/13、浏览器／界面各 3/3、Ubuntu OpenSSH 与真实 VM。正常等待／SIGSTOP × 两种有效 `KillUserProcesses` 的四次 logout 都观察到 worker 消失、原 session scope 停止；`setsid` 虽脱离进程 session，仍留在原登录 cgroup。原任务均进入 `needs_reconciliation`，每次只提交一次。正常运行也失败，因此不能把 SIGSTOP 当唯一原因；未捕获终止信号，不归因为某个 signal 或仅由 logind policy 导致。
+
+新 runner 已接入有限单任务 transient service：already-root system manager，或已有 `Linger=yes` 且当前 UID user bus 可用的 user manager；不改主机政策，不提权。worker 实际 cgroup 核验与 core 的持久 `execution` 在 ACK 前完成；manager 启动不确定时不 fallback。macOS／无 systemd／条件不满足的用户保留 setsid，并显示明确续跑限制，重启存活不作承诺。本机 core 52、runner 8、控制流程 26、真实 synthetic submission 与默认 state／错误 cgroup 检查通过；新的 managed logout／重启 runtime 等待 fresh Linux CI，不据源码或合成证明生产 VPS。
 
 ## 精确服务生命周期与视觉身份（候选）
 
