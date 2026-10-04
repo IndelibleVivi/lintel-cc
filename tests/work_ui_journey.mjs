@@ -55,6 +55,26 @@ try{
   await dialog.getByLabel('加密包完整路径',{exact:true}).fill(portable);await dialog.getByLabel('归档口令',{exact:true}).fill('wrong-passphrase');await dialog.getByRole('button',{name:'解锁并查看',exact:true}).click();await dialog.getByRole('alert').waitFor();
   await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'解锁并查看',exact:true}).click();await dialog.getByRole('heading',{name:'选择性迁入',exact:true}).waitFor();await dialog.getByLabel('会话资料',{exact:true}).uncheck();await dialog.getByRole('button',{name:'预览迁入计划',exact:true}).click();await approve();
   assert.equal(await readFile(path.join(destination.root,'CLAUDE.md'),'utf8'),'# Synthetic instructions\n');assert.equal(await readFile(path.join(destination.root,'lintel-imports/projects/synthetic/memory/MEMORY.md'),'utf8'),'Synthetic memory\n');await page.screenshot({path:path.join(fixture,'portable-import-night.png')});assert.deepEqual(errors,[]);
-  report.checks.push('Independent install/empty jobs → wrong-password feedback → portable selective import → real files, no original job state');report.calls=[...new Set(calls)];report.passed=true;
+  report.checks.push('Independent install/empty jobs → wrong-password feedback → portable selective import → real files, no original job state');
+  // Explicit synthetic retained-probe receipt, read through the real core job
+  // API. This verifies UI recovery presentation, not a real killed worker.
+  const modeled=(await data({command:'jobs'})).jobs[0],probe=modeled.migration_probe.path;
+  await mkdir(probe);await writeFile(path.join(probe,'placeholder'),'');
+  modeled.title='Synthetic retained probe receipt';modeled.status='needs_reconciliation';modeled.migration_probe.status='retained';
+  modeled.steps=[{id:'migration_preflight',label:'模拟路径检查中断',status:'executing',message:'Synthetic retained probe fixture.'}];
+  await writeFile(path.join(context.LINTEL_STATE_DIR,'jobs',`${modeled.id}.json`),JSON.stringify(modeled));
+  const executeCount=calls.filter(command=>command==='execute').length;
+  for(const [theme,button] of [['night','深色 Night'],['day','浅色 Day']]){
+    await page.reload();await page.getByRole('button',{name:button,exact:true}).click();
+    await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
+    await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
+    await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
+    await dialog.getByText(probe,{exact:true}).waitFor();
+    await page.screenshot({path:path.join(fixture,`probe-recovery-${theme}.png`)});
+  }
+  assert.equal(calls.filter(command=>command==='execute').length,executeCount);
+  assert.equal(await readFile(path.join(probe,'placeholder'),'utf8'),'');
+  report.checks.push('Modeled retained-probe receipt → real original-job query → exact scratch path visible in Day/Night; no replay or cleanup');
+  report.calls=[...new Set(calls)];report.passed=true;
   async function approve(){await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();}
 }finally{await browser?.close();preview.kill('SIGTERM');const reportPath=process.env.LINTEL_WORK_UI_REPORT||path.join(fixture,'report.json');await mkdir(path.dirname(reportPath),{recursive:true});await writeFile(reportPath,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}

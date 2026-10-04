@@ -117,3 +117,5 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 归档发布前先持久记录执行中的 archive 步骤、`archive_path` 与 `archive_intent_digest`，后者绑定待发布的准确密文；写后读回成功才记录完成和 `archive_digest`。中断回执中的路径不表示包已完成：查询原任务核对产物，包存在时可用原 job 解锁，尚不存在时返回具体读错误。job 读取先采用完成 digest，没有完成 digest 时核对 intent digest；旧回执两者都没有才沿用兼容行为。
 
 批准后的迁入先在实际目标文件系统的私有临时目录里，以空文件验证整批路径。preserve/reset 使用新根所在的 environments 目录，import 使用已批准的目标 root；这一步不写归档正文，正常返回清理自身创建的空文件和目录，不递归删除额外内容。大小写折叠或 Unicode 规范化等仍使路径等价时，返回 migration_path_conflict，在新环境创建或任何正文迁入前整批拒绝。包仍可检查与阅读；整理源内容重新归档，或选择可区分这些路径的文件系统。此检查只在已批准执行中运行，预览保持无目标写入。
+
+路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。

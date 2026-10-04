@@ -216,7 +216,7 @@ impl Engine {
                 return Err(err("import_conflict", "预览后出现同名内容；没有覆盖"));
             }
         }
-        work::preflight_migration_paths(root, &work::migration_paths(&selected)?)?;
+        work::preflight_migration_paths(root, &work::migration_paths(&selected)?, j, journal)?;
         for ((entry, f), pth) in planned.iter().zip(&selected).zip(&targets) {
             private_dir(pth.parent().unwrap())?;
             let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;

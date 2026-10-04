@@ -369,3 +369,5 @@ lintel restore plan --job <original-job-id>
 | 桌面 UI | 构建页面及真实 core／host 配合合成 invoke／SSH／clipboard 的旅程；部分历史 native 观察 | 所有最新界面都已经在 native WebKit、Finder、Terminal 与真实账号环境完整验收 |
 
 完整目标仍包括更多认证与入口适配、系统级网络约束、浏览器持久安装与专用启动、服务迁移闭环、定时漂移、菜单栏、升级卸载与正式签名分发。这些继续属于 Lintel 的范围，不能通过从使用指南中删掉它们就视为整版完成。
+
+路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。

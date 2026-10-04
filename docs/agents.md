@@ -186,3 +186,5 @@ install 的 prepare_runner → install_runner → query_install 与 App 共用�
 这些路径的合成测试不替代真实 Claude 认证、正式浏览器、native WebKit、生产 VPS 或 Linux logout/reboot 验收。当前证据与完整未交付目标继续在 [current-state.md](current-state.md) 和 [SPEC.md](SPEC.md)。
 
 迁入的 `migration_path_conflict` 表示实际目标文件系统把包内路径视为同名或文件／目录冲突。批准执行中的空文件 preflight 在新根创建／正文写入前整批拒绝，预览不写目标。包可继续 inspect/read；整理源内容重新归档，或选择能区分这些路径的文件系统。不要重发原任务来绕过名称冲突。
+
+路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。

@@ -213,7 +213,12 @@ pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
 /// Runs only inside approved execution. The private scratch tree contains zero
 /// byte placeholders, never archived content; cleanup removes only names we
 /// created, and leaves any unexpected extra entry intact.
-pub(crate) fn preflight_migration_paths(root: &Path, paths: &[PathBuf]) -> Result<()> {
+pub(crate) fn preflight_migration_paths(
+    root: &Path,
+    paths: &[PathBuf],
+    j: &mut Value,
+    journal: &Path,
+) -> Result<()> {
     struct Probe {
         files: Vec<PathBuf>,
         directories: Vec<PathBuf>,
@@ -228,28 +233,48 @@ pub(crate) fn preflight_migration_paths(root: &Path, paths: &[PathBuf]) -> Resul
             }
         }
     }
-    let scratch = root.join(format!(".lintel-path-check-{}", uuid::Uuid::new_v4()));
-    guard(&scratch)?;
-    fs::create_dir(&scratch)?;
-    let mut probe = Probe {
-        files: vec![],
-        directories: vec![scratch.clone()],
-    };
-    private_dir(&scratch)?;
-    let conflict = || {
-        err("migration_path_conflict", "目标文件系统将所选路径视为同名或文件／目录冲突；未新建环境或迁入正文，请整理源内容后重新归档，或使用能区分这些路径的文件系统目标")
-    };
-    for relative in paths {
-        let mut parent = scratch.clone();
-        for component in relative.parent().unwrap_or(Path::new("")).components() {
-            parent.push(component);
-            match fs::create_dir(&parent) {
-                Ok(()) => {
-                    probe.directories.push(parent.clone());
-                    private_dir(&parent)?;
+    let scratch = record_migration_probe(root, j, journal)?;
+    let result = (|| {
+        fs::create_dir(&scratch)?;
+        let mut probe = Probe {
+            files: vec![],
+            directories: vec![scratch.clone()],
+        };
+        private_dir(&scratch)?;
+        let conflict = || {
+            err("migration_path_conflict", "目标文件系统将所选路径视为同名或文件／目录冲突；未新建环境或迁入正文，请整理源内容后重新归档，或使用能区分这些路径的文件系统目标")
+        };
+        for relative in paths {
+            let mut parent = scratch.clone();
+            for component in relative.parent().unwrap_or(Path::new("")).components() {
+                parent.push(component);
+                match fs::create_dir(&parent) {
+                    Ok(()) => {
+                        probe.directories.push(parent.clone());
+                        private_dir(&parent)?;
+                    }
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::AlreadyExists && parent.is_dir() => {
+                    }
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
+                        ) =>
+                    {
+                        return Err(conflict())
+                    }
+                    Err(error) => return Err(error.into()),
                 }
-                Err(error)
-                    if error.kind() == std::io::ErrorKind::AlreadyExists && parent.is_dir() => {}
+            }
+            let target = scratch.join(relative);
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&target)
+            {
+                Ok(_) => probe.files.push(target),
                 Err(error)
                     if matches!(
                         error.kind(),
@@ -261,26 +286,35 @@ pub(crate) fn preflight_migration_paths(root: &Path, paths: &[PathBuf]) -> Resul
                 Err(error) => return Err(error.into()),
             }
         }
-        let target = scratch.join(relative);
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&target)
-        {
-            Ok(_) => probe.files.push(target),
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
-                ) =>
-            {
-                return Err(conflict())
-            }
-            Err(error) => return Err(error.into()),
-        }
+        Ok(())
+    })();
+    let removed = match fs::symlink_metadata(&scratch) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+        _ => false,
+    };
+    j["migration_probe"]["status"] = json!(if removed { "removed" } else { "retained" });
+    if removed {
+        let status = if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        };
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migration_preflight","label":"检查目标文件系统路径","status":status,"message":"临时空文件检查目录已清理；此步骤没有迁入归档正文。"});
     }
-    Ok(())
+    save(journal, j)?;
+    if !removed {
+        return Err(err("migration_probe_retained", "路径检查目录未确认清理；按原任务的 migration_probe.path 核对，未迁入正文，不自动重发或删除额外内容"));
+    }
+    result
+}
+
+fn record_migration_probe(root: &Path, j: &mut Value, journal: &Path) -> Result<PathBuf> {
+    let scratch = root.join(format!(".lintel-path-check-{}", uuid::Uuid::new_v4()));
+    guard(&scratch)?;
+    j["migration_probe"] = json!({"path":scratch,"status":"executing"});
+    j["steps"].as_array_mut().unwrap().push(json!({"id":"migration_preflight","label":"检查目标文件系统路径","status":"executing","message":"正在以临时空文件检查路径；中断后按本任务记录核对检查目录。"}));
+    save(journal, j)?;
+    Ok(scratch)
 }
 
 pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
@@ -619,7 +653,7 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let targets = migration_paths(files)?;
-        preflight_migration_paths(&self.state.join("environments"), &targets)?;
+        preflight_migration_paths(&self.state.join("environments"), &targets, j, journal)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
         let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
@@ -968,6 +1002,41 @@ mod tests {
                 fs::read(new_root.join("lintel-imports/projects/Foo.jsonl")).unwrap(),
                 b"upper"
             );
+        }
+    }
+
+    #[test]
+    fn interrupted_probe_is_discoverable_from_the_original_job() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let state = base.join("state");
+        let engine = Engine::new(home.clone(), state.clone()).unwrap();
+        let job_id = uuid::Uuid::new_v4().to_string();
+        let journal = engine.path("jobs", &job_id);
+        let mut receipt = json!({"id":job_id,"status":"executing","steps":[],"warnings":[]});
+        let scratch =
+            record_migration_probe(&state.join("environments"), &mut receipt, &journal).unwrap();
+        assert!(!scratch.exists(), "intent must precede directory creation");
+        let before = load(&journal).unwrap();
+        assert_eq!(before["migration_probe"]["path"].as_str(), scratch.to_str());
+        assert_eq!(before["steps"][0]["status"], "executing");
+        // Model a killed worker after the durable boundary: cleanup cannot run.
+        private_dir(&scratch).unwrap();
+        fs::write(scratch.join("placeholder"), b"").unwrap();
+        drop(engine);
+        let next = Engine::new(home, state).unwrap();
+        for _ in 0..2 {
+            let response = next.request(json!({"command":"job","job_id":job_id}));
+            assert_eq!(response["ok"], true);
+            assert_eq!(response["data"]["id"], job_id);
+            assert_eq!(response["data"]["status"], "needs_reconciliation");
+            assert_eq!(
+                response["data"]["migration_probe"],
+                before["migration_probe"]
+            );
+            assert_eq!(fs::read(scratch.join("placeholder")).unwrap(), b"");
         }
     }
 }

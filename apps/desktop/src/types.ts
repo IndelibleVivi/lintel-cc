@@ -34,6 +34,7 @@ export interface Receipt {
   service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
   service_restorable?: boolean;
   execution?: { mode: 'setsid' | 'system_manager' | 'user_manager'; manager: 'system' | 'user' | null; unit: string | null; continuation: string; limitation: string | null; reboot_survival: false };
+  migration_probe?: { path: string; status: 'executing' | 'removed' | 'retained' };
   error?: { code: string; message: string; phase: string; step_id?: string | null; recovery?: string; next_action?: string; uncertain_side_effects?: boolean };
   coverage?: Record<string, unknown>; next_steps?: string[]; task_outcome?: string; outcome?: string;
   local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
