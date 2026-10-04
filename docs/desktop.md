@@ -67,7 +67,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 ## 帮助与开发者说明
 
-侧栏“帮助”提供 Faye 的 GitHub、Lintel 源码与说明，以及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 和连接排障章节。Lintel 是独立工具，当前源码仓库为私有，访问需相应权限。桌面只通过 `resources.rs` 中有限的 resource ID 打开固定 HTTPS 文档链接；不接受任意 URL，不附带配置、错误或凭据。网页预览使用普通外链，macOS App 使用系统浏览器。打开失败时保留可复制链接。
+侧栏“帮助”提供 Faye 的 GitHub、Lintel 源码与说明，以及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 和连接排障章节。Lintel 是独立工具，项目仓库提供源码、使用说明与当前验收状态。桌面只通过 `resources.rs` 中有限的 resource ID 打开固定 HTTPS 文档链接；不接受任意 URL，不附带配置、错误或凭据。网页预览使用普通外链，macOS App 使用系统浏览器。打开失败时保留可复制链接。
 
 ## 远端运行器
 

@@ -2,7 +2,7 @@
 
 让 Claude 使用环境清晰、可控。Lintel 将外发设置、工作内容、浏览器操作和变更记录放在同一个本地工具中，提供 macOS 桌面界面与独立 CLI。
 
-**当前是 0.1.0 开发候选，完整 SPEC 尚未交付，未正式发布。** 可以在独立测试环境中使用已接通的功能；已接入有限本地清理、官方注销入口、工作归档迁入与 SSH 控制；真实认证、完整浏览器旅程、进程级网络强约束和正式远端运行仍未验收。具体证据与缺口见 [当前状态](docs/current-state.md)。
+**当前是 0.1.0 开发候选，完整 SPEC 尚未交付，未正式发布。** 可以在独立测试环境中使用已接通的功能；已接入有限本地清理、官方注销入口、工作归档迁入与 SSH 控制；真实认证、正式 Chrome/Edge/Firefox/AdsPower、进程级网络强约束和生产远端环境仍未验收。具体证据与缺口见 [当前状态](docs/current-state.md)。
 
 ## 现在可以做什么
 
@@ -17,7 +17,7 @@
 
 桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK，由独立会话中的 worker 执行。已验证本地父进程退出后的完成与去重，真实 Linux logout/cgroup 行为仍需验收，见 [远程指南](docs/remote.md)。
 
-App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；私有源码仓库需相应访问权限。
+App 的“帮助”包含开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；项目仓库保留完整目标、实际验收证据与当前限制。
 
 ## 本地构建与试用
 
@@ -77,4 +77,4 @@ python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 
 源码：`crates/core` 为计划与文件操作权威，`apps/runner` 提供 CLI，`apps/desktop` 为 Tauri + React，`extensions/browser` 为扩展和 Native Messaging host，`crates/egress` 为受控代理，桌面的 `src-tauri/src/remote.rs` 是 native SSH bridge；`platform/ssh` 保留可选 Python stdlib CLI controller。
 
-Lintel 是独立工具，与 Anthropic 无官方关联。Clawd 形象属于 Anthropic；可选本地字体不随仓库分发。产品名 **Lintel**，仓库暂名 **lintel-cc**。尚未选定公开发行许可证；第三方依赖保留各自许可。
+Lintel 是独立工具，与 Anthropic 无官方关联。Clawd 形象属于 Anthropic；可选本地字体不随仓库分发。产品名 **Lintel**，仓库暂名 **lintel-cc**。尚未选定项目原创代码、文档与身份资产的公开复用许可证；源码可见性不构成这些材料的通用复用许可，也不表示正式发布。第三方依赖与 Clawd 形象保留各自权利，未由本项目重新授权。
