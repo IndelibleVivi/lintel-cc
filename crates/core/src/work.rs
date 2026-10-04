@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs::{self, OpenOptions},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
     path::{Component, Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -207,6 +207,20 @@ pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
         targets.push(target);
     }
     Ok(targets)
+}
+
+/// Missing work directories are private at creation. Existing destination
+/// directories belong to the approved environment and keep their permissions.
+pub(crate) fn migration_parent(path: &Path) -> Result<()> {
+    guard(path)?;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)?;
+    if fs::metadata(path)?.uid() != unsafe { libc::geteuid() } {
+        return Err(err("wrong_owner", "迁入目录不属于当前用户"));
+    }
+    Ok(())
 }
 
 /// Check this batch against the actual destination filesystem's name rules.
@@ -666,7 +680,7 @@ impl Engine {
         save(journal, j)?;
         for (f, relative) in files.iter().zip(targets) {
             let target = destination.join(relative);
-            private_dir(
+            migration_parent(
                 target
                     .parent()
                     .ok_or_else(|| err("invalid_path", "缺少迁入目标"))?,

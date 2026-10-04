@@ -218,7 +218,7 @@ impl Engine {
         }
         work::preflight_migration_paths(root, &work::migration_paths(&selected)?, j, journal)?;
         for ((entry, f), pth) in planned.iter().zip(&selected).zip(&targets) {
-            private_dir(pth.parent().unwrap())?;
+            work::migration_parent(pth.parent().unwrap())?;
             let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
             j["steps"].as_array_mut().unwrap().push(json!({"id":entry["path"],"label":entry["path"],"status":"executing","message":"正在发布并核验迁入文件；不替换已有内容。"}));
             save(journal, j)?;

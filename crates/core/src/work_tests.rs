@@ -694,3 +694,107 @@ fn portable_import_case_equivalence_rejects_before_content_writes() {
         .to_string_lossy()
         .starts_with(".lintel-path-check-")));
 }
+
+#[test]
+fn portable_import_existing_ancestor_rejects_before_any_content_write() {
+    let (_temp, engine, environment, root) = fixture();
+    let package = json!({"schema":"lintel.work/1","files": [
+        {"path":"CLAUDE.md","category":"instructions","data":b"first","digest":digest(b"first")},
+        {"path":"projects/new.jsonl","category":"sessions","data":b"second","digest":digest(b"second")}
+    ]});
+    let archive_path = root.parent().unwrap().join("portable-ancestor.age");
+    atomic_new(
+        &archive_path,
+        &archive::seal(&package, PASS).unwrap(),
+        0o600,
+    )
+    .unwrap();
+    let request = json!({"command":"plan_import","environment_id":environment["id"],"archive_path":archive_path,"categories":["instructions","sessions"],"archive_passphrase":PASS});
+    let plan = ok(&engine, request.clone());
+    fs::create_dir(root.join("lintel-imports")).unwrap();
+    let blocker = root.join("lintel-imports/projects");
+    fs::write(&blocker, b"existing ancestor file").unwrap();
+    // The shared path guard inspects every actual ancestor before the import
+    // loop, including a blocker introduced after preview.
+    assert_eq!(err_code(&engine, request), "path_unreadable");
+    let receipt = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(receipt["status"], "needs_reconciliation");
+    assert_eq!(receipt["error"]["code"], "path_unreadable");
+    assert!(!root.join("CLAUDE.md").exists());
+    assert_eq!(fs::read(&blocker).unwrap(), b"existing ancestor file");
+    assert!(!receipt["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|step| step["id"] == "CLAUDE.md"));
+    let queried = ok(&engine, json!({"command":"job","job_id":receipt["id"]}));
+    assert_eq!(queried["id"], receipt["id"]);
+    assert_eq!(queried["error"], receipt["error"]);
+    assert!(!root.join("CLAUDE.md").exists());
+}
+
+#[test]
+fn portable_import_preserves_existing_directory_modes_and_creates_private_parents() {
+    let (_temp, engine, environment, root) = fixture();
+    let imports = root.join("lintel-imports");
+    let projects = imports.join("projects");
+    fs::create_dir_all(&projects).unwrap();
+    for (path, mode) in [(&root, 0o755), (&imports, 0o775), (&projects, 0o750)] {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+    let package = json!({"schema":"lintel.work/1","files": [
+        {"path":"CLAUDE.md","category":"instructions","data":b"instruction","digest":digest(b"instruction")},
+        {"path":"projects/new.jsonl","category":"sessions","data":b"session","digest":digest(b"session")},
+        {"path":"projects/example/memory/MEMORY.md","category":"memory","data":b"memory","digest":digest(b"memory")}
+    ]});
+    let archive_path = root.parent().unwrap().join("portable-modes.age");
+    atomic_new(
+        &archive_path,
+        &archive::seal(&package, PASS).unwrap(),
+        0o600,
+    )
+    .unwrap();
+    let plan = ok(
+        &engine,
+        json!({"command":"plan_import","environment_id":environment["id"],"archive_path":archive_path,"categories":["instructions","memory","sessions"],"archive_passphrase":PASS}),
+    );
+    let receipt = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(receipt["status"], "completed");
+    for (path, mode) in [(&root, 0o755), (&imports, 0o775), (&projects, 0o750)] {
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            mode,
+            "{}",
+            path.display()
+        );
+    }
+    for path in [projects.join("example"), projects.join("example/memory")] {
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o700,
+            "{}",
+            path.display()
+        );
+    }
+    for (relative, bytes) in [
+        ("CLAUDE.md", b"instruction".as_slice()),
+        ("lintel-imports/projects/new.jsonl", b"session".as_slice()),
+        (
+            "lintel-imports/projects/example/memory/MEMORY.md",
+            b"memory".as_slice(),
+        ),
+    ] {
+        let path = root.join(relative);
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}

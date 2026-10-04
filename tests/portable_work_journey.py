@@ -151,6 +151,12 @@ class PortableWorkJourney(unittest.TestCase):
         target = Install(self.base, "target")
         dest = target.home / "other-claude"
         dest.mkdir(parents=True)
+        imports = dest / "lintel-imports"
+        projects = imports / "projects"
+        projects.mkdir(parents=True)
+        existing_modes = [(dest, 0o755), (imports, 0o775), (projects, 0o750)]
+        for directory, mode in existing_modes:
+            directory.chmod(mode)
         dest_id = target.register(dest)
         path = str(out)
         manifest = target.data("archive_inspect", archive_path=path, archive_passphrase=PASSPHRASE)
@@ -164,6 +170,10 @@ class PortableWorkJourney(unittest.TestCase):
         )
         receipt = target.execute(import_plan)
         self.assertEqual(receipt["status"], "completed")
+        for directory, mode in existing_modes:
+            self.assertEqual(directory.stat().st_mode & 0o777, mode)
+        for directory in [projects / "example", projects / "example/memory", projects / "foo.jsonl"]:
+            self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
         self.assertEqual((dest / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n")
         self.assertEqual((dest / "lintel-imports/projects/example/session.jsonl").read_bytes(), b"Earlier preserved session.\n")
         self.assertEqual((dest / "lintel-imports/projects/example/lintel-1-session.jsonl").read_bytes(), b'{"synthetic":true}\n')
