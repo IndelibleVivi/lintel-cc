@@ -113,6 +113,8 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 <a id="browser-adapter"></a>
 
+`categories` 在 named/finite 请求中必须至少选择一项；空 JSON 数组和 `--categories ''` 都拒绝。protocol-1 raw request 保留历史兼容默认。
+
 ## Browser：有限适配与人类等待
 
 macOS CLI：
@@ -174,6 +176,8 @@ lintel remote submit approved-alias <<'JSON'
 JSON
 lintel remote job approved-alias <original-remote-plan-id>
 ```
+
+远端交互会话只在 macOS 的真实 TTY 使用 `lintel remote launch approved-alias <remote-environment-id>`：stdin/stdout 都需为终端，不接受 prompt 或额外参数；先只读 launch_context preflight，再由有限 controller 请求 Terminal。JSON `remote control` 的 launch 被拒绝，不能用隐藏管道发起会话。
 
 install 的 prepare_runner → install_runner → query_install 与 App 共用实现和准确计划批准，资源、原注册和 runner 绑定都再核对，提交不明时只 query_install；操作字段见当前 `remote` schema 和 [remote.md](remote.md)。原 Python stdlib controller 保留其已有 caller/subset，作为 legacy compatibility 入口；新增功能以共享 Rust controller 为 canonical，不再平行扩展 Python。
 

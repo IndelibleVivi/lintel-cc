@@ -27,7 +27,7 @@ fn property(name: &str) -> Value {
             json!({"type":"boolean"})
         }
         "categories" => {
-            json!({"type":"array","items":choice(&["instructions","memory","sessions"]),"uniqueItems":true})
+            json!({"type":"array","items":choice(&["instructions","memory","sessions"]),"minItems":1,"uniqueItems":true})
         }
         "trusted_devices" => choice(&["unknown", "required", "not_required"]),
         "preset" => choice(&["preserve", "reduce", "custom"]),
@@ -174,7 +174,8 @@ fn check_property(value: &Value, schema: &Value) -> bool {
         }),
         Some("boolean") => value.is_boolean(),
         Some("array") => value.as_array().is_some_and(|items| {
-            items.iter().all(|v| check_property(v, &schema["items"]))
+            items.len() >= schema["minItems"].as_u64().unwrap_or(0) as usize
+                && items.iter().all(|v| check_property(v, &schema["items"]))
                 && (schema["uniqueItems"] != true
                     || items
                         .iter()
@@ -317,6 +318,21 @@ pub fn catalog() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn work_selection_requires_at_least_one_category() {
+        assert_eq!(
+            schema("plan_archive").unwrap()["properties"]["categories"]["minItems"],
+            1
+        );
+        for command in ["plan_archive", "plan_preserve"] {
+            assert!(validate(
+                &json!({"command":command,"environment_id":"synthetic","categories":[]})
+            )
+            .is_err());
+            assert!(validate(&json!({"command":command,"environment_id":"synthetic","categories":["instructions"]})).is_ok());
+        }
+        assert!(validate(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
+    }
     #[test]
     fn schemas_validate_exact_sources_and_secret_fields() {
         assert!(validate(

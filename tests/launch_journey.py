@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='lintel-launch-') as tmp:
     extra = subprocess.run([str(binary), 'launch', environment['id'], '--prompt'], env=env,
                            capture_output=True, text=True, timeout=20)
     assert extra.returncode and 'Usage:' in extra.stderr
-    def terminal(args, input_text=b''):
+    def terminal(args, input_text=b'', expected_exit=0):
         master, slave = pty.openpty()
         process = subprocess.Popen([str(binary), *args], env=env, stdin=slave,
                                    stdout=slave, stderr=slave, start_new_session=True)
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='lintel-launch-') as tmp:
                     output.extend(block)
                 elif process.poll() is not None:
                     break
-            assert process.wait(timeout=2) == 0, output.decode(errors='replace')
+            assert process.wait(timeout=2) == expected_exit, output.decode(errors='replace')
         finally:
             os.close(master)
             if process.poll() is None:
@@ -75,6 +75,12 @@ with tempfile.TemporaryDirectory(prefix='lintel-launch-') as tmp:
         return output.decode(errors='replace')
     terminal(['launch', environment['id']])
     assert log.read_text().splitlines() == [str(root), str(root), '0']
+    # A real TTY reaches finite alias validation; the missing synthetic alias
+    # guarantees this check never invokes SSH or opens Terminal.
+    denied_remote = terminal(['remote', 'launch', 'missing-synthetic', environment['id']], expected_exit=1)
+    assert json.loads(denied_remote)['error']['code'] == 'host_not_registered', denied_remote
+    extra_remote = terminal(['remote', 'launch', 'missing-synthetic', environment['id'], '--prompt'], expected_exit=1)
+    assert json.loads(extra_remote)['error']['code'] == 'invalid_argument', extra_remote
     log.unlink()  # Only the inert fixture result is removed between its two invocations.
     output = terminal(['tui'], f"o\n{environment['id']}\nq\n".encode())
     assert '打开 Claude' in output

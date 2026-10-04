@@ -1697,6 +1697,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"plan-1","plan_id":"plan-1","status":"com
             json!({"command":"job","job_id":"job-1","plan_id":"plan-1"}),
             json!({"command":"plan_policy","environment_id":"env-1","preset":"reduce"}),
             json!({"command":"plan_archive","environment_id":"env-1","categories":["memory"],"output_path":"relative/archive"}),
+            json!({"command":"plan_archive","environment_id":"env-1","categories":[]}),
             json!({"command":"plan_preserve","environment_id":"env-1","categories":["memory"],"shell":"bad"}),
             json!({"command":"execute","plan_id":"plan-1","approval":"secret"}),
             json!({"command":"launch","environment_id":"env-1"}),

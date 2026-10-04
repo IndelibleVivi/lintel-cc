@@ -44,6 +44,16 @@ def run():
         hidden = command('call', 'launch', payload={'environment_id': '00000000-0000-4000-8000-000000000000'}, good=False)
         assert hidden['error']['code'] == 'interactive_launch_required', hidden
         assert not state.exists(), 'Hidden-pipe launch initialized core state'
+        remote_hidden = command('remote', 'control', payload={'op': 'launch', 'alias': 'missing-synthetic',
+                                'environment_id': '00000000-0000-4000-8000-000000000000'}, good=False)
+        assert remote_hidden['error']['code'] == 'interactive_launch_required', remote_hidden
+        remote_hidden = command('remote', 'launch', 'missing-synthetic',
+                                '00000000-0000-4000-8000-000000000000', good=False)
+        assert remote_hidden['error']['code'] == 'interactive_launch_required', remote_hidden
+        empty_selection = command('work', 'archive', 'plan', '--environment',
+                                  '00000000-0000-4000-8000-000000000000', '--categories', '', good=False)
+        assert empty_selection['error']['code'] == 'invalid_request', empty_selection
+        assert not state.exists(), 'Rejected launch/selection initialized core state'
         command('describe', 'does-not-exist', good=False)
 
         for payload in ['{', '{"command":"discover"}', '{"command":"execute"}']:

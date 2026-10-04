@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const HELP: &str = "Lintel — Claude environment control\n\n  lintel version [--json]                     Static build/protocol identity\n  lintel capabilities [--environment ID]       Operation catalog; optional target inspection\n  lintel describe OPERATION [--json]           Parameters, effects, approval and recovery\n  lintel schema OPERATION                     JSON Schema envelope, no discovery\n  lintel env list | inspect ID | create --name NAME | register --name NAME --root PATH\n  lintel policy plan --environment ID --preset reduce --keep-remote-control\n  lintel plan show ID                         Read original frozen plan\n  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n  lintel job submit --plan ID --approval HASH  Durable ACK; secret fields via JSON stdin\n  lintel restore plan --job ID                Prepare an independent restoration\n  lintel work archive plan --environment ID --categories instructions,memory,sessions\n  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n  lintel browser operations [--instance ID]    Static actions; optional pairing/online facts\n  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n  lintel browser submit | query | control    Finite host control; JSON stdin\n  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n  lintel remote operations                   Static finite SSH schemas, no state\n  lintel remote hosts | aliases | inspect ALIAS\n  lintel remote request ALIAS | submit ALIAS   JSON stdin; submit only execute\n  lintel remote job ALIAS PLAN_ID             Query original; no resubmission\n  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\nLegacy: request, submit, discover, inspect ID, jobs, job ID, launch ID, tui.\nOrdinary commands print one ok/data or ok/error envelope. Network serve is explicitly NDJSON.\nPassphrases never belong in argv or persistent request files. No blanket --yes.\nStatic catalog commands do not initialize state. Protocol-1 request retains historical defaults.\n";
+pub const HELP: &str = "Lintel — Claude environment control\n\n  lintel version [--json]                     Static build/protocol identity\n  lintel capabilities [--environment ID]       Operation catalog; optional target inspection\n  lintel describe OPERATION [--json]           Parameters, effects, approval and recovery\n  lintel schema OPERATION                     JSON Schema envelope, no discovery\n  lintel env list | inspect ID | create --name NAME | register --name NAME --root PATH\n  lintel policy plan --environment ID --preset reduce --keep-remote-control\n  lintel plan show ID                         Read original frozen plan\n  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n  lintel job submit --plan ID --approval HASH  Durable ACK; secret fields via JSON stdin\n  lintel restore plan --job ID                Prepare an independent restoration\n  lintel work archive plan --environment ID --categories instructions,memory,sessions\n  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n  lintel browser operations [--instance ID]    Static actions; optional pairing/online facts\n  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n  lintel browser submit | query | control    Finite host control; JSON stdin\n  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n  lintel remote operations                   Static finite SSH schemas, no state\n  lintel remote hosts | aliases | inspect ALIAS\n  lintel remote request ALIAS | submit ALIAS   JSON stdin; submit only execute\n  lintel remote job ALIAS PLAN_ID             Query original; no resubmission\n  lintel remote launch ALIAS ENVIRONMENT_ID    Real TTY, macOS Terminal, no prompt\n  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\nLegacy: request, submit, discover, inspect ID, jobs, job ID, launch ID, tui.\nOrdinary commands print one ok/data or ok/error envelope. Network serve is explicitly NDJSON.\nPassphrases never belong in argv or persistent request files. No blanket --yes.\nStatic catalog commands do not initialize state. Protocol-1 request retains historical defaults.\n";
 
 pub fn error(code: &str, message: impl AsRef<str>) -> Value {
     json!({"ok":false,"error":{"code":code,"message":message.as_ref()}})
@@ -470,6 +470,17 @@ fn remote(args: &[String]) -> Value {
             error("invalid_argument", "remote operations 仅接受 --json")
         };
     }
+    if word(1) == "launch" {
+        if args.len() != 4 {
+            return error(
+                "invalid_argument",
+                "remote launch ALIAS ENVIRONMENT_ID；不接受 prompt 或额外字段",
+            );
+        }
+        if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+            return error("interactive_launch_required", "请在真实交互终端使用 lintel remote launch ALIAS ENVIRONMENT_ID；不从隐藏管道打开 Terminal");
+        }
+    }
     let mut payload = match word(1) {
         "control" => match stdin_json(true){Ok(r)=>r,Err(e)=>return e},
         "hosts"|"aliases" => json!({"op":word(1)}),
@@ -485,11 +496,15 @@ fn remote(args: &[String]) -> Value {
             request["op"]=json!("execute");request["alias"]=json!(word(2));request
         }
         "job" if !word(2).is_empty()&&!word(3).is_empty()=>json!({"op":"reconnect","alias":word(2),"plan_id":word(3)}),
-        _=>return error("invalid_argument","remote control | hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID"),
+        "launch" => json!({"op":"launch","alias":word(2),"environment_id":word(3)}),
+        _=>return error("invalid_argument","remote control | hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID"),
     };
+    if word(1) != "launch" && payload["op"] == "launch" {
+        return error("interactive_launch_required", "remote control 不执行交互启动；请在真实 TTY 使用 lintel remote launch ALIAS ENVIRONMENT_ID");
+    }
     let start = match word(1) {
         "hosts" | "aliases" | "control" => 2,
-        "job" => 4,
+        "job" | "launch" => 4,
         _ => 3,
     };
     let mut config = match flags(&args[start..], json!({})) {
