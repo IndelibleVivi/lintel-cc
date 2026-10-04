@@ -107,10 +107,13 @@ fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
         };
         #[cfg(target_os = "linux")]
         let status = unsafe {
-            libc::renameat2(
-                libc::AT_FDCWD,
+            // Rust's bundled musl can lack the renameat2 wrapper even when the
+            // binding is declared. Use the fixed kernel operation directly.
+            libc::syscall(
+                libc::SYS_renameat2,
+                libc::AT_FDCWD as libc::c_long,
                 from.as_ptr(),
-                libc::AT_FDCWD,
+                libc::AT_FDCWD as libc::c_long,
                 to.as_ptr(),
                 libc::RENAME_NOREPLACE,
             )
