@@ -57,6 +57,8 @@ try{
   await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'清理与重建',exact:true}).click();
   await page.getByRole('radio',{name:/修复本地登录/}).check();
+  const writersWarning=page.getByText(/仍有无法归属到此目录的 Claude 写入进程/);
+  await writersWarning.waitFor();
   const control=page.locator('.service-control');await control.locator('summary').click();
   await control.getByLabel('服务 unit').fill(held.unit);await control.getByRole('button',{name:'检查服务',exact:true}).click();
   await control.getByText('运行中',{exact:true}).waitFor();assert.equal(calls.some(c=>c.command==='execute'),false);
@@ -67,6 +69,9 @@ try{
   report.checks.push('inspect/preview/cancel never mutates; target and persistent hold visible');
   await control.getByRole('button',{name:'检查服务',exact:true}).click();await control.getByRole('button',{name:'预览暂停服务',exact:true}).click();
   await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).waitFor();
+  // Receipt rendering precedes the async inventory refresh and cleanup effect.
+  // Observe the actual updated writer UI rather than racing the invoke queue.
+  await writersWarning.waitFor({state:'hidden'});
   assert.equal(calls.filter(c=>c.command==='execute').length,1);assert.ok(calls.filter(c=>c.command==='cleanup_inspect').length>=2,'service receipt refreshes cleanup writers');assert.equal(await dialog.getByRole('button',{name:'打开 Claude',exact:true}).count(),0);
   resumeConflict=true;await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).click();await dialog.getByText(/目标 unit 在任务后被编辑/).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,1);
   report.checks.push('lost ACK queries original job; one approved mutation; external-edit conflict preserves hold');
