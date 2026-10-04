@@ -66,7 +66,7 @@ lintel job wait <restore-plan-id> --timeout 30s
 
 ## 所有 core 操作与旧调用者
 
-命名入口涵盖常见任务；剩余操作使用有限 `call OPERATION`，参数对象从 stdin 进入，同一 schema 校验。例如：
+命名入口涵盖常见任务；其余 core 请求使用有限 `call OPERATION`，参数对象从 stdin 进入，同一 schema 校验。交互启动统一使用 `lintel launch ID` 的真实 TTY 入口；`call launch` 在进入 core 前返回 `interactive_launch_required`。例如：
 
 ```sh
 lintel call cleanup_inspect <<'JSON'

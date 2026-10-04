@@ -300,7 +300,7 @@ pub fn describe(command: &str) -> Option<Value> {
         "secret_fields":if s["properties"].get("archive_passphrase").is_some() {vec!["archive_passphrase"]} else {vec![]},
         "request_schema":s,
         "result":{"envelope":"ok/data or ok/error(code,message)","receipt_states":["accepted","executing","verifying","completed","partially_completed","needs_reconciliation","interrupted"],"recovery":["query_original","repreview","resolve_conflict"]},
-        "launch_conditions":if command=="launch" {json!({"named_cli":"real_TTY_required_no_prompt","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"})}else{Value::Null},
+        "launch_conditions":if command=="launch" {json!({"named_cli":"real_TTY_required_no_prompt","named_cli_entry":"lintel launch <environment-id>","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"})}else{Value::Null},
         "compatibility":"协议 1 的 raw core request 保留历史可选字段/default；named CLI 与有限 SSH 使用明确字段合同"
     }))
 }
