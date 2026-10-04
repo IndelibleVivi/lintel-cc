@@ -10,7 +10,7 @@
 
 现有 lintel runner 提供静态 version/capabilities/describe/schema、named core 操作、冻结 plan show 和原 ID job wait。GUI 与 CLI 共用 crates/remote 的有限 SSH controller；Mac CLI 接现有 browser-host control，浏览器人工确认／真正重启仍由目标 profile 拥有。network serve 与既有 egress 共用前台生命周期，明确 owner/PID/实际 active_config；不能查询或停止 App 进程内通道。discover 两入口的 runner capabilities 一致，submit 拒绝退出非零。清理预览与执行都先保全／新根迁入，再批准的注销与精确删除；接受后失败回执保留 code/message/真实 phase/step/不确定副作用与原任务恢复指引。
 
-本机 macOS arm64 的默认检查已执行，最初 portable fixture 的静态发现不一致已修正，并独立通过其 5 项跨进程测试。根 workspace（core 62、shared remote 37 passed／2 independent ignored）、standalone desktop/native-host、JS/Python、frontend build 与 CLI journeys 通过；ignored 不计通过。新的 work-ui 及 browser-pairing-ui/service-ui/remote-task-ui 四项通过，工作旅程使用两个隔离 HOME 的真实 core，检查归档／保全／独立导入、错误口令、键盘和 Day/Night；invoke/clipboard/SSH/service seams 为合成，不证明 native WebKit 或生产主机。现有 CI owner 已接 work-ui；本轮 fresh Linux CI 尚未运行。
+本机 macOS arm64 clean `a959d8a` 的默认 17 项检查全部通过。根 workspace（core 62、shared remote 37 passed／2 independent ignored）、standalone desktop/native-host、JS/Python、frontend build 与 CLI journeys 通过；ignored 不计通过。新的 work-ui 及 browser-pairing-ui/service-ui/remote-task-ui 四项通过，工作旅程使用两个隔离 HOME 的真实 core，检查归档／保全／独立导入、错误口令、键盘和 Day/Night；invoke/clipboard/SSH/service seams 为合成，不证明 native WebKit 或生产主机。当前 App 包内 host/扩展资源的两项独立 synthetic 安装检查也通过。现有 CI owner 已接 work-ui；本轮 fresh Linux CI 尚未运行。
 
 全新临时版本目录的 release CLI 已安装并通过 named plan/submit/原 ID wait/restore、portable package 和有限 adapter journeys；不依赖 GUI。当前源码的 arm64 App 已构建（约 14.42 MiB，含 canonical browser host 与扩展），未安装、激活、签名公证或正式发行；此候选没有本轮新 Linux runner bundles，远端安装明确显示 bundle_unavailable，不能把前轮静态 runner 当成新增 API 已安装。新 Linux CLI build/runtime、正式浏览器／真实认证与生产 VPS 仍需独立证据。上面的源码交付不改写下方历史 clean CI 和 App 证据。
 
