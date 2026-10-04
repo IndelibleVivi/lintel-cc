@@ -201,7 +201,7 @@ npm run test:browser
 
 合成构建 `node scripts/build.mjs --fixture` 生成显眼命名的 fixture 包，只接受 `http://localhost:18765`。其 Cookie/DNR/loopback 权限是测试预授权，与正式包分开。不要将 fixture 包发布给普通用户。
 
-2026-10-04 验证：20 项 JS contract tests 与 12 项 native host Rust tests 有既有通过证据。macOS arm64 / Playwright Chromium 155.0.8059.12 的当前完整两阶段 smoke 已通过，保留原有 11 项断言：真正活跃的 SW `waitUntil` CacheStorage writer 与 iframe writer、目标／宿主关闭、隔离保持、五类存储删除／邻域保留、定位权限目标级 block/restore、旧 operation ID 不重删新的合成登录，以及真实 `connectNative` 短码请求／本地批准／浏览器确认 WebRTC／host 持久回执。
+2026-10-04 验证：20 项 JS contract tests 与 12 项 native host Rust tests 有既有通过证据。macOS arm64 / Playwright Chromium 155.0.8059.12 的当前完整两阶段 smoke 已通过；同源 clean `93c3f74` 的 [CI 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) 在 macOS arm64／Ubuntu x86_64 的 Chromium 151.0.7922.34 上也通过，保留原有 11 项断言：真正活跃的 SW `waitUntil` CacheStorage writer 与 iframe writer、目标／宿主关闭、隔离保持、五类存储删除／邻域保留、定位权限目标级 block/restore、旧 operation ID 不重删新的合成登录，以及真实 `connectNative` 短码请求／本地批准／浏览器确认 WebRTC／host 持久回执。
 
 持久安装由测试专用 [persistent-install.mjs](../extensions/browser/tests/persistent-install.mjs) 调用 Chromium 原生管理页安装器完成：仅临时破坏自己复制的 fixture manifest，以取得浏览器生成的加载失败恢复凭据，随后逐字节恢复，再由原生安装器重试。这遵循 [Chromium 原生 reload/loadUnpacked 实现](https://chromium.googlesource.com/chromium/src/+/main/chrome/browser/extensions/api/developer_private/developer_private_functions.cc)；不是产品的自动扩展安装入口。测试确认旧浏览器进程已退出、新进程不同、重新启动没有 `--load-extension` 或 `--disable-extensions-except`，同一扩展身份保留，生产监听器实际收到新的 `runtime.onStartup` 世代，再单独确认 `finishClear`。测试不直接写入 profile preferences 或启动世代，也不伪造启动事件。详细证据写入本地 `extensions/browser/artifacts/browser-smoke.json`，失败则写 `browser-smoke-failure.json`；这些生成文件不纳入 Git。
 
