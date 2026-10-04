@@ -151,7 +151,7 @@ fn exec_context_arg(args: &[String]) -> Option<Value> {
     None
 }
 
-pub fn run(mode: &str, args: &[String]) {
+pub fn run(mode: &str, args: &[String]) -> bool {
     let mut input = io::BufReader::new(io::stdin());
     if mode == "__worker" {
         // Match the original caller's environment without putting credentials in
@@ -170,7 +170,7 @@ pub fn run(mode: &str, args: &[String]) {
             emit(
                 &json!({"ok":false,"error":{"code":"worker_environment_invalid","message":"worker 调用环境未能完整接收；未持久接受，请查询原任务"}}),
             );
-            return;
+            return false;
         }
         let environment: Vec<(Vec<u8>, Vec<u8>)> = match serde_json::from_slice(&header) {
             Ok(value) => value,
@@ -178,7 +178,7 @@ pub fn run(mode: &str, args: &[String]) {
                 emit(
                     &json!({"ok":false,"error":{"code":"worker_environment_invalid","message":"worker 调用环境无效；未持久接受，请查询原任务"}}),
                 );
-                return;
+                return false;
             }
         };
         // Before any worker threads/core work, replace manager-inherited values
@@ -198,20 +198,20 @@ pub fn run(mode: &str, args: &[String]) {
         emit(
             &json!({"ok":false,"error":{"code":"request_limit","message":"提交请求超过 1 MiB 或读取失败"}}),
         );
-        return;
+        return false;
     }
     let request: Value = match lintel_core::decode_request(&bytes) {
         Ok(v) => v,
         Err(_) => {
             emit(&json!({"ok":false,"error":{"code":"invalid_json","message":"提交请求无效"}}));
-            return;
+            return false;
         }
     };
     if request["command"] != "execute" {
         emit(
             &json!({"ok":false,"error":{"code":"invalid_submission","message":"submit 只接受批准的 execute；查询用 request"}}),
         );
-        return;
+        return false;
     }
     if mode == "__worker" {
         // A manager-launched worker must already live in its exact selected unit's
@@ -223,14 +223,27 @@ pub fn run(mode: &str, args: &[String]) {
                 emit(
                     &json!({"ok":false,"error":{"code":"execution_context_mismatch","message":"worker 实际 cgroup 不属于所选 unit；未写入持久接收，请查询原 plan_id"}}),
                 );
-                return;
+                return false;
             }
         }
         let response = lintel_core::handle_request_with_execution(request, context, Some(accepted));
         if !ACK_SENT.load(Ordering::SeqCst) {
             emit(&response);
         }
-        return;
+        return response["ok"] == true;
+    }
+    let response = submit(&request);
+    emit(&response);
+    response["ok"] == true
+}
+
+pub fn submit(request: &Value) -> Value {
+    if request["command"] != "execute" {
+        return json!({"ok":false,"error":{"code":"invalid_submission","message":"submit 只接受批准的 execute"}});
+    }
+    let bytes = serde_json::to_vec(request).unwrap();
+    if bytes.len() > 1024 * 1024 {
+        return json!({"ok":false,"error":{"code":"request_limit","message":"提交请求超过 1 MiB"}});
     }
     // Select the exact execution context for this original plan. Selection is
     // read-only; a manager is used only when this session can legitimately own the
@@ -240,10 +253,10 @@ pub fn run(mode: &str, args: &[String]) {
     let selection = supervisor::select(&plan_id);
     let context = supervisor::execution_context(&selection);
     match launch(&selection, &context, &bytes, &request) {
-        Ok(v) => emit(&v),
-        Err(message) => emit(
-            &json!({"ok":false,"error":{"code":"submission_uncertain","message":message},"plan_id":request["plan_id"]}),
-        ),
+        Ok(v) => v,
+        Err(message) => {
+            json!({"ok":false,"error":{"code":"submission_uncertain","message":message},"plan_id":request["plan_id"]})
+        }
     }
 }
 

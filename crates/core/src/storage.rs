@@ -73,6 +73,16 @@ pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+    write_atomic(path, bytes, mode, true)
+}
+/// Publish a complete new file without replacing a concurrently created target.
+/// The temporary file and destination share a directory/filesystem. A hard link
+/// atomically claims the unused name; removing the temporary name restores the
+/// single-link invariant before the operation reports success.
+pub fn atomic_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+    write_atomic(path, bytes, mode, false)
+}
+fn write_atomic(path: &Path, bytes: &[u8], mode: u32, overwrite: bool) -> Result<()> {
     guard(path)?;
     let parent = path
         .parent()
@@ -88,7 +98,21 @@ pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
         f.sync_all()?;
         fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
         guard(path)?;
-        fs::rename(&tmp, path)?;
+        if overwrite {
+            fs::rename(&tmp, path)?;
+        } else {
+            fs::hard_link(&tmp, path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    err(
+                        "target_exists",
+                        "目标文件已经出现；原内容保持不变，请核对原任务",
+                    )
+                } else {
+                    e.into()
+                }
+            })?;
+            fs::remove_file(&tmp)?;
+        }
         std::fs::File::open(parent)?.sync_all()?;
         Ok(())
     })();

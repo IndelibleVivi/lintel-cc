@@ -6,12 +6,12 @@ fn quote(value: &str) -> String {
 }
 impl Controller {
     pub(super) fn launch_remote(&self, alias: &str, payload: &Value) -> Result<Value> {
-        exact_fields(payload, &["op", "alias", "environment_id"], &[])?;
+        exact_operation_fields(payload)?;
         let environment_id = valid_id(field(payload, "environment_id")?)?;
         let terminal = self.terminal.as_ref().ok_or_else(|| {
             failure(
                 "platform_unsupported",
-                "桌面远端交互启动需要 macOS Terminal；Linux 终端请使用 lintel launch",
+                "此远端交互启动需要 macOS Terminal；当前控制端平台不支持",
             )
         })?;
         let bound = self.binding(alias)?;

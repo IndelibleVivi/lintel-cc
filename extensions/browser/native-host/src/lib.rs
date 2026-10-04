@@ -134,9 +134,8 @@ where
     FileExt::unlock(&lock).map_err(|e| e.to_string())?;
     result
 }
-fn action(a: &Value) -> Result<()> {
-    let kind = string(a, "kind")?;
-    let extra: &[&str] = match kind {
+fn action_fields(kind: &str) -> Result<&'static [&'static str]> {
+    Ok(match kind {
         "clear" => &["origins", "types", "cookieStoreId"],
         "clearProfileCache" => &[],
         "webrtc" => &["setting"],
@@ -146,7 +145,11 @@ fn action(a: &Value) -> Result<()> {
         "pauseRules" => &["minutes"],
         "restore" | "finishClear" => &["receiptId"],
         _ => return Err("unknown_action".into()),
-    };
+    })
+}
+fn action(a: &Value) -> Result<()> {
+    let kind = string(a, "kind")?;
+    let extra = action_fields(kind)?;
     let mut all = vec!["kind"];
     all.extend(extra);
     fields(a, &all)?;
@@ -231,6 +234,54 @@ fn action(a: &Value) -> Result<()> {
         _ => {}
     }
     Ok(())
+}
+/// Static finite control catalog; unlike control(), this never opens a journal.
+pub fn operation_catalog() -> Value {
+    let action_kinds = [
+        "clear",
+        "clearProfileCache",
+        "webrtc",
+        "sitePermission",
+        "proxy",
+        "blockSites",
+        "pauseRules",
+        "restore",
+        "finishClear",
+    ];
+    let actions: Vec<Value> = action_kinds.iter().map(|kind| {
+        let mut properties = serde_json::Map::new();
+        properties.insert("kind".into(), json!({"type":"string","const":kind}));
+        let mut required = vec!["kind"];
+        for field in action_fields(kind).unwrap() {
+            let schema = match *field {
+                "origins" => json!({"type":"array","minItems":1,"maxItems":2,"items":{"enum":["https://claude.ai","https://console.anthropic.com"]}}),
+                "types" => json!({"type":"array","minItems":1,"maxItems":6,"items":{"enum":["cookies","localStorage","indexedDB","serviceWorkers","cacheStorage","cache"]}}),
+                "setting" if *kind=="webrtc" => json!({"enum":["default","default_public_interface_only","disable_non_proxied_udp"]}),
+                "setting" => json!({"enum":["location","camera","microphone","notifications"]}),
+                "port" => json!({"type":"integer","minimum":1024,"maximum":65535}),
+                "minutes" => json!({"type":"integer","minimum":1,"maximum":60}),
+                "cookieStoreId" => json!({"type":"string","pattern":"^firefox-(default|container-[0-9]+)$"}),
+                _ => json!({"type":"string","minLength":1}),
+            };
+            properties.insert(field.to_string(), schema);
+            if *field!="cookieStoreId" {required.push(field);}
+        }
+        json!({"type":"object","properties":properties,"required":required,"additionalProperties":false})
+    }).collect();
+    let operations: Vec<Value> = ["instances","pair_create","pair_pending","pair_approve","submit","query","installation_plan","install_native_host"].iter().map(|op| {
+        let fields: &[&str] = match *op {
+            "pair_approve" => &["challenge"], "submit" => &["instance_id","operation_id","action"],
+            "query" => &["instance_id","operation_id"], "installation_plan"|"install_native_host" => &["browser","extension_id","host_path"], _=>&[],
+        };
+        let mut properties=serde_json::Map::new(); properties.insert("op".into(),json!({"const":op}));
+        let mut required=vec!["op"];
+        for field in fields {required.push(field); properties.insert(field.to_string(),match *field {
+            "action"=>json!({"oneOf":actions}), "browser"=>json!({"enum":["chrome","edge","firefox"]}),
+            "host_path"=>json!({"type":"string","pattern":"^/"}), _=>json!({"type":"string","minLength":1}),
+        });}
+        json!({"id":format!("browser.{op}"),"request_schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":properties,"required":required,"additionalProperties":false},"effects":{"profile":if *op=="submit"{"native_browser_api_after_extension_approval"}else{"none"},"lintel_state":if *op=="installation_plan"{"read_registration_and_resources"}else if *op=="install_native_host"{"manual_current_user_host_and_registration"}else{"host_journal_transaction"}},"approval":if *op=="submit" {"extension_confirmation_and_native_permission"}else{"explicit_operation_request"},"result":{"phases":["awaiting-browser-confirmation","running","awaiting-browser-restart","completed","uncertain","rejected","failed"],"recovery":"query_original_instance_and_operation_id"},"limitations":["profile pairing and current online evidence are separate","Firefox proxy/sitePermission/cache behavior remains limited","clear requires actual runtime.onStartup then separately approved finishClear"]})
+    }).collect();
+    json!({"operations":operations,"execution_owner":"paired_extension_native_browser_api","installation":"manual_host_path_cli_only"})
 }
 fn public_instance(key: &str, v: &Value) -> Value {
     json!({"instance_id":key,"label":v["label"],"browser":v["browser"],"extension_id":v["extension_id"],"paired":v["paired"],"conflict":v["conflict"],"last_seen":v["last_seen"],"online":v["last_seen"].as_u64().is_some_and(|t|now().saturating_sub(t)<20)})

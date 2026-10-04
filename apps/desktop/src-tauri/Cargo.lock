@@ -2347,6 +2347,7 @@ dependencies = [
  "lintel-browser-host",
  "lintel-core",
  "lintel-egress",
+ "lintel-remote",
  "serde_json",
  "sha2 0.10.9",
  "tauri",
@@ -2365,6 +2366,24 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "webpki-roots",
+]
+
+[[package]]
+name = "lintel-operations"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "lintel-remote"
+version = "0.1.0"
+dependencies = [
+ "fs2",
+ "libc",
+ "lintel-operations",
+ "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

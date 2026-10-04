@@ -7,12 +7,16 @@
 每个环境启动一个独立实例，并将该环境的受控启动入口指向输出的 loopback 地址。配置例子全部为 synthetic 值：
 
 ```sh
+lintel network serve --config crates/egress/examples/policy.synthetic.json
+# Independent existing executable uses the same serve_config owner:
 cargo run -p lintel-egress -- --config crates/egress/examples/policy.synthetic.json
 ```
 
-第一行 JSON 报告实际监听地址，例如 `127.0.0.1:49152`。端口 `0` 由 OS 分配；只接受 IPv4/IPv6 loopback 绑定，不监听公网，也不自动改 shell、浏览器、服务、路由或防火墙。没有配置好的客户端不会自动经过此代理。其他同一台机器上的进程也能够连接这个端口；独立端口是配置作用域，**不是进程身份验证**。
+两条 CLI 共用 `serve_config`，stdout 明确为 NDJSON。首条 `listening` 报告 `owner=foreground_process`、PID、规范化 `active_config` 与实际监听地址，例如 `127.0.0.1:49152`。端口 `0` 由 OS 分配；只接受 IPv4/IPv6 loopback 绑定，不监听公网，也不自动改 shell、浏览器、服务、路由或防火墙。没有配置好的客户端不会自动经过此代理。其他同一台机器上的进程也能够连接这个端口；独立端口是配置作用域，**不是进程身份验证**。
 
 退出 CLI 使用 Ctrl-C。它会先停止接入，再关闭已有 tunnel / HTTP 连接。重新加载规则采用显式停止旧实例、等待停止完成、再启动新实例的流程；已经建立的 CONNECT tunnel 不会绕过新规则继续存活。代理停止或上游失败后，本代理不会尝试绕开指定上游。客户端是否自行回退直连仍需分别验证。
+
+GUI 与 CLI 使用同一 Config/Proxy crate，但 GUI 通道由 App 进程持有；CLI 不读取或停止 App 通道。两者不共享跨进程 lifecycle。
 
 GUI/runner integration 使用同一 crate：
 

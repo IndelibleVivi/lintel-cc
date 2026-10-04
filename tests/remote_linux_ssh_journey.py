@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Opt-in Linux OpenSSH acceptance for the native desktop remote controller.
+"""Opt-in Linux OpenSSH acceptance for the shared finite remote controller.
 
 Build the real x86_64 musl runner first, then run:
   python3 tests/remote_linux_ssh_journey.py target/x86_64-unknown-linux-musl/release/lintel
 
-Requires Linux x86_64, OpenSSH client/server and the desktop Cargo build prerequisites.
+Requires Linux x86_64, OpenSSH client/server and the Rust shared remote crate.
 The server is a foreground loopback process under the current user. All keys,
 known_hosts, config, HOME, Lintel state and Claude fixtures live in one temporary
 directory; no accounts, system sshd configuration or user shell are changed.
@@ -184,8 +184,8 @@ def run(runner):
                     time.sleep(0.1)
                 env = dict(os.environ, LINTEL_SSH_ACCEPTANCE="1", LINTEL_ACCEPTANCE_FIXTURE=str(base), LINTEL_ACCEPTANCE_RUNNER=str(runner))
                 test = subprocess.Popen([
-                    "cargo", "test", "--locked", "--manifest-path", str(ROOT / "apps/desktop/src-tauri/Cargo.toml"),
-                    "remote::acceptance::linux_openssh_runtime_journey", "--", "--ignored", "--exact", "--nocapture", "--test-threads=1",
+                    "cargo", "test", "--locked", "--manifest-path", str(ROOT / "crates/remote/Cargo.toml"),
+                    "acceptance::linux_openssh_runtime_journey", "--", "--ignored", "--exact", "--nocapture", "--test-threads=1",
                 ], cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 summary = ""
                 for line in test.stdout:

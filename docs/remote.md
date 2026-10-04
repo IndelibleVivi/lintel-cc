@@ -235,7 +235,7 @@ CLI 的可导入 API 是 `list_aliases(Path)`、`Controller(state_dir).request(a
 ## 合成验证
 
 ```sh
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml remote::
+cargo test -p lintel-remote::
 python3 -m unittest discover -s platform/ssh/tests -v
 ```
 
@@ -244,3 +244,12 @@ python3 -m unittest discover -s platform/ssh/tests -v
 这些验证证明控制端 transport 与恢复边界，不代表 runner 已部署、真实 VPS session 存活、目标 service 隔离或完整 G03 已完成验收。
 
 `linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。clean `8c9d85c` 的 [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37177180828) 已完成这套观察：精确 system-manager 服务暂停、邻居保留、外部编辑冲突、独立恢复与真实 reboot 后 loaded hold 通过。`KillUserProcesses=no` 和 `yes` 下 worker 都被实际 logout 终止，原任务查询得到 `needs_reconciliation`；真实 reboot 后同样查询原 accepted job，不重新 execute。它验证了发现中断和保留原任务的行为，未验证退出登录后可靠继续执行。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)。新的 system/user transient service 路径另做严格 logout 存活与原任务完成检查，结果见 [当前状态](current-state.md)；生产 VPS 与完整 G03 仍未验收。
+
+
+## GUI 与独立 CLI 的共同 owner
+
+`crates/remote` 保存唯一有限 controller（SSH、intent、alias registry、runner 绑定、安装与 query-only）。桌面 remote.rs 只定位 App 的同源资源并适配 Tauri async command；正式 `lintel remote` 使用同一公共 control。静态 `remote operations`、`describe remote.OP`、`schema remote.OP` 不读 HOME/state 或连接 SSH。core request 子集复用 `crates/operations` schema，并保留 transport 自己的 allowed-set 与单位/文本限制。
+
+`remote aliases/hosts/inspect`、`request ALIAS`、`submit ALIAS`、`job ALIAS PLAN_ID` 的 stdin、批准与资源目录见 [agents.md](agents.md#ssh-controller)。旧 `platform/ssh/lintel_ssh.py` 为已有 caller/subset 保留，新功能以共享 Rust 路径为 canonical；两者不共享 submission 去重 state，不能跨 controller 重发未核对任务。
+
+工作包 `archive_path/output_path` 始终是**远端主机**的路径，不是本机文件选择。跨主机先显式传输密文，再在目标主机读取/预览/批准 import，详见 [迁移步骤](operator-guide.md#work)。这个 controller 不增加任意文件上传/下载 endpoint；runner install 仍只上传冻结的 canonical static resource。

@@ -83,7 +83,7 @@ def _check(
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
 
 CHECKS: List[Check] = [
-    _check("cargo-workspace-test", "cargo test --workspace (core, egress, runner)", "rust",
+    _check("cargo-workspace-test", "cargo test --workspace (core, operations, remote, egress, runner)", "rust",
            *(CARGO or "cargo", "test", "--workspace"), tools=("cargo",), loopback=True,
            requires="cargo; loopback sockets for crates/egress/tests/proxy.rs"),
     _check("desktop-rust-test", "cargo test in standalone Tauri crate apps/desktop/src-tauri",
@@ -109,7 +109,7 @@ CHECKS: List[Check] = [
     _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
            PYTHON, "tests/remote_linux_ssh_journey.py", "target/x86_64-unknown-linux-musl/release/lintel",
            tools=("cargo", "ssh", "ssh-keygen"), paths=(ROOT / "target/x86_64-unknown-linux-musl/release/lintel",),
-           loopback=True, requires="Linux x86_64; OpenSSH sshd; static musl runner; desktop build prerequisites",
+           loopback=True, requires="Linux x86_64; OpenSSH sshd; static musl runner; shared remote Rust crate",
            independent=True, reason="needs an actual Linux runtime and isolated loopback sshd"),
     _check("browser-smoke", "real Chromium two-phase clear smoke (Playwright, synthetic profile)",
            "independent", *(NODE or "node", "extensions/browser/tests/browser-smoke.mjs"),
@@ -128,6 +128,7 @@ CHECKS: List[Check] = [
                Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
                ROOT / "apps/desktop/dist/index.html"), loopback=True,
            independent=True, reason="headless Chromium UI evidence; service manager and invoke are synthetic"),
+    _check("work-ui", "built App task help, independent archive/preserve and portable import (real synthetic core)", "independent", *(NODE or "node", "tests/work_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="isolated headless Chromium and invoke fixture; not native WebKit"),
     _check("remote-task-ui", "built App original SSH task/reopen/conflict/separate restore (synthetic transport)",
            "independent", *(NODE or "node", "tests/remote_task_ui_journey.mjs"),
            tools=("node",), paths=(
@@ -149,8 +150,13 @@ CHECKS: List[Check] = [
            independent=True, reason="native bundle + real WebKit runtime; macOS-only"),
 ]
 
+CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and target request contracts (synthetic transport)", "python", PYTHON, "tests/shared_remote_journey.py", tools=("cargo",), paths=(ROOT / "tests/shared_remote_journey.py",)))
+
 # Synthetic end-to-end journeys sharing the runner-build prerequisite.
 for _id, _desc, _file in (
+    ("journey-agent-cli", "agent CLI contract, portable work, independent import and original-job wait", "agent_cli_journey.py"),
+    ("journey-agent-adapters", "finite CLI adapters and foreground network lifecycle", "agent_adapters_journey.py"),
+    ("journey-portable-work", "portable archive in independent state and persisted failure codes", "portable_work_journey.py"),
     ("journey-cli", "CLI journey (register/preview/approve/apply/restore)", "cli_journey.py"),
     ("journey-submission", "detached submission journey (durable ACK, replay dedup)",
      "submission_journey.py"),

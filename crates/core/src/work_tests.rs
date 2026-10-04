@@ -1,0 +1,512 @@
+//! Core regression tests for independent work preservation and execution
+//! semantics. Synthetic temporary roots only; no real Claude, account or
+//! operator path is ever touched.
+use super::*;
+use std::os::unix::fs::PermissionsExt;
+
+const PASS: &str = "synthetic work-preservation passphrase";
+
+fn fixture() -> (tempfile::TempDir, Engine, Value, PathBuf) {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let home = base.join("home");
+    let root = home.join("fixture");
+    fs::create_dir_all(&root).unwrap();
+    let engine = Engine::new(home, base.join("state")).unwrap();
+    let e = engine.register("synthetic", &root, false).unwrap();
+    (temp, engine, e, root)
+}
+fn ok(engine: &Engine, r: Value) -> Value {
+    let v = engine.request(r);
+    assert_eq!(v["ok"], true, "{v}");
+    v["data"].clone()
+}
+fn err_code(engine: &Engine, r: Value) -> String {
+    let v = engine.request(r);
+    assert_eq!(v["ok"], false, "{v}");
+    v["error"]["code"].as_str().unwrap().to_string()
+}
+fn seed_work(root: &Path) {
+    fs::write(root.join("CLAUDE.md"), "Synthetic instruction only.").unwrap();
+    fs::create_dir_all(root.join("projects/example/memory")).unwrap();
+    fs::write(
+        root.join("projects/example/memory/MEMORY.md"),
+        "Synthetic memory only.",
+    )
+    .unwrap();
+    fs::write(
+        root.join("projects/example/session.jsonl"),
+        "{\"synthetic\":true}\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join(".credentials.json"),
+        "SYNTHETIC_CREDENTIAL_DO_NOT_COPY",
+    )
+    .unwrap();
+    fs::write(
+        root.join("settings.json"),
+        "{\"env\":{\"SYNTHETIC_LOGIN_FLAG\":\"keep\"}}",
+    )
+    .unwrap();
+}
+
+#[test]
+fn archive_only_does_not_create_or_change_environment() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let before_inventory = engine.request(json!({"command":"discover"}))["data"]["environments"]
+        .as_array()
+        .unwrap()
+        .len();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions","memory","sessions"]}),
+    );
+    assert_eq!(p["kind"], "archive");
+    assert_eq!(p["outcome"], "archive_only");
+    assert_eq!(p["file_count"], 3);
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["status"], "completed");
+    assert_eq!(j["outcome"], "archive_only");
+    assert!(
+        j["new_environment_id"].is_null(),
+        "archive-only must not create a root"
+    );
+    assert!(root.join(".credentials.json").exists());
+    assert!(root.join("settings.json").exists());
+    assert_eq!(
+        fs::read_to_string(root.join("settings.json")).unwrap(),
+        "{\"env\":{\"SYNTHETIC_LOGIN_FLAG\":\"keep\"}}"
+    );
+    let after_inventory = engine.request(json!({"command":"discover"}))["data"]["environments"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(
+        before_inventory, after_inventory,
+        "no new environment was registered"
+    );
+    let encrypted = fs::read(j["archive_path"].as_str().unwrap()).unwrap();
+    assert!(encrypted.starts_with(b"age-encryption.org/"));
+    assert!(!String::from_utf8_lossy(&encrypted).contains("Synthetic instruction"));
+    for path in fs::read_dir(engine.state.join("jobs")).unwrap() {
+        let text = fs::read_to_string(path.unwrap().path()).unwrap();
+        assert!(!text.contains(PASS));
+    }
+}
+
+#[test]
+fn archive_output_path_freezes_and_refuses_overwrite() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let out = root.parent().unwrap().join("carried.age");
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":out.to_str().unwrap()}),
+    );
+    assert_eq!(p["output_path"], out.to_str().unwrap());
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["archive_path"], out.to_str().unwrap());
+    assert!(out.exists());
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":out.to_str().unwrap()})
+        ),
+        "output_exists"
+    );
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":"/no/such/lintel/dir/x.age"})
+        ),
+        "invalid_output_path"
+    );
+}
+
+#[test]
+fn encrypted_package_travels_to_independent_install() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let out = root.parent().unwrap().join("carried.age");
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions","memory","sessions"],"output_path":out.to_str().unwrap()}),
+    );
+    ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let other_home = base.join("home");
+    let dest_root = other_home.join("other-claude");
+    fs::create_dir_all(&dest_root).unwrap();
+    let other = Engine::new(other_home, base.join("state")).unwrap();
+    let dest = other.register("independent", &dest_root, false).unwrap();
+    let path = out.to_str().unwrap();
+    let manifest = ok(
+        &other,
+        json!({"command":"archive_inspect","archive_path":path,"archive_passphrase":PASS}),
+    );
+    assert_eq!(manifest["generator"], "Lintel");
+    assert_eq!(manifest["schema"], "lintel.work/1");
+    assert_eq!(manifest["files"].as_array().unwrap().len(), 3);
+    let read = ok(
+        &other,
+        json!({"command":"archive_read","archive_path":path,"archive_passphrase":PASS,"path":"CLAUDE.md"}),
+    );
+    assert_eq!(read["text"], "Synthetic instruction only.");
+    let import = ok(
+        &other,
+        json!({"command":"plan_import","environment_id":dest["id"],"archive_path":path,"categories":["instructions","memory","sessions"],"archive_passphrase":PASS}),
+    );
+    let j = ok(
+        &other,
+        json!({"command":"execute","plan_id":import["id"],"approval":import["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["status"], "completed");
+    assert_eq!(
+        fs::read_to_string(dest_root.join("CLAUDE.md")).unwrap(),
+        "Synthetic instruction only."
+    );
+    assert!(dest_root
+        .join("lintel-imports/projects/example/session.jsonl")
+        .exists());
+    fs::create_dir_all(base.join("other-two")).unwrap();
+    let dest2 = other
+        .register("independent two", &base.join("other-two"), false)
+        .unwrap();
+    let import_mem = ok(
+        &other,
+        json!({"command":"plan_import","environment_id":dest2["id"],"archive_path":path,"categories":["memory"],"archive_passphrase":PASS}),
+    );
+    ok(
+        &other,
+        json!({"command":"execute","plan_id":import_mem["id"],"approval":import_mem["hash"],"archive_passphrase":PASS}),
+    );
+    assert!(
+        !base.join("other-two/CLAUDE.md").exists(),
+        "unselected category was not imported"
+    );
+    assert!(base
+        .join("other-two/lintel-imports/projects/example/memory/MEMORY.md")
+        .exists());
+    assert_eq!(
+        err_code(
+            &other,
+            json!({"command":"plan_import","environment_id":dest["id"],"archive_path":path,"categories":["instructions"],"archive_passphrase":PASS})
+        ),
+        "import_conflict"
+    );
+}
+
+#[test]
+fn stale_wrong_passphrase_and_corrupt_packages_are_refused() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let out = root.parent().unwrap().join("carried.age");
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":out.to_str().unwrap()}),
+    );
+    ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    let path = out.to_str().unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"archive_inspect","archive_path":path,"archive_passphrase":"incorrect synthetic passphrase"}),
+        ),
+        "archive_locked"
+    );
+    fs::write(&out, b"not an age archive").unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"archive_inspect","archive_path":path,"archive_passphrase":PASS}),
+        ),
+        "invalid_archive"
+    );
+    let payload = json!({"schema":"lintel.work/1","files":[{"path":"../CLAUDE.md","category":"instructions","data":[65],"digest":digest(b"A")}]});
+    fs::write(&out, archive::seal(&payload, PASS).unwrap()).unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"archive_inspect","archive_path":path,"archive_passphrase":PASS}),
+        ),
+        "archive_path"
+    );
+}
+
+#[test]
+fn preserve_completes_while_legacy_reset_stays_partial() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let preserve = ok(
+        &engine,
+        json!({"command":"plan_preserve","environment_id":e["id"],"categories":["instructions","memory","sessions"],"name":"writing"}),
+    );
+    assert_eq!(preserve["kind"], "preserve");
+    assert_eq!(preserve["outcome"], "preserve");
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":preserve["id"],"approval":preserve["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["status"], "completed", "{j}");
+    assert_eq!(j["outcome"], "preserved");
+    let new_root = PathBuf::from(j["new_root"].as_str().unwrap());
+    assert!(new_root.join("CLAUDE.md").exists());
+    assert!(new_root
+        .join("lintel-imports/projects/example/session.jsonl")
+        .exists());
+    assert!(root.join(".credentials.json").exists());
+    assert!(root.join("settings.json").exists());
+    // The retained old environment is the desired outcome, reported as
+    // `preserved` (not a misleading not_completed step) with explicit coverage.
+    let steps = j["steps"].as_array().unwrap();
+    let retained = steps.iter().find(|s| s["id"] == "status").unwrap();
+    assert_eq!(retained["status"], "preserved", "{j}");
+    assert_eq!(j["coverage"]["old_login"], "retained");
+    assert_eq!(j["coverage"]["old_root"], "retained");
+    assert_eq!(j["coverage"]["service_binding"], "unchanged");
+    assert!(j["coverage"]["file_count"].as_u64().unwrap() >= 3);
+    assert!(j["next_steps"].as_array().unwrap().len() >= 2);
+    let legacy = ok(
+        &engine,
+        json!({"command":"plan_reset","environment_id":e["id"],"recipe":"rebuild","categories":["instructions"]}),
+    );
+    let lj = ok(
+        &engine,
+        json!({"command":"execute","plan_id":legacy["id"],"approval":legacy["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(lj["status"], "partially_completed", "{lj}");
+}
+
+#[test]
+fn failure_after_verifying_records_real_phase() {
+    let (_t, engine, e, root) = fixture();
+    fs::write(
+        root.join("settings.json"),
+        "{\"env\":{\"DISABLE_TELEMETRY\":\"false\"}}",
+    )
+    .unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce","keep_remote_control":false}),
+    );
+    // Make the post-write baseline save fail: the settings write itself succeeds
+    // and the receipt reaches `verifying`, then the failure is recorded. Replace
+    // the private baseline directory with a regular file so creating the baseline
+    // record fails deterministically (no permission/root assumptions).
+    let baselines = engine.state.join("baselines");
+    fs::remove_dir_all(&baselines).unwrap();
+    fs::write(&baselines, b"block").unwrap();
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}),
+    );
+    assert_eq!(j["status"], "needs_reconciliation", "{j}");
+    assert_eq!(j["error"]["phase"], "verifying", "{j}");
+    assert!(j["error"]["code"].is_string());
+    assert!(j["error"]["recovery"].is_string());
+    assert!(
+        j["restorable"].as_bool().unwrap(),
+        "written settings stay restorable"
+    );
+    assert!(root.join("settings.json").exists());
+    // The settings write completed before the verifying-stage failure; the
+    // receipt stays restorable and the file remains valid JSON.
+    assert!(load(&root.join("settings.json")).unwrap()["env"].is_object());
+}
+
+#[test]
+fn logout_failure_reports_ordered_steps_and_does_not_delete() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let home = base.join("home");
+    let root = home.join("cc");
+    fs::create_dir_all(&root).unwrap();
+    let engine = Engine::new(home.clone(), base.join("state")).unwrap();
+    let script = home.join("fake-claude");
+    fs::write(
+        &script,
+        "#!/bin/sh\ncase \"$2\" in\n status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n logout) exit 3;;\nesac\nexit 9\n",
+    )
+    .unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut e = engine.register("synthetic", &root, false).unwrap();
+    e["executable"] = json!(script);
+    save(&engine.state.join("inventory.json"), &json!([e.clone()])).unwrap();
+    fs::write(root.join("CLAUDE.md"), "Synthetic instruction only.").unwrap();
+    fs::write(root.join(".credentials.json"), "synthetic credential").unwrap();
+    fs::write(root.join(".claude.json"), "{\"synthetic\":true}").unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":true,"categories":["instructions"]}),
+    );
+    let ids: Vec<String> = p["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap().to_string())
+        .collect();
+    let pos = |name: &str| ids.iter().position(|x| x == name).unwrap();
+    // Canonical reset order in the frozen preview: archive, then the fresh root
+    // + migration, then logout, then removals. No destructive action leads.
+    assert!(pos("archive") < pos("logout"), "{ids:?}");
+    assert!(pos("archive") < pos("rebuild"), "{ids:?}");
+    assert!(pos("rebuild") < pos("logout"), "{ids:?}");
+    assert!(pos("logout") < pos("credentials"), "{ids:?}");
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["status"], "needs_reconciliation", "{j}");
+    assert_eq!(j["error"]["code"], "logout_failed", "{j}");
+    assert_eq!(j["error"]["phase"], "executing");
+    assert_eq!(j["error"]["uncertain_side_effects"], true);
+    assert_eq!(j["error"]["step_id"], "logout");
+    assert!(j["error"]["recovery"].is_string());
+    assert!(j["archive_path"].is_string());
+    assert!(j["state_archive_path"].is_string());
+    // The fresh root and its migration were produced BEFORE the failed logout and
+    // are retained; the approved local files were not deleted.
+    assert!(
+        j["new_root"].is_string(),
+        "fresh root must be retained across logout failure"
+    );
+    let new_root = PathBuf::from(j["new_root"].as_str().unwrap());
+    assert_eq!(
+        fs::read_to_string(new_root.join("CLAUDE.md")).unwrap(),
+        "Synthetic instruction only."
+    );
+    assert!(root.join(".credentials.json").exists());
+    assert!(root.join(".claude.json").exists());
+    let steps = j["steps"].as_array().unwrap();
+    assert_eq!(
+        steps.iter().find(|s| s["id"] == "archive").unwrap()["status"],
+        "completed"
+    );
+    assert_eq!(
+        steps.iter().find(|s| s["id"] == "create").unwrap()["status"],
+        "completed"
+    );
+    assert_eq!(
+        steps.iter().find(|s| s["id"] == "migrate").unwrap()["status"],
+        "completed"
+    );
+    assert_eq!(
+        steps.iter().find(|s| s["id"] == "logout").unwrap()["status"],
+        "executing"
+    );
+    // Ordered execution: create and migrate precede the logout step.
+    let step_pos = |name: &str| steps.iter().position(|s| s["id"] == name).unwrap();
+    assert!(step_pos("archive") < step_pos("create"), "{steps:?}");
+    assert!(step_pos("create") < step_pos("logout"), "{steps:?}");
+    // No local removal step was executed after the failed logout.
+    assert!(steps.iter().all(|s| s["id"] != "credentials"), "{steps:?}");
+    assert!(steps.iter().all(|s| s["id"] != "client_state"), "{steps:?}");
+    let queried = ok(&engine, json!({"command":"job","job_id":p["id"]}));
+    assert_eq!(queried["status"], "needs_reconciliation");
+    assert_eq!(queried["error"]["code"], "logout_failed");
+    assert_eq!(queried["new_root"], j["new_root"]);
+    assert!(root.join(".credentials.json").exists());
+    assert_eq!(queried["id"], j["id"]);
+}
+
+#[test]
+fn accepted_after_failure_code_persists_across_engines() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let home = base.join("home");
+    let root = home.join("cc");
+    fs::create_dir_all(&root).unwrap();
+    let state = base.join("state");
+    let engine = Engine::new(home.clone(), state.clone()).unwrap();
+    let e = engine.register("synthetic", &root, false).unwrap();
+    fs::write(root.join("CLAUDE.md"), "instruction").unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"]}),
+    );
+    // Occupy the exact private archive destination with a directory so the
+    // write fails only after the durable accept has been persisted.
+    let dest = state
+        .join("archives")
+        .join(format!("{}.age", p["id"].as_str().unwrap()));
+    fs::create_dir_all(&dest).unwrap();
+    fs::write(dest.join("x"), "block").unwrap();
+    let j = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(j["status"], "needs_reconciliation", "{j}");
+    let code = j["error"]["code"].as_str().unwrap().to_string();
+    assert!(!code.is_empty());
+    let reopened = Engine::new(home, state).unwrap();
+    let q = ok(&reopened, json!({"command":"job","job_id":p["id"]}));
+    assert_eq!(q["status"], "needs_reconciliation");
+    assert_eq!(q["error"]["code"], code);
+    assert!(q["error"]["message"].is_string());
+    assert_eq!(q["error"]["phase"], "executing");
+}
+
+#[test]
+fn plan_show_reads_frozen_plan_without_secrets() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let out = root.parent().unwrap().join("x.age");
+    let p = ok(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"],"output_path":out.to_str().unwrap()}),
+    );
+    let shown = ok(&engine, json!({"command":"plan_show","plan_id":p["id"]}));
+    assert_eq!(shown["id"], p["id"]);
+    assert_eq!(shown["hash"], p["hash"]);
+    assert_eq!(shown["kind"], "archive");
+    assert_eq!(shown["file_count"], 1);
+    assert!(shown["archive_passphrase_required"].as_bool().unwrap());
+    let text = shown.to_string();
+    assert!(!text.contains(PASS));
+    assert!(shown.get("snapshot").is_none());
+    assert!(shown.get("root_identity").is_none());
+    assert!(shown.get("extra").is_none());
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"plan_show","plan_id":"00000000-0000-4000-8000-000000000009"})
+        ),
+        "plan_not_found"
+    );
+}
+
+#[test]
+fn publishing_new_files_keeps_concurrent_target_and_single_link() {
+    use std::os::unix::fs::MetadataExt;
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let occupied = base.join("occupied.age");
+    fs::write(&occupied, b"external content").unwrap();
+    let failure = atomic_new(&occupied, b"approved package", 0o600).unwrap_err();
+    assert_eq!(failure.code, "target_exists");
+    assert_eq!(fs::read(&occupied).unwrap(), b"external content");
+    let fresh = base.join("fresh.age");
+    atomic_new(&fresh, b"complete package", 0o600).unwrap();
+    assert_eq!(fs::read(&fresh).unwrap(), b"complete package");
+    assert_eq!(fs::metadata(&fresh).unwrap().nlink(), 1);
+    assert_eq!(
+        fs::read_dir(&base).unwrap().count(),
+        2,
+        "temporary publication files remain"
+    );
+}

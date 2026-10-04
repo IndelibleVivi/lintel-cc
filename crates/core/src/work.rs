@@ -1,12 +1,122 @@
-use crate::{err, now, storage::*, string, Engine, Result};
+use crate::{archive, err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
+    collections::HashSet,
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     time::{Duration, Instant},
 };
 const MAX_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_FILES: usize = 10000;
+
+/// Absolute-path guard for an explicit archive destination: parent must already
+/// exist (we never create directories outside the frozen path), the path must be
+/// absolute without parent-directory hops, must not itself be a symlink, and if
+/// it already exists it must be a regular single-link file owned by this user.
+/// Existing content is never a valid target: callers reject before writing.
+pub(crate) fn freeze_output_path(path: &Path) -> Result<PathBuf> {
+    guard(path)?;
+    if path.file_name().is_none() {
+        return Err(err("invalid_output_path", "请给出一个完整的归档文件名"));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| err("invalid_output_path", "归档路径缺少父目录"))?;
+    if !parent.is_dir() {
+        return Err(err(
+            "invalid_output_path",
+            "归档目标目录不存在；Lintel 不会替你新建目录",
+        ));
+    }
+    guard(parent)?;
+    if path.exists() {
+        return Err(err(
+            "output_exists",
+            "归档目标已存在；请选择新文件名，不覆盖已有内容",
+        ));
+    }
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(err("symlink_target", "归档目标不能是符号链接"));
+    }
+    Ok(path.to_path_buf())
+}
+
+/// Read back an encrypted archive package from an explicit frozen path and
+/// return it with the digest of the on-disk encrypted bytes. Lintel-sealed
+/// archives are always single-link regular files owned by the current user, so
+/// they travel between independent installs but never through a symlink.
+pub(crate) fn read_package(path: &Path, pass: &str) -> Result<(Value, String)> {
+    guard(path)?;
+    let meta =
+        fs::symlink_metadata(path).map_err(|_| err("archive_missing", "找不到该归档文件"))?;
+    use std::os::unix::fs::MetadataExt;
+    if !meta.is_file()
+        || meta.file_type().is_symlink()
+        || meta.uid() != unsafe { libc::geteuid() }
+        || meta.nlink() != 1
+    {
+        return Err(err("archive_missing", "归档不是安全的常规文件"));
+    }
+    // The ciphertext envelope is slightly larger than the plaintext bound used
+    // by `unseal`; allow headroom while still bounded.
+    let bytes = read(path, crate::archive::MAX_PLAIN + 16 * 1024 * 1024)?;
+    let package = archive::unseal(&bytes, pass)?;
+    Ok((package, digest(&bytes)))
+}
+
+/// Validate a work package's file list. It is completely self-contained: every
+/// entry is judged on its own path/category/digest, so an external package that
+/// arrives without the original inventory or job still passes or fails on its
+/// own merits. Unsupported/unapproved categories and unsafe paths are refused.
+pub(crate) fn validate_package_files(package: &Value) -> Result<Vec<Value>> {
+    if package["schema"] != "lintel.work/1" {
+        return Err(err(
+            "archive_schema",
+            "只支持 Lintel 工作内容包；状态备份不能自动迁入",
+        ));
+    }
+    let files = package["files"]
+        .as_array()
+        .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?;
+    if files.len() > MAX_FILES {
+        return Err(err("archive_limit", "归档文件数量超过上限"));
+    }
+    let mut seen = HashSet::new();
+    let mut total = 0usize;
+    for f in files {
+        let name = string(f, "path")?;
+        let path = Path::new(name);
+        if path.is_absolute()
+            || name.contains('\\')
+            || name.contains('\0')
+            || path
+                .components()
+                .any(|c| !matches!(c, Component::Normal(_)))
+            || !seen.insert(path.components().collect::<PathBuf>())
+        {
+            return Err(err("archive_path", "归档包含重复路径或不安全路径"));
+        }
+        let category = string(f, "category")?;
+        if !["instructions", "memory", "sessions"].contains(&category) {
+            return Err(err(
+                "archive_category",
+                "归档含不受支持的类别；不能声明已覆盖全部所选内容",
+            ));
+        }
+        if classify(path) != Some(category) {
+            return Err(err("archive_category", "归档文件与批准的工作类别不符"));
+        }
+        let data: Vec<u8> = serde_json::from_value(f["data"].clone())?;
+        total += data.len();
+        if data.len() > 8 * 1024 * 1024 || total > MAX_BYTES as usize {
+            return Err(err("archive_limit", "工作内容超过容量上限"));
+        }
+        if digest(&data) != f["digest"] {
+            return Err(err("archive_integrity", "归档文件完整性校验失败"));
+        }
+    }
+    Ok(files.clone())
+}
 
 pub fn categories(r: &Value) -> Result<Vec<String>> {
     let values = r["categories"]
@@ -194,14 +304,18 @@ pub fn check_passphrase(r: &Value) -> Result<&str> {
     Ok(s)
 }
 impl Engine {
-    pub(crate) fn archive_work(
+    /// Build the encrypted work package for a selection and write it to `dest`.
+    /// The caller has already frozen `dest` (an explicit output path or the
+    /// plan's private state path). Returns the on-disk archive path and digest.
+    pub(crate) fn write_archive(
         &self,
         e: &Value,
         p: &Value,
         r: &Value,
+        dest: &Path,
         j: &mut Value,
         journal: &Path,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<(PathBuf, Vec<Value>)> {
         let pass = check_passphrase(r)?;
         let root = PathBuf::from(string(e, "root")?);
         let categories = categories(&p["extra"])?;
@@ -228,21 +342,106 @@ impl Engine {
             files.push(json!({"path":entry["path"],"category":entry["category"],"digest":entry["digest"],"data":data}));
         }
         let package = json!({"schema":"lintel.work/1","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
-        let encrypted = crate::archive::seal(&package, pass)?;
-        let archive = self
+        let encrypted = archive::seal(&package, pass)?;
+        // Recheck the frozen destination, then atomically publish without replacement.
+        if dest.exists() {
+            return Err(err(
+                "output_exists",
+                "归档目标在执行前已出现；没有覆盖，原内容保持不变",
+            ));
+        }
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"archive","label":"加密工作归档","status":"executing","message":"正在发布并核验完整加密工作包；目标已有文件不会覆盖。"}));
+        save(journal, j)?;
+        atomic_new(dest, &encrypted, 0o600)?;
+        j["archive_path"] = json!(dest);
+        if read(dest, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
+            return Err(err("archive_readback_failed", "归档写后校验未通过"));
+        }
+        j["archive_path"] = json!(dest);
+        j["archive_digest"] = json!(digest(&encrypted));
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"});
+        save(journal, j)?;
+        Ok((dest.to_path_buf(), files))
+    }
+
+    /// Archive into the plan's private state path. Used by rebuild/cleanup,
+    /// where the archive stays inside Lintel's own state directory so a receipt
+    /// can point back to it without a caller-supplied destination.
+    pub(crate) fn archive_work(
+        &self,
+        e: &Value,
+        p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<Vec<Value>> {
+        let dest = self
             .state
             .join("archives")
             .join(format!("{}.age", string(p, "id")?));
-        atomic(&archive, &encrypted, 0o600)?;
-        if read(&archive, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
-            return Err(err("archive_readback_failed", "归档写后校验未通过"));
-        }
-        j["archive_path"] = json!(archive);
-        j["steps"] = json!([{"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"}]);
-        save(journal, j)?;
+        let (_, files) = self.write_archive(e, p, r, &dest, j, journal)?;
         Ok(files)
     }
-    pub(crate) fn rebuild(
+
+    /// Archive-only plan: encrypt the selected work into an explicit output path
+    /// (frozen at preview) or into Lintel's private state. Never creates a new
+    /// environment, never touches settings, credentials or the original files.
+    pub(crate) fn plan_archive(&self, r: &Value) -> Result<Value> {
+        let e = self.env(r)?;
+        let categories = categories(r)?;
+        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let output = match r.get("output_path") {
+            Some(Value::String(s)) if !s.is_empty() => {
+                Some(stringify_path(freeze_output_path(Path::new(s))?))
+            }
+            _ => None,
+        };
+        let actions = json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false}]);
+        self.plan(
+            &e,
+            "archive",
+            "仅加密归档所选工作内容",
+            json!([]),
+            vec!["原环境全部内容（不注销、不删除、不新建）", "settings、hooks、MCP 与插件文件"],
+            actions,
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"output_path":output,"outcome":"archive_only"}),
+        )
+    }
+
+    /// Preserve plan: encrypt the selected work and prepare a fresh root to
+    /// migrate into. Distinct from plan_reset/rebuild because its receipt
+    /// reports its own outcome and next steps instead of a partially-completed
+    /// cleanup.
+    pub(crate) fn plan_preserve(&self, r: &Value) -> Result<Value> {
+        let e = self.env(r)?;
+        let categories = categories(r)?;
+        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let name = r
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("保全");
+        let actions = json!([
+            {"id":"archive","label":"加密归档选中的工作内容","reversible":false},
+            {"id":"create","label":"创建新的配置目录","reversible":false},
+            {"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false}
+        ]);
+        self.plan(
+            &e,
+            "preserve",
+            "保全工作内容并准备新环境",
+            json!([]),
+            vec!["原环境全部内容（不注销、不删除、不停止进程）", "settings、hooks、MCP 与插件文件"],
+            actions,
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"preserve_name":name,"outcome":"preserve"}),
+        )
+    }
+
+    /// Preserve execution: archive the selection, then create a fresh owned root
+    /// and migrate the selected categories read-back-verified. The original
+    /// root, its login and its process state are left untouched.
+    pub(crate) fn preserve(
         &self,
         e: &Value,
         p: &Value,
@@ -251,13 +450,51 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let files = self.archive_work(e, p, r, j, journal)?;
-        let new = self.create(&format!("{} · 重建", string(e, "name")?))?;
+        self.migrate_files(
+            e,
+            p["extra"]["preserve_name"].as_str().unwrap_or("保全"),
+            &files,
+            j,
+            journal,
+        )?;
+        // Preservation keeps the source install untouched; that is the desired
+        // outcome, not an outstanding task. Report it as retained with explicit
+        // coverage instead of a misleading "not completed" step.
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"status","label":"旧环境、登录与运行进程","status":"preserved","message":"原 root、旧登录与运行进程全部保留；本次不注销、不删除、不停止。"}));
+        j["coverage"] = json!({
+            "categories": p["extra"]["categories"],
+            "file_count": p["extra"]["manifest"].as_array().map_or(0, Vec::len),
+            "old_login": "retained",
+            "old_root": "retained",
+            "service_binding": "unchanged"
+        });
+        j["next_steps"] = json!([
+            "在新环境采用自己的保护方案并完成一次真实启动，再核对运行效果；迁移内容不会自动启用。",
+            "在新环境按官方流程正常登录；旧登录仍在原 root。",
+            "原 root 的后台服务/进程绑定保持不变，Lintel 不会把新 root 改绑到已有 service。"
+        ]);
+        j["status"] = json!("completed");
+        j["outcome"] = json!("preserved");
+        Ok(())
+    }
+
+    /// Create a fresh owned root and copy the given archived entries into it,
+    /// read-back verified. Does not archive or delete anything.
+    fn migrate_files(
+        &self,
+        e: &Value,
+        label: &str,
+        files: &[Value],
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let new = self.create(&format!("{} · {}", string(e, "name")?, label))?;
         j["new_environment_id"] = new["id"].clone();
         j["new_root"] = new["root"].clone();
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"}));
         save(journal, j)?;
         let destination = PathBuf::from(string(&new, "root")?);
-        for f in &files {
+        for f in files {
             let relative = Path::new(string(f, "path")?);
             // Only the one supported text instruction location is active. Session/memory formats are preserved for inspection, not falsely claimed resumable.
             // Content already held in lintel-imports keeps its logical path; it
@@ -274,12 +511,45 @@ impl Engine {
                     .ok_or_else(|| err("invalid_path", "缺少迁入目标"))?,
             )?;
             let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
-            atomic(&target, &bytes, 0o600)?;
+            atomic_new(&target, &bytes, 0o600)?;
             if digest(&read(&target, 8 * 1024 * 1024)?) != f["digest"] {
                 return Err(err("migration_failed", "迁入文件校验失败"));
             }
         }
         j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"}));
+        Ok(())
+    }
+
+    /// reset_client path: the work archive was already written earlier in the
+    /// receipt (so nothing is deleted before it is preserved). Re-open that
+    /// frozen archive and migrate it into a new root.
+    pub(crate) fn migrate_to_new_root(
+        &self,
+        e: &Value,
+        _p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let path = j["archive_path"]
+            .as_str()
+            .ok_or_else(|| err("archive_missing", "此任务没有工作归档"))?
+            .to_owned();
+        let (package, _) = read_package(Path::new(&path), check_passphrase(r)?)?;
+        let files = validate_package_files(&package)?;
+        self.migrate_files(e, "重建", &files, j, journal)
+    }
+
+    pub(crate) fn rebuild(
+        &self,
+        e: &Value,
+        p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let files = self.archive_work(e, p, r, j, journal)?;
+        self.migrate_files(e, "重建", &files, j, journal)?;
         if p["kind"] == "rebuild" {
             j["steps"].as_array_mut().unwrap().push(json!({"id":"credentials","label":"旧登录与客户端状态","status":"not_completed","message":"旧环境没有注销、删除或停进程；完整处理请使用清理配方。"}));
             j["status"] = json!("partially_completed");
@@ -289,4 +559,8 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+fn stringify_path(path: PathBuf) -> String {
+    path.to_string_lossy().into_owned()
 }
