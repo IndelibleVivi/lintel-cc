@@ -60,3 +60,10 @@ python3 tests/fixtures/linux_vm/test_wait_boot.py -v
 It checks that a transient SSH timeout keeps the same guest and the original
 overall deadline. CI runs it with the verification control self-tests; it does
 not produce Linux runtime evidence.
+
+All host controller regressions run with
+`python3 -m unittest discover -s tests/fixtures/linux_vm -v`. Expected rejected
+runner submissions are read despite their nonzero exit, then must match the
+exact error code and a nonzero status. A zero-status rejection or another error
+cannot satisfy that check; ordinary SSH failures still raise. These controller
+tests do not replace the real guest acceptance above.
