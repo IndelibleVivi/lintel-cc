@@ -2,7 +2,7 @@
 //! semantics. Synthetic temporary roots only; no real Claude, account or
 //! operator path is ever touched.
 use super::*;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 const PASS: &str = "synthetic work-preservation passphrase";
 
@@ -766,6 +766,58 @@ fn portable_import_case_equivalence_rejects_before_content_writes() {
         .file_name()
         .to_string_lossy()
         .starts_with(".lintel-path-check-")));
+}
+
+#[test]
+fn portable_import_unwritable_parent_rejects_before_any_content_write() {
+    let (_temp, engine, environment, root) = fixture();
+    let package = json!({"schema":"lintel.work/1","files": [
+        {"path":"CLAUDE.md","category":"instructions","data":b"first","digest":digest(b"first")},
+        {"path":"projects/new.jsonl","category":"sessions","data":b"second","digest":digest(b"second")}
+    ]});
+    let archive_path = root.parent().unwrap().join("portable-permissions.age");
+    atomic_new(
+        &archive_path,
+        &archive::seal(&package, PASS).unwrap(),
+        0o600,
+    )
+    .unwrap();
+    let parent = root.join("lintel-imports/projects");
+    fs::create_dir_all(&parent).unwrap();
+    let request = json!({"command":"plan_import","environment_id":environment["id"],"archive_path":archive_path,"categories":["instructions","sessions"],"archive_passphrase":PASS});
+    let plan = ok(&engine, request.clone());
+    let expected = if unsafe { libc::geteuid() } == 0 {
+        std::os::unix::fs::chown(&parent, Some(65534), None).unwrap();
+        "wrong_owner"
+    } else {
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o500)).unwrap();
+        "migration_destination_unwritable"
+    };
+    assert_eq!(err_code(&engine, request), expected);
+    let receipt = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+    if unsafe { libc::geteuid() } == 0 {
+        std::os::unix::fs::chown(&parent, Some(0), None).unwrap();
+    }
+    assert!(
+        !root.join("CLAUDE.md").exists(),
+        "Known destination failure partially imported content"
+    );
+    assert_eq!(receipt["error"]["code"], expected);
+    assert!(!parent.join("new.jsonl").exists());
+    if fs::metadata("/").unwrap().uid() != unsafe { libc::geteuid() } {
+        // Metadata-only exercise of the foreign-UID branch; no creation or
+        // permission change occurs outside this test's temporary root.
+        assert_eq!(
+            work::preflight_import_parent(Path::new("/"), &root.join("metadata-only"))
+                .unwrap_err()
+                .code,
+            "wrong_owner"
+        );
+    }
 }
 
 #[test]

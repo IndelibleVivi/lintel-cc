@@ -147,7 +147,7 @@ impl Engine {
             .collect();
         for (f, relative) in selected.iter().zip(work::migration_paths(&selected)?) {
             let p = root.join(relative);
-            guard(&p)?;
+            work::preflight_import_parent(root, &p)?;
             if p.exists() {
                 return Err(err(
                     "import_conflict",
@@ -208,7 +208,7 @@ impl Engine {
             return Err(err("insufficient_space", "目标空间不足；未覆盖原文件"));
         }
         for (entry, target) in planned.iter().zip(&targets) {
-            guard(target)?;
+            work::preflight_import_parent(root, target)?;
             if entry["destination"].as_str() != target.to_str() {
                 return Err(err("stale_plan", "迁入目标与冻结清单不一致；请重新预览"));
             }

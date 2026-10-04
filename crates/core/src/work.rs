@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs::{self, OpenOptions},
+    os::unix::ffi::OsStrExt,
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
     path::{Component, Path, PathBuf},
     time::{Duration, Instant},
@@ -235,6 +236,49 @@ pub(crate) fn migration_parent(path: &Path) -> Result<()> {
         return Err(err("wrong_owner", "迁入目录不属于当前用户"));
     }
     Ok(())
+}
+
+fn migration_access(path: &Path, mode: libc::c_int) -> Result<()> {
+    let path = std::ffi::CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| err("invalid_path", "迁入目录路径含无效字符"))?;
+    if unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), mode, libc::AT_EACCESS) } != 0 {
+        return Err(err(
+            "migration_destination_unwritable",
+            "迁入目录不可写入或访问；请核对权限后重新预览，已有权限不会自动改变",
+        ));
+    }
+    Ok(())
+}
+
+/// Inspect actual ancestors inside the approved root before any content write.
+/// Missing parents require write access only to their nearest existing parent;
+/// existing ancestors keep their modes and need search access, not blanket chmod.
+pub(crate) fn preflight_import_parent(root: &Path, target: &Path) -> Result<()> {
+    guard(target)?;
+    let relative = target
+        .parent()
+        .unwrap()
+        .strip_prefix(root)
+        .map_err(|_| err("invalid_path", "迁入目标不在批准的配置目录内"))?;
+    let mut directory = root.to_path_buf();
+    let mut last_existing = root.to_path_buf();
+    for component in std::iter::once(None).chain(relative.components().map(Some)) {
+        if let Some(component) = component {
+            directory.push(component);
+        }
+        match fs::metadata(&directory) {
+            Ok(metadata) => {
+                if metadata.uid() != unsafe { libc::geteuid() } {
+                    return Err(err("wrong_owner", "迁入目录不属于当前用户"));
+                }
+                migration_access(&directory, libc::X_OK)?;
+                last_existing = directory.clone();
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(_) => return Err(err("path_unreadable", "无法检查迁入目录")),
+        }
+    }
+    migration_access(&last_existing, libc::W_OK | libc::X_OK)
 }
 
 /// Check this batch against the actual destination filesystem's name rules.
