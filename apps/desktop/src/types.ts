@@ -37,7 +37,7 @@ export interface Receipt {
   migration_probe?: { path: string; status: 'executing' | 'removed' | 'retained' };
   error?: { code: string; message: string; phase: string; step_id?: string | null; recovery?: string; next_action?: string; uncertain_side_effects?: boolean };
   coverage?: Record<string, unknown>; next_steps?: string[]; task_outcome?: string; outcome?: string;
-  local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
+  local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string; archive_digest?: string;
 }
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }
 export interface ArchiveManifest { job_id?: string | null; archive_path?: string; created_at: string; files: {path: string; category: string; bytes: number; digest: string}[]; notes: string }

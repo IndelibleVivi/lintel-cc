@@ -110,7 +110,7 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py`、`python3 tests/policy_journey.py`、`python3 tests/work_preservation_journey.py` 与 `python3 tests/portable_work_journey.py` 均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询、加密迁移，以及本次新增的 archive-only 不新建环境、output_path 冻结/拒绝覆盖、跨独立 home/state 的包读取与迁入、stale/错误口令/损坏包拒绝、preserve 完成而旧 reset 仍 partial、canonical reset 顺序、logout 假失败保留产物与结构化 error 跨 Engine 持久、`plan_show` 不泄露秘密；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、七项 inspect、自定义选择/空改动/回执冻结/字段恢复和外部编辑拒绝，portable work journey 跨独立进程验证包携带、只读清单、显式路径迁入与 accepted 后失败码持久。版本探测使用 inert executable，不运行 Claude。
 
 
-独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以原子新名称发布（不会替换已出现的文件），完成后恢复单硬链接状态并读回。import 在预览和正文写入前核对整批实际目标的祖先：path guard 拒绝非目录／链接，批准 root 内的现有目录必须属于当前执行器 UID，实际权限须允许访问和在最近现有父目录写入。已知错误分别为 `path_unreadable`、`wrong_owner`、`migration_destination_unwritable`，在整批正文写入前拒绝；Lintel 不更改已有权限。共同迁入路径只将新建父目录设为 `0700`，已有目标根和父目录权限保留，文件为 `0600`。目的地文件系统需支持同目录 hard link；不支持时返回具体写入失败，保留原数据与原任务，不退回覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。
+独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以系统原子不覆盖 rename 发布（不会替换已出现的文件）；临时名在同一操作中消失，不产生发布后的双链接清理窗口，再读回核验。import 在预览和正文写入前核对整批实际目标的祖先：path guard 拒绝非目录／链接，批准 root 内的现有目录必须属于当前执行器 UID，实际权限须允许访问和在最近现有父目录写入。已知错误分别为 `path_unreadable`、`wrong_owner`、`migration_destination_unwritable`，在整批正文写入前拒绝；Lintel 不更改已有权限。共同迁入路径只将新建父目录设为 `0700`，已有目标根和父目录权限保留，文件为 `0600`。macOS 使用 renameatx_np(RENAME_EXCL)，Linux 使用 renameat2(RENAME_NOREPLACE)；目标文件系统或内核不支持时返回 atomic_publication_unsupported，保留原数据与原任务，不退回 hard link 或覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。
 
 接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建在 mkdir 前分配并持久保存准确 new_root/new_environment_id 与执行中步骤；登记失败或中断后原任务仍能定位目录，意图不证明登记成功。整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
 
@@ -121,3 +121,5 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 批准后的迁入先在实际目标文件系统的私有临时目录里，以空文件验证整批路径。preserve/reset 使用新根所在的 environments 目录，import 使用已批准的目标 root；这一步不写归档正文，正常返回清理自身创建的空文件和目录，不递归删除额外内容。大小写折叠或 Unicode 规范化等仍使路径等价时，返回 migration_path_conflict，在新环境创建或任何正文迁入前整批拒绝。包仍可检查与阅读；整理源内容重新归档，或选择可区分这些路径的文件系统。此检查只在已批准执行中运行，预览保持无目标写入。
 
 路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。
+
+原子不覆盖 rename 的平台合同见 [Linux rename manual](https://www.man7.org/linux/man-pages/man2/rename.2.html) 与 [Apple rename manual source](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)。

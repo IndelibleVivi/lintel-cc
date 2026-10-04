@@ -3,10 +3,10 @@ import { request } from './api';
 import Clawd from './Clawd';
 import { ResourceLink } from './Resources';
 import type { ArchiveManifest, Environment, Plan, Receipt } from './types';
-import { Icon, Notice, formatBytes, formatDate } from './ui';
+import { Icon, Notice, formatBytes, formatDate, hasConfirmedWorkArchive } from './ui';
 
 export default function ArchivePanel({ send = request, jobs, environments, initialJob, selectedId, onImport }: { send?: typeof request; jobs: Receipt[]; environments: Environment[]; initialJob?: string; selectedId: string; onImport: (environment: Environment, plan: Plan, passphrase: string) => void }) {
-  const archives = jobs.filter(job => job.archive_path);
+  const archives = jobs.filter(hasConfirmedWorkArchive);
   const [source, setSource] = useState<'job'|'file'>(archives.length ? 'job' : 'file');
   const [jobId, setJobId] = useState(initialJob ?? archives[0]?.id ?? '');
   const [archivePath, setArchivePath] = useState('');
@@ -27,7 +27,7 @@ export default function ArchivePanel({ send = request, jobs, environments, initi
     {error && <div role="alert"><Notice tone="error">{error}</Notice></div>}
     <div className="segmented archive-source" aria-label="归档来源"><button disabled={!!busy || !archives.length} aria-pressed={source === 'job'} onClick={() => { setSource('job'); clear(); }}>当前主机的任务归档</button><button disabled={!!busy} aria-pressed={source === 'file'} onClick={() => { setSource('file'); clear(); }}>独立加密包</button></div>
     {source === 'job' ? <label className="field">工作归档<select disabled={!!busy} value={jobId} onChange={event => { setJobId(event.target.value); clear(); }}>{archives.map(job => <option key={job.id} value={job.id}>{job.title} · {formatDate(job.created_at)}</option>)}</select></label> : <label className="field">加密包完整路径<input aria-label="加密包完整路径" aria-describedby="archive-source-help" disabled={!!busy} value={archivePath} onChange={event => { setArchivePath(event.target.value); clear(); }} placeholder="/path/to/work-package.age" spellCheck={false}/><span id="archive-source-help" className="small-print">文件须已放在当前目标主机。切换 SSH 主机时使用那台机器上的路径；传送密文的步骤见迁移指南。</span></label>}
-    {!archives.length && <p className="small-print">当前主机还没有任务归档。可从“工作保全”生成，或直接打开已有的独立加密包。</p>}
+    {!archives.length && <p className="small-print">当前主机没有已读回的任务归档。回执中的待核对路径先按原任务检查；也可直接打开已有的独立加密包。</p>}
     <form className="archive-unlock" onSubmit={event => { event.preventDefault(); void run('unlock', async () => { const result = await send('archive_inspect', { ...sourceFields, archive_passphrase: passphrase }); if (alive.current) { setManifest(result); setPreview(null); } }); }}><label className="field">归档口令<input disabled={!!busy} type="password" value={passphrase} onChange={event => { setPassphrase(event.target.value); setManifest(null); setPreview(null); }} autoComplete="off" placeholder="仅在此窗口临时使用"/></label><button disabled={!!busy || !passphrase || !validSource}>{busy === 'unlock' ? '正在解锁…' : '解锁并查看'}</button></form>
     <p className="small-print">口令不进入草案或本地存储；关闭面板后清除。解锁只阅读资料。</p>
     {manifest && <><div className="archive-count"><span>{manifest.files.length} 个文件</span><span>{formatBytes(manifest.files.reduce((total, file) => total + file.bytes, 0))}</span></div><div className="archive-files">{manifest.files.map(file => <button key={file.path} className={preview?.path === file.path ? 'selected-file' : ''} disabled={!!busy} onClick={() => void run('read', async () => { const result = await send('archive_read', { ...sourceFields, archive_passphrase: passphrase, path: file.path }); if (alive.current) setPreview(result); })}><Icon name="terminal" size={14}/><code>{file.path}</code><span>{formatBytes(file.bytes)}</span></button>)}</div>{preview && <div className="archive-text"><div className="surface-heading"><h4>{preview.path}</h4><span className="small-label">只读文本</span></div><pre tabIndex={0}>{preview.text}</pre>{preview.truncated && <Notice>仅展示前 1 MiB；完整原文件仍在加密归档内。</Notice>}</div>}{manifest.notes && <Notice>{manifest.notes}</Notice>}

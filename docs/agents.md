@@ -121,6 +121,8 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 保全／重建回执的 `new_root` 与 `new_environment_id` 在创建目录前持久保存；它们是 intent，只有 create 步骤完成才证明登记成功。创建或登记失败时只查询原 job，保留准确路径／ID，不因意图存在而重建或自动清理。
 
+新归档／迁入文件使用 macOS/Linux 原子不覆盖 rename；不支持的文件系统／内核返回 `atomic_publication_unsupported`，没有 hard-link 或覆盖 fallback。回执中的 archive_path 是 intent；archive_digest 或完成的 archive 步骤才证明读回。App 仅让已读回的任务归档进入查看／选择入口，独立路径仍由 core 检查原文件。
+
 <a id="browser-adapter"></a>
 
 `categories` 在 named/finite 请求中必须至少选择一项；空 JSON 数组和 `--categories ''` 都拒绝。protocol-1 raw request 保留历史兼容默认。

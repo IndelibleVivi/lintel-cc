@@ -72,6 +72,8 @@ try{
   // recovery paths, but offer policy editing only for actual inventory entries.
   modeled.new_environment_id='11111111-2222-4333-8444-555555555555';
   modeled.new_root=path.join(fixture,'unregistered-new-root');
+  modeled.archive_path=path.join(fixture,'unpublished-work.age');delete modeled.archive_digest;
+  modeled.state_archive_path=path.join(fixture,'unpublished-state.age');
   modeled.steps=[{id:'migration_preflight',label:'模拟路径检查中断',status:'executing',message:'Synthetic retained probe fixture.'}];
   await writeFile(path.join(context.LINTEL_STATE_DIR,'jobs',`${modeled.id}.json`),JSON.stringify(modeled));
   const executeCount=calls.filter(command=>command==='execute').length;
@@ -81,6 +83,11 @@ try{
     await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
     await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
     await dialog.getByText(probe,{exact:true}).waitFor();
+    assert.equal(await dialog.getByRole('button',{name:'查看工作归档',exact:true}).count(),0);
+    await dialog.getByText('工作归档（待核对）',{exact:true}).waitFor();
+    await dialog.getByText(modeled.archive_path,{exact:true}).waitFor();
+    await dialog.getByText('状态备份（待核对）',{exact:true}).waitFor();
+    await dialog.getByText(modeled.state_archive_path,{exact:true}).waitFor();
     await dialog.getByText('新配置目录（待核对）',{exact:true}).waitFor();
     await dialog.getByText(modeled.new_root,{exact:true}).waitFor();
     assert.equal(await dialog.getByRole('button',{name:'为新环境选择保护方案'}).count(),0);
@@ -88,6 +95,9 @@ try{
   }
   assert.equal(calls.filter(command=>command==='execute').length,executeCount);
   assert.equal(await readFile(path.join(probe,'placeholder'),'utf8'),'');
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.locator('.archive-shortcut').getByRole('button').click();
+  assert.equal(await dialog.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
   report.checks.push('Modeled retained-probe receipt → real original-job query → exact scratch path visible in Day/Night; no replay or cleanup');
   report.calls=[...new Set(calls)];report.passed=true;
   async function approve(){await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();}
