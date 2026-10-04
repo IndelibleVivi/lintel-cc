@@ -257,8 +257,27 @@ cases observed worker termination on logout; original receipts became
 `needs_reconciliation`, with one submission each. This is executed observation
 and reconciliation evidence, **not reliable logout-surviving execution**.
 The VM and its overlay/seed/keys were cleaned up. This historical run used
-setsid and is not evidence for the new manager path; its fresh results and
-production VPS limits are recorded in [current-state](current-state.md).
+setsid and is not evidence for the new manager path.
+
+Latest clean `7a05291` [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079)
+passed macOS/Ubuntu defaults 13/13 each, independently selected browser/UI
+checks 4/4 each, Ubuntu OpenSSH 1/1 and real Linux VM 1/1. All six entrypoint
+reports identify the same clean HEAD. The VM report is `evidence_complete`:
+under effective `KillUserProcesses=yes`, both eligible system/user-manager
+workers stayed in their exact unit cgroups after the original PAM logout and
+completed the original policy task after barrier release. Ineligible setsid
+terminated and reconciled. Real reboot changed the boot ID; system-managed and
+setsid accepted jobs remained the same original `needs_reconciliation` jobs
+on repeated query, with one submission and no reexecution. The managed shared
+auth fixture preserved caller context and rejected before acceptance, without
+logout, credential deletion or persisting the environment value; its read-only
+preview took 55.279 seconds. The complete service/neighbor/conflict/persistent
+hold recovery suite also passed. This is isolated x86_64 runtime evidence,
+not production VPS, aarch64 or real Claude/auth acceptance. The App reopen /
+original-query / full-receipt / separate-recovery journey uses real rendered
+Chromium with synthetic invoke/SSH/registry, not native WebKit or production
+transport. Current candidate and remaining limits are recorded in
+[current-state](current-state.md).
 
 The built service UI can be checked separately with
 `python3 tests/verify.py --checks service-ui`. Set `LINTEL_SERVICE_UI_REPORT` for
@@ -297,4 +316,4 @@ and `passed`/`failed`/`skipped`/`deferred` reporting against throwaway commands.
 
 Earlier custom-policy source acceptance: clean `1fb9ab6` [CI run 37125403657](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37125403657) passed 12/12 defaults on both macOS and Ubuntu. The separately selected Linux OpenSSH runtime check passed 1/1 with 0 ignored; it exercised the seven-field custom contract on a real x86_64 static-musl runner, including exact subset changes, frozen receipt, lost ACK recovery and interactive PTY launch. It uses temporary synthetic roots and inert Claude, and does not establish real Claude effects, production VPS state or aarch64 runtime.
 
-Current browser source acceptance: clean `93c3f74` [CI run 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) passed 12/12 defaults and 2/2 explicitly selected browser checks on both macOS arm64 and Ubuntu x86_64. Detailed Chromium 151.0.7922.34 reports retain all 11 smoke assertions, actual process exit/replacement, a new production `runtime.onStartup` generation, no relaunch extension-loading flags, retained identity and completed native receipt. The App copy-to-real-host pairing report passes with synthetic invoke/clipboard. Ubuntu OpenSSH runtime also passes 1/1 with 0 ignored. All five entrypoint reports record the same clean HEAD; packaged-App opt-ins and local Chromium 155 evidence remain separate. Formal browser distributions, AdsPower, real Claude/auth, native WebKit/OS clipboard and non-developer installation remain unverified.
+Earlier browser source acceptance: clean `93c3f74` [CI run 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) passed 12/12 defaults and 2/2 explicitly selected browser checks on both macOS arm64 and Ubuntu x86_64. Detailed Chromium 151.0.7922.34 reports retain all 11 smoke assertions, actual process exit/replacement, a new production `runtime.onStartup` generation, no relaunch extension-loading flags, retained identity and completed native receipt. The App copy-to-real-host pairing report passes with synthetic invoke/clipboard. Ubuntu OpenSSH runtime also passes 1/1 with 0 ignored. All five entrypoint reports record the same clean HEAD; packaged-App opt-ins and local Chromium 155 evidence remain separate. Formal browser distributions, AdsPower, real Claude/auth, native WebKit/OS clipboard and non-developer installation remain unverified.

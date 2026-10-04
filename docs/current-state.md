@@ -1,18 +1,22 @@
 # 当前状态
 
-2026-10-04 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
+2026-10-05 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
 ## SSH 原任务与恢复入口（候选）
 
-主机面板查询原任务后可直接查看完整回执与恢复，进入准确 alias／环境的记录；已移除主机保留 query-only。恢复依旧独立预览和批准。TypeScript/Vite 与 `remote-task-ui`、`service-ui` 本机渲染检查通过，涵盖丢 ACK 后 App reload、一次原提交、查询更新、关闭面板后的迟到响应、后续编辑冲突、独立恢复和 Day/Night 1120／900 布局。`remote-task-ui` 的 SSH/invoke/持久 registry 为合成；不代表 native WebKit、真实 SSH 或生产 VPS。CI 的既有独立 browser owner 已接统一入口；新 CI 结果待核对。
+主机面板查询原任务后可直接查看完整回执与恢复，进入准确 alias／环境的记录；已移除主机保留 query-only。恢复依旧独立预览和批准。TypeScript/Vite 与 `remote-task-ui`、`service-ui` 本机渲染检查通过，涵盖丢 ACK 后 App reload、一次原提交、查询更新、关闭面板后的迟到响应、后续编辑冲突、独立恢复和 Day/Night 1120／900 布局。clean `7a05291` 的 [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079) 也已通过 macOS／Ubuntu 默认各 13/13、独立 browser/UI 各 4/4（启动、配对、服务、原任务）。`remote-task-ui` 的 SSH/invoke/持久 registry 为合成；不代表 native WebKit、真实 SSH 或生产 VPS。
 
-## SSH 任务托管与生命周期（源码候选）
+## SSH 任务托管与生命周期（候选，隔离 runtime 已验证）
 
 clean `200aaed` 的 [CI37209110177](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37209110177) 已通过 macOS／Ubuntu 默认各 13/13、浏览器／界面各 3/3、Ubuntu OpenSSH 与真实 VM。正常等待／SIGSTOP × 两种有效 `KillUserProcesses` 的四次 logout 都观察到 worker 消失、原 session scope 停止；`setsid` 虽脱离进程 session，仍留在原登录 cgroup。原任务均进入 `needs_reconciliation`，每次只提交一次。正常运行也失败，因此不能把 SIGSTOP 当唯一原因；未捕获终止信号，不归因为某个 signal 或仅由 logind policy 导致。
 
-新 runner 已接入有限单任务 transient service：already-root system manager，或已有 `Linger=yes` 且当前 UID user bus 可用的 user manager；不改主机政策，不提权。worker 经同机私有 pipe 保留原环境与工作目录，认证来源／proxy 复查不失真；环境值不进入 unit 属性、argv、回执或磁盘。实际 cgroup 核验与 core 的持久 `execution` 在 ACK 前完成；manager 启动不确定时不 fallback。macOS／无 systemd／条件不满足的用户保留 setsid，并显示明确续跑限制，重启存活不作承诺。本机 core 52、runner 8、控制流程 26、真实 synthetic submission 与默认 state／错误 cgroup 检查通过；新的 managed logout／重启 runtime 等待 fresh Linux CI，不据源码或合成证明生产 VPS。
+新 runner 已接入有限单任务 transient service：already-root system manager，或已有 `Linger=yes` 且当前 UID user bus 可用的 user manager；不改主机政策，不提权。worker 经同机私有 pipe 保留原环境与工作目录，认证来源／proxy 复查不失真；环境值不进入 unit 属性、argv、回执或磁盘。实际 cgroup 核验与 core 的持久 `execution` 在 ACK 前完成；manager 启动不确定时不 fallback。macOS／无 systemd／条件不满足的用户保留 setsid，并显示明确续跑限制，重启存活不作承诺。
+
+最新 clean `7a05291` 的 CI 已完成真实 Ubuntu 24.04.4／systemd 255 VM：有效 `KillUserProcesses=yes` 下，原 OpenSSH/PAM session 已 logout 后，system/user 两种 manager 的 worker 都在准确单任务 unit cgroup 中保持运行；释放合成 barrier 后，原 policy job 完成。不符合条件的 setsid worker 消失，查询成为原任务的 `needs_reconciliation`。各只提交一次，没有重新 execute。真实 reboot 改变 kernel boot ID 后，system-managed 和 setsid 的 accepted job 都重复查询为同一原任务的 `needs_reconciliation`，不重放。原 system-manager 服务暂停／邻居保留／外部编辑冲突／持久 hold 重启恢复套件继续通过。
+
+同一真实 VM 的共享认证 fixture 验证 caller 环境在 system manager 切换后保留：预览后新增共享范围，执行在 accept 前返回 `shared_auth_scope`，没有调用注销、删除合成凭据或持久保存环境值。只读清理预览实测 55.279 秒；该完整 fixture 预览预算 180 秒，普通请求仍为 60 秒。macOS／Ubuntu core 各 52、runner 各 8、VM 控制流程各 26 项通过；六份默认／browser／OpenSSH／VM 入口报告记录同一 clean HEAD。上述 runtime 使用合成用户、临时 roots 与 inert Claude，不证明生产 VPS 或真实认证行为。
 
 ## 精确服务生命周期与视觉身份（候选）
 
@@ -22,9 +26,9 @@ clean `8c9d85c` 的 [CI37177180828](https://github.com/IndelibleVivi/lintel-cc/a
 
 `linux-vm-runtime` 的详细报告为 `evidence_complete`：disposable Ubuntu 24.04.4、systemd 255 PID 1、OpenSSH 9.6 的真实 PAM session／logind／cgroup。root system-manager 完整 service suite 及 prepare → 真 reboot → recover 均通过：精确暂停后 inactive/dead、MainPID 为零、cgroup 为空；Restart=always／timer／手动启动不能回写，邻居继续运行且 InvocationID 不变；外部 unit 编辑返回 `service_restore_conflict` 并保留修改和 blocker；独立恢复、原 inactive 状态与重复执行不重启通过。真实 kernel boot ID 已变化，持久 hold 在重启后实际加载，查询同一 quiesce job 后独立批准恢复。此前实际 wire／condition 路径及 Requires 成员排列问题已修正；成员增删、源文件变化和 pending/failed 状态仍拒绝。VM、overlay、seed 与测试密钥已清理，宿主 login policy 未更改。
 
-两种有效 `KillUserProcesses=no`／`yes` policy 的 PAM logout **都观察到 worker 被终止**，session scope 已结束；原任务查询成为 `needs_reconciliation`，各只提交一次，没有重新 execute。另一个 accepted worker 在真实 reboot 后重复查询也保持原 job 与 `needs_reconciliation`，没有重发。这验证中断发现和原任务核对，**未交付退出登录后可靠继续执行的保证**。生产 VPS、user-manager 生命周期和完整 G03 仍未验收。
+上述 `8c9d85c` 的旧 setsid 路径在两种有效 `KillUserProcesses=no`／`yes` policy 下都被 logout 终止；原任务与另一个 reboot 后的 accepted job 均保持原 ID、`needs_reconciliation` 和一次提交。该历史证据只证明旧路径的中断发现。新 system/user manager 的严格 logout 存活与完成证据见前节；生产 VPS 与完整 G03 仍未验收。
 
-提供的视觉资产已接入 canonical SVG master、主题内联 mark、五个 Tauri icon exports，并保留可编辑展示 variants；仍保持纸上晨光／夜里月光、侧栏 `lintel_` 与分割线、2.6 秒慢闪（reduced motion 静止）。本机已重建 `e5ba805` 的 identity/service arm64 App，约 17.76 MiB，包含 D-Bus／condition 路径及无序关系修正与对应 x86_64/aarch64 静态 runner；包内实际字节、大小和摘要与 manifest 一致。构建与包内资源核验分别记录，尚未安装、激活、签名或正式分发。见 [视觉身份](visual-language.md)。
+提供的视觉资产已接入 canonical SVG master、主题内联 mark、五个 Tauri icon exports，并保留可编辑展示 variants；仍保持纸上晨光／夜里月光、侧栏 `lintel_` 与分割线、2.6 秒慢闪（reduced motion 静止）。本机已重建 `7a05291` 的 arm64 App，约 17.87 MiB，包含新托管路径、caller 环境保留与共享认证前置拒绝，以及对应 x86_64/aarch64 静态 runner；包内实际字节、大小和摘要与 manifest 一致，icon 与 supplied export 字节相同。可执行文件仅有 linker ad-hoc signature，无发行证书；尚未安装、激活、发行签名、公证或正式分发。见 [视觉身份](visual-language.md)。
 
 ## 浏览器首次连接与真实重启验收（候选）
 
@@ -65,7 +69,7 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 - core / runner：环境登记与建立、版本化外发设置计划/批准/读回、字段恢复、漂移、脱敏支持资料；有限登录修复/客户端重建/退役；加密归档、文本阅读与选择性迁入。清理范围是预览中的准确文件和可显式调用的官方认证入口，不等于全客户端清场。概览统计与归档准入解耦（大文件不阻断 inspect）；二次重建会把此前迁入 lintel-imports 的工作重新计入归档；损坏 settings 不阻断不修改 settings 的保全计划；各变量分别按官方非空值或 boolean 语义判断；静态识别 native/npm 产品版本，Remote Control 按版本／Trusted Devices 条件评估，未知条件显式标注。冲突旧值通过用户选定的准确删除 diff 解除；预览冻结策略与产品版本，变更后拒绝执行。
 - 桌面：同一套本机/SSH 环境、计划、清理、归档和任务界面；浏览器模块全操作入口、Native Messaging 注册计划与配对；本机代理启停/连接观察。所有修改先生成计划或独立确认。
 - 界面：聊天式首页按角色招呼、操作框、一行工作入口重排，玩耍入口集中到不挤动工作区的口袋菜单。Clawd 支持摸摸／拖抱／弹飞／连续戳戳害羞与躲藏、下拉起飞；四幅重新绘制的字符风景保留清楚角色轮廓与画面比例，另有跳跃小游戏。提供 Day / Night / System、可选本地字体、键盘操作及减少动态效果。字体文件不进入 Git，干净 checkout 使用系统 fallback。
-- SSH：native Rust bridge 使用系统 OpenSSH、静态 alias、严格 host key 与有限 JSON 请求；`lintel submit` 持久接收后返回 ACK，独立会话 worker 执行，重连只查询原任务。桌面可移除／撤销移除 alias；原任务与去重记录保留。新增用户批准的 Linux x86_64 / arm64 runner 探测、安装预览、内置文件上传、SHA／权限／能力核验与 alias 版本绑定；上传前持久 intent，丢 ACK 只核对原安装，原任务冻结 runner。仅写用户专用版本目录，不修改 PATH／系统服务／Claude。错误提供阶段、具体原因、排查步骤、退出码、限长 stderr 与只读核验命令，查询错误同样保留诊断。Python controller 是可选 CLI，不是桌面依赖，也未接入这一轮的结构化诊断。
+- SSH：native Rust bridge 使用系统 OpenSSH、静态 alias、严格 host key 与有限 JSON 请求；`lintel submit` 持久接收后返回 ACK，符合既有条件的 Linux 使用有限单任务 system/user transient service，其他路径保留 setsid 与明确续跑限制，重连只查询原任务。桌面可移除／撤销移除 alias；原任务与去重记录保留。新增用户批准的 Linux x86_64 / arm64 runner 探测、安装预览、内置文件上传、SHA／权限／能力核验与 alias 版本绑定；上传前持久 intent，丢 ACK 只核对原安装，原任务冻结 runner。安装仅写用户专用版本目录，不修改 PATH／系统服务／Claude。错误提供阶段、具体原因、排查步骤、退出码、限长 stderr 与只读核验命令，查询错误同样保留诊断。Python controller 是可选 CLI，不是桌面依赖，也未接入这一轮的结构化诊断。
 - 帮助：App 内提供开发者 GitHub、Lintel 源码说明、Infra Field Guide 的 VPS 101 与 SSH 排障入口。macOS native 仅打开固定 HTTPS 文档资源；远端准备文档区分 App 批准安装与独立 CLI 的手工 PATH 准备。
 - 浏览器：Chromium MV3 / Firefox 独立适配、Native Messaging host、实例冲突/配对/持久操作记录与固定路径安装器。Chromium 清理先隔离、关闭目标及 iframe 宿主、注销 worker，等待完整浏览器重启，再用新确认继续删除。
 - 网络：loopback CONNECT / 有限 HTTP 转发、精确域名/端口规则、上游与连接事件；仅证明经过通道的流量。native start/status 返回实际采用的规范化 active_config；界面分开呈现当前生效配置与按环境保存的下次启动草案，支持默认动作及允许／阻止规则和端口。
@@ -78,11 +82,11 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 | CLI / submission | 实际 CLI 配置往返旅程通过；独立 worker 的 durable ACK、父进程退出后完成、原 ID 查询、去重、口令不落记录通过。PTY 中重建/批准/无回显口令/加密归档通过。新增 work_preservation journey 3/3（大文件概览、A→B→C 保留、损坏 settings 独立保全）；policy journey 覆盖版本变化拒绝、外部编辑、准确删除、恢复外部旧值、receipt 策略证据 |
 | Egress | 5 unit + 7 localhost socket tests 通过；新增 inet_aton 式／IPv4-mapped IP 写法不能绕过精确规则、wire 配置缺省 default_action 直接拒绝的回归。本轮 native network tests 3/3 新鲜通过，覆盖规范化生效配置读回、精确规则命中、环境隔离、无效配置与通道结束状态。没有真实 Claude 公网探针或进程强约束证据 |
 | Browser | 20 JS 与当前 12 native host Rust tests 通过；App 内置扩展安装器 12 项含包内资源测试、host 安装／更新与实际 executable 验证见上节。既有覆盖：通用 control 不能放行扩展（授权仅限安装路径）、配对码 12 hex／5 次失败作废／pending 上限、browser 由调用方身份派生、running 回执移到 durable 边界之后、DNR 读回数组序不敏感。活跃 SW 负例证实注销后仍可能回写；当前真实 Chromium 持久安装／完整退出与原生 onStartup／二次确认 smoke 已通过，详见上节。覆盖 active SW／iframe writer、五类目标存储与邻域保留、隔离／权限恢复、重复操作不重删及 Native Messaging 持久回执。正式三浏览器与 AdsPower／Firefox 容器／真实网站仍未验收 |
-| SSH | 本轮 desktop 默认 56 passed、3 independent ignored（不计为通过）；此前内置浏览器轮 57 passed、0 ignored（包含两项包内资源 opt-in，过滤独立 Linux runtime），Ubuntu 独立 OpenSSH runtime 已通过，保留既有 SSH 回归，包括上传真实字节／权限／哈希、过期目标／文件／批准拒绝、丢回包只核对、外部文件保留、平台／能力拒绝、原任务版本冻结；既有覆盖移除后保留任务／去重、具体失败分类、stderr 并发排空／限长／去敏、只读排查命令、查询原错误保留；既有严格 host key、固定命令、丢 ACK 查询继续通过。固定关闭 `ProxyCommand=none` / `RemoteCommand=none`，observe 仅采用 id 匹配的回执，私有目录校验属主。Python fake-SSH 13/13 通过，含有限 custom schema 与 stdin payload 回归。两台真实 Linux x86_64 主机已完成严格 SSH 与生产安装脚本的只读探测，OS／架构／UID／安装条件返回有效且目标身份不同；未上传、未安装、未运行 Claude 或 runner。隔离 VM 的真实 PAM logout／cgroup 与 reboot 后原任务核对已通过，两种 logout policy 都观察到 worker 被终止且未重发；生产 VPS 与 user-manager 生命周期未验收 |
+| SSH | 本轮 desktop 默认 56 passed、3 independent ignored（不计为通过）；此前内置浏览器轮 57 passed、0 ignored（包含两项包内资源 opt-in，过滤独立 Linux runtime），Ubuntu 独立 OpenSSH runtime 已通过，保留既有 SSH 回归，包括上传真实字节／权限／哈希、过期目标／文件／批准拒绝、丢回包只核对、外部文件保留、平台／能力拒绝、原任务版本冻结；既有覆盖移除后保留任务／去重、具体失败分类、stderr 并发排空／限长／去敏、只读排查命令、查询原错误保留；既有严格 host key、固定命令、丢 ACK 查询继续通过。固定关闭 `ProxyCommand=none` / `RemoteCommand=none`，observe 仅采用 id 匹配的回执，私有目录校验属主。Python fake-SSH 13/13 通过，含有限 custom schema 与 stdin payload 回归。两台真实 Linux x86_64 主机已完成严格 SSH 与生产安装脚本的只读探测，OS／架构／UID／安装条件返回有效且目标身份不同；未上传、未安装、未运行 Claude 或 runner。最新隔离 VM 已验证符合条件的 system/user manager 在严格 PAM logout 后继续并完成原任务，不符合条件的 setsid 路径明确受限；真实 reboot 后原任务核对且未重发。生产 VPS 与 aarch64 runtime 未验收 |
 | Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。重排后 Home 的 Day/Night、900×640布局、工作入口、口袋展开不挤动操作框、连续戳戳／躲藏／拖甩、鼠标／滚轮／模拟触摸、焦点返回和减少动态已验证；四画收星、等比例缩放、翻页，游戏跳跃／暂停／碰撞／重开与本机最高分通过。网络面板经 synthetic native-response harness 验证延迟响应隔离和停止／编辑／重启。新增安装卡合成 native bridge 验证预览前不上传、显式批准、丢回包后的状态同步、原安装只读查询、关闭／重开／迟到响应隔离与连接管理；安装卡 Day/Night 和 900×640 长路径详情已实际渲染检查，视觉仍待用户接受。F04 界面使用真实合成 CLI 完成计划／批准／解除／回执／组织条件往返；新增 SSH 合成 native-response harness 验证具体错误／摘要复制、显式重连、移除／撤销／失败保留、当前主机回本机、原任务查询和关闭面板后的迟到响应隔离；帮助链接 ID 与 900×640 长命令排版通过。其后完成纸上晨光/夜里月光环境光、首页问候纵向重排、统一柔影刻度、clay tint 选中态的 Day/Night/窄屏截图 QA；浏览器面板移除独立「允许扩展 ID」按钮（扩展授权并入用户确认的安装路径），经合成空间复核；概览「已设置关闭」计数使用各变量解析后的 configured 状态。视觉稿仍属候选 |
-| macOS | 当前 arm64 App 本地构建成功，约 17.76 MiB，含自定义策略、内置 Chromium／Firefox 扩展、browser host 与两种静态 Linux runner；默认包排除本机可选字体。typecheck、Vite 与 Tauri release 构建通过。此前已观察原生 WebKit 首页和 Clawd，本轮扩展界面使用浏览器合成 bridge 验证，未完成新 native runtime／真实 VPS 交互验收；没有自动重启已打开的旧窗口。无 Developer ID、公证、正式分发或 Applications 安装验收 |
+| macOS | 当前 `7a05291` arm64 App 本地构建成功，约 17.87 MiB，含自定义策略、内置 Chromium／Firefox 扩展、browser host、新 SSH 托管与两种静态 Linux runner；默认包排除本机可选字体。typecheck、Vite 与 Tauri release 构建通过。此前已观察原生 WebKit 首页和 Clawd，本轮界面使用浏览器合成 bridge 验证，未完成新 native runtime／真实 VPS 交互验收；没有自动重启已打开的旧窗口。仅 linker ad-hoc signature，无 Developer ID、公证、正式分发或 Applications 安装验收 |
 
-统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与五条合成 journey；浏览器与 native bundle 显式 opt-in。最新 clean `8c9d85c` 的 CI 默认各 12/12、独立浏览器启动／App 配对／service-ui 各 3/3、Ubuntu OpenSSH 1/1 与真实 VM 1/1 全部通过；默认、浏览器、OpenSSH、VM 六份入口 JSON 的 HEAD 与工作树状态一致，详细启动／PAM／服务／reboot 报告已核对。当前本机 App `e5ba805` 与包内资源核验是独立证据，未用后续公开说明或文档提交重新运行整套 CI。两种 Linux musl ELF 已交叉构建并打包；x86_64 已在 Ubuntu 隔离 SSH 和 VM 执行，aarch64 runtime 仍未验收。历史 CI 与局部用例证据保留在 [acceptance-status.json](acceptance-status.json)。
+统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与五条合成 journey；浏览器与 native bundle 显式 opt-in。最新 clean `7a05291` 的 [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079) 默认各 13/13、独立浏览器启动／App 配对／service-ui／remote-task-ui 各 4/4、Ubuntu OpenSSH 1/1 与真实 VM 1/1 全部通过；默认、浏览器、OpenSSH、VM 六份入口 JSON 的 HEAD 与工作树状态一致，详细启动／PAM／服务／reboot／共享认证报告已核对。当前本机 App `7a05291` 与包内资源核验是独立证据，后续文档提交不重跑未变更的源码验证。两种 Linux musl ELF 已交叉构建并打包；x86_64 已在 Ubuntu 隔离 SSH 和 VM 执行，aarch64 runtime 仍未验收。历史 CI 与局部用例证据保留在 [acceptance-status.json](acceptance-status.json)。
 
 实际主机为 macOS arm64。Linux x86_64 musl 已有上述 CI runtime 证据；aarch64、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
 
@@ -90,9 +94,9 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 
 1. **真实认证与写入者控制：** Keychain/共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。官方 auth 命令仅有合成 CLI 证据，不能宣称生产注销已验收。
 2. **完整外发策略与强约束：** 七项自定义已接入；更多取舍、入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
-3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、PAM logout／cgroup 与 reboot 后核对。两种 logout policy 都终止 worker，可靠继续执行仍有缺口；生产 VPS 安装与任务实跑、user-manager 生命周期及其他 supervisor 仍未验收。
+3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、符合既有条件的 system/user manager 严格 logout 后续跑、原任务完成与 reboot 后核对。setsid 不保证 logout 存活，托管路径也不保证 reboot 续跑；生产 VPS 安装与任务实跑、aarch64 runtime、其他 supervisor 和完整 G03 仍未验收。
 4. **浏览器旅程：** 独立 Chromium 临时测试 profile 已完成真实持久安装／onStartup 两阶段清理；仍需正式 Chrome、Edge、Firefox 与 AdsPower 的安装、配对与清理验收。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。
 5. **发行与维护：** 菜单栏、定时漂移、签名规则更新、卸载、升级、正式签名/公证、性能预算。
 6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。混合状态加密备份不支持自动恢复；会话/记忆迁入不证明可以续聊。
 
-这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、VPS session/cgroup／重启验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。
+这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、生产 VPS 任务验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。
