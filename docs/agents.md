@@ -66,7 +66,7 @@ lintel job wait <restore-plan-id> --timeout 30s
 
 计划生成会保存冻结计划；不会修改目标 settings。`plan show` 不刷新旧计划，而是读回其公共范围。批准必须匹配该计划的 hash，并来自当前任务对这些动作的既有用户授权；没有通用 `--yes`。后续外部编辑会拒绝恢复；不要把冲突当作强制覆盖理由。
 
-`job submit` 返回 durable ACK，通常 status 为 accepted。ACK 后任务仍可能失败；另一独立进程使用同一个 HOME/state 和原 plan ID 可以查询。`job wait` 默认 30s，支持 0–3600s 或毫秒值；超时返回非零、`error.code=wait_timeout`、原 `plan_id` 和最新 `data`，**不会重新提交**。needs_reconciliation/interrupted 是需要核对的终态，wait 不替你执行恢复。
+`job submit` 返回 durable ACK，通常 status 为 accepted。ACK 后任务仍可能失败；另一独立进程使用同一个 HOME/state 和原 plan ID 可以查询。`job wait` 在轮询前按共同 schema 校验原 plan ID；无效 UUID 返回非零、`invalid_request`，不会初始化 state。默认等待 30s，支持 0–3600s 或毫秒值；超时返回非零、`error.code=wait_timeout`、原 `plan_id` 和最新 `data`，**不会重新提交**。needs_reconciliation/interrupted 是需要核对的终态，wait 不替你执行恢复。
 
 接受后的失败在持久回执 `error` 中记录 code/message/phase/recovery；已完成步骤和 archive/new_root 等产物保留。查询原记录，不从 warnings 中文文本猜 code、不自动再 execute。还要检查实际托管 `execution`：SSH 断线、父进程退出、logout、reboot 是不同事件，ACK 不保证 reboot survival。当前 runner 不 sudo、不启用 linger、不改变登录策略。
 

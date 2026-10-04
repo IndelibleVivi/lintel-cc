@@ -204,9 +204,13 @@ fn named(command: &str, args: &[String], seed: Value, input: bool) -> Value {
 }
 
 pub fn wait(job: &str, timeout: Duration) -> Value {
+    let request = json!({"command":"job","plan_id":job});
+    if let Err(e) = lintel_operations::validate(&request) {
+        return error("invalid_request", e);
+    }
     let start = Instant::now();
     loop {
-        let response = dispatch(json!({"command":"job","plan_id":job}));
+        let response = dispatch(request.clone());
         if response["ok"] != true {
             return response;
         }

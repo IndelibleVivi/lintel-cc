@@ -41,6 +41,10 @@ def run():
         operations = {operation['id']: operation for operation in catalog['operations']}
         assert operations['discover']['effects']['lintel_state'] == 'update_inventory'
         assert operations['archive_read']['secret_fields'] == ['archive_passphrase']
+        for identity in ['plan-secret', '00000000000040008000000000000001']:
+            rejected = command('job', 'wait', identity, '--timeout', '0s', good=False)
+            assert rejected['error']['code'] == 'invalid_request', rejected
+            assert not state.exists(), 'Invalid wait UUID initialized core state'
         # Generic JSON automation must stop before the core/GUI launch path.
         hidden = command('call', 'launch', payload={'environment_id': '00000000-0000-4000-8000-000000000000'}, good=False)
         assert hidden['error']['code'] == 'interactive_launch_required', hidden
