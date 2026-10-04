@@ -37,7 +37,7 @@ core 先持久保存 job 与 blocker 写入意图，然后在该 unit 的默认�
 
 blocker 添加一个非 trigger `ConditionPathExists`，指向 state 内该任务唯一且永不创建的 `.service-resume-permit` 路径。permit 不存在时，每种启动来源都跳过目标 service；state 暂时不可用或晚挂载时仍阻止启动。core reload manager，读取结构化 D-Bus `Conditions` 确认精确条件已加载，再只 stop 已批准 unit，并核验 cgroup 空。enablement、原 unit 文件、其他 drop-in 与邻居 service 不被改写。
 
-ConditionPathExists 的路径值按原始绝对路径写入，不加 JSON 或 shell 引号；路径中的 `%` 写为 `%%`，避免 systemd specifier 展开改变目标。state 路径需是无控制字符的 UTF-8 路径，无法表达时在预览阶段明确拒绝。执行还会核对冻结 blocker 与当前生成规则；旧计划若保存了不同语义的文本，会返回 `stale_service_plan`，要求重新预览。文件存在或 daemon-reload 成功都不能替代实际 loaded condition 的精确核验。
+ConditionPathExists 的路径值按原始绝对路径写入，不加 JSON 或 shell 引号；路径中的 `%` 写为 `%%`，避免 systemd specifier 展开改变目标。state 路径需是无控制字符的 UTF-8 路径，无法表达时在预览阶段明确拒绝。执行还会核对冻结 blocker 与当前生成规则；旧暂停计划若保存了不同语义的文本，会返回 `stale_service_plan`，要求重新预览。文件存在或 daemon-reload 成功都不能替代实际 loaded condition 的精确核验。
 
 暂停是持久的，直到独立批准恢复。它不会自动随着窗口关闭、SSH logout 或客户端重开而恢复；磁盘 blocker 可跨 reboot 保留。user manager 在 logout 后是否继续运行、runner job 是否完成，以及 reboot 后当前 unit 是否仍正确加载，都需要独立真实运行证据，不能从配置或旧 receipt 推断。
 
@@ -52,6 +52,8 @@ ConditionPathExists 的路径值按原始绝对路径写入，不加 JSON 或 sh
 批准后只移除原任务仍拥有的 blocker。删除使用既有隔离机制绑定冻结的文件对象；删除窗口内出现替换时保留新文件，并在回执中记录恢复目录。core reload 并核验配置。原先 active 的 service 才启动；原先 inactive 的 service 保持 inactive。若 stop 已中断且原先运行的同一绑定服务仍 active，独立恢复只解除 blocker，不再执行 start 或 stop。恢复本身也拥有 durable job，同一个 execute 不重复 start。
 
 任务中断或命令失败会标为 `needs_reconciliation`。重复 execute 只返回原 job；不能自动重发 stop、清理或 start。blocker 尚未加载、写入未完成、state 遗失或当前配置无法解释时，恢复可能无法生成；保留现状与原回执，由操作者核对固定 unit 的配置与 manager，而不是删除 journal/deduplication 记录后重试。
+
+暂停期间，若 reload 后精确 blocker 已加载，但移除自有 hold 后的配置与原预览不同，回执的 `service.configuration_conflict` 保存实际比较的差异键。固定安全属性附 `expected/current` 值；环境赋值、User、condition 参数和源路径只记录差异键，不输出值。源文件按冻结清单中的 index 报告差异键及 digest/device/inode/mode/owner，不输出路径或文件原文。属性长值和超过 32 项的文件差异会明确标记截断。这个诊断不排序、归一或忽略任何差异；任务仍在 stop 前拒绝，并保留 blocker 与原 journal，供操作者区分 manager 读回变化和外部编辑。
 
 清理计划仍要求确认非 systemd 写入者已停止，同时扫描可访问 manager 的 loaded 与 installed service 直接 root 绑定，并复查原 hold 的实时证据。发现绑定此 root 却未被批准 hold 的 service，即使填写 `writers_confirmed_stopped: true` 也不会生成清理计划。检测明确属于其他 root 的 Claude 进程时，Linux 清理不把它当作目标写入者。未知 supervisor、wrapper、IDE、手动进程与通过脚本/EnvironmentFile 隐藏的服务绑定仍需独立核对；本适配器没有提供全机写入者识别。
 
@@ -81,6 +83,6 @@ python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel -
 python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel --json /var/tmp/service-recover.json --phase recover --previous-report /var/tmp/service-prepare.json
 ```
 
-prepare 报告保存 synthetic fixture 标识、home/state/root、unit 名、原 quiesce job、preboot inspect、hold 路径与 boot ID。首次 inspect 前还记录自有 fixture 的 `EnvironmentFiles`、`ExecStop` 与 `ExecStopPost` 有限原始 show/JSON 输出，失败时也写入 `--json` 报告，便于诊断属性读取。execute 未完成时，报告附上自有 hold 文本、loaded Conditions/DropInPaths、服务状态与本 unit 最近 30 条有容量上限的 journal 输出，回收后再清理自有 fixtures。recover 先查询同一个 job，核验目标跨 reboot 未回写、blocker 仍实际加载且邻居运行，再独立批准恢复。只有 boot ID 实际变化才报告 `persistent_hold_survived_real_reboot`。脚本不自行 reboot、不修改 login policy，也不把服务验收等同于完整 G03 的 SSH/PAM/logout/任务存活验收。
+prepare 报告保存 synthetic fixture 标识、home/state/root、unit 名、原 quiesce job、preboot inspect、hold 路径与 boot ID。首次 inspect 前还记录自有 fixture 的 `EnvironmentFiles`、`ExecStop` 与 `ExecStopPost` 有限原始 show/JSON 输出，失败时也写入 `--json` 报告，便于诊断属性读取。execute 未完成时，`failed_service_receipt` 保留原回执及其有限配置差异诊断；报告还附上自有 hold 文本、loaded Conditions/DropInPaths、服务状态与本 unit 最近 30 条有容量上限的 journal 输出，回收后再清理自有 fixtures。recover 先查询同一个 job，核验目标跨 reboot 未回写、blocker 仍实际加载且邻居运行，再独立批准恢复。只有 boot ID 实际变化才报告 `persistent_hold_survived_real_reboot`。脚本不自行 reboot、不修改 login policy，也不把服务验收等同于完整 G03 的 SSH/PAM/logout/任务存活验收。
 
 机制依据：[systemd unit conditions](https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html)、[systemd service Restart](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)、[systemctl stop/mask](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html)、[systemd D-Bus Conditions 与依赖属性](https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html)。空数组与 JSON 读取行为依据官方 v255 的 [systemctl 属性打印实现](https://github.com/systemd/systemd/blob/v255/src/systemctl/systemctl-show.c#L1168-L1309)及 [busctl get-property 实现](https://github.com/systemd/systemd/blob/v255/src/busctl/busctl.c#L1983-L2019)；condition 路径语法依据 [condition parser](https://github.com/systemd/systemd/blob/v255/src/core/load-fragment.c#L2795-L2844)和 [specifier 转义实现](https://github.com/systemd/systemd/blob/v255/src/shared/specifier.c#L49-L87)。runtime mask 对高优先级本地 unit 的限制是选用独立持久 drop-in 的原因。

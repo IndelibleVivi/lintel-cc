@@ -134,6 +134,79 @@ fn config_only(properties: &Value) -> Value {
     }
     p
 }
+fn diff_keys(expected: &Value, current: &Value) -> Vec<String> {
+    let keys: std::collections::BTreeSet<_> = expected
+        .as_object()
+        .into_iter()
+        .chain(current.as_object())
+        .flat_map(|object| object.keys())
+        .collect();
+    keys.into_iter()
+        .filter(|key| expected.get(*key) != current.get(*key))
+        .cloned()
+        .collect()
+}
+fn diagnostic_property(value: &Value) -> Value {
+    match value.as_str() {
+        Some(text) if text.len() > 2048 => {
+            json!({"prefix":text.chars().take(2048).collect::<String>(),"bytes":text.len(),"truncated":true})
+        }
+        Some(_) => value.clone(),
+        None if value.is_null() => Value::Null,
+        None => json!({"value_withheld":"non-string property"}),
+    }
+}
+fn diagnostic_file(file: Option<&Value>) -> Value {
+    file.map(|file| {
+        json!({"digest":file["digest"],"device":file["device"],"inode":file["inode"],"mode":file["mode"],"owner":file["owner"]})
+    })
+    .unwrap_or(Value::Null)
+}
+// Observability for the strict comparison only; never normalize or relax it.
+// Do not export environment assignments, identities, condition arguments,
+// source paths or source bytes. File indices retain their frozen source order.
+fn configuration_conflict(expected: &Value, current: &Value) -> Value {
+    let property_diff_keys = diff_keys(&expected["properties"], &current["properties"]);
+    let mut property_values = json!({});
+    let mut withheld_property_diff_keys = vec![];
+    for key in &property_diff_keys {
+        if (SHOW_PROPERTIES.contains(&key.as_str())
+            && ![
+                "User",
+                "PassEnvironment",
+                "UnsetEnvironment",
+                "FragmentPath",
+                "SourcePath",
+            ]
+            .contains(&key.as_str()))
+            || COMPLEX_PROPERTIES.iter().any(|(name, _)| name == key)
+        {
+            property_values[key] = json!({"expected":diagnostic_property(&expected["properties"][key]),"current":diagnostic_property(&current["properties"][key])});
+        } else {
+            withheld_property_diff_keys.push(key);
+        }
+    }
+    let expected_files = expected["files"].as_array().unwrap();
+    let current_files = current["files"].as_array().unwrap();
+    let mut differences = vec![];
+    let mut difference_count = 0;
+    for index in 0..expected_files.len().max(current_files.len()) {
+        let before = expected_files.get(index);
+        let after = current_files.get(index);
+        if before != after {
+            difference_count += 1;
+            if differences.len() < 32 {
+                differences.push(json!({"index":index,
+                    "diff_keys":diff_keys(before.unwrap_or(&Value::Null),after.unwrap_or(&Value::Null)),
+                    "expected":diagnostic_file(before),"current":diagnostic_file(after)}));
+            }
+        }
+    }
+    json!({"snapshot_diff_keys":diff_keys(expected,current),"property_diff_keys":property_diff_keys,
+        "property_values":property_values,"withheld_property_diff_keys":withheld_property_diff_keys,
+        "files":{"expected_count":expected_files.len(),"current_count":current_files.len(),
+            "difference_count":difference_count,"differences":differences,"differences_truncated":difference_count>differences.len()}})
+}
 fn view(properties: &Value) -> Value {
     json!({"active_state":properties["ActiveState"],"sub_state":properties["SubState"],
         "unit_file_state":properties["UnitFileState"],"restart":properties["Restart"]})
@@ -852,6 +925,17 @@ impl Engine {
                             .retain(|v| v[3] != hold["condition_path"]);
                     }
                 }
+                // Synthetic-only seam for configuration changes in the reload
+                // window, after execute has accepted the original preview.
+                if let Some(requires) = p["fixture_reload_requires"].as_str().map(str::to_owned) {
+                    p["Requires"] = json!(requires);
+                }
+                if p["fixture_reload_source_edit"] == true {
+                    fs::write(
+                        string(&p, "FragmentPath")?,
+                        "synthetic reload-time source edit",
+                    )?;
+                }
             } else if operation == "stop" {
                 if p["fixture_fail_stop"] == true {
                     return Err(err("service_command_failed", "synthetic interrupted stop"));
@@ -909,7 +993,11 @@ impl Engine {
             let loaded = self.service_snapshot(manager, unit, root)?;
             // Check blocker before issuing stop, including resets from later drop-ins.
             ensure_condition(&loaded["properties"], hold)?;
-            if config_without_hold(&loaded, hold)? != config_without_hold(&s["before"], hold)? {
+            let current = config_without_hold(&loaded, hold)?;
+            let expected = config_without_hold(&s["before"], hold)?;
+            if current != expected {
+                j["service"]["configuration_conflict"] =
+                    configuration_conflict(&expected, &current);
                 return Err(err(
                     "service_restore_conflict",
                     "写入 blocker 时 unit 配置变化；保留当前文件并查询原任务",
@@ -1687,6 +1775,128 @@ mod tests {
         assert_eq!(fs::read(root.join("settings.json")).unwrap(), settings);
         assert_eq!(log_before.matches("stop:target.service").count(), 1);
         assert_eq!(log_before.matches("start:target.service").count(), 1);
+    }
+    #[test]
+    fn reload_configuration_conflict_records_evidence_without_stopping_or_replaying() {
+        for source_edit in [false, true] {
+            let (_temp, engine, e, _root) = fixture(true);
+            let mut properties = load(&stored(&engine)).unwrap();
+            properties["Requires"] = json!("sysinit.target system.slice");
+            if source_edit {
+                properties["fixture_reload_source_edit"] = json!(true);
+            } else {
+                properties["fixture_reload_requires"] = json!("system.slice sysinit.target");
+            }
+            save(&stored(&engine), &properties).unwrap();
+            let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+            let receipt = execute(&engine, &plan);
+            assert_eq!(
+                receipt["data"]["status"], "needs_reconciliation",
+                "{receipt}"
+            );
+            let conflict = &receipt["data"]["service"]["configuration_conflict"];
+            assert!(conflict.is_object(), "{receipt}");
+            if source_edit {
+                assert_eq!(conflict["property_diff_keys"], json!([]));
+                assert_eq!(
+                    conflict["files"]["differences"][0]["diff_keys"],
+                    json!(["digest"])
+                );
+            } else {
+                assert_eq!(conflict["property_diff_keys"], json!(["Requires"]));
+                assert_eq!(
+                    conflict["property_values"]["Requires"]["expected"],
+                    "sysinit.target system.slice"
+                );
+                assert_eq!(
+                    conflict["property_values"]["Requires"]["current"],
+                    "system.slice sysinit.target"
+                );
+                assert_eq!(conflict["files"]["differences"], json!([]));
+            }
+            assert_eq!(receipt["data"]["steps"][0]["status"], "executing");
+            assert_eq!(receipt["data"]["steps"].as_array().unwrap().len(), 1);
+            assert!(Path::new(plan["service"]["hold"]["path"].as_str().unwrap()).exists());
+            assert_eq!(load(&stored(&engine)).unwrap()["ActiveState"], "active");
+            let before = log(&engine);
+            assert_eq!(before, "daemon-reload:target.service\n");
+            assert_eq!(execute(&engine, &plan), receipt);
+            let query = engine.request(json!({"command":"job","job_id":receipt["data"]["id"]}));
+            assert_eq!(query["data"], receipt["data"]);
+            assert_eq!(log(&engine), before);
+        }
+    }
+    #[test]
+    fn configuration_diagnostics_withhold_sensitive_values_and_bound_output() {
+        let mut expected =
+            json!({"properties":{"Requires":"sysinit.target system.slice"},"files":[]});
+        let mut current =
+            json!({"properties":{"Requires":"system.slice sysinit.target"},"files":[]});
+        for key in [
+            "Environment",
+            "User",
+            "PassEnvironment",
+            "UnsetEnvironment",
+            "FragmentPath",
+            "SourcePath",
+            "DropInPaths",
+            "Conditions",
+        ] {
+            expected["properties"][key] = json!("SYNTHETIC_PRIVATE_EXPECTED");
+            current["properties"][key] = json!("SYNTHETIC_PRIVATE_CURRENT");
+        }
+        for index in 0..33 {
+            expected["files"].as_array_mut().unwrap().push(json!({"path":format!("/SYNTHETIC_PRIVATE_EXPECTED/{index}"),"digest":"before","device":1,"inode":index,"mode":0o100600,"owner":0}));
+            current["files"].as_array_mut().unwrap().push(json!({"path":format!("/SYNTHETIC_PRIVATE_CURRENT/{index}"),"digest":"after","device":1,"inode":index+1,"mode":0o100600,"owner":0}));
+        }
+        let evidence = configuration_conflict(&expected, &current);
+        assert_eq!(
+            evidence["snapshot_diff_keys"],
+            json!(["files", "properties"])
+        );
+        assert_eq!(
+            evidence["property_values"],
+            json!({"Requires":{"expected":"sysinit.target system.slice","current":"system.slice sysinit.target"}})
+        );
+        assert_eq!(
+            evidence["withheld_property_diff_keys"]
+                .as_array()
+                .unwrap()
+                .len(),
+            8
+        );
+        assert!(!evidence.to_string().contains("SYNTHETIC_PRIVATE"));
+        assert_eq!(evidence["files"]["difference_count"], 33);
+        assert_eq!(
+            evidence["files"]["differences"].as_array().unwrap().len(),
+            32
+        );
+        assert_eq!(evidence["files"]["differences_truncated"], true);
+        assert_eq!(
+            evidence["files"]["differences"][0]["diff_keys"],
+            json!(["digest", "inode", "path"])
+        );
+        assert_eq!(
+            evidence["files"]["differences"][0]["expected"]["digest"],
+            "before"
+        );
+        current["properties"]["Requires"] = json!("a".repeat(2049));
+        let evidence = configuration_conflict(&expected, &current);
+        assert_eq!(
+            evidence["property_values"]["Requires"]["current"]["truncated"],
+            true
+        );
+        assert_eq!(
+            evidence["property_values"]["Requires"]["current"]["bytes"],
+            2049
+        );
+        assert_eq!(
+            evidence["property_values"]["Requires"]["current"]["prefix"]
+                .as_str()
+                .unwrap()
+                .len(),
+            2048
+        );
     }
     #[test]
     fn original_inactive_state_stays_inactive_on_resume() {
