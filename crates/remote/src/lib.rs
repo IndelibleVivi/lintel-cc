@@ -110,6 +110,15 @@ fn valid_id(id: &str) -> Result<&str> {
     }
     Ok(id)
 }
+fn valid_core_id(id: &str) -> Result<&str> {
+    if !lintel_operations::valid_uuid(id) {
+        return Err(failure(
+            "invalid_request",
+            "远端环境或计划 ID 需要 UUID 格式",
+        ));
+    }
+    Ok(id)
+}
 fn field<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
     value[key]
         .as_str()
@@ -1011,7 +1020,7 @@ impl Controller {
             || record["status"].as_str().is_none()
             || !record["lookup_id"]
                 .as_str()
-                .is_some_and(|v| valid_id(v).is_ok())
+                .is_some_and(lintel_operations::valid_uuid)
         {
             return Err(failure(
                 "local_record_invalid",
@@ -1024,7 +1033,9 @@ impl Controller {
         if response["ok"] == true {
             let receipt = &response["data"];
             if receipt["plan_id"] != record["plan_id"]
-                || !receipt["id"].as_str().is_some_and(|v| valid_id(v).is_ok())
+                || !receipt["id"]
+                    .as_str()
+                    .is_some_and(lintel_operations::valid_uuid)
                 || receipt["status"].as_str().is_none()
             {
                 return Err(failure(
@@ -1061,6 +1072,11 @@ impl Controller {
     }
     fn dispatch(&self, payload: Value) -> Result<Value> {
         let op = field(&payload, "op")?;
+        if op == "execute" || op == "reconnect" {
+            valid_core_id(field(&payload, "plan_id")?)?;
+        } else if op == "launch" {
+            valid_core_id(field(&payload, "environment_id")?)?;
+        }
         if op == "aliases" {
             exact_operation_fields(&payload)?;
             return list_aliases(&self.config);
@@ -1192,7 +1208,7 @@ impl Controller {
             }
             "execute" | "reconnect" => {
                 exact_operation_fields(&payload)?;
-                let plan_id = valid_id(field(&payload, "plan_id")?)?;
+                let plan_id = field(&payload, "plan_id")?;
                 let (path, _held) = self.record(alias, plan_id)?;
                 if path.exists() {
                     return self.query(alias, &path, self.checked_record(&path, plan_id)?);
@@ -1549,6 +1565,54 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert!(!temp.path().join("args").exists());
     }
     #[test]
+    fn outer_core_ids_are_rejected_before_records_or_ssh() {
+        let (temp, controller) = fixture(RECEIPT);
+        for id in ["plan-secret", "00000000000040008000000000000001"] {
+            for op in ["execute", "reconnect"] {
+                let mut request = json!({"op":op,"alias":"synthetic-host","plan_id":id});
+                if op == "execute" {
+                    request["approval"] = json!("synthetic");
+                }
+                let result = envelope(controller.dispatch(request));
+                assert_eq!(result["error"]["code"], "invalid_request", "{result}");
+                assert!(!controller.state.join("tasks").exists());
+                assert!(!temp.path().join("args").exists());
+            }
+            let result = envelope(
+                controller
+                    .dispatch(json!({"op":"launch","alias":"synthetic-host","environment_id":id})),
+            );
+            assert_eq!(result["error"]["code"], "invalid_request", "{result}");
+            assert!(!temp.path().join("args").exists());
+        }
+        let plan_id = "00000000-0000-4000-8000-000000000002";
+        let (path, held) = controller.record("synthetic-host", plan_id).unwrap();
+        save(
+            &path,
+            &json!({"plan_id":plan_id,"lookup_id":"plan-secret","status":"submission_unknown"}),
+        )
+        .unwrap();
+        drop(held);
+        let before = fs::read(&path).unwrap();
+        let result = envelope(
+            controller
+                .dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":plan_id})),
+        );
+        assert_eq!(result["error"]["code"], "local_record_invalid", "{result}");
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert!(!temp.path().join("args").exists());
+        let fresh = Controller {
+            state: temp.path().join("fresh-state"),
+            ..controller
+        };
+        let result =
+            envelope(fresh.dispatch(
+                json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-secret"}),
+            ));
+        assert_eq!(result["error"]["code"], "invalid_request", "{result}");
+        assert!(!fresh.state.exists());
+    }
+    #[test]
     fn services_use_finite_preview_schema_and_never_send_shell_or_mutation_bypass() {
         let (temp, controller) = fixture("printf '%s\\n' '{\"ok\":true,\"data\":{}}'");
         let inspect = json!({"command":"service_inspect","environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":"synthetic-target.service"});
@@ -1858,7 +1922,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert_eq!(queried["data"]["status"], "completed");
         assert_eq!(
             envelope(controller.dispatch(
-                json!({"op":"reconnect","alias":"synthetic-host","plan_id":"unrecorded"})
+                json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000006"})
             ))["error"]["code"],
             "host_not_registered"
         );
@@ -2031,7 +2095,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             "authentication_failed"
         );
         let secret = "PRIVATE_ARCHIVE_PASSPHRASE";
-        let response = envelope(controller.dispatch(json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-secret","approval":"PRIVATE_APPROVAL","archive_passphrase":secret})));
+        let response = envelope(controller.dispatch(json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000004","approval":"PRIVATE_APPROVAL","archive_passphrase":secret})));
         assert_eq!(
             response["error"]["diagnostic"]["submission_uncertain"],
             true
@@ -2043,7 +2107,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         let record = fs::read_to_string(
             controller
                 .state
-                .join("tasks/synthetic-host/plan-secret.json"),
+                .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000004.json"),
         )
         .unwrap();
         assert!(!record.contains("PRIVATE"));
@@ -2058,7 +2122,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
     fn local_spawn_and_reconnect_errors_keep_action_specific_guidance() {
         let (_temp, mut controller) = fixture("printf 'Connection refused' >&2; exit 255");
         let response = envelope(controller.dispatch(
-            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-existing"}),
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000005"}),
         ));
         assert_eq!(
             response["error"]["diagnostic"]["reason"],
@@ -2114,8 +2178,8 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
     fn query_preserves_runner_diagnostic_without_replaying_on_retry() {
         let (temp, controller) = fixture("printf 'synthetic runner detail' >&2; printf '%s' '{\"ok\":false,\"error\":{\"code\":\"job_not_found\",\"message\":\"synthetic original job missing\"}}'; exit 1");
         for request in [
-            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"plan-existing"}),
-            json!({"op":"execute","alias":"synthetic-host","plan_id":"plan-existing","approval":"SENSITIVE_APPROVAL"}),
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000005"}),
+            json!({"op":"execute","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000005","approval":"SENSITIVE_APPROVAL"}),
         ] {
             let response = envelope(controller.dispatch(request));
             assert_eq!(response["error"]["code"], "reconciliation_required");
@@ -2138,7 +2202,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert!(!fs::read_to_string(
             controller
                 .state
-                .join("tasks/synthetic-host/plan-existing.json")
+                .join("tasks/synthetic-host/00000000-0000-4000-8000-000000000005.json")
         )
         .unwrap()
         .contains("diagnostic"));

@@ -69,7 +69,10 @@ fn property(op: &str, field: &str) -> Value {
         "alias" => {
             json!({"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]*$","not":{"pattern":"[^A-Za-z0-9._-]"},"maxLength":128})
         }
-        "plan_id" | "install_id" | "environment_id" => {
+        "plan_id" | "environment_id" => {
+            json!({"type":"string","format":"uuid","minLength":36,"maxLength":36})
+        }
+        "install_id" => {
             json!({"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9_-]*$","not":{"pattern":"[^A-Za-z0-9_-]"},"maxLength":160})
         }
         "request" => request_schema(),

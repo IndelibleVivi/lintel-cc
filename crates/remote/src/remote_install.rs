@@ -643,8 +643,10 @@ eval "$last"
         let (_t, c) = fixture();
         let p = prepare(&c);
         install(&c, &p).unwrap();
-        let (path, held) = c.record("synthetic-host", "old-plan").unwrap();
-        save(&path,&json!({"plan_id":"old-plan","lookup_id":"old-plan","status":"submission_unknown","runner_digest":p["bundle"]["sha256"]})).unwrap();
+        let (path, held) = c
+            .record("synthetic-host", "00000000-0000-4000-8000-000000000007")
+            .unwrap();
+        save(&path,&json!({"plan_id":"00000000-0000-4000-8000-000000000007","lookup_id":"00000000-0000-4000-8000-000000000007","status":"submission_unknown","runner_digest":p["bundle"]["sha256"]})).unwrap();
         save(
             &c.state.join("bindings/synthetic-host.json"),
             &json!({"digest":"b".repeat(64)}),
@@ -652,7 +654,7 @@ eval "$last"
         .unwrap();
         drop(held);
         let result =
-            c.dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"old-plan"}));
+            c.dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000007"}));
         assert!(result.is_err()); // inert fixture's discover is not a matching receipt
         let commands =
             fs::read_to_string(c.transport.ssh.parent().unwrap().join("commands")).unwrap();

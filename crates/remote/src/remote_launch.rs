@@ -7,7 +7,7 @@ fn quote(value: &str) -> String {
 impl Controller {
     pub(super) fn launch_remote(&self, alias: &str, payload: &Value) -> Result<Value> {
         exact_operation_fields(payload)?;
-        let environment_id = valid_id(field(payload, "environment_id")?)?;
+        let environment_id = field(payload, "environment_id")?;
         let terminal = self.terminal.as_ref().ok_or_else(|| {
             failure(
                 "platform_unsupported",
@@ -102,7 +102,7 @@ mod tests {
             ),
         );
         let response = controller
-            .dispatch(json!({"op":"launch","alias":"synthetic-host","environment_id":"env-1"}))
+            .dispatch(json!({"op":"launch","alias":"synthetic-host","environment_id":"00000000-0000-4000-8000-000000000001"}))
             .unwrap();
         assert_eq!(response["data"]["status"], "launch_requested");
         let args = fs::read_to_string(temp.path().join("opened")).unwrap();
@@ -117,7 +117,7 @@ mod tests {
             "'-oClearAllForwardings=yes'",
             "'-oStrictHostKeyChecking=yes'",
             "launch",
-            "env-1",
+            "00000000-0000-4000-8000-000000000001",
             &sha,
         ] {
             assert!(script.contains(expected), "{expected}");
@@ -142,13 +142,13 @@ mod tests {
         );
         assert_eq!(
             controller
-                .dispatch(json!({"op":"launch","alias":"synthetic-host","environment_id":"env-1"}))
+                .dispatch(json!({"op":"launch","alias":"synthetic-host","environment_id":"00000000-0000-4000-8000-000000000001"}))
                 .unwrap()["error"]["code"],
             "environment_retired"
         );
         for request in [
             json!({"op":"launch","alias":"synthetic-host","environment_id":"x;bad"}),
-            json!({"op":"launch","alias":"synthetic-host","environment_id":"env-1","proxy_url":"http://127.0.0.1:1"}),
+            json!({"op":"launch","alias":"synthetic-host","environment_id":"00000000-0000-4000-8000-000000000001","proxy_url":"http://127.0.0.1:1"}),
         ] {
             assert!(controller.dispatch(request).is_err());
         }
@@ -158,7 +158,7 @@ mod tests {
     fn terminal_rejection_and_unsupported_platform_are_specific() {
         let (_temp, mut controller) = super::super::tests::fixture(CONTEXT);
         opener(&controller, "exit 1");
-        let request = json!({"op":"launch","alias":"synthetic-host","environment_id":"env-1"});
+        let request = json!({"op":"launch","alias":"synthetic-host","environment_id":"00000000-0000-4000-8000-000000000001"});
         assert_eq!(
             controller.dispatch(request.clone()).unwrap_err().code,
             "launch_failed"

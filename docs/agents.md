@@ -39,6 +39,8 @@ Service unit 只接受准确 `.service` 名称，例如 `claude.service` 或 `cl
 
 Named CLI 与有限 SSH 的 `environment_id`、`plan_id`、`job_id` 按 schema 的 UUID 格式检查，接受大小写十六进制的 `8-4-4-4-12` 连字符形式。错误格式返回 `invalid_request`，在本机 state 初始化或 SSH 调用前拒绝；始终使用执行器返回的原 ID。旧 raw protocol-1 仍由 core 按既有 ID 规则处理。
 
+外层 `remote.execute` / `remote.reconnect` 的 `plan_id` 与 `remote.launch` 的 `environment_id` 也共用这条 UUID 规则，在本地记录或 SSH 前检查。`install_id` 属于安装 controller 的独立受限标识规则，使用安装预览返回值。
+
 `env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
 
 普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。

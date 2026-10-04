@@ -55,6 +55,13 @@ def run():
                                   '00000000-0000-4000-8000-000000000000', '--categories', '', good=False)
         assert empty_selection['error']['code'] == 'invalid_request', empty_selection
         assert not state.exists(), 'Rejected launch/selection initialized core state'
+        for operation in ['execute', 'reconnect']:
+            payload = {'op': operation, 'alias': 'missing-synthetic', 'plan_id': 'plan-secret'}
+            if operation == 'execute':
+                payload['approval'] = 'synthetic'
+            rejected = command('remote', 'control', payload=payload, good=False)
+            assert rejected['error']['code'] == 'invalid_request', rejected
+            assert not state.exists(), 'Invalid outer UUID initialized remote state'
         for operation, field in [('inspect', 'environment_id'), ('plan_show', 'plan_id'), ('job', 'job_id')]:
             for identity in ['synthetic-invalid-id', '00000000000040008000000000000001']:
                 rejected = command('call', operation, payload={field: identity}, good=False)

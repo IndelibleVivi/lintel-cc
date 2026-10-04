@@ -181,20 +181,23 @@ pub fn schema(command: &str) -> Option<Value> {
     Some(value)
 }
 
+pub fn valid_uuid(value: &str) -> bool {
+    value.len() == 36
+        && value.bytes().enumerate().all(|(index, byte)| {
+            if [8, 13, 18, 23].contains(&index) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+}
+
 fn check_property(value: &Value, schema: &Value) -> bool {
     let typed = match schema["type"].as_str() {
         Some("string") => value.as_str().is_some_and(|s| {
             s.chars().count() >= schema["minLength"].as_u64().unwrap_or(0) as usize
                 && s.chars().count() <= schema["maxLength"].as_u64().unwrap_or(u64::MAX) as usize
-                && (schema["format"] != "uuid"
-                    || (s.len() == 36
-                        && s.bytes().enumerate().all(|(index, byte)| {
-                            if [8, 13, 18, 23].contains(&index) {
-                                byte == b'-'
-                            } else {
-                                byte.is_ascii_hexdigit()
-                            }
-                        })))
+                && (schema["format"] != "uuid" || valid_uuid(s))
         }),
         Some("boolean") => value.is_boolean(),
         Some("array") => value.as_array().is_some_and(|items| {
