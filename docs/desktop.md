@@ -94,7 +94,7 @@ node scripts/local-fonts.mjs /absolute/path/to/authorized-font-directory
 
 此命令仅读取六个精确字体文件名，不扫描来源项目。开发服务器可使用这些本地字体；**默认 `npm run build` 和 `npm run desktop:build` 排除 `public/`（当前仅含可选本地字体）与字体加载列表，使用系统 fallback**，已有本地字体文件保留。只有显式 `npm run build -- --mode local-candidate` 才把它们带入本机候选；此类候选不得视为可公开分发包。此处只解决构建夹带字体的边界，签名／公证、扩展发布和正式分发仍未完成。
 
-应用名称与原始图标源是 `src/brand.svg`；Tauri 生成的其他平台 icon 不代表对应平台已验收。
+App 图标 master 是 `src/brand.svg`，Tauri 使用提供的五个 exports（PNG、ICNS、ICO），图形为陶土横梁、两根中性色支撑和右下光标。App 内 `Brand()` 使用同一几何并跟随 Day / Night tokens；侧栏 `lintel_`、分割线和 2.6 秒慢闪保留，reduced motion 下静止。可编辑展示资产与使用边界见 [视觉身份](visual-language.md)。构建包含图标不代表正式 macOS / Linux launcher 已验收。
 
 ## 开发与验证
 

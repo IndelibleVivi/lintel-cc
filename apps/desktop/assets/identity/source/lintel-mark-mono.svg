@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" role="img" aria-labelledby="title desc">
+  <title id="title">Lintel monochrome mark</title>
+  <desc id="desc">A load-bearing beam over two supports, with an active cursor at the lower right.</desc>
+  <g fill="#1F1F1D">
+    <rect x="0" y="0" width="650" height="110" rx="6"/>
+    <rect x="80" y="110" width="106" height="300" rx="4"/>
+    <rect x="468" y="110" width="96" height="300" rx="4"/>
+    <rect x="588" y="364" width="102" height="46" rx="3"/>
+  </g>
+</svg>

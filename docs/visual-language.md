@@ -1,0 +1,31 @@
+# Lintel 的视觉身份
+
+Lintel 的图形由承重横梁、两根支撑和右下方的光标构成。横梁承住配置、状态与恢复的复杂性；开口保留可用空间。光标放在开口之外，与 `lintel_` 和 CLI 呼应，避免把开口画成一张脸。
+
+图形来源于为本项目提供的 identity kit。现有纸上晨光／夜里月光界面继续使用；这是身份资产接入，不是整套界面换皮。
+
+## 当前源与用法
+
+| 表面 | 权威源 | 当前行为 |
+| --- | --- | --- |
+| App 图标 | [`apps/desktop/src/brand.svg`](../apps/desktop/src/brand.svg) | 1024 master；暖纸容器、陶土横梁与光标、中性色支撑 |
+| Tauri 图标 | [`apps/desktop/src-tauri/icons`](../apps/desktop/src-tauri/icons) | 使用提供的 PNG、ICNS、ICO exports；打包路径由 `tauri.conf.json` 指定 |
+| App 内小标记 | [`Brand()`](../apps/desktop/src/ui.tsx) | 32-unit 无底色图形；横梁／光标跟随 accent，支撑跟随 text，适配 Day / Night |
+| 左上角字标 | [`App.tsx`](../apps/desktop/src/App.tsx)、[`styles.css`](../apps/desktop/src/styles.css) | 保留现有 serif `lintel_`、分割线与 2.6 秒慢闪光标；reduced motion 下静止 |
+| 可编辑展示资产 | [`assets/identity`](../apps/desktop/assets/identity/README.md) | 透明、单色、outlined 字标、横向组合、16/24/32 optical 与可选 dark 图标 |
+
+文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于导出材料，界面继续使用自己的 serif 字体。静态小标记的光标不闪烁；侧栏字标的慢闪是保留的交互风格。
+
+## 保留的关系
+
+- **纸面外壳：** 温暖纸色、serif 标题、细线与留白。
+- **系统工具：** sans 控件、monospace 证据、明确的 plan／approval／receipt。
+- **像素伙伴：** Clawd、风景与 playroom 保持独立层次，不作为 App 身份或信任标记。
+
+Day 的 paper / support / beam 是 `#FAF9F5` / `#3D3D3A` / `#C16A47`；Night 为 `#24231F` / `#EAE5DA` / `#E0A485`，由现有 CSS tokens 管理。陶土色不是通用状态色；成功、警告与破坏性操作继续使用功能颜色。
+
+保留右侧光标和空开口，不拉伸、加立体斜面／光晕、额外屋顶／盾牌／锁，不把光标移到开口中央。16/24/32 px 展示优先采用 optical 版本；更大的图标使用 master。主 App 图标在 OS 明暗主题中都保留浅色容器；dark 资产只是可选展示版本。
+
+## 验收边界
+
+源码接入、打包、实际桌面辨识度和用户审美接受是不同事实。发布前仍需检查 macOS Dock、Finder、Spotlight、Cmd–Tab、安装器／About，以及正式 Linux launcher／window icon；同时看明暗桌面背景和小尺寸。提供 assets 或通过 build 不代表这些环境已经验收。当前实测状态见 [current-state](current-state.md)。

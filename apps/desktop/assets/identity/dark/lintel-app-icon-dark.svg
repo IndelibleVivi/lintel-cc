@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Lintel dark app icon</title>
+  <desc id="desc">A warm clay load-bearing beam over parchment supports on a charcoal field, with an active cursor at the lower right.</desc>
+  <rect x="40" y="40" width="944" height="944" rx="220" fill="#24231F" stroke="#454037" stroke-width="8"/>
+  <rect x="133" y="266" width="715" height="121" rx="7" fill="#E0A485"/>
+  <rect x="221" y="387" width="117" height="330" rx="5" fill="#EAE5DA"/>
+  <rect x="647" y="387" width="106" height="330" rx="5" fill="#EAE5DA"/>
+  <rect x="779" y="666" width="112" height="51" rx="4" fill="#E0A485"/>
+</svg>

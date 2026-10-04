@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="24" y="24" width="464" height="464" rx="104" fill="#F3ECE2"/><path d="M132 374V170h72v204M308 374V170h72v204" fill="#D39774"/><path d="M112 122h288v66H112z" fill="#B96647"/><path d="M227 256h58v118h-58z" fill="#B96647"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Lintel app icon</title>
+  <desc id="desc">A clay load-bearing beam over two charcoal supports, with an active cursor at the lower right.</desc>
+  <rect x="40" y="40" width="944" height="944" rx="220" fill="#FAF9F5" stroke="#E5E3DA" stroke-width="8"/>
+  <rect x="133" y="266" width="715" height="121" rx="7" fill="#C16A47"/>
+  <rect x="221" y="387" width="117" height="330" rx="5" fill="#3D3D3A"/>
+  <rect x="647" y="387" width="106" height="330" rx="5" fill="#3D3D3A"/>
+  <rect x="779" y="666" width="112" height="51" rx="4" fill="#C16A47"/>
+</svg>

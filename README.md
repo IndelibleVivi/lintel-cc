@@ -69,7 +69,7 @@ python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 
 - [产品目标](docs/SPEC.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
 - [统一验证与独立 runtime 关口](docs/verification.md)
-- [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)
+- [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)、[视觉身份与源资产](docs/visual-language.md)
 - [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)
 - [目标架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
 

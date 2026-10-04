@@ -368,6 +368,8 @@ button.quiet-button{border:0;background:transparent;color:var(--muted);padding-l
 .network-panel .padded>p{font-size:12px;line-height:1.8}.network-options{font-size:12px;margin-top:16px}.network-options>summary{color:var(--accent);padding-block:5px}.network-controls{margin-top:17px}.network-controls button{font-size:12px}.network-panel .small-print{font-size:11px;margin-top:16px}.network-panel .network-message{color:var(--accent);margin-top:12px}.connection-log{margin-top:18px;font-size:11px}.connection-log>div{display:flex;justify-content:space-between;gap:15px;padding:9px 0;border-top:1px solid var(--line)}.connection-log code{overflow-wrap:anywhere;min-width:0}
 
 .brand-mark{width:31px;height:31px;color:var(--accent);flex-shrink:0}
+.brand-mark .brand-beam,.brand-mark .brand-mark-cursor{fill:var(--accent)}
+.brand-mark .brand-support{fill:var(--text)}
 .new-space{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:7px 11px;background:transparent;border:0;font-size:13px;min-height:35px;border-radius:6px}
 .new-space>span:first-child{width:21px;height:21px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--text) 7%,transparent)}
 .sidebar-environments{margin-top:27px;min-height:0;overflow:auto}

@@ -2,6 +2,7 @@
 
 - Product: Lintel; repository name: lintel-cc. Target: macOS GUI and headless Linux runner.
 - docs/SPEC.md preserves the complete product target; docs/current-state.md records delivered versus unverified capabilities. Do not silently narrow the target.
+- Desktop icon master is apps/desktop/src/brand.svg; the five tracked Tauri icons are supplied identity exports, not disposable build resources. Brand() is the theme-aware inline mark; preserve the sidebar lintel_ wordmark and slow blink (static under reduced motion). docs/visual-language.md owns identity usage and editable assets.
 - crates/core owns plans, filesystem mutations, receipts and restoration. GUI and CLI call the same core; browser storage is changed only through native browser APIs.
 - Test mutations only on synthetic temporary roots. Never modify real Claude credentials, settings, browser profiles, services or network policy during development.
 - No account actions, production/remote deployment, paid services, public publishing, activation bypass or third-party code/assets without explicit current authorization.
