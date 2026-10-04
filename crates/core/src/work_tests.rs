@@ -545,6 +545,23 @@ fn job_archive_rejects_replacement_but_explicit_path_remains_independent() {
         json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
     );
     let mut replacement = archive::unseal(&fs::read(&out).unwrap(), PASS).unwrap();
+    let record_path = engine.path("jobs", receipt["id"].as_str().unwrap());
+    let completed = load(&record_path).unwrap();
+    let mut interrupted = completed.clone();
+    interrupted
+        .as_object_mut()
+        .unwrap()
+        .remove("archive_digest");
+    interrupted["status"] = json!("needs_reconciliation");
+    interrupted["steps"][0]["status"] = json!("executing");
+    save(&record_path, &interrupted).unwrap();
+    // A package published before the completion save remains discoverable by
+    // its original job and is bound to the pre-publication ciphertext intent.
+    ok(
+        &engine,
+        json!({"command":"archive_inspect","job_id":receipt["id"],"archive_passphrase":PASS}),
+    );
+    save(&record_path, &completed).unwrap();
     let bytes: &[u8] = b"synthetic replacement instruction";
     replacement["files"][0]["data"] = json!(bytes);
     replacement["files"][0]["digest"] = json!(digest(bytes));
@@ -572,9 +589,20 @@ fn job_archive_rejects_replacement_but_explicit_path_remains_independent() {
     );
     assert_eq!(explicit["text"], "synthetic replacement instruction");
     // Legacy receipts without a digest retain their documented compatibility.
-    let record_path = engine.path("jobs", receipt["id"].as_str().unwrap());
     let mut legacy = load(&record_path).unwrap();
     legacy.as_object_mut().unwrap().remove("archive_digest");
+    save(&record_path, &legacy).unwrap();
+    assert_eq!(
+        err_code(
+            &engine,
+            json!({"command":"archive_inspect","job_id":receipt["id"],"archive_passphrase":PASS})
+        ),
+        "stale_archive"
+    );
+    legacy
+        .as_object_mut()
+        .unwrap()
+        .remove("archive_intent_digest");
     save(&record_path, &legacy).unwrap();
     ok(
         &engine,

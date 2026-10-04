@@ -92,7 +92,10 @@ impl Engine {
             if record["archive_path"].as_str() != path.to_str() {
                 return Err(err("archive_missing", "此任务的归档来源已经变化"));
             }
-            record["archive_digest"].as_str().map(str::to_owned)
+            record["archive_digest"]
+                .as_str()
+                .or_else(|| record["archive_intent_digest"].as_str())
+                .map(str::to_owned)
         } else {
             None
         };

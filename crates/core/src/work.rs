@@ -159,7 +159,7 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
 }
 
 /// Map one selected batch into the inactive work area. Reserve every original
-/// name first, then disambiguate only colliding names without changing suffixes
+/// name first, then disambiguate colliding file/ancestor names without changing suffixes
 /// or wrapping already imported paths. Preserve and portable import share this.
 pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
     let preferred: Vec<PathBuf> = files
@@ -176,11 +176,16 @@ pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
         })
         .collect::<Result<_>>()?;
     let reserved: HashSet<_> = preferred.iter().cloned().collect();
+    let directories: HashSet<_> = preferred
+        .iter()
+        .flat_map(|path| path.ancestors().skip(1))
+        .map(Path::to_path_buf)
+        .collect();
     let mut used = HashSet::new();
     let mut targets = Vec::with_capacity(files.len());
     for path in preferred {
         let mut target = path.clone();
-        if used.contains(&target) {
+        if used.contains(&target) || directories.contains(&target) {
             let name = path
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -188,7 +193,10 @@ pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
             let mut index = 1;
             loop {
                 target.set_file_name(format!("lintel-{index}-{name}"));
-                if !reserved.contains(&target) && !used.contains(&target) {
+                if !reserved.contains(&target)
+                    && !directories.contains(&target)
+                    && !used.contains(&target)
+                {
                     break;
                 }
                 index += 1;
@@ -397,14 +405,15 @@ impl Engine {
             ));
         }
         j["steps"].as_array_mut().unwrap().push(json!({"id":"archive","label":"加密工作归档","status":"executing","message":"正在发布并核验完整加密工作包；目标已有文件不会覆盖。"}));
+        j["archive_path"] = json!(dest);
+        let archive_digest = digest(&encrypted);
+        j["archive_intent_digest"] = json!(archive_digest);
         save(journal, j)?;
         atomic_new(dest, &encrypted, 0o600)?;
-        j["archive_path"] = json!(dest);
         if read(dest, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
             return Err(err("archive_readback_failed", "归档写后校验未通过"));
         }
-        j["archive_path"] = json!(dest);
-        j["archive_digest"] = json!(digest(&encrypted));
+        j["archive_digest"] = json!(archive_digest);
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"});
         save(journal, j)?;
         Ok((dest.to_path_buf(), files))
@@ -733,6 +742,21 @@ mod tests {
                 "memory",
                 b"active memory".as_slice(),
             ),
+            (
+                "lintel-imports/projects/foo.jsonl",
+                "sessions",
+                b"ancestor file".as_slice(),
+            ),
+            (
+                "projects/foo.jsonl/session.jsonl",
+                "sessions",
+                b"child session".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/lintel-1-foo.jsonl/session.jsonl",
+                "sessions",
+                b"reserved directory".as_slice(),
+            ),
         ];
         let files: Vec<Value> = entries.iter().map(|(path, category, bytes)|
             json!({"path":path,"category":category,"data":bytes,"digest":digest(bytes)})).collect();
@@ -759,6 +783,19 @@ mod tests {
                 bytes
             );
         }
+        for (relative, bytes) in [
+            ("lintel-2-foo.jsonl", b"ancestor file".as_slice()),
+            ("foo.jsonl/session.jsonl", b"child session".as_slice()),
+            (
+                "lintel-1-foo.jsonl/session.jsonl",
+                b"reserved directory".as_slice(),
+            ),
+        ] {
+            assert_eq!(
+                fs::read(destination.join("lintel-imports/projects").join(relative)).unwrap(),
+                bytes
+            );
+        }
         let again = manifest(destination, &["sessions".to_string(), "memory".to_string()]).unwrap();
         assert_eq!(again.len(), entries.len());
         assert!(again.iter().all(|file| !file["path"]
@@ -771,6 +808,49 @@ mod tests {
                 .iter()
                 .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
                 .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn archive_publication_intent_keeps_its_destination_on_failure() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let preview = engine
+            .plan_archive(
+                &json!({"environment_id":environment["id"],"categories":["instructions"]}),
+            )
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        // A destination whose leaf cannot be published isolates the durable
+        // boundary immediately before atomic_new, without a process race.
+        let destination = engine.state.join("archives").join("x".repeat(300));
+        let journal = engine.path("jobs", string(&preview, "id").unwrap());
+        let mut receipt = json!({"id":preview["id"],"plan_id":preview["id"],"steps":[]});
+        assert!(engine
+            .write_archive(
+                &environment,
+                &plan,
+                &json!({"archive_passphrase":"synthetic passphrase only"}),
+                &destination,
+                &mut receipt,
+                &journal
+            )
+            .is_err());
+        let stored = load(&journal).unwrap();
+        assert_eq!(stored["archive_path"].as_str(), destination.to_str());
+        assert_eq!(stored["steps"][0]["status"], "executing");
+        assert!(stored["archive_digest"].is_null());
+        assert!(stored["archive_intent_digest"].is_string());
+        assert!(!destination.exists());
+        assert_eq!(
+            fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+            "synthetic instruction"
         );
     }
 }
