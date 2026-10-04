@@ -52,6 +52,23 @@ const SHOW_PROPERTIES: &[&str] = &[
     "Upholds",
     "Conflicts",
 ];
+// Exactly the queried v255 Unit properties using property_get_dependencies:
+// each is an unordered Hashmap of units, not an ordered configuration list.
+const DEPENDENCY_PROPERTIES: &[&str] = &[
+    "RequiredBy",
+    "BoundBy",
+    "ConsistsOf",
+    "PropagatesStopTo",
+    "TriggeredBy",
+    "OnFailure",
+    "OnSuccess",
+    "Requires",
+    "Requisite",
+    "BindsTo",
+    "Wants",
+    "Upholds",
+    "Conflicts",
+];
 const COMPLEX_PROPERTIES: &[(&str, &str)] = &[
     ("EnvironmentFiles", "a(sb)"),
     ("ExecStop", "a(sasbttttuii)"),
@@ -133,6 +150,23 @@ fn config_only(properties: &Value) -> Value {
         p.as_object_mut().unwrap().remove(*key);
     }
     p
+}
+fn normalize_dependencies(p: &mut Value) -> Result<()> {
+    for key in DEPENDENCY_PROPERTIES {
+        let text = p[key].as_str().ok_or_else(|| {
+            err(
+                "service_schema_unsupported",
+                "systemd unit 关系属性格式未知",
+            )
+        })?;
+        // v255's array printer separates shell_maybe_quote(unit->id) tokens
+        // with an ASCII space. Valid unit IDs contain no literal whitespace;
+        // keep each printed token's quoting/escapes and multiplicity intact.
+        let mut members: Vec<_> = text.split(' ').collect();
+        members.sort_unstable();
+        p[key] = json!(members.join(" "));
+    }
+    Ok(())
 }
 fn diff_keys(expected: &Value, current: &Value) -> Vec<String> {
     let keys: std::collections::BTreeSet<_> = expected
@@ -276,6 +310,7 @@ fn read_service_properties(
     p["Conditions"] = property("org.freedesktop.systemd1.Unit", "Conditions", "a(sbbsi)")?;
     // Condition status is runtime state, not part of the frozen configuration.
     normalize_conditions(&mut p)?;
+    normalize_dependencies(&mut p)?;
     Ok(p)
 }
 
@@ -422,6 +457,7 @@ impl Engine {
         if let Some(fixture) = &self.service_fixture {
             let mut properties = load(&fixture.join(format!("{manager}-{unit}.json")))?;
             retain_root_environment(&mut properties)?;
+            normalize_dependencies(&mut properties)?;
             return Ok(properties);
         }
         let selection = format!("--property={}", SHOW_PROPERTIES.join(","));
@@ -1480,6 +1516,88 @@ mod tests {
         })
     }
     #[test]
+    fn wire_normalizes_only_unit_dependency_order_without_interpreting_tokens() {
+        let (_temp, engine, _e, _root) = fixture(true);
+        let mut properties = load(&stored(&engine)).unwrap();
+        let dependencies = [
+            "RequiredBy",
+            "BoundBy",
+            "ConsistsOf",
+            "PropagatesStopTo",
+            "TriggeredBy",
+            "OnFailure",
+            "OnSuccess",
+            "Requires",
+            "Requisite",
+            "BindsTo",
+            "Wants",
+            "Upholds",
+            "Conflicts",
+        ];
+        for key in dependencies {
+            properties[key] = json!(r#"z.timer "a\\x20b.socket" a.service"#);
+        }
+        properties["User"] = json!("z a");
+        properties["FragmentPath"] = json!("/z /a");
+        properties["DropInPaths"] = json!(["/z/source.conf", "/a/source.conf"]);
+        properties["Conditions"] = json!([
+            ["ConditionPathExists", false, false, "/z", 0],
+            ["ConditionPathExists", false, false, "/a", 0]
+        ]);
+        let (show, bus) = wire_outputs(&properties);
+        let observed = read_wire(&show, &bus).unwrap();
+        for key in dependencies {
+            assert_eq!(
+                observed[key], r#""a\\x20b.socket" a.service z.timer"#,
+                "{key}"
+            );
+        }
+        for key in ["User", "FragmentPath", "DropInPaths", "Conditions"] {
+            assert_eq!(observed[key], properties[key], "{key}");
+        }
+        // Preserve an unexpected duplicate rather than silently deleting it.
+        properties["Requires"] = json!("system.slice sysinit.target system.slice");
+        let (show, bus) = wire_outputs(&properties);
+        assert_eq!(
+            read_wire(&show, &bus).unwrap()["Requires"],
+            "sysinit.target system.slice system.slice"
+        );
+        let mut invalid = observed;
+        invalid["Requires"] = json!([]);
+        assert_eq!(
+            normalize_dependencies(&mut invalid).unwrap_err().code,
+            "service_schema_unsupported"
+        );
+    }
+    #[test]
+    fn old_noncanonical_dependency_snapshot_requires_new_preview_before_mutation() {
+        let (_temp, engine, e, _root) = fixture(true);
+        let mut properties = load(&stored(&engine)).unwrap();
+        properties["Requires"] = json!("system.slice sysinit.target");
+        save(&stored(&engine), &properties).unwrap();
+        let preview = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+        let path = engine.path("plans", preview["id"].as_str().unwrap());
+        let mut old = load(&path).unwrap();
+        assert_eq!(
+            old["extra"]["service"]["before"]["properties"]["Requires"],
+            "sysinit.target system.slice"
+        );
+        // A formerly frozen raw permutation remains intact and validly hashed.
+        // The existing full snapshot check rejects it; no legacy write path.
+        old["extra"]["service"]["before"]["properties"]["Requires"] =
+            json!("system.slice sysinit.target");
+        old.as_object_mut().unwrap().remove("hash");
+        old["hash"] = json!(digest(&serde_json::to_vec(&old).unwrap()));
+        save(&path, &old).unwrap();
+        let rejected = execute(&engine, &old);
+        assert_eq!(
+            rejected["error"]["code"], "stale_service_plan",
+            "{rejected}"
+        );
+        assert_eq!(log(&engine), "");
+        assert!(!Path::new(preview["service"]["hold"]["path"].as_str().unwrap()).exists());
+    }
+    #[test]
     fn condition_path_is_literal_unquoted_and_old_approved_text_is_stale() {
         let (_temp, mut engine, e, _root) = fixture(true);
         let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
@@ -1778,14 +1896,18 @@ mod tests {
     }
     #[test]
     fn reload_configuration_conflict_records_evidence_without_stopping_or_replaying() {
-        for source_edit in [false, true] {
+        for (reload_requires, source_edit) in [
+            ("sysinit.target", false),
+            ("sysinit.target system.slice basic.target", false),
+            ("", true),
+        ] {
             let (_temp, engine, e, _root) = fixture(true);
             let mut properties = load(&stored(&engine)).unwrap();
             properties["Requires"] = json!("sysinit.target system.slice");
             if source_edit {
                 properties["fixture_reload_source_edit"] = json!(true);
             } else {
-                properties["fixture_reload_requires"] = json!("system.slice sysinit.target");
+                properties["fixture_reload_requires"] = json!(reload_requires);
             }
             save(&stored(&engine), &properties).unwrap();
             let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
@@ -1810,7 +1932,11 @@ mod tests {
                 );
                 assert_eq!(
                     conflict["property_values"]["Requires"]["current"],
-                    "system.slice sysinit.target"
+                    if reload_requires.contains("basic.target") {
+                        "basic.target sysinit.target system.slice"
+                    } else {
+                        reload_requires
+                    }
                 );
                 assert_eq!(conflict["files"]["differences"], json!([]));
             }
@@ -1825,6 +1951,59 @@ mod tests {
             assert_eq!(query["data"], receipt["data"]);
             assert_eq!(log(&engine), before);
         }
+    }
+    #[test]
+    fn dependency_permutations_allow_exact_hold_resume_and_remain_query_only() {
+        let (_temp, engine, e, _root) = fixture(true);
+        let neighbor = engine
+            .service_fixture
+            .as_ref()
+            .unwrap()
+            .join("user-neighbor.service.json");
+        let neighbor_before = fs::read(&neighbor).unwrap();
+        let mut properties = load(&stored(&engine)).unwrap();
+        properties["Requires"] = json!("sysinit.target system.slice");
+        properties["fixture_reload_requires"] = json!("system.slice sysinit.target");
+        properties["TriggeredBy"] = json!("z-trigger.timer a-trigger.socket");
+        save(&stored(&engine), &properties).unwrap();
+        let plan = request(&engine, &e, "plan_service_quiesce")["data"].clone();
+        let paused = execute(&engine, &plan);
+        assert_eq!(paused["data"]["status"], "completed", "{paused}");
+        assert_eq!(
+            request(&engine, &e, "service_inspect")["data"]["quiesced"],
+            true
+        );
+        let before = log(&engine);
+        assert_eq!(execute(&engine, &plan), paused);
+        assert_eq!(log(&engine), before);
+        let original = engine
+            .service_original(plan["id"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            original["extra"]["service"]["before"]["properties"]["TriggeredBy"],
+            "a-trigger.socket z-trigger.timer"
+        );
+        // The manager can return either permutation during resume preview,
+        // approval recheck and the daemon-reload after removing the blocker.
+        properties = load(&stored(&engine)).unwrap();
+        properties["TriggeredBy"] = json!("a-trigger.socket z-trigger.timer");
+        save(&stored(&engine), &properties).unwrap();
+        let resume =
+            engine.request(json!({"command":"plan_service_resume","job_id":paused["data"]["id"]}));
+        assert_eq!(resume["ok"], true, "{resume}");
+        properties["Requires"] = json!("sysinit.target system.slice");
+        properties["TriggeredBy"] = json!("z-trigger.timer a-trigger.socket");
+        save(&stored(&engine), &properties).unwrap();
+        let restored = execute(&engine, &resume["data"]);
+        assert_eq!(restored["data"]["status"], "completed", "{restored}");
+        assert_eq!(load(&stored(&engine)).unwrap()["ActiveState"], "active");
+        assert!(!Path::new(plan["service"]["hold"]["path"].as_str().unwrap()).exists());
+        let before = log(&engine);
+        assert_eq!(before.matches("stop:target.service").count(), 1);
+        assert_eq!(before.matches("start:target.service").count(), 1);
+        assert_eq!(execute(&engine, &resume["data"]), restored);
+        assert_eq!(log(&engine), before);
+        assert_eq!(fs::read(&neighbor).unwrap(), neighbor_before);
     }
     #[test]
     fn configuration_diagnostics_withhold_sensitive_values_and_bound_output() {
