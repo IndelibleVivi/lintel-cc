@@ -123,8 +123,8 @@ CHECKS: List[Check] = [
            independent=True, reason="needs an actual Linux runtime and isolated loopback sshd"),
     _check("browser-smoke", "real Chromium two-phase clear smoke (Playwright, synthetic profile)",
            "independent", *(NODE or "node", "extensions/browser/tests/browser-smoke.mjs"),
-           tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),
-           independent=True, reason="needs Playwright and a real browser restart generation"),
+           tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
+           independent=True, reason="needs built App, Playwright and a real browser restart generation; synthetic invoke, not native WebKit"),
     _check("browser-pairing-ui", "built App copy/real native host pairing/approval journey (synthetic invoke and clipboard)",
            "independent", *(NODE or "node", "tests/browser_pairing_ui_journey.mjs"),
            tools=("node", "cargo"), paths=(

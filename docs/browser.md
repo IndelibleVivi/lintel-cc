@@ -109,6 +109,14 @@ host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户�
 
 桌面只在准确预览获批准后安装和注册。卸载前在扩展中逐项恢复仍归本扩展控制的设置并解除清理隔离。移除 native manifest 和 host 后连接会显示离线；浏览器卸载扩展会移除其 DNR/content/privacy/proxy 控制。浏览器删除的数据不能恢复，bridge 回执不会假装提供“撤销全部”。
 
+## 原任务接续与未执行预览
+
+App 发起的 clear 在第一次批准后仍是 `awaiting-browser-restart`。完整退出并重启浏览器后，在 popup 点击“预览重启后继续删除”并再次批准；Engine 将 child 结果和原任务最终结果一起保存，随后以原 App operation ID 回传。回到 App 点“查询原任务”即可看到完成或需核对的结果。原回执 `result.continuedBy` 指向续办 ID；App 的 finishClear 入口也使用同一 Engine 路径。未观察到真实 `runtime.onStartup` 时不能续办，worker 重启不替代该证据。
+
+预览五分钟后失效；状态读取／轮询和执行入口会将其持久标为 `expired`。popup 的取消操作只把未执行 preview 标为 `canceled`，不撤回已经开始的任务。终态会回传 host，App 可重新预览并获得新 ID；旧 ID 始终不重做。host 每次最多返回两个请求，按实例轮转整个待确认队列，旧预览不会堵住后来的请求。
+
+Native ACK 只在 Engine 串行锁内更新最新记录的元数据；准备阶段的旧 ACK 不确认已经变化的最终结果，也不清除 `finishedBy`／`restoredBy`。DNR 恢复比较按 rule ID 排序后的集合，浏览器返回数组顺序不同不会制造恢复冲突。
+
 ## Native bridge 接口
 
 CLI 的静态 browser catalog/schema 与 host validator 共用 ID 长度和身份常量：instance/operation/challenge/receipt ID 为 8–80 个 ASCII 字母、数字、`-` 或 `_`；安装时 Chrome/Edge 只接受 32 个 `a`–`p` 的 extension ID，Firefox 只接受 `lintel@lintel.local`。纯 manifest helper 支持 `chromium` 名称，固定路径注册 installer 不支持该名称；不能从 helper 的支持推导一个安装入口。
@@ -199,11 +207,11 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-需要已有可构建的 Rust toolchain，smoke 会构建 debug native host。可复用已安装的 Playwright：`PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs npm run test:browser`。Playwright 与浏览器 revision 应匹配；如指定 `PLAYWRIGHT_CHROMIUM_EXECUTABLE`，仅允许 `ms-playwright/chromium-*` 缓存中的可执行文件，不接受 `/Applications` 的普通 Chrome。测试只创建临时 profile/native DB，并启动固定端口 18765 的合成 localhost HTTP fixture；端口冲突会失败，不改现有服务。不会复用个人 Chrome profile、读取 Cookie DB 或访问真实 Claude 站点。
+先在仓库根目录运行 `npm --prefix apps/desktop run build`，准备 App 前端；需要已有可构建的 Rust toolchain，smoke 会构建 debug native host 与 runner。可复用已安装的 Playwright：`PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs npm run test:browser`。Playwright 与浏览器 revision 应匹配；如指定 `PLAYWRIGHT_CHROMIUM_EXECUTABLE`，仅允许 `ms-playwright/chromium-*` 缓存中的可执行文件，不接受 `/Applications` 的普通 Chrome。测试只创建临时 profile/native DB，并启动固定端口 18765 的合成 localhost HTTP fixture；端口冲突会失败，不改现有服务。不会复用个人 Chrome profile、读取 Cookie DB 或访问真实 Claude 站点。
 
 合成构建 `node scripts/build.mjs --fixture` 生成显眼命名的 fixture 包，只接受 `http://localhost:18765`。其 Cookie/DNR/loopback 权限是测试预授权，与正式包分开。不要将 fixture 包发布给普通用户。
 
-2026-10-04 验证：20 项 JS contract tests 与 12 项 native host Rust tests 有既有通过证据。macOS arm64 / Playwright Chromium 155.0.8059.12 的当前完整两阶段 smoke 已通过；同源 clean `93c3f74` 的 [CI 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) 在 macOS arm64／Ubuntu x86_64 的 Chromium 151.0.7922.34 上也通过，保留原有 11 项断言：真正活跃的 SW `waitUntil` CacheStorage writer 与 iframe writer、目标／宿主关闭、隔离保持、五类存储删除／邻域保留、定位权限目标级 block/restore、旧 operation ID 不重删新的合成登录，以及真实 `connectNative` 短码请求／本地批准／浏览器确认 WebRTC／host 持久回执。
+2026-10-05 本地阶段验证：29 项 JS contract tests 与 14 项 native host Rust tests 通过。macOS arm64 的完整 Chromium smoke 保留原有 11 项断言，并新增第 12 条 App clear → 浏览器完整退出／真实 onStartup → popup 继续 → 原 App ID 最终回执链；同一链路还验证取消预览回传 App、旧 ID 不执行。App 通过合成 invoke 调用真实 core／host，新增 HTTPS 页面完全由测试本地 fulfill，不连接真实 Claude。正式 WebKit／个人 profile 不在该证据中。旧跨平台证据见 [候选历史](candidate-history.md)，本轮源码与 CI 状态见 [当前状态](current-state.md)。
 
 持久安装由测试专用 [persistent-install.mjs](../extensions/browser/tests/persistent-install.mjs) 调用 Chromium 原生管理页安装器完成：仅临时破坏自己复制的 fixture manifest，以取得浏览器生成的加载失败恢复凭据，随后逐字节恢复，再由原生安装器重试。这遵循 [Chromium 原生 reload/loadUnpacked 实现](https://chromium.googlesource.com/chromium/src/+/main/chrome/browser/extensions/api/developer_private/developer_private_functions.cc)；不是产品的自动扩展安装入口。测试确认旧浏览器进程已退出、新进程不同、重新启动没有 `--load-extension` 或 `--disable-extensions-except`，同一扩展身份保留，生产监听器实际收到新的 `runtime.onStartup` 世代，再单独确认 `finishClear`。测试不直接写入 profile preferences 或启动世代，也不伪造启动事件。详细证据写入本地 `extensions/browser/artifacts/browser-smoke.json`，失败则写 `browser-smoke-failure.json`；这些生成文件不纳入 Git。
 

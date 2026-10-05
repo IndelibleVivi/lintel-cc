@@ -74,14 +74,25 @@ pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
-    write_atomic(path, bytes, mode, true)
+    write_atomic(path, bytes, mode, true, |_| Ok(()))
+}
+/// Persist the settings publication intent while the staged inode still has
+/// its private name. A later reader can distinguish this exact object from an
+/// independent writer that happened to produce identical JSON.
+pub fn atomic_recorded(
+    path: &Path,
+    bytes: &[u8],
+    mode: u32,
+    record: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
+    write_atomic(path, bytes, mode, true, record)
 }
 /// Publish a complete new file without replacing a concurrently created target.
 /// The temporary file and destination share a directory/filesystem. Native
 /// no-replace rename consumes the staged name and publishes the single-link
 /// destination in one operation, including the interruption boundary.
 pub fn atomic_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
-    write_atomic(path, bytes, mode, false)
+    write_atomic(path, bytes, mode, false, |_| Ok(()))
 }
 fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -140,7 +151,13 @@ fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
         Err(failure.into())
     }
 }
-fn write_atomic(path: &Path, bytes: &[u8], mode: u32, overwrite: bool) -> Result<()> {
+fn write_atomic(
+    path: &Path,
+    bytes: &[u8],
+    mode: u32,
+    overwrite: bool,
+    record: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
     guard(path)?;
     let parent = path
         .parent()
@@ -155,6 +172,7 @@ fn write_atomic(path: &Path, bytes: &[u8], mode: u32, overwrite: bool) -> Result
         f.write_all(bytes)?;
         f.sync_all()?;
         fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
+        record(&tmp)?;
         guard(path)?;
         if overwrite {
             fs::rename(&tmp, path)?;

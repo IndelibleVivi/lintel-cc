@@ -9,6 +9,8 @@ const equalRules = (a,b) => JSON.stringify([...(a||[])].sort((x,y)=>ruleKey(x)-r
 const PERMISSION_API = {location:'location',camera:'camera',microphone:'microphone',notifications:'notifications'};
 const CLEANUP_RULE_START = 10000;
 const NETWORK_RULE_START = 20000;
+const PREVIEW_TTL = 300000;
+const TERMINAL_ACK_PHASES = ['completed','uncertain','rejected','awaiting-browser-restart','canceled','expired'];
 export class Engine {
   constructor(api,config=CONFIG) {this.api=api;this.config=config;this.tail=Promise.resolve();}
   serial(fn) {const run=this.tail.then(fn,fn);this.tail=run.catch(()=>{});return run;}
@@ -22,7 +24,7 @@ export class Engine {
       if (!equal(existing.action,action)) fail('operation_id_conflict');
       return existing;
     }
-    const record={id:operationId,action,source,phase:'preview',createdAt:Date.now(),expiresAt:Date.now()+300000,preview:describe(action,this.config),permissions:requiredPermissions(action,this.config)};
+    const record={id:operationId,action,source,phase:'preview',createdAt:Date.now(),expiresAt:Date.now()+PREVIEW_TTL,preview:describe(action,this.config),permissions:requiredPermissions(action,this.config)};
     if (action.kind === 'clear') {
       record.preview.writerHandling=action.cookieStoreId ? '容器删除不注销共享 Service Worker；浏览器重启后仍仅保证所选 store 的 API 确认，无法验证后台本地回写停止。' : action.types.includes('serviceWorkers') ? '关闭目标 frame 并注销 Service Worker；重启浏览器后再次确认删除，隔离保留到单独解除。' : '未选择 serviceWorkers，无法可靠停止后台本地写入；执行前须选择该类别。';
       if (!action.cookieStoreId && !action.types.includes('serviceWorkers')) fail('service_worker_quiescence_required',record.preview.writerHandling);
@@ -50,7 +52,13 @@ export class Engine {
     const key=`operation:${id}`,r=await this.get(key);
     if (!r) fail('unknown_operation');
     if (r.phase !== 'preview') return r; // running/uncertain/completed never replay
-    if (r.expiresAt < Date.now()) fail('preview_expired');
+    if (r.expiresAt < Date.now()) {
+      // A preview that was never executed must not stay re-deliverable forever.
+      // Make the terminal state durable under the serial lock (no browser change).
+      const expired={...r,phase:'expired',expiredAt:Date.now(),error:{code:'preview_expired',message:'预览已过期，未执行；请重新预览以获得新的操作 ID，不会改变浏览器。'}};
+      await this.set(key,expired);
+      return expired;
+    }
     if (r.source === 'app' && !(await this.get('pairing'))?.paired) fail('pairing_required');
     if (!await this.api.permissions.contains(r.permissions)) fail('permissions_missing');
     const running={...r,phase:'running',startedAt:Date.now()};
@@ -69,18 +77,60 @@ export class Engine {
       const result=await this.execute(running);
       const phase=result.phase||'completed';
       const done={...running,...result,phase,...(phase==='completed'?{completedAt:Date.now()}:{preparedAt:Date.now()})};
-      await this.set(key,done);return done;
+      await this.saveOutcome(done);return done;
     } catch (error) {
       // API failure may follow a side effect. Keep uncertainty; never retry the ID.
       const saved=await this.get(key);
       const uncertain={...saved,phase:'uncertain',error:{code:error.code||'browser_api_error',message:error.message},completedAt:Date.now()};
-      await this.set(key,uncertain);return uncertain;
+      await this.saveOutcome(uncertain);return uncertain;
     }
   });}
-  async recover() {
+  // Single serialized entry point for ACK metadata. The host acknowledges a
+  // durable receipt by id; the extension must re-read the *latest* record under
+  // the same lock and only stamp acknowledgement fields. Writing back a stale
+  // snapshot (e.g. a `restore` completion) would erase newer Engine state such
+  // as `restoredBy`, silently re-arming a one-shot restore. No browser mutation.
+  acknowledge(id,{sent,acknowledgedAt=Date.now()}={}) {return this.serial(async()=>{
+    const key=`operation:${id}`,r=await this.get(key);
+    if (!r) fail('unknown_operation');
+    if (!TERMINAL_ACK_PHASES.includes(r.phase)) fail('operation_not_terminal',`operation ${id} is ${r.phase}; nothing to acknowledge`);
+    // A preparation ACK may arrive after finishClear changed the final fact.
+    if (sent && !equal([sent.phase,sent.result,sent.error,sent.completedAt],[r.phase,r.result,r.error,r.completedAt])) return r;
+    r.acknowledgedAt=acknowledgedAt;r.nativeAcknowledged=true;
+    await this.set(key,r);return r;
+  });}
+  // Persist a terminal state for a preview that was never executed (user cancel
+  // or a consumed/expired preview). Never mutates the browser. Uses the same
+  // serialized mutation path so it cannot clobber a concurrent commit.
+  abandon(id,reason) {return this.serial(async()=>{
+    const key=`operation:${id}`;
+    const r=await this.get(key);
+    if (!r || r.phase!=='preview') return r;
+    const terminal={...r,phase:'canceled',canceledAt:Date.now(),cancelReason:reason};
+    await this.set(key,terminal);
+    return terminal;
+  });}
+  expirePreviews() {return this.serial(async()=>{
     const all=await this.api.storage.local.get(null);
-    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:') && r.phase==='running') await this.set(key,{...r,phase:'uncertain',error:{code:'worker_restarted',message:'执行期间扩展重启；请核对持久结果，不自动重复删除。'}});
+    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:') && r.phase==='preview' && r.expiresAt<Date.now()) {
+      await this.set(key,{...r,phase:'expired',expiredAt:Date.now(),error:{code:'preview_expired',message:'预览已过期，未执行；请重新预览。'}});
+    }
+  });}
+  // Called under the Engine lock. The child and original clear publish their
+  // final fact together; popup continuation therefore uses the original App ID.
+  async saveOutcome(r) {
+    const records={[`operation:${r.id}`]:r};
+    if (r.action.kind==='finishClear') {
+      const prior=await this.get(`operation:${r.action.receiptId}`);
+      if (prior?.finishedBy===r.id) records[`operation:${prior.id}`]={...prior,phase:r.phase,
+        result:{...r.result,continuedBy:r.id},...(r.error?{error:r.error}:{}),completedAt:r.completedAt,nativeAcknowledged:false};
+    }
+    await this.api.storage.local.set(records);
   }
+  recover() {return this.serial(async()=>{
+    const all=await this.api.storage.local.get(null);
+    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:') && r.phase==='running') await this.saveOutcome({...r,phase:'uncertain',error:{code:'worker_restarted',message:'执行期间扩展重启；请核对持久结果，不自动重复删除。'}});
+  });}
   async checkpoint(r,extra) {Object.assign(r,extra);await this.set(`operation:${r.id}`,r);}
   async execute(r) {
     const a=r.action;
@@ -101,8 +151,10 @@ export class Engine {
       const rules=this.rules(a,NETWORK_RULE_START);
       await this.checkpoint(r,{undo:{type:'rules',before:prior,applied:rules}});
       await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:prior.map(v=>v.id),addRules:rules});
+      const effective=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
+      if (!equalRules(effective,rules)) fail('rules_not_effective');
       await this.set('networkRules',rules);
-      return {result:{verification:'effective-readback',rules:await this.api.declarativeNetRequest.getDynamicRules()}};
+      return {result:{verification:'effective-readback',rules:effective}};
     }
     if (a.kind === 'pauseRules') {
       const rules=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
@@ -236,11 +288,11 @@ export class Engine {
       if (u.before.levelOfControl==='controlled_by_this_extension' ? effective.levelOfControl!=='controlled_by_this_extension' || !equal(effective.value,u.before.value) : effective.levelOfControl==='controlled_by_this_extension') fail('restore_not_effective');
     } else if (u.type==='rules') {
       const current=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
-      if (!equal(current,u.applied) || await this.get('pausedRules')) fail('restore_conflict');
+      if (!equalRules(current,u.applied) || await this.get('pausedRules')) fail('restore_conflict');
       await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:current.map(v=>v.id),addRules:u.before});
       await this.set('networkRules',u.before);
       effective=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
-      if (!equal(effective,u.before)) fail('restore_not_effective');
+      if (!equalRules(effective,u.before)) fail('restore_not_effective');
     } else if (u.type==='content') {
       if (!equal(await this.get(`contentRules:${u.name}`),u.applied)) fail('restore_conflict');
       const api=this.api.contentSettings[u.name];
@@ -264,6 +316,7 @@ export class Engine {
     await this.api.storage.local.remove('pausedRules');
   }
   async status() {
+    await this.expirePreviews();
     const all=await this.api.storage.local.get(null);
     const webrtc=await this.api.privacy.network.webRTCIPHandlingPolicy.get({});
     return {browser:this.config.browser,synthetic:this.config.fixture,pairing:all.pairing || {paired:false},bridge:all.bridge || {connected:false},

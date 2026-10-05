@@ -74,6 +74,8 @@ lintel job wait <restore-plan-id> --timeout 30s
 
 接受后的失败在持久回执 `error` 中记录 code/message/phase/recovery；已完成步骤和 archive/new_root 等产物保留。查询原记录，不从 warnings 中文文本猜 code、不自动再 execute。还要检查实际托管 `execution`：SSH 断线、父进程退出、logout、reboot 是不同事件，ACK 不保证 reboot survival。当前 runner 不 sudo、不启用 linger、不改变登录策略。
 
+配置发布中断后，先 `job show` 原 ID（或 `call job`）取得 `settings_recovery`。`written` 是核对 staged 文件对象与冻结计划后得到的证据，才允许新建 `plan_restore`；`not_written`／`ownership_unproven` 保留当前文件，不自动恢复、不重发。正常已完成任务的字段恢复仍检查后续编辑，其他字段保留。
+
 ## 所有 core 操作与旧调用者
 
 命名入口涵盖常见任务；其余 core 请求使用有限 `call OPERATION`，参数对象从 stdin 进入，同一 schema 校验。交互启动统一使用 `lintel launch ID` 的真实 TTY 入口；`call launch` 在进入 core 前返回 `interactive_launch_required`。例如：
@@ -128,6 +130,8 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 <a id="browser-adapter"></a>
 
 工作保全、归档、迁入、旧重建及 cleanup 的 reset_client/retire 在 named/finite 请求中必须至少选择一种类别；空 JSON 数组和 `--categories ''` 拒绝。repair_login 不处理工作内容，categories 可省略或为空，schema 按 recipe 条件表达同一规则。protocol-1 raw request 保留历史兼容默认。
+
+`plan_import` 与 `plan show` 的 `import_manifest` 是批准时应核对的最终清单：`package:{format,generator,sha256}`、`files:[{source,destination,category,size,sha256}]`。source 与 destination 均为相对路径，destination 相对于已选目标 root，含重名分配；摘要对应实际冻结字节。它不含文件正文或归档口令。
 
 ## Browser：有限适配与人类等待
 
@@ -197,7 +201,7 @@ lintel remote job approved-alias <original-remote-plan-id>
 
 远端交互会话只在 macOS 的真实 TTY 使用 `lintel remote launch approved-alias <remote-environment-id>`：stdin/stdout 都需为终端，不接受 prompt 或额外参数；先只读 launch_context preflight，再由有限 controller 请求 Terminal。JSON `remote control` 的 launch 被拒绝，不能用隐藏管道发起会话。
 
-install 的 prepare_runner → install_runner → query_install 与 App 共用实现和准确计划批准，资源、原注册和 runner 绑定都再核对，提交不明时只 query_install；操作字段见当前 `remote` schema 和 [remote.md](remote.md)。原 Python stdlib controller 保留其已有 caller/subset，作为 legacy compatibility 入口；新增功能以共享 Rust controller 为 canonical，不再平行扩展 Python。
+install 的 prepare_runner → install_runner → query_install 与 App 共用实现和准确计划批准，资源、原注册和 runner 绑定都再核对，提交不明时只 query_install；未核对安装会在 prepare 与上传入口同时阻止新上传，错误 diagnostic 给出原 install_id。激活要求预览冻结的 previous_binding 仍成立；superseded 表示旧安装已核实但后续绑定保留，verified 表示缺少冻结前置绑定的旧记录仅已核实。旧 preview 缺少该证据时必须重新准备；操作字段见当前 `remote` schema 和 [remote.md](remote.md)。原 Python stdlib controller 保留其已有 caller/subset，作为 legacy compatibility 入口；新增功能以共享 Rust controller 为 canonical，不再平行扩展 Python。
 
 这些路径的合成测试不替代真实 Claude 认证、正式浏览器、native WebKit、生产 VPS 或 Linux logout/reboot 验收。当前证据与完整未交付目标继续在 [current-state.md](current-state.md) 和 [SPEC.md](SPEC.md)。
 

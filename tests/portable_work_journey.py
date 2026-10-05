@@ -25,6 +25,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from typing import Any
 
@@ -70,6 +71,15 @@ class Install:
     def data(self, command: str, **fields: Any) -> Any:
         response = self.call(command, **fields)
         assert response["ok"], json.dumps(response.get("error"), ensure_ascii=False)
+        return response["data"]
+
+    def named(self, *args: str, **fields: Any) -> Any:
+        result = subprocess.run(
+            [str(BINARY), *args], input=json.dumps(fields), text=True,
+            capture_output=True, cwd=self.base, env=self.env, timeout=45, check=False,
+        )
+        response = json.loads(result.stdout)
+        assert response["ok"], response
         return response["data"]
 
     def register(self, root: Path, name: str = "synthetic") -> str:
@@ -164,10 +174,32 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertEqual(len(manifest["files"]), 7)
         read = target.data("archive_read", archive_path=path, archive_passphrase=PASSPHRASE, path="CLAUDE.md")
         self.assertEqual(read["text"], "Synthetic instruction only.\n")
-        import_plan = target.data(
-            "plan_import", environment_id=dest_id, archive_path=path,
-            categories=["instructions", "memory", "sessions"], archive_passphrase=PASSPHRASE,
+        import_plan = target.named(
+            "work", "import", "plan", "--environment", dest_id, "--archive-path", path,
+            "--categories", "instructions,memory,sessions", archive_passphrase=PASSPHRASE,
         )
+        public_manifest = import_plan["import_manifest"]
+        self.assertEqual(public_manifest["package"], {
+            "format": "lintel.work/1", "generator": "Lintel",
+            "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
+        })
+        shown = target.named("plan", "show", import_plan["id"])
+        self.assertEqual(shown, import_plan)
+        expected_mapping = {
+            "projects/example/session.jsonl": "lintel-imports/projects/example/lintel-1-session.jsonl",
+            "projects/example/memory/MEMORY.md": "lintel-imports/projects/example/memory/lintel-1-MEMORY.md",
+            "lintel-imports/projects/foo.jsonl": "lintel-imports/projects/lintel-1-foo.jsonl",
+            "projects/foo.jsonl/session.jsonl": "lintel-imports/projects/foo.jsonl/session.jsonl",
+        }
+        for entry in public_manifest["files"]:
+            self.assertEqual(set(entry), {"source", "destination", "category", "size", "sha256"})
+            self.assertFalse(Path(entry["source"]).is_absolute())
+            self.assertFalse(Path(entry["destination"]).is_absolute())
+            if entry["source"] in expected_mapping:
+                self.assertEqual(entry["destination"], expected_mapping[entry["source"]])
+        encoded = json.dumps(shown)
+        for private in [PASSPHRASE, "Synthetic instruction only.", str(dest), str(out)]:
+            self.assertNotIn(private, encoded)
         receipt = target.execute(import_plan)
         self.assertEqual(receipt["status"], "completed")
         for directory, mode in existing_modes:
@@ -279,6 +311,124 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertNotIn("credentials", step_ids)
         self.assertNotIn("client_state", step_ids)
         self.assertTrue((self.root / ".credentials.json").exists())
+
+    def test_cleanup_freezes_executable_before_any_auth_recheck(self) -> None:
+        scripts = []
+        markers = []
+        for name in ("first", "second"):
+            directory = self.base / name
+            directory.mkdir()
+            script = directory / "claude"
+            marker = directory / "calls"
+            script.write_text(
+                '#!/bin/sh\nprintf "%s\\n" "$2" >> "' + str(marker) + '"\n'
+                "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"\n"
+            )
+            script.chmod(0o700)
+            scripts.append(directory)
+            markers.append(marker)
+        self.source.env["PATH"] = str(scripts[0]) + ":/usr/bin:/bin"
+        environment_id = self.source.register(self.root)
+        for discover_after_change in (False, True):
+            self.source.env["PATH"] = str(scripts[0]) + ":/usr/bin:/bin"
+            self.source.data("discover")
+            plan = self.source.data(
+                "plan_cleanup", environment_id=environment_id, recipe="repair_login",
+                writers_confirmed_stopped=True, official_logout=True,
+            )
+            calls_before = markers[0].read_bytes()
+            self.source.env["PATH"] = str(scripts[1]) + ":/usr/bin:/bin"
+            if discover_after_change:
+                self.source.data("discover")
+            self.source.approve(plan)
+            rejected = self.source.call("execute", plan_id=plan["id"], approval=plan["hash"])
+            self.assertEqual(rejected["error"]["code"], "executable_changed")
+            self.assertEqual(markers[0].read_bytes(), calls_before)
+            self.assertFalse(markers[1].exists(), "replacement executable was probed under an old approval")
+            self.assertFalse((self.source.state / "jobs" / (plan["id"] + ".json")).exists())
+            self.assertTrue((self.root / ".credentials.json").exists())
+
+    def test_cleanup_rechecks_new_writer_after_preservation_with_or_without_logout(self) -> None:
+        script = self.source.home / ".local/bin/claude"
+        script.parent.mkdir(parents=True)
+        logout_marker = self.base / "unexpected-logout"
+        script.write_text(
+            '#!/bin/sh\nif test "$2" = logout; then touch "' + str(logout_marker) + '"; exit 3; fi\n'
+            "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"\n"
+        )
+        script.chmod(0o700)
+        # This inert sleeper has the process name that the production ps check
+        # recognizes; its only binding is our disposable root.
+        writer_path = self.base / "writer" / "claude"
+        writer_path.parent.mkdir()
+        source = writer_path.with_suffix(".c")
+        source.write_text("#include <unistd.h>\nint main(void) { sleep(40); return 0; }\n")
+        # The build toolchain already needs cc. Compile our inert fixture rather
+        # than copying a signed system binary (which macOS may refuse to run).
+        compiled = subprocess.run(
+            ["cc", str(source), "-o", str(writer_path)], cwd=self.base,
+            env=self.source.env, capture_output=True, text=True, check=False, timeout=30,
+        )
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        environment_id = self.source.register(self.root)
+        for official_logout in (False, True):
+            with self.subTest(official_logout=official_logout):
+                plan = self.source.data(
+                    "plan_cleanup", environment_id=environment_id, recipe="reset_client",
+                    writers_confirmed_stopped=True, official_logout=official_logout,
+                    categories=["instructions"],
+                )
+                self.source.approve(plan)
+                process = subprocess.Popen(
+                    [str(BINARY), "request"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True, cwd=self.base, env=self.source.env,
+                )
+                process.stdin.write(json.dumps({
+                    "command": "execute", "plan_id": plan["id"], "approval": plan["hash"],
+                    "archive_passphrase": PASSPHRASE,
+                }))
+                process.stdin.close()
+                process.stdin = None
+                writer = None
+                try:
+                    journal = self.source.state / "jobs" / (plan["id"] + ".json")
+                    deadline = time.monotonic() + 30
+                    while time.monotonic() < deadline:
+                        if journal.exists() and json.loads(journal.read_text()).get("state_archive_path"):
+                            break
+                        self.assertIsNone(process.poll(), "cleanup ended before the preservation checkpoint")
+                        time.sleep(0.01)
+                    else:
+                        self.fail("state archive checkpoint did not appear")
+                    writer = subprocess.Popen(
+                        [str(writer_path), "40"], cwd=self.base,
+                        env={**self.source.env, "CLAUDE_CONFIG_DIR": str(self.root)},
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                    output, errors = process.communicate(timeout=45)
+                    self.assertIsNone(writer.poll(), "synthetic writer must remain live through recheck")
+                    envelope = json.loads(output)
+                    self.assertTrue(envelope["ok"], (envelope, errors))
+                    receipt = envelope["data"]
+                    self.assertEqual(receipt["status"], "needs_reconciliation")
+                    self.assertEqual(receipt["error"]["code"], "writers_active")
+                    self.assertEqual(receipt["error"]["step_id"], "quiescence")
+                    self.assertTrue(Path(receipt["archive_path"]).is_file())
+                    self.assertTrue(Path(receipt["state_archive_path"]).is_file())
+                    self.assertEqual((Path(receipt["new_root"]) / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n")
+                    self.assertTrue((self.root / ".credentials.json").exists())
+                    self.assertFalse(logout_marker.exists())
+                    steps = [step["id"] for step in receipt["steps"]]
+                    self.assertIn("migrate", steps)
+                    self.assertNotIn("credentials", steps)
+                    self.assertNotIn("logout", steps)
+                finally:
+                    if writer is not None:
+                        writer.terminate()
+                        writer.wait(timeout=5)
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
 
     def test_accepted_after_failure_code_persists_across_processes(self) -> None:
         environment_id = self.source.register(self.root)

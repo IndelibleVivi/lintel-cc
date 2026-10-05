@@ -171,7 +171,8 @@
       "status": "partial",
       "evidence": [
         "2026-10-04 real Chromium smoke: active SW waitUntil CacheStorage writer and iframe writer, isolation/target-host closure, actual old-process exit/new-process startup with native onStartup generation, separately approved finishClear and post-deletion reads passed. No fabricated startup events or profile preference writes; formal browsers/Firefox writer behavior remains unverified.",
-        "Clean 93c3f74 CI37163091952: macOS arm64 and Ubuntu x86_64 browser-smoke and browser-pairing-ui each passed (2/2 per platform); detailed real Chromium 151 reports retain all 11 assertions, actual old-process exit/new process, changed production onStartup generation, empty relaunch extension-loading flags, retained identity and completed native receipt. Local synthetic origins/temporary profiles only. https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952"
+        "Clean 93c3f74 CI37163091952: macOS arm64 and Ubuntu x86_64 browser-smoke and browser-pairing-ui each passed (2/2 per platform); detailed real Chromium 151 reports retain all 11 assertions, actual old-process exit/new process, changed production onStartup generation, empty relaunch extension-loading flags, retained identity and completed native receipt. Local synthetic origins/temporary profiles only. https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952",
+        "extensions/browser/tests/browser-smoke.mjs and app-clear.mjs retain active-writer/neighbor checks and add rendered App → actual browser restart → popup finish → original App receipt, with no replay of new synthetic login."
       ]
     },
     {
@@ -453,7 +454,8 @@
       "required": "按字段冲突处理，不整文件盖回旧版本",
       "status": "partial",
       "evidence": [
-        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md."
+        "crates/core/src/lib.rs tests; tests/cli_journey.py passed on synthetic roots. Remaining runtime/scope conditions are in docs/core.md.",
+        "crates/core/src/settings_tests.rs: actual child exits before/after settings publication; original-job reconciliation and separately approved exact restore; equal external rewrite and later field/root changes rejected."
       ]
     },
     {
@@ -574,7 +576,8 @@
       "required": "extension journal 与消息去重保持，不删除新的登录",
       "status": "partial",
       "evidence": [
-        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior."
+        "extensions/browser/tests/*.test.mjs (10 passed) and native-host tests (5 passed); mocks/native journal do not establish formal browser behavior.",
+        "Engine ACK mutation preserves restoredBy; stale preparation ACK does not consume final receipt. Consumed interrupted finishClear becomes uncertain on the original App task. Expiry and cancellation remain unexecuted; host poll rotates bounded batches."
       ]
     },
     {
@@ -731,7 +734,8 @@
       "required": "用户能说清已发生和未发生的事，知道哪一项可恢复",
       "status": "partial",
       "evidence": [
-        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope."
+        "Desktop web synthetic journey and macOS arm64 local app build. Native/assistive-tech/full performance and user-comprehension acceptance remain unverified; docs/current-state.md records scope.",
+        "tests/work_ui_journey.mjs and remote_task_ui_journey.mjs show approved final import destinations, pending-task filtering and original install reconciliation; only synthetic Chromium/invoke, not native WebKit or human acceptance."
       ]
     },
     {
@@ -771,5 +775,5 @@
   ],
   "updated": "2026-10-05",
   "evidence_semantics": "partial means bounded executed synthetic/unit or isolated real-runtime evidence exists; it does not mark the entire acceptance case passed. Source implementation without executed evidence remains not-run.",
-  "implementation_update": "2026-10-05: Development candidate, full SPEC/G01-G04/U01 incomplete. Repository remains PUBLIC; original-material public-reuse license is unselected and no release is implied. Latest clean 7a05291 CI37216354079 passed macOS/Ubuntu defaults 13/13 each, independent browser/UI 4/4 each, Ubuntu static-musl OpenSSH 1/1 and real Linux VM 1/1; all six entrypoint reports identify the same clean HEAD. Core 52/52, runner 8/8 and VM controls 26/26 passed on both platforms; desktop defaults 56 passed/3 independent ignored, Python SSH 13 passed. Runner selects one transient unit for already-root systemd or an existing lingering current-UID user manager, otherwise setsid with an explicit limitation. Private worker stdin preserves caller environment and cwd without credential-bearing unit properties/argv/journal/spool; exact cgroup and execution facts persist before ACK. Strict KillUserProcesses=yes VM logout left both eligible manager workers alive and their original policy tasks completed; ineligible setsid reconciled. Actual reboot changed kernel boot ID and both managed/setsid accepted jobs reconciled on repeated original query without resubmission. Managed shared-auth changes rejected before accept without logout, deleting synthetic credentials or persisting environment values. Complete root service live-hold/timer/manual-start/neighbor/external-conflict/independent-resume/inactive-state and persistent hold reboot recovery passed. The App reopen/original-query/full-receipt/separate-recovery journey passed in rendered Chromium with synthetic invoke/SSH/registry. Existing full persistent Chromium two-stage smoke retains all 11 assertions and production onStartup evidence; App pairing uses real core/host processes with synthetic invoke/clipboard. Bundled non-fixture extension and host preparation/owned updates remain approved current-user operations; formal browsers and developer-free installation remain unverified. Local 7a05291 arm64 App candidate is 17.87 MiB with exact bundled musl runner bytes/digests and supplied icon verified; it has only linker ad-hoc signing, no distribution certificate, notarization, Applications installation or activation. Sidebar lintel_ and 2.6-second slow blink/reduced-motion static behavior remain. Formal Chrome/Edge/Firefox/AdsPower, native WebKit/OS clipboard, real Claude/auth/model effects, production VPS, aarch64 runtime and full product journeys remain unverified. Latest CI: https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079"
+  "implementation_update": "2026-10-05: Development candidate remains incomplete; SPEC/G01-G04 are not closed. Current stage repairs settings publication recovery, frozen cleanup approvals and post-preservation quiescence, public import mapping, remote binding activation and unresolved install gating, browser serialized ACKs, original App clear continuation, preview terminal states and DNR set comparison. Local default18/18, pairing/service/remote UI3/3, website/game3/3, latest work UI and Chromium smoke12 assertions passed; packaged host/extension installation2/2 passed using the actual rebuilt arm64 App resources. Both static musl runners match bundled manifests. Exact current source/CI/artifact boundaries live in docs/current-state.md; earlier evidence retained in docs/candidate-history.md. No formal browser, real authentication, production VPS, aarch64 runtime, native WebKit, distribution signing, installation or release claim."
 }

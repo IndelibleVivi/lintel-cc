@@ -40,6 +40,7 @@ function receipt(r){return {id:r.id,phase:r.phase,...(r.result?{result:r.result}
 async function poll(){
   if (polling) return;polling=true;
   try {
+    await engine.expirePreviews();
     const data=await native('poll');
     await engine.set('pairing',{paired:true});await engine.set('bridge',{connected:true,lastSeen:Date.now()});
     for (const proposal of data.proposals){
@@ -47,8 +48,8 @@ async function poll(){
     }
     // Re-send only durable receipts, never browser mutations. Lost ACK is safe.
     const all=await api.storage.local.get(null);
-    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected','awaiting-browser-restart'].includes(r.phase)&&!r.nativeAcknowledged){
-      await native('receipt',{receipt:receipt(r)});r.nativeAcknowledged=true;await engine.set(key,r);
+    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected','awaiting-browser-restart','canceled','expired'].includes(r.phase)&&!r.nativeAcknowledged){
+      await native('receipt',{receipt:receipt(r)});await engine.acknowledge(r.id,{sent:r});
     }
   }catch(error){
     await engine.set('pairing',{paired:false,reason:error.code || 'native-unavailable'});
@@ -66,6 +67,7 @@ async function handle(message,sender){
     case 'resetIdentity':
       if(port)port.disconnect();identity=newIdentity();await engine.set('identity',identity);await engine.set('pairing',{paired:false,reason:'identity-reset-repair-required'});return {instanceId:identity.instanceId};
     case 'preview': return engine.preview(message.action);
+    case 'cancel': {const result=await engine.abandon(message.id,'user-cancelled');await pollIfConnected();return result;}
     case 'commit': {
       const r=await engine.get(`operation:${message.id}`);
       if (r?.source==='app') {await poll();if (!(await engine.get('pairing'))?.paired) fail('pairing_required');}

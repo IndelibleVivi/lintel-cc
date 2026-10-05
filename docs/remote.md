@@ -40,8 +40,15 @@ stateDiagram-v2
     needs_reconciliation --> not_installed: 未找到匹配文件
     needs_reconciliation --> installed_unverified: 文件存在，运行能力未通过
     needs_reconciliation --> needs_reconciliation: 中断后只核对原安装
-    ready --> ready: 再次查询不回滚新绑定
+    ready --> ready: 当前绑定仍属于本安装
+    ready --> superseded: 已被后来绑定取代
+    installed_unverified --> superseded: 核实成功但前置绑定已变化
+    installed_unverified --> verified: 旧记录缺少冻结绑定
 ```
+
+安装预览同时冻结 `previous_binding`（原 `{digest,install_id}` 或无绑定），纳入准确 approval。`install_runner` 在同一 alias 的安装锁内、保存新上传意图前重查未确认安装；`install_reconciliation_required` 的完整 diagnostic 返回原 `alias`／`install_id`，App 可直接“核对这份未确认安装”。提前生成另一份预览也不能绕过这一条件。
+
+核验成功仅在原 binding 条件仍成立时激活。旧安装若已被后来绑定取代，返回 `superseded`，当前 runner 保持不变；即便 digest 相同，不同 install ID 仍是不同绑定代次。缺少冻结 binding 的 legacy 未激活记录只返回 `verified`（已核实、未绑定），旧 preview 返回 `stale_install_binding`，需重新预览。查询当前绑定所属的安装仍返回 `ready`；安装记录显示上次核验事实，重新查询才更新。已有 task pin 与原 ID 去重不变。
 
 ### 准备 App 内置资源
 

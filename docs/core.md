@@ -67,19 +67,21 @@
 
 任务先持久接收，再记录执行、验证、结果。`lintel request` 在前台执行；`lintel submit` 仅接受 execute，通过 stdin 交给 worker，在 accepted journal 已落盘后返回 ACK。Linux PID 1 systemd／当前 euid 0 使用 system transient service；非 root 必须已有 `Linger=yes` 和可用的当前 UID user bus 才使用 user transient service。原调用环境经同机私有 stdin pipe 继承，工作目录保持一致，认证来源／proxy 复查不能因 manager 切换丢失；环境值不写入 unit 配置、命令参数、回执或磁盘。worker 在接受前核验实际 cgroup 属于所选 unit，`Restart=no`，没有自动重发或 manager 启动失败后的第二次 fallback。其他主机保留 `setsid` 并明确记录续跑限制；这是 macOS、无 systemd 和未满足 user manager 条件的现行兼容路径。`execution` 的 mode、manager、unit、continuation、limitation 与 `reboot_survival: false` 来自 runner 内部，在 ACK 前持久写入，调用者请求里的同名字段不能伪造。旧回执没有该字段时保持原事实，不补造托管结论。断线后查询原 ID；恢复另行预览和批准。真实 PAM logout／重启证据与生产 VPS 限制见 [当前状态](current-state.md)。
 
+配置写入在原子 rename 前，将已同步 staged 文件的对象身份、字节摘要、权限与冻结 plan hash 持久写入原 job 的 `settings_write`。若进程在发布后、回执更新前退出，`job`／`plan_restore` 在取得 operation lock 后核对当前文件与原始／待发布快照，并保存 `settings_recovery:{state,reason,message}`。只有匹配原 staged 对象的 `written` 才开放 `restorable`；原对象仍在是 `not_written`，其他对象／字节或计划、root 身份变化是 `ownership_unproven`。两者均保留现状，不自动重写、删除或恢复。中断查询仍为 `needs_reconciliation`，不是把原任务追认为完整成功。外部原子 rewrite 即便生成相同字段，也不算已证明本任务发布；旧任务没有此意图时不补造写入证据。
+
 设置恢复只处理 Lintel 修改过的字段：当前值必须仍等于原任务写入值，否则拒绝。无关的后续编辑保留。当前文件写入路径提供快照复查与原子替换，但**不与不合作的外部编辑器构成原子 compare-and-swap**；最后复查与 rename 之间仍有竞争窗口。有限 [systemd 服务暂停](services.md) 可核对特定绑定 unit 与启动阻止项；它不覆盖全部 Claude、IDE、交互终端或其他 supervisor，因此不能宣称完整并发清场保障。
 
 ## 加密归档与新环境
 
 工作类别为 `instructions`、`memory`、`sessions`。执行归档类计划需额外 `archive_passphrase`（至少 12 个字符），只能在此次请求内传递；不进入计划、journal 或支持资料。
 
-`plan_archive` 只加密归档选中的工作内容，`outcome` 为 `archive_only`：不新建环境、不改 settings、不碰凭据，原文件保持不变。可选绝对 `output_path` 会在预览时冻结路径与父目录的 device/inode，接受执行和实际发布前都核对同一目录对象。目录替换返回 `stale_plan`；缺少身份的旧显式输出计划须重新预览，已完成原任务继续查询、不重跑。该路径必须不存在，core 不覆盖已有文件，也不替调用者创建父目录；未给出时归档留在私有 state，receipt 里的 `archive_path` 指回它。`plan_preserve` 在此之上建立新根并迁入所选内容，`outcome` 为 `preserve`：receipt 以 `outcome:"preserved"` 完成，`coverage` 声明 `old_login`/`old_root` 保留、`service_binding:"unchanged"`，`next_steps` 列出在新环境采用保护方案、正常登录与运行验证，并说明迁移内容不会自动启用、原 root 的 service 绑定不改。旧环境的保留步骤以 `preserved`（保留）呈现，不是未完成项。`plan_show` 读回已冻结计划供 CLI 展示，返回与预览相同的字段并剥离私有原始快照、根身份与 `extra`；口令从不写入计划，因此不会泄出。
+`plan_archive` 只加密归档选中的工作内容，`outcome` 为 `archive_only`：不新建环境、不改 settings、不碰凭据，原文件保持不变。可选绝对 `output_path` 会在预览时冻结路径与父目录的 device/inode，接受执行和实际发布前都核对同一目录对象。目录替换返回 `stale_plan`；缺少身份的旧显式输出计划须重新预览，已完成原任务继续查询、不重跑。该路径必须不存在，core 不覆盖已有文件，也不替调用者创建父目录；未给出时归档留在私有 state，receipt 里的 `archive_path` 指回它。`plan_preserve` 在此之上建立新根并迁入所选内容，`outcome` 为 `preserve`：receipt 以 `outcome:"preserved"` 完成，`coverage` 声明 `old_login`/`old_root` 保留、`service_binding:"unchanged"`，`next_steps` 列出在新环境采用保护方案、正常登录与运行验证，并说明迁移内容不会自动启用、原 root 的 service 绑定不改。旧环境的保留步骤以 `preserved`（保留）呈现，不是未完成项。`plan_show` 读回已冻结计划供 CLI 展示，返回与预览相同的字段并剥离私有原始快照、根身份与 `extra`；迁入计划另投影公开清单，见下文；口令从不写入计划，因此不会泄出。
 
 `plan_reset` 仍只接受 `recipe: "rebuild"`，语义不变：仅归档后建立新根并迁入，旧 root/登录保留，receipt 维持 `partially_completed`（旧登录/客户端清理步骤未完成）；历史 receipt 不复绿。
 
 当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。枚举预算为单文件 8 MiB、总量 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
-工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
+工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
 
 工作包与状态备份仅在归档完成后才创建新根。`CLAUDE.md` 迁入新根，会话/记忆资料进入 `lintel-imports`；不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的记忆与会话按原逻辑路径重新计入 manifest，不会遗漏。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
@@ -89,11 +91,11 @@
 
 `plan_cleanup` 接受 `repair_login`、`reset_client`、`retire`，要求 `writers_confirmed_stopped: true`，可选 `official_logout`。默认根的混合状态是 home 下 `.claude.json`；专用根使用其 `.claude.json`。修复登录只处理 `.credentials.json`；其余两类还处理预览中的混合状态文件。工作、settings、hooks、MCP 与插件文件不会被通配删除。
 
-reset_client 的冻结 `actions` 与 receipt 有序 `steps` 采用同一 canonical 顺序：复查写入者 → 状态备份 + 工作加密归档 → 新根创建与迁入 → 官方注销（如选）→ 精确移除旧文件。任何破坏性动作都不早于保全；reset_client 重读刚生成的工作包时核对本任务的 archive_digest，包被替换返回 stale_archive，在新根创建／迁入／注销／删除前停止。官方注销失败时保留已生成的归档、新根与 create/migrate 完成步骤，后续旧文件移除与 retire 不执行，同 ID 查询原任务不重跑。retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
+reset_client 的冻结 `actions` 与 receipt 有序 `steps` 采用同一 canonical 顺序：复查写入者 → 状态备份 + 工作加密归档 → 新根创建与迁入 → 再次复查写入者与冻结范围 → 官方注销（如选）→ 精确移除旧文件。任何破坏性动作都不早于保全；reset_client 重读刚生成的工作包时核对本任务的 archive_digest，包被替换返回 stale_archive，在新根创建／迁入／注销／删除前停止。官方注销失败时保留已生成的归档、新根与 create/migrate 完成步骤，后续旧文件移除与 retire 不执行，同 ID 查询原任务不重跑。retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
 
 执行被持久接受后失败时，receipt 额外写入结构化 `error: {code,message,phase,recovery}`：`phase` 记录失败发生的真实 receipt 状态（如 `verifying`），`recovery` 指向以同一 ID 查询原任务，机器不必猜中文 warnings；已完成的步骤与产物（归档、新根）保留，不可逆步骤不重放。
 
-已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper。Linux 的明确绑定 systemd unit 需通过独立暂停计划，清理前再读回 owned hold、inactive、MainPID 与空 cgroup；手工 `stopped` 声明不能代替该证据。非 systemd 与其他写入者仍须单独处理，详见 [服务指南](services.md)。官方注销仅接受可验证的本地登录来源；存在共享 Anthropic profile 或相应环境变量时，先于较慢的 service／进程检查拒绝。该范围在预览、执行检查及实际注销前复查。仅调用官方 `auth logout`，不猜测 Keychain service 名；服务端 token 撤销始终另列 `unverified`。
+已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper。Linux 的明确绑定 systemd unit 需通过独立暂停计划，清理前再读回 owned hold、inactive、MainPID 与空 cgroup；手工 `stopped` 声明不能代替该证据。非 systemd 与其他写入者仍须单独处理，详见 [服务指南](services.md)。官方注销仅接受可验证的本地登录来源；存在共享 Anthropic profile 或相应环境变量时，先于较慢的 service／进程检查拒绝。该范围在预览、执行检查及实际注销前复查。实际认证探测前还核对计划冻结的 executable、当前 inventory 与实时发现，重新 discover 不能让旧批准改指另一个程序。不选官方注销时同样在归档／迁入后、删除前复查写入者。仅调用官方 `auth logout`，不猜测 Keychain service 名；服务端 token 撤销始终另列 `unverified`。
 
 本地删除先将对象原子移入同目录的私有隔离目录，再核对被冻结的对象，避免按原路径误删随后替换的新文件。冲突时不覆盖新文件；无法回到原位置的对象保留在回执所列隔离目录，必须核对。它不等于对持有开放文件描述符的外部写入者建立 OS 级 CAS。官方命令导致额外状态变化或状态重新出现时，会停止后续动作。未选择官方注销的回执为 `partially_completed`；精确文件已处理不代表 Keychain、Desktop、IDE、浏览器或目录外认证已清空。
 

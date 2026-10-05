@@ -375,3 +375,12 @@ Remote receipt refresh uses original-task reconnect. Manual App ID lookup and CL
 Shared remote tests: 41 passed, 2 independent ignored. The installed-runner upgrade check covers reconnect and both job lookup fields; unknown-ID lookup creates no task/dedup record, later execute submits once, and repeats query. The real installed-CLI regression also proves that a manual job lookup bypasses submission storage without opening SSH. A new explicit reconnect durably captures the current runner binding before its first query; three fixture queries retain that binding across an alias upgrade with no submission. Retained original-job lookups remain available after alias removal. The unchanged stdin-transport/no-task-directory assertion and shared current-HOME journey passed.
 
 Shared plan-hash shape is exactly 64 lowercase hex characters for strict named execute and new remote submissions. Malformed approval rejects before named core state or remote task intent/SSH; existing task records remain query-only. Old controller/schema regressions failed, then operations 6/6, remote 41 passed/2 ignored and the actual CLI journey passed; schemas use the same owner. Raw protocol-1 core approval checks remain compatible.
+
+Browser smoke also renders the built App through a synthetic invoke adapter to
+real core/native-host processes. Build the desktop frontend first. Its additional
+App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
+process exit and production runtime.onStartup, popup continuation, original-ID
+query, and unexecuted-preview cancellation. It never visits the Claude service.
+The default group includes 18 checks; the CI independent browser/UI group includes
+browser-smoke, browser-pairing-ui, service-ui, work-ui, remote-task-ui, site-ui and
+clawd-app-ui. Linux OpenSSH and VM remain separate jobs within the same CI owner.

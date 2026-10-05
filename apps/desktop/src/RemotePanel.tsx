@@ -15,7 +15,7 @@ export async function remoteRequest<T>(payload: Record<string, unknown>): Promis
   return result.data;
 }
 type InstallPlan = { install_id: string; alias: string; probe: { os: string; architecture: string; uid: string }; bundle: { version: string; target: string; bytes: number; sha256: string }; destination: string; approval: string; status: string; effects: string[]; last_error?: {message: string} | null };
-const installStatus: Record<string, string> = { previewed:'等待批准', needs_reconciliation:'结果待核对', ready:'运行器已就绪', not_installed:'未找到匹配的运行器', installed_unverified:'文件已安装，运行能力未通过' };
+const installStatus: Record<string, string> = { previewed:'等待批准', needs_reconciliation:'结果待核对', ready:'运行器已就绪', superseded:'已核实 · 当前绑定已更新', verified:'已核实 · 尚未绑定', not_installed:'未找到匹配的运行器', installed_unverified:'文件已安装，运行能力未通过' };
 type Inventory = { installations?: InstallPlan[]; hosts: { alias: string }[]; tasks: { alias: string; plan_id: string; lookup_id: string; status: string }[] };
 export default function RemotePanel({ current, onSelect, onRemoved, onOpenReceipt }: { current: string | null; onSelect: (alias: string | null) => void; onRemoved: (alias: string) => void; onOpenReceipt: (alias: string, receipt: Receipt, environment: Environment) => void }) {
   const [inventory, setInventory] = useState<Inventory>({ hosts: [], tasks: [] });
@@ -30,6 +30,7 @@ export default function RemotePanel({ current, onSelect, onRemoved, onOpenReceip
   const alive = useRef(false);
   const failureRef = useRef<HTMLDivElement>(null);
   const native = transport === 'native';
+  const pendingInstall = failure?.error instanceof RequestError && failure.error.code === 'install_reconciliation_required' ? failure.error.diagnostic : undefined;
   async function run(name: string, context: string, action: () => Promise<void>) {
     setBusy(name); setFailure(null);
     try { await action(); }
@@ -57,7 +58,7 @@ export default function RemotePanel({ current, onSelect, onRemoved, onOpenReceip
   return <div className="remote-panel"><div className="module-intro"><Clawd small mood="work"/><div><h3>远一点，也能看清每一步</h3><p>先确认 SSH 能登录，再检查远端 Lintel runner。登记主机不会安装软件。</p></div></div>
     {!native && <Notice>合成测试没有真实 SSH 连接。请在桌面应用中选择已配置的 SSH alias。</Notice>}
     <details className="remote-prerequisites"><summary>连接前需要什么？</summary><ol><li>在系统 SSH 中配置 Host alias，并核对主机身份。</li><li>密钥已交给 OpenSSH 或系统 agent；Lintel 的非交互连接不会弹出密码输入框。</li><li>远端需要 <code>lintel</code> runner。Linux x86_64 / arm64 可以在这里检查、预览并批准安装 App 内置版本；只放入目标用户的专用目录。已有 PATH runner 也可直接连接。</li></ol><div className="resource-links"><ResourceLink resource="remote-setup">Lintel 远端准备说明</ResourceLink><ResourceLink resource="vps-basics">VPS 101</ResourceLink><ResourceLink resource="ssh-troubleshooting">SSH 排障手册</ResourceLink></div></details>
-    {failure && <div ref={failureRef}><RequestFailure key={`${failure.context}:${failure.error.message}`} error={failure.error} context={failure.context}/>{failure.retry && <button disabled={!!busy} onClick={failure.retry}>重新检查连接</button>}</div>}
+    {failure && <div ref={failureRef}><RequestFailure key={`${failure.context}:${failure.error.message}`} error={failure.error} context={failure.context}/>{pendingInstall?.install_id && pendingInstall.alias && <button disabled={!!busy} onClick={() => void run(`verify:${pendingInstall.install_id}`, `核对 ${pendingInstall.alias} 的原安装`, async () => { const result = await remoteRequest<InstallPlan>({ op: 'query_install', alias: pendingInstall.alias, install_id: pendingInstall.install_id }); if (alive.current) { setInstallPlan(result); await refresh(); } })}>核对这份未确认安装<Icon name="refresh" size={14}/></button>}{failure.retry && <button disabled={!!busy} onClick={failure.retry}>重新检查连接</button>}</div>}
     {removed && <div className="remote-removed" role="status"><span>已从 Lintel 移除 <strong>{removed}</strong>。系统 SSH 配置与原任务记录均保留。</span><button disabled={!!busy} onClick={() => void run('undo', `重新登记 ${removed}`, async () => { await remoteRequest({ op: 'add_host', alias: removed }); if (alive.current) { setRemoved(null); await refresh(); } })}>撤销移除</button></div>}
     <div className="host-row"><div><strong>本机</strong><small>当前 Mac 的环境与本地记录</small></div><button disabled={!!busy || current === null} onClick={() => onSelect(null)}>{current === null ? '当前工作空间' : '切换到本机'}</button></div>
     {inventory.hosts.map(host => <div className="host-row" key={host.alias}>
@@ -71,7 +72,7 @@ export default function RemotePanel({ current, onSelect, onRemoved, onOpenReceip
       <p className="install-description">运行器放进当前 SSH 用户的 Lintel 专用目录，管理范围也属于这个用户。Claude 由其他用户运行时，请选择那个用户的 SSH alias。</p>
       <div className="install-scope"><Icon name="check" size={15}/><span>现有配置与工作内容保留；已有任务继续使用原运行器。</span></div>
       <details className="install-details"><summary>查看安装与校验详情<Icon name="chevron" size={13}/></summary><dl className="install-facts"><div><dt>目标用户</dt><dd>SSH 用户 · UID {installPlan.probe.uid}</dd></div><div><dt>完整安装位置</dt><dd><code>{installPlan.destination}</code></dd></div><div><dt>SHA-256</dt><dd><code>{installPlan.bundle.sha256}</code></dd></div></dl><ol>{installPlan.effects.map(effect => <li key={effect}>{effect}</li>)}</ol><p>不需要 sudo 或远端编译环境；不修改 PATH、shell 启动文件、sshd 或 Claude 配置。远端需具备基础 Linux 工具与 machine-id。已有版本保留，批准只适用于这次预览的主机、用户和文件。</p></details>
-      {installPlan.last_error && <Notice>{installPlan.last_error.message}</Notice>}
+      {installPlan.status === 'superseded' && <Notice>这份安装已经核实，当前主机仍使用后来选择的运行器。查询旧记录不会切回旧版本，已有任务继续使用各自绑定的版本。</Notice>}{installPlan.status === 'verified' && <Notice>这份历史安装已核实，但没有足够的原绑定信息来自动启用。需要使用它时，请重新检查并批准一份新的安装计划。</Notice>}{installPlan.last_error && <Notice>{installPlan.last_error.message}</Notice>}
       <div className="install-footer"><small>{installPlan.status === 'needs_reconciliation' ? '回包中断时，核对同一份安装即可。' : installPlan.status === 'ready' ? '文件与运行能力均已核验，可以进入工作空间。' : '安装范围仅限这个用户的运行器。'} </small>
       {installPlan.status === 'previewed' && <button className="primary" disabled={!!busy} onClick={() => void run(`install:${installPlan.install_id}`, `安装 ${installPlan.alias} 的运行器`, async () => { try { const result = await remoteRequest<InstallPlan>({op:'install_runner', alias:installPlan.alias, install_id:installPlan.install_id, approval:installPlan.approval}); if (alive.current) setInstallPlan(result); } finally { if (alive.current) await refresh(); } })}>{busy === `install:${installPlan.install_id}` ? '正在上传并核验…' : '批准并安装这个运行器'}<Icon name="arrow" size={15}/></button>}
       {installPlan.status !== 'previewed' && installPlan.status !== 'ready' && <button className="primary" disabled={!!busy} onClick={() => void run(`verify:${installPlan.install_id}`, `核对 ${installPlan.alias} 的原安装`, async () => { const result = await remoteRequest<InstallPlan>({op:'query_install',alias:installPlan.alias,install_id:installPlan.install_id}); if (alive.current) { setInstallPlan(result); await refresh(); } })}>核对原安装<Icon name="refresh" size={15}/></button>}
