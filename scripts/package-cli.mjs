@@ -192,6 +192,9 @@ function verifyStaticElf(bytes, machine, label) {
         fail('wrong_format', `${label}: ELF segment is truncated`);
       }
       if (type === 1) {
+        if (size > bytes.readBigUInt64LE(header + 40)) {
+          fail('wrong_format', `${label}: ELF load segment exceeds its memory mapping`);
+        }
         const address = bytes.readBigUInt64LE(header + 16);
         if ((bytes.readUInt32LE(header + 4) & 1) !== 0 && entry >= address && entry < address + size) {
           loadedEntry = true;

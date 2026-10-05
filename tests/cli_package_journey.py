@@ -11,8 +11,8 @@ depend on any other repository target output. A missing, unreadable or
 wrong-architecture native input, or an unsupported host, is a hard failure.
 
 An optional full-real-input smoke runs only when every canonical input already
-exists locally; it never replaces the native acceptance. Nothing is a silent
-skip. Never points at the operator's home. Run:
+exists locally in the expected platform format; it never replaces the native
+acceptance. Nothing is a silent skip. Never points at the operator's home. Run:
 python3 tests/cli_package_journey.py <native-lintel>
 """
 from __future__ import annotations
@@ -39,7 +39,8 @@ SECOND_REVISION = "b0001234567890abcdef1234567890abcdef1234"
 
 
 def elf(machine: int, interp: bool = False, *, file_type: int = 2,
-        entry: int = 0x401000, needed: bool = False, dynamic: bool = False) -> bytes:
+        entry: int = 0x401000, needed: bool = False, dynamic: bool = False,
+        memory_size: int = 256) -> bytes:
     header = bytearray(64)
     header[0:4] = b"\x7fELF"
     header[4] = 2
@@ -57,7 +58,7 @@ def elf(machine: int, interp: bool = False, *, file_type: int = 2,
     program = bytearray(56)
     payload_offset = phoff + phentsize * phnum
     struct.pack_into("<IIQQQQQQ", program, 0, 3 if interp else 1, 5,
-                     payload_offset, 0x401000, 0x401000, 256, 256, 1)
+                     payload_offset, 0x401000, 0x401000, 256, memory_size, 1)
     payload = bytearray(b"\x90" * 256)
     if needed or dynamic:
         dynamic_program = struct.pack("<IIQQQQQQ", 2, 4, payload_offset, 0x401000, 0x401000, 32, 32, 8)
@@ -100,6 +101,64 @@ def host_target() -> str | None:
     if system == "Linux" and machine in ("aarch64", "arm64"):
         return "linux-aarch64"
     return None
+
+
+def canonical_smoke_inputs(root: Path) -> dict[str, Path] | None:
+    inputs = {
+        "macos": root / "target/release/lintel",
+        "x86": root / "target/x86_64-unknown-linux-musl/release/lintel",
+        "arm": root / "target/aarch64-unknown-linux-musl/release/lintel",
+        "runners": root / "apps/desktop/src-tauri/runner-bundles",
+    }
+    binaries = [(inputs["macos"], None), (inputs["x86"], 62), (inputs["arm"], 183),
+                (inputs["runners"] / "x86_64-unknown-linux-musl/lintel", 62),
+                (inputs["runners"] / "aarch64-unknown-linux-musl/lintel", 183)]
+    # Availability only: the packager still owns full format/manifest validation.
+    # target/release/lintel is a Linux host build on Linux, not a Mac input.
+    try:
+        if not (inputs["runners"] / "manifest.json").is_file():
+            return None
+        for binary, machine in binaries:
+            with binary.open("rb") as handle:
+                header = handle.read(64)
+            if machine is None:
+                if len(header) < 32 or struct.unpack_from("<I", header)[0] != 0xFEEDFACF \
+                        or struct.unpack_from("<I", header, 4)[0] != 0x0100000C \
+                        or struct.unpack_from("<I", header, 12)[0] != 2:
+                    return None
+            elif len(header) < 64 or header[:6] != b"\x7fELF\x02\x01" \
+                    or struct.unpack_from("<H", header, 18)[0] != machine \
+                    or struct.unpack_from("<H", header, 16)[0] not in (2, 3):
+                return None
+    except OSError:
+        return None
+    return inputs
+
+
+def smoke_selection(base: Path) -> None:
+    root = base / "smoke-selection"
+    runners = root / "apps/desktop/src-tauri/runner-bundles"
+    payloads = {
+        root / "target/release/lintel": macho_arm64(),
+        root / "target/x86_64-unknown-linux-musl/release/lintel": elf(62),
+        root / "target/aarch64-unknown-linux-musl/release/lintel": elf(183),
+        runners / "x86_64-unknown-linux-musl/lintel": elf(62),
+        runners / "aarch64-unknown-linux-musl/lintel": elf(183),
+        runners / "manifest.json": b'{"runners":[]}',
+    }
+    for path, payload in payloads.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    assert canonical_smoke_inputs(root) is not None
+    for path, original in payloads.items():
+        path.unlink()
+        assert canonical_smoke_inputs(root) is None, path
+        path.write_bytes(original)
+        if path.name == "lintel":
+            path.write_bytes(elf(62) if path == root / "target/release/lintel" else macho_arm64())
+            assert canonical_smoke_inputs(root) is None, path
+            path.write_bytes(original)
+    assert canonical_smoke_inputs(root) is not None
 
 
 class PackageJourney:
@@ -253,7 +312,9 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
                                 ("arm", "aarch64-unknown-linux-musl", 183)):
         for kind, payload, code in (("object", elf(machine, file_type=1), "not_executable"),
                                     ("shared", elf(machine, file_type=3, entry=0), "not_executable"),
-                                    ("needed", elf(machine, file_type=3, needed=True), "dynamic_dependency")):
+                                    ("needed", elf(machine, file_type=3, needed=True), "dynamic_dependency"),
+                                    ("small-mapping", elf(machine, memory_size=255), "wrong_format"),
+                                    ("empty-mapping", elf(machine, memory_size=0), "wrong_format")):
             name = f"{key}-{kind}"
             runners = journey.base / (name + "-runners")
             shutil.copytree(inputs["runners"], runners)
@@ -298,7 +359,7 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
     supplied = dict(inputs, runners=runners)
     for key, triple, machine in (("x86", "x86_64-unknown-linux-musl", 62),
                                 ("arm", "aarch64-unknown-linux-musl", 183)):
-        payload = elf(machine, file_type=3, dynamic=True)
+        payload = elf(machine, file_type=3, dynamic=True, memory_size=512)
         binary = runners / triple / "lintel"
         binary.write_bytes(payload)
         supplied[key] = binary
@@ -617,22 +678,13 @@ def main() -> int:
             assert probe_manifest["identity_verified_executed"] is False, probe_manifest
 
         # --- optional full-real-input smoke (never replaces native acceptance) -
-        real_note = "skipped (canonical inputs absent)"
-        real_paths = {
-            "macos": ROOT / "target/release/lintel",
-            "x86": ROOT / "target/x86_64-unknown-linux-musl/release/lintel",
-            "arm": ROOT / "target/aarch64-unknown-linux-musl/release/lintel",
-        }
-        if all(p.exists() for p in real_paths.values()):
+        smoke_selection(base)
+        real_note = "skipped (canonical inputs absent or wrong platform format)"
+        real_inputs = canonical_smoke_inputs(ROOT)
+        if real_inputs is not None:
             real_out = base / "real-out"
             # The real smoke uses only canonical inputs so every Linux CLI input
             # is byte-identical to its canonical runner.
-            real_inputs = {
-                "macos": real_paths["macos"],
-                "x86": real_paths["x86"],
-                "arm": real_paths["arm"],
-                "runners": ROOT / "apps/desktop/src-tauri/runner-bundles",
-            }
             real_version = None if journey.host == "macos-arm64" else version
             real = journey.package(real_out, real_inputs, version=real_version)
             assert real.returncode == 0, real.stderr

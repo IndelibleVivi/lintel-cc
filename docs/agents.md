@@ -24,7 +24,7 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 每个 canonical Linux runner 不得超过现有 SSH installer 的 32 MiB 上传上限；超限返回 `runner_too_large`，在生成任何 archive／索引之前停止。
 
-格式检查要求 macOS 输入有完整 Mach-O 64-bit header、arm64 CPU 和 `MH_EXECUTE` 类型；Linux 输入有 ELF64 executable／static PIE 类型、位于文件支持的 executable segment 内的非零入口，且没有 `PT_INTERP` 或 `DT_NEEDED` 动态依赖。截断 header、object／dylib／无入口 shared object 拒绝；格式检查仍不替代其它架构的实际执行。probe 与显式声明的版本都先通过相同的安全版本语法，才用于候选身份与输出路径。
+格式检查要求 macOS 输入有完整 Mach-O 64-bit header、arm64 CPU 和 `MH_EXECUTE` 类型；Linux 输入有 ELF64 executable／static PIE 类型、位于文件支持的 executable segment 内的非零入口，load segment 的 file size 不超过 memory size，且没有 `PT_INTERP` 或 `DT_NEEDED` 动态依赖。截断 header、object／dylib／无入口 shared object 拒绝；格式检查仍不替代其它架构的实际执行。probe 与显式声明的版本都先通过相同的安全版本语法，才用于候选身份与输出路径。
 
 Mach-O 逐条核对 load-command 数量、边界与 segment／section 结构，并要求 `LC_MAIN` 或 ARM64 `LC_UNIXTHREAD` 入口位于文件支持的 executable segment。只有 header、没有入口、未映射入口或不可执行 segment 的输入均拒绝。打包／最终索引发布报错时，回收本次已发布且 identity／大小／mtime 仍未变化的 links，保留既有文件与可检测到的外部替换或编辑，然后可重试；不承诺进程突然终止后的自动 transaction 恢复。
 
