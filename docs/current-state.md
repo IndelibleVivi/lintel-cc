@@ -4,16 +4,24 @@
 
 ## 这份候选包含什么
 
-本轮候选来自同一工作树的阶段修复与官网／共享游戏源码。版本仍为 0.1.0，不能只凭版本号认定两个候选相同。提交与跨平台 CI 完成后在本节记录准确引用。
+本轮 runtime 源码是 [`e276f67`](https://github.com/IndelibleVivi/lintel-cc/commit/e276f6711b461901fe6b9f41b7a1b6285efaa80c)，包含独立官网／共享游戏提交 [`896d38a`](https://github.com/IndelibleVivi/lintel-cc/commit/896d38adb00b3e5cbff70e95107c515c4993c8cf)。版本仍为 0.1.0，不能只凭版本号认定两个候选相同。以下 App 在提交前从相同 runtime 源码构建；随后只补文档和验证入口元数据。
 
 | 对象 | 当前证据与边界 |
 | --- | --- |
-| 源码 | 十项恢复／审批／浏览器问题已修复；官网与共享游戏独立提交 `896d38a` |
+| 源码 | `e276f67` 十项恢复／审批／浏览器修复；官网与共享游戏 `896d38a`；两者均已 push |
 | CLI | 当前 debug runner 已重建，独立命令、portable work、原任务查询／恢复与七项策略旅程通过 |
 | macOS App | arm64 `Lintel.app` 22.63 MiB，包含本轮修复与共享 Clawd；路径 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app` |
 | Linux runner | 新构建 x86_64／aarch64 musl；App `remote-runners` 的 bytes／SHA-256 与各自产物一致，aarch64 runtime 未验证 |
 | 浏览器资源 | Chromium／Firefox 非 fixture 扩展与当前 arm64 native host 已入包；包内文件与 source／manifest 核对一致，直接使用包内资源的两个 synthetic 安装测试通过 |
 | 安装与发行 | 仅 linker ad-hoc signature；无 Applications 安装、生产远端部署、Developer ID 签名、公证或正式发布 |
+
+包内资源身份可按下表核对；SHA-256 为完整摘要，来自本地构建和 source/resource 比对，不表示这些二进制已经发行。路径相对于 `Lintel.app/Contents`。
+
+| 对象 | 路径 | SHA-256 |
+| --- | --- | --- |
+| macOS arm64 App executable | `MacOS/lintel-desktop` | `f3f867248a200956f5a6f3a0bdf09cd8c1bf26437421768f65f1bfe89c0d36c5` |
+| Linux x86_64 runner | `Resources/remote-runners/x86_64-unknown-linux-musl/lintel` | `9eb09f30bec1660914440aa1959f527a53d8afde5426a4322611036248018da6` |
+| Linux aarch64 runner | `Resources/remote-runners/aarch64-unknown-linux-musl/lintel` | `907e122d9d897335606bfa8ec4400df9c68224417bf455f10b8108f0806a13a0` |
 
 ## 阶段修复的合同
 
@@ -47,7 +55,18 @@
 
 统一入口是 `python3 tests/verify.py`；浏览器启动、App 渲染、Linux OpenSSH／VM 和 App 包内资源是独立检查。每份报告的源码 HEAD／dirty、fixture、runtime 和跳过状态分别记录；构建成功不代表实际安装或 runtime 验收。详细验收用例继续见 [acceptance-status.json](acceptance-status.json)，局部通过不自动关闭完整用例。
 
-本地默认检查 18/18 通过；最后相关变更另有 29 项 Engine 单测、App 工作／迁入 UI、完整 Chromium 12 项 smoke 通过。配对／服务／远端 UI 为 3/3，官网／共享游戏为 3/3，包内 host／extension 安装为 2/2。配置 crash recovery 用真实 child 进程在发布前／后退出，重开查询、准确归属、独立恢复与后续编辑拒绝有回归。此前 macOS／Ubuntu、真实 Chromium 启动、隔离 OpenSSH、Linux VM 的证据与旧 App 资源保留在 [候选历史](candidate-history.md)，不冒充这次源码的新鲜验证。
+本轮 clean `e276f67` 的 [CI 37263003720](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37263003720) 全部通过；下载核对的六份入口 JSON 均记录同一 HEAD、`dirty=false`。
+
+| 检查 | macOS arm64 | Ubuntu x86_64 |
+| --- | --- | --- |
+| 默认合成验证 | 18/18 | 18/18 |
+| 独立 browser／App／官网 UI | 7/7 | 7/7 |
+| 静态 musl runner 的真实 OpenSSH | 不适用 | 1/1 |
+| 一次性 Linux VM 生命周期 | 不适用 | 1/1 |
+
+两平台 Chromium 报告均有完整 12 项 smoke：保留原存储／写入者／邻域／启动检查，新增 App clear → 实际进程退出／新 onStartup → popup 继续 → 原 App 最终回执；提交一次，取消预览回传也通过。VM 报告为 `evidence_complete`，覆盖真实 systemd/PAM/logout/cgroup/reboot 与服务恢复，证据限于一次性 guest。
+
+本地默认 18/18、29 项 Engine 单测及最新工作 UI 也通过；实际使用本节 App 包内 host／extension 资源的独立安装检查为 2/2。配置 crash recovery 用真实 child 进程在发布前／后退出，重开查询、准确归属、独立恢复与后续编辑拒绝有回归。旧版本报告与旧 App 资源保留在 [候选历史](candidate-history.md)，不替代本次源码验证。
 
 仓库已公开；项目原创材料的公开复用许可证仍未选定，源码可见不构成通用复用许可，第三方权利保持独立。
 
