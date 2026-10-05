@@ -81,6 +81,8 @@ def _check(
 
 
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
+_CLI_PACKAGE_BINARY = ROOT / ("target/x86_64-unknown-linux-musl/release/lintel"
+                             if platform.system() == "Linux" else "target/debug/lintel")
 
 CHECKS: List[Check] = [
     _check("cargo-workspace-test", "cargo test --workspace (core, operations, remote, egress, runner)", "rust",
@@ -106,6 +108,11 @@ CHECKS: List[Check] = [
            *(NPM or "npm", "run", "build"), cwd=ROOT / "apps/desktop", tools=("npm",),
            paths=(ROOT / "apps/desktop/node_modules",), requires="apps/desktop/node_modules"),
     # Independent / real-runtime evidence: never in the implicit default group.
+    _check("cli-candidate", "portable CLI package/extract/native execution and retained-state upgrade", "independent",
+           PYTHON, "tests/cli_package_journey.py", str(_CLI_PACKAGE_BINARY),
+           tools=("node", "tar"), paths=(_CLI_PACKAGE_BINARY,),
+           independent=True, requires="macOS arm64 native CLI or Linux x86_64 static musl CLI; Node for packaging; tar and platform checksum tool",
+           reason="executes the native extracted package; other architectures use visibly synthetic format fixtures"),
     _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
            PYTHON, "tests/remote_linux_ssh_journey.py", "target/x86_64-unknown-linux-musl/release/lintel",
            tools=("cargo", "ssh", "ssh-keygen"), paths=(ROOT / "target/x86_64-unknown-linux-musl/release/lintel",),

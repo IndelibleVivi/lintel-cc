@@ -58,6 +58,8 @@ npm run desktop:build
 
 packager 要求两种架构文件全部存在，核验 ELF 架构且没有动态加载器，然后生成版本、协议、字节数与 SHA-256 manifest。生成资源被 Git 忽略；Tauri 将其带入 `remote-runners`。从源码构建的 App 若未准备这些资源，本机和已有 PATH runner 仍可使用，但安装入口返回 `bundle_unavailable`。资源存在和静态 ELF 构建成功不能代替真实 Linux 执行证据。
 
+独立 CLI 候选同样携带两种 Linux runner，放在所选 executable 旁的 `bin/remote-runners`。打包、校验和保留旧版本的安装步骤见 [Agent CLI 指南](agents.md)。CLI 与 App 调用同一安装 controller；取得候选包不会自动连接或安装远端软件。
+
 ## 从源码准备目标 runner
 
 以下是用户自行准备 runner 的手工流程，**不是应用会自动执行的安装步骤**。先取得并审核要使用的 Lintel 源码版本。Linux 目标应在目标 Linux OS / CPU 架构的环境中构建；也可使用与目标兼容的 Linux 构建机。macOS 上构建出的 `lintel` 不能直接复制到 Linux 执行，macOS arm64 App 构建成功也不能证明 Linux runner 可运行。
@@ -72,17 +74,11 @@ cargo build --locked --release -p lintel-runner --bin lintel
 ./target/release/lintel --help
 ```
 
-`uname` 显示目标系统与 CPU 架构，`rustc -vV` 的 `host` 字段显示当前 Rust 工具链平台。这里使用 [runner Cargo manifest](../apps/runner/Cargo.toml) 中的 package `lintel-runner` 和 binary `lintel`。未覆盖 Cargo 的 target 目录或 target triple 时，产物为仓库下的 `target/release/lintel`。`--help` 应能直接运行，标题显示 Lintel 版本，并列出 `request`、`submit`、`discover` 等命令；当前 [CLI 实现](../apps/runner/src/main.rs) **没有 `--version` 参数**。
+`uname` 显示目标系统与 CPU 架构，`rustc -vV` 的 `host` 字段显示当前 Rust 工具链平台。这里使用 [runner Cargo manifest](../apps/runner/Cargo.toml) 中的 package `lintel-runner` 和 binary `lintel`。未覆盖 Cargo 的 target 目录或 target triple 时，产物为仓库下的 `target/release/lintel`。`--help` 应能直接运行；使用 `lintel version --json` 核对版本与协议，`lintel capabilities --json` 核对静态 catalog。独立版本安装优先按 [Agent CLI 指南](agents.md) 选择准确 executable。
 
-确认目标用户、构建产物与安装/更新操作后，可以在该目标用户自己的终端中放入用户级 bin 目录。以下复制会安装或替换该用户的同名 `lintel` 文件，不需要 sudo：
+确认目标用户和构建产物后，按 [Agent CLI 指南](agents.md#独立安装选定版本与升级) 安装到选定的新版本目录，保留旧 executable、state 与原任务 ID。不要把候选直接复制覆盖到已有 `lintel`。已有 PATH runner 是仍受支持的兼容入口；新版本目录需要由调用方明确选择。
 
-```sh
-install -d "$HOME/.local/bin"
-install -m 755 ./target/release/lintel "$HOME/.local/bin/lintel"
-"$HOME/.local/bin/lintel" --help
-```
-
-随后确保这个目录属于**该账号的非交互 SSH PATH**。仅在交互终端执行 `export PATH=...` 不足以证明桌面连接能找到它；PATH 的持久配置位置由目标账号的登录 shell 与 sshd 配置决定。不要为修复 PATH 改成关闭主机验证，或在 shell 启动文件向 stdout 打印调试信息。
+若继续使用 PATH 兼容入口，确保所选版本的 `bin` 属于**该账号的非交互 SSH PATH**。仅在交互终端执行 `export PATH=...` 不足以证明桌面连接能找到它；PATH 的持久配置位置由目标账号的登录 shell 与 sshd 配置决定。不要为修复 PATH 改成关闭主机验证，或在 shell 启动文件向 stdout 打印调试信息。
 
 在管理端自己的终端中，把下例的 `synthetic-host` 换成已核验身份的 alias。第一条检查非交互命令解析出的路径，第二条实际执行该 PATH 中的 runner 帮助。它们不会提交 Lintel 任务，也不会自动接受 host key：
 

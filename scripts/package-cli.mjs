@@ -1,0 +1,474 @@
+#!/usr/bin/env node
+// Canonical packager for portable, independently installable Lintel CLI
+// candidate archives. It never compiles, downloads, signs or resolves a remote
+// host: every binary input is supplied explicitly by the caller.
+//
+// Usage (from the repository root, after the canonical builds exist):
+//   node scripts/package-cli.mjs \
+//     --macos-arm64 target/release/lintel \
+//     --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
+//     --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
+//     --linux-runners apps/desktop/src-tauri/runner-bundles \
+//     --revision "$(git rev-parse HEAD)" \
+//     --out candidate-packages
+//
+// Inputs are the three CLI executables (one macOS arm64 Mach-O and two static
+// Linux musl ELF) plus the canonical `remote-runners` directory the CLI itself
+// resolves next to its executable. Each Linux input must be byte-identical to
+// that target's canonical runner, so a stale or mixed set cannot be packaged as
+// one candidate. Missing, wrong-architecture or dynamically-linked Linux inputs
+// are rejected specifically. Packaging is an unsigned candidate artifact, not a
+// signed or formal release.
+//
+// Archive layout (flat, exactly what the CLI resolves at runtime):
+//   bin/lintel                          selected CLI executable
+//   bin/remote-runners/manifest.json    canonical runner manifest
+//   bin/remote-runners/<triple>/lintel  both static Linux runners
+//   candidate.json                      truthful candidate metadata
+//   SHA256SUMS                          shasum/sha256sum -c verifiable digests
+//   README.txt                          install/upgrade instructions
+//
+// The output directory is created only after every input validates. Archives
+// and the identity-specific index are published with true no-replace semantics,
+// so a previous candidate is never overwritten. The repository-relative
+// `candidate-packages/` output directory is ignored by Git; a caller-selected
+// temporary directory is equally acceptable.
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { link, lstat, mkdir, mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+// --- canonical identities -----------------------------------------------------
+// Product/protocol/catalog identity is a fixed contract the caller checks with
+// `lintel version --json` and `lintel capabilities --json`.
+const PRODUCT = 'Lintel';
+const PROTOCOL = 1;
+const CATALOG_VERSION = 1;
+
+const TARGETS = {
+  'macos-arm64': { platform: 'macos', architecture: 'aarch64', triple: 'aarch64-apple-darwin' },
+  'linux-x86_64': { platform: 'linux', architecture: 'x86_64', triple: 'x86_64-unknown-linux-musl' },
+  'linux-aarch64': { platform: 'linux', architecture: 'aarch64', triple: 'aarch64-unknown-linux-musl' },
+};
+const LINUX_TARGETS = {
+  'linux-x86_64': 'x86_64-unknown-linux-musl',
+  'linux-aarch64': 'aarch64-unknown-linux-musl',
+};
+
+function fail(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  throw error;
+}
+
+function parseArgs(argv) {
+  const flags = new Map();
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith('--')) fail('invalid_argument', `unexpected argument: ${token}`);
+    const name = token.slice(2);
+    if (name === 'help') {
+      flags.set('help', 'true');
+      continue;
+    }
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith('--')) fail('invalid_argument', `--${name} needs a value`);
+    flags.set(name, value);
+    i += 1;
+  }
+  return flags;
+}
+
+function required(flags, name) {
+  const value = flags.get(name);
+  if (!value) fail('invalid_argument', `--${name} is required`);
+  return path.resolve(value);
+}
+
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+// --- binary format checks -----------------------------------------------------
+// Mach-O arm64: 64-bit magic (0xfeedfacf) + CPU_TYPE_ARM64.
+function verifyMachOArm64(bytes, label) {
+  if (bytes.length < 8 || bytes.readUInt32LE(0) !== 0xfeedfacf) {
+    fail('wrong_format', `${label}: not a 64-bit little-endian Mach-O executable`);
+  }
+  if (bytes.readUInt32LE(4) !== 0x0100000c) {
+    fail('wrong_architecture', `${label}: Mach-O is not arm64 (cputype=0x${bytes.readUInt32LE(4).toString(16)})`);
+  }
+}
+
+// Static Linux musl ELF: ELF64 little-endian, matching e_machine, no PT_INTERP.
+function verifyStaticElf(bytes, machine, label) {
+  if (bytes.length < 64 || bytes.readUInt32BE(0) !== 0x7f454c46) {
+    fail('wrong_format', `${label}: not an ELF executable`);
+  }
+  if (bytes[4] !== 2 || bytes[5] !== 1) {
+    fail('wrong_format', `${label}: not a 64-bit little-endian ELF`);
+  }
+  const found = bytes.readUInt16LE(18);
+  if (found !== machine) {
+    fail('wrong_architecture', `${label}: ELF e_machine=${found}, expected ${machine}`);
+  }
+  const phoff = Number(bytes.readBigUInt64LE(32));
+  const phentsize = bytes.readUInt16LE(54);
+  const phnum = bytes.readUInt16LE(56);
+  if (phentsize === 0 || phoff + phentsize * phnum > bytes.length) {
+    fail('wrong_format', `${label}: ELF program headers are unreadable`);
+  }
+  for (let i = 0; i < phnum; i += 1) {
+    if (bytes.readUInt32LE(phoff + i * phentsize) === 3) {
+      fail('dynamic_loader', `${label}: ELF requests a dynamic loader (PT_INTERP); a static musl build is required`);
+    }
+  }
+}
+
+// Validate the caller-supplied canonical remote-runners directory the way the
+// CLI resolves it and the shared Rust installer re-checks it, and return its
+// per-target bytes so the Linux CLI inputs can be proven identical.
+async function verifyRunnerBundles(dir) {
+  const manifestPath = path.join(dir, 'manifest.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  } catch {
+    fail('missing_runner_bundles', `canonical remote-runners manifest not readable: ${manifestPath}`);
+  }
+  const entries = manifest.runners;
+  if (!Array.isArray(entries)) fail('invalid_runner_bundles', 'remote-runners manifest lacks a runners array');
+  const files = [];
+  const bytesByTarget = {};
+  for (const [targetId, triple] of Object.entries(LINUX_TARGETS)) {
+    const meta = entries.find((r) => r.target === triple);
+    if (!meta) fail('missing_runner_bundles', `remote-runners manifest is missing ${triple}`);
+    if (meta.protocol !== PROTOCOL) fail('invalid_runner_bundles', `${triple}: manifest protocol is not ${PROTOCOL}`);
+    const runnerPath = path.join(dir, triple, 'lintel');
+    const bytes = await readFile(runnerPath).catch(() => {
+      fail('missing_runner_bundles', `remote-runners file not readable: ${runnerPath}`);
+    });
+    verifyStaticElf(bytes, targetId === 'linux-x86_64' ? 62 : 183, `remote-runners/${triple}/lintel`);
+    const digest = sha256(bytes);
+    if (meta.bytes !== bytes.length || meta.sha256 !== digest) {
+      fail('invalid_runner_bundles', `${triple}: manifest size/digest does not match the actual bytes`);
+    }
+    files.push({ source: runnerPath, archive: `bin/remote-runners/${triple}/lintel`, bytes });
+    bytesByTarget[targetId] = { bytes, digest };
+  }
+  const manifestBytes = await readFile(manifestPath);
+  files.push({ source: manifestPath, archive: 'bin/remote-runners/manifest.json', bytes: manifestBytes });
+  return { files, manifest, bytesByTarget };
+}
+
+const HELP = 'See the header of scripts/package-cli.mjs for usage.';
+
+// Ask the macOS binary for its true static identity. This executes only the
+// "version" command, which is documented not to initialize state. Returns null
+// when the binary cannot run on this host (e.g. packaging on Linux).
+function readBinaryIdentity(binary) {
+  try {
+    const out = execFileSync(binary, ['version', '--json'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000,
+    });
+    return JSON.parse(out).data;
+  } catch {
+    return null;
+  }
+}
+
+// Does any filesystem entry (regular file, directory, or symlink — including a
+// dangling one) exist at this path? lstat never follows the final symlink.
+async function entryExists(absolutePath) {
+  try {
+    await lstat(absolutePath);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+// Publish bytes without ever replacing an existing entry and without ever
+// exposing a partially written final file. The complete bytes go to an
+// exclusive private temporary file in `tempDir` (a mkdtemp directory this
+// process owns), fsynced, then hard-linked to the final path. A link is atomic
+// and fails EEXIST if anything already occupies the final path, so an
+// interrupted or failed write cannot surface a truncated final archive. The
+// owned temporary is unlinked afterward. No journal or broader installer.
+async function publishNoReplace(absolutePath, bytes, mode, tempDir) {
+  if (await entryExists(absolutePath)) {
+    fail('output_exists', `refusing to overwrite an existing path: ${absolutePath}`);
+  }
+  const staged = path.join(tempDir, `publish-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  let handle;
+  try {
+    handle = await open(staged, 'wx', mode);
+    await handle.writeFile(bytes);
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+  } finally {
+    if (handle) await handle.close();
+  }
+  try {
+    await link(staged, absolutePath);
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      fail('output_exists', `refusing to overwrite an existing path: ${absolutePath}`);
+    }
+    throw error;
+  } finally {
+    await rm(staged, { force: true });
+  }
+}
+
+async function main() {
+  const flags = parseArgs(process.argv.slice(2));
+  if (flags.has('help')) return console.log(HELP);
+
+  const binaries = {
+    'macos-arm64': required(flags, 'macos-arm64'),
+    'linux-x86_64': required(flags, 'linux-x86_64'),
+    'linux-aarch64': required(flags, 'linux-aarch64'),
+  };
+  const runnerDir = required(flags, 'linux-runners');
+  const outDir = required(flags, 'out');
+  // The source revision is an explicit caller declaration used for build
+  // identity; it is never inferred from a digest or probe.
+  const revision = flags.get('revision');
+  if (!revision || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(revision)) {
+    fail('invalid_revision', '--revision must be the exact full lowercase hex git object id (40 or 64 chars)');
+  }
+
+  const cli = {};
+  const macosBytes = await readFile(binaries['macos-arm64']).catch(() => {
+    fail('missing_input', `macOS arm64 input not readable: ${binaries['macos-arm64']}`);
+  });
+  verifyMachOArm64(macosBytes, 'macos-arm64/lintel');
+  cli['macos-arm64'] = { bytes: macosBytes, source: binaries['macos-arm64'] };
+  // Probing happens in a private temp directory so a later rejection leaves the
+  // caller's output path untouched.
+  const probeDir = await mkdtemp(path.join(tmpdir(), 'lintel-package-probe-'));
+  const probe = path.join(probeDir, 'lintel');
+  await writeFile(probe, macosBytes, { mode: 0o755 });
+  const probed = readBinaryIdentity(probe);
+  await rm(probeDir, { recursive: true, force: true });
+
+  const runners = await verifyRunnerBundles(runnerDir);
+  const declared = flags.get('version');
+  if (declared && !/^[0-9][0-9A-Za-z.\-+]*$/.test(declared)) {
+    fail('invalid_argument', '--version must be a version string like 0.1.0');
+  }
+  if (probed) {
+    if (!['Lintel', 'lintel'].includes(probed.product)) {
+      fail('invalid_identity', `macOS binary reports unexpected product: ${probed.product}`);
+    }
+    if (probed.protocol !== PROTOCOL || probed.catalog_version !== CATALOG_VERSION) {
+      fail('invalid_identity', `macOS binary protocol/catalog ${probed.protocol}/${probed.catalog_version} != expected ${PROTOCOL}/${CATALOG_VERSION}`);
+    }
+  }
+  // When the macOS binary runs here its self-report is authoritative and any
+  // --version must agree. When it cannot run, an explicit --version is required
+  // and every target records that its identity was declared, not executed.
+  if (probed && declared && probed.version !== declared) {
+    fail('version_mismatch', `--version ${declared} does not match the macOS binary self-report ${probed.version}`);
+  }
+  const version = probed ? probed.version : declared;
+  if (typeof version !== 'string' || version.length === 0) {
+    fail('version_unverified', 'cannot determine candidate version; pass --version (the macOS binary could not be executed on this host)');
+  }
+  // Both canonical runner manifest entries must declare the candidate version.
+  for (const entry of runners.manifest.runners) {
+    if (entry.version !== version) {
+      fail('version_mismatch', `remote-runners ${entry.target} manifest version ${entry.version} does not match candidate version ${version}`);
+    }
+  }
+  for (const targetId of Object.keys(LINUX_TARGETS)) {
+    const bytes = await readFile(binaries[targetId]).catch(() => {
+      fail('missing_input', `${targetId} input not readable: ${binaries[targetId]}`);
+    });
+    verifyStaticElf(bytes, targetId === 'linux-x86_64' ? 62 : 183, `${targetId}/lintel`);
+    const canonical = runners.bytesByTarget[targetId];
+    if (sha256(bytes) !== canonical.digest) {
+      fail('input_runner_mismatch', `${targetId} CLI input is not byte-identical to the canonical ${LINUX_TARGETS[targetId]} runner; stale or mixed inputs cannot form one candidate`);
+    }
+    cli[targetId] = { bytes, source: binaries[targetId], identitySource: 'declared_static' };
+  }
+  cli['macos-arm64'].identitySource = probed ? 'macos_input_executed' : 'declared_static';
+
+  // The candidate carries an explicit build identity so that a bare product
+  // version (e.g. 0.1.0) is never the only identity a caller sees.
+  const identity = `${version}-candidate-${revision.slice(0, 12)}`;
+  const indexPath = path.join(outDir, `candidates-${identity}.json`);
+
+  await mkdir(outDir, { recursive: true });
+  // Refuse before writing any archive if this identity's index already exists —
+  // including a dangling symlink — so a rejected second call never writes
+  // archives or leaves an index claiming older outputs.
+  if (await entryExists(indexPath)) {
+    fail('output_exists', `refusing to overwrite an existing candidate index: ${indexPath}`);
+  }
+  // A private mkdtemp directory this process owns holds staged publications.
+  // Hard-link publication requires the staged file and destination to share a
+  // filesystem; keep our private staging directory inside the selected output.
+  const publishDir = await mkdtemp(path.join(outDir, '.lintel-publish-'));
+  try {
+    const archives = await buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed });
+    const summary = {
+      schema: 'lintel.cli-candidates/1',
+      version,
+      candidate_identity: identity,
+      protocol: PROTOCOL,
+      catalog_version: CATALOG_VERSION,
+      source_revision: revision,
+      source_revision_note: 'caller-declared build identity; not derived from a digest or probe',
+      archives,
+    };
+    await publishNoReplace(indexPath, Buffer.from(`${JSON.stringify(summary, null, 2)}\n`), 0o644, publishDir);
+    console.log(JSON.stringify(summary, null, 2));
+    return undefined;
+  } finally {
+    await rm(publishDir, { recursive: true, force: true });
+  }
+}
+
+async function buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed }) {
+
+  const archives = [];
+  // Refuse every occupied archive path (regular file, directory, dangling
+  // symlink) before publishing any of them, so a conflicting call cannot leave
+  // a partial candidate set behind.
+  for (const targetId of Object.keys(TARGETS)) {
+    const archivePath = path.join(outDir, `lintel-cli-${identity}-${targetId}.tar.gz`);
+    if (await entryExists(archivePath)) {
+      fail('output_exists', `refusing to overwrite an existing archive: ${archivePath}`);
+    }
+  }
+  for (const [targetId, target] of Object.entries(TARGETS)) {
+    const archiveName = `lintel-cli-${identity}-${targetId}.tar.gz`;
+    const archivePath = path.join(outDir, archiveName);
+
+    const stage = path.join(publishDir, `.stage-${targetId}-${process.pid}`);
+    await rm(stage, { recursive: true, force: true });
+    await mkdir(path.join(stage, 'bin'), { recursive: true });
+
+    // The CLI resolves its remote runners at `dirname(current_exe)/remote-runners`,
+    // so the executable lives at bin/lintel and the bundles at bin/remote-runners.
+    const entries = [{ archive: 'bin/lintel', bytes: cli[targetId].bytes }];
+    for (const file of runners.files) {
+      const destination = path.join(stage, file.archive);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, file.bytes, { mode: 0o700 });
+      entries.push({ archive: file.archive, bytes: file.bytes });
+    }
+    await writeFile(path.join(stage, 'bin', 'lintel'), cli[targetId].bytes, { mode: 0o755 });
+
+    const fileEntries = entries.map((entry) => ({
+      path: entry.archive,
+      bytes: entry.bytes.length,
+      sha256: sha256(entry.bytes),
+    }));
+    // A portable, Node-free verification artifact for the installed bytes.
+    const sums = entries
+      .map((entry) => `${sha256(entry.bytes)}  ${entry.archive}`)
+      .sort()
+      .join('\n');
+    await writeFile(path.join(stage, 'SHA256SUMS'), `${sums}\n`);
+    entries.push({ archive: 'SHA256SUMS', bytes: null });
+
+    const manifest = {
+      schema: 'lintel.cli-candidate/1',
+      product: PRODUCT,
+      version,
+      candidate_identity: identity,
+      protocol: PROTOCOL,
+      catalog_version: CATALOG_VERSION,
+      source_revision: revision,
+      source_revision_note: 'caller-declared build identity; not derived from a digest or probe',
+      target: targetId,
+      platform: target.platform,
+      architecture: target.architecture,
+      triple: target.triple,
+      // Honest per-target provenance: only the macOS input is executed here.
+      identity_source: targetId === 'macos-arm64' ? cli[targetId].identitySource : 'declared_static',
+      identity_verified_executed: targetId === 'macos-arm64' && probed !== null,
+      signed: false,
+      release: false,
+      limits: target.platform === 'macos'
+        ? ['requires macOS arm64 (Apple silicon); not notarized or signed']
+        : ['static musl build; remote browser component reports browser_component_unavailable'],
+      files: fileEntries,
+    };
+    await writeFile(path.join(stage, 'candidate.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+    entries.push({ archive: 'candidate.json', bytes: null });
+
+    const readme = [
+      `${PRODUCT} CLI candidate ${identity} (${targetId})`,
+      '',
+      'This is an unsigned development candidate, not a formal release.',
+      `Product version: ${version}  Protocol: ${PROTOCOL}  Catalog: ${CATALOG_VERSION}`,
+      `Source revision (declared build identity): ${revision}`,
+      `Input identity source: ${manifest.identity_source} (executed=${manifest.identity_verified_executed})`,
+      '',
+      'Install without Rust/GUI into an explicit NEW identity directory:',
+      '  1. Create only the parent, then require the identity directory to be absent',
+      '     (plain `mkdir` fails if it already exists, so a prior version is never overwritten):',
+      '       parent="$' + '{LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}"',
+      '       mkdir -p "$parent"',
+      `       dest="$parent/${identity}"`,
+      `       mkdir "$dest" && tar -xzf ${archiveName} -C "$dest"`,
+      '  2. Verify the installed bytes from the selected directory (no Node required):',
+      '       cd "$dest"',
+      `       ${target.platform === 'macos' ? 'shasum -a 256 -c SHA256SUMS' : 'sha256sum -c SHA256SUMS'}`,
+      '  3. Run the absolute executable path and inspect identity/capabilities:',
+      '       "$dest/bin/lintel" version --json',
+      '       "$dest/bin/lintel" capabilities --json',
+      '',
+      'Upgrade by selecting another candidate identity directory; never replace this one in place.',
+      'This archive changes no PATH, shell rc, App, service, Claude, credentials or browser registration.',
+      'Both canonical Linux remote runners ship at bin/remote-runners, resolved next to bin/lintel.',
+      '',
+    ].join('\n');
+    await writeFile(path.join(stage, 'README.txt'), readme);
+    entries.push({ archive: 'README.txt', bytes: null });
+
+    // Build the archive in a private temp file, then publish with true
+    // no-replace so an existing archive (regular file, directory or dangling
+    // symlink) is refused before anything is written and no partial final
+    // archive can appear.
+    const tempArchive = path.join(publishDir, `.tmp-${archiveName}-${process.pid}`);
+    await rm(tempArchive, { force: true });
+    execFileSync('tar', [
+      '-czf', tempArchive,
+      '-C', stage,
+      ...entries.map((e) => e.archive).sort(),
+    ], {
+      // COPYFILE_DISABLE suppresses macOS AppleDouble `._*` members so the
+      // archive contains exactly the payload the manifest lists.
+      env: { ...process.env, COPYFILE_DISABLE: '1' },
+      stdio: ['ignore', 'inherit', 'inherit'],
+    });
+    const archiveBytes = await readFile(tempArchive);
+    try {
+      await publishNoReplace(archivePath, archiveBytes, 0o644, publishDir);
+    } finally {
+      await rm(tempArchive, { force: true });
+      await rm(stage, { recursive: true, force: true });
+    }
+
+    archives.push({
+      target: targetId,
+      archive: archiveName,
+      bytes: archiveBytes.length,
+      sha256: sha256(archiveBytes),
+      cli_sha256: sha256(cli[targetId].bytes),
+    });
+  }
+
+  return archives;
+}
+
+main().catch((error) => {
+  console.error(`${error.code ?? 'error'}: ${error.message}`);
+  process.exitCode = 1;
+});

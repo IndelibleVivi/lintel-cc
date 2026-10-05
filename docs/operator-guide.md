@@ -10,7 +10,7 @@ Lintel 帮你处理具体的 Claude 使用环境：减少指定的可选外发�
 
 如果你已经拿到 Lintel 的本地构建 App，打开后从下面的任务表进入。当前仍是开发候选，源码仓库没有把正式签名、公证和非开发者安装验收视为完成。需要自己构建时，按照 [README 的本地构建与试用](../README.md#本地构建与试用) 准备 Rust、Node 和 macOS 构建环境。
 
-Linux 只使用独立 runner/CLI，不需要安装桌面环境。Mac 可以在主机面板批准准备 App 内置的 Linux runner，见第 5 节；从源码取得 CLI 可用 `cargo build -p lintel-runner`，二进制在 `target/debug/lintel`。App 存在不代表终端已经能用 `lintel`，先确认所使用的二进制路径。
+Linux 只使用独立 runner/CLI，不需要安装桌面环境。Mac 可以在主机面板批准准备 App 内置的 Linux runner，见第 5 节。独立 CLI 候选提供 macOS arm64、Linux x86_64 与 aarch64 包，取得匹配的候选后不需要 Rust 或 GUI；按 [Agent CLI 指南](agents.md) 校验并解包到新版本目录，明确选择 executable，升级保留旧目录与原任务。自行从源码取得 CLI 可用 `cargo build -p lintel-runner`，二进制在 `target/debug/lintel`。App 存在不代表终端已经能用 `lintel`，先确认所使用的二进制路径。
 
 第一次只想熟悉操作，可按 README 启动 `dev:synthetic`；页面会明确显示测试空间。
 
@@ -344,7 +344,7 @@ scp -o StrictHostKeyChecking=yes /absolute/path/work-package.age approved-alias:
 
 ## 只有终端时：独立 CLI
 
-CLI 不依赖 GUI 启动或 Tauri。源码安装与升级、机器可读 schema、秘密 stdin、批准、原任务 wait、恢复、browser/SSH/network 的有限适配见 [Agent CLI 指南](agents.md)。
+CLI 不依赖 GUI 启动或 Tauri。候选包校验／独立版本安装与升级、源码构建、机器可读 schema、秘密 stdin、批准、原任务 wait、恢复、browser/SSH/network 的有限适配见 [Agent CLI 指南](agents.md)。候选是明确选择的本地版本，未提供自动更新或正式签名发行。
 
 ```sh
 lintel version --json

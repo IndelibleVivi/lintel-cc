@@ -68,7 +68,9 @@ npm run desktop:build
 ./target/debug/lintel tui
 ```
 
-`discover` 可登记已发现的默认根，只检查已知目录，不运行 Claude、shell rc、hooks 或 MCP。命名命令或兼容 `lintel request` 共用计划/批准/执行/查询/恢复。静态 version/schema/describe/capabilities 不初始化 state；submit 拒绝退出非零，accepted 与任务完成分开。交互启动使用真实 TTY 的 `lintel launch ID`，generic `call launch` 明确拒绝。远端交互使用 `lintel remote launch ALIAS ENVIRONMENT_ID`，同样需要真实 TTY；JSON `remote control` 不启动交互会话。独立源码安装、选定 executable 和升级见 [Agent CLI 指南](docs/agents.md)；完整 core 与兼容合同见 [core 与 CLI](docs/core.md) 和 [协议](contracts/protocol.md)。
+`discover` 可登记已发现的默认根，只检查已知目录，不运行 Claude、shell rc、hooks 或 MCP。命名命令或兼容 `lintel request` 共用计划/批准/执行/查询/恢复。静态 version/schema/describe/capabilities 不初始化 state；submit 拒绝退出非零，accepted 与任务完成分开。交互启动使用真实 TTY 的 `lintel launch ID`，generic `call launch` 明确拒绝。远端交互使用 `lintel remote launch ALIAS ENVIRONMENT_ID`，同样需要真实 TTY；JSON `remote control` 不启动交互会话。
+
+独立 CLI 候选可打包为 macOS arm64、Linux x86_64 与 aarch64 archives，每包携带两种 static Linux remote runners、候选身份及文件校验清单。取得匹配候选后，无需 Rust 或 GUI；核验包和文件，解包到尚不存在的新版本目录，再选择准确的 `bin/lintel`。升级保留旧 executable、state 与原任务 ID，不自动修改 PATH、shell rc 或服务。打包命令、安装／升级和源码构建见 [Agent CLI 指南](docs/agents.md)；完整 core 与兼容合同见 [core 与 CLI](docs/core.md) 和 [协议](contracts/protocol.md)。
 
 ## 数据与边界
 

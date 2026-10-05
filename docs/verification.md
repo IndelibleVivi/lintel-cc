@@ -137,6 +137,7 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 
 | id | what it needs |
 | --- | --- |
+| `cli-candidate` | macOS arm64 native CLI or Linux x86_64 static musl CLI, Node on the packaging host, tar and platform checksum tool. Packages/extracts/runs the native CLI in synthetic homes, rejects wrong/dynamic/missing inputs and overwrites, and preserves original state/job across two selected version directories. Other-architecture inputs are visibly synthetic format fixtures; these do not prove their runtime. |
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and shared Rust controller; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
@@ -145,6 +146,22 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `linux-vm-runtime` | Linux x86_64, static musl runner, QEMU, cloud-image-utils, OpenSSH client, gpgv and Ubuntu cloud-image public keyring. Creates a disposable Ubuntu guest with real systemd/PAM, synthetic services and users; host policy and production VPS remain outside the test. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
+
+CLI candidate packaging has its own explicit selection:
+
+```sh
+# macOS arm64: the entrypoint selects target/debug/lintel.
+cargo build --locked -p lintel-runner
+python3 tests/verify.py --checks cli-candidate --json /tmp/lintel-cli-candidate.json
+```
+
+On Linux x86_64, first build `target/x86_64-unknown-linux-musl/release/lintel`
+with the static musl command below; the same selection uses that executable.
+CI selects this check on both platforms after the applicable build. Installation
+verification uses the packaged checksum list with macOS `shasum` or Linux
+`sha256sum`; Node is a packaging-host prerequisite, not a CLI runtime dependency.
+The producer supplies the selected full source revision. Package checksums and
+native version output do not authenticate source provenance or a signature.
 
 Browser runtime and App pairing have a separate opt-in entrypoint (repository root):
 

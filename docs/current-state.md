@@ -4,6 +4,16 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 可安装候选与双架构 runner（本机构建候选）
+
+本机 macOS arm64 App 已从 A/B/C 合并后的源码重新构建，约 22.52 MiB，包含 x86_64 / aarch64 两种 static musl Linux runners，以及 canonical browser host 和 Chromium / Firefox 扩展。实际 App 中的两种 runner 与本次 cross-build 产物逐字节一致，manifest 的大小、SHA-256、ELF 架构及无动态加载器均已核对；实际 App host／扩展资源的两项 synthetic 安装测试通过。资源准备使用既有 `prepare-remote-runners.mjs`，没有新增下载器或 VPS 编译路径。
+
+独立 CLI 打包入口为 `scripts/package-cli.mjs`：明确提供三种架构的构建产物，核对两种 Linux CLI 与 canonical runner 字节一致，生成各自归档、逐文件 `SHA256SUMS` 和候选身份索引。安装选择尚不存在的新版本目录；已有归档／索引／版本目录不覆盖，临时完整文件通过原子不覆盖发布。source_revision 是调用方声明，checksum 核验字节而非签名或源码 provenance。[安装与升级指南](agents.md) 给出无需 Rust／GUI／Node runtime 的使用流程。
+
+本机显式 `cli-candidate` 1/1 已通过：实际解包并执行 Mac native CLI 的 version／capabilities／schema，切换到第二个合成候选身份仍能查询原环境与 job，并验证重复解包保留已有版本。非 native slots 是明确的合成格式 fixtures；另有本机全部真实构建输入的打包 smoke。macOS／Ubuntu CI 已接入同一 canonical selection，Linux native 包执行与新 source CI 待验证；不能由合成其它架构输入推定 runtime。
+
+候选资源与生产安装是不同事实。未复制到 Applications、未 Developer ID 签名／公证、未正式发行或安装到真实远端。aarch64 目前只有构建和包内资源证据，runtime 仍未验收。下方 A/B/C 的 `d0851c7` CI 和较早 App 是历史证据，不能替代本轮候选的安装／runtime 检查。
+
 ## 人类任务、agent CLI 与独立工作保全（源码已合并，开发候选）
 
 完整 A/B/C 已通过 [PR #1](https://github.com/IndelibleVivi/lintel-cc/pull/1) 合并到 main。已接入六个 App 任务帮助入口及[人类指南](operator-guide.md)、[Agent CLI 指南](agents.md)。工作保全独立于清理：archive-only 只生成加密包；preserve 归档后建立新根并迁入，成功按本任务显示完成，旧登录／设置／服务绑定保留。旧 plan_reset/rebuild 与历史部分完成回执仍兼容。工作包保留 lintel.work/1 格式，可用目标主机的显式 archive_path 独立检查、阅读、选择性迁入，不依赖原 job/state；密文由明确的系统工具传输，已有文件不覆盖，包内容与目标在批准执行时再核对。
@@ -14,7 +24,7 @@ Review 修复纳入共同执行路径：创建新 root 前分配并持久保存�
 
 最终源码 clean `d0851c7` 的 [CI37249445342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37249445342) 已通过 macOS／Ubuntu 默认各 17/17、独立 browser/UI 各 5/5（真实启动、App 配对、服务、原任务、工作保全），Ubuntu OpenSSH 1/1 与真实 Linux VM 1/1。六份入口报告记录同一 clean source HEAD；两平台 root workspace 检查通过；本机 core 80/80、operations 6/6；本机 shared remote 41 passed／2 independent ignored。ignored 不计为通过。详细 Chromium 启动报告保留全部 11 个断言、旧进程退出／新进程、生产 onStartup 世代与无扩展加载 flags；VM 报告 evidence_complete，原 PAM logout、准确 system/user unit cgroup、原任务完成、真实 reboot 后核对、精确 service 恢复均通过。全部使用合成 roots、账户与 inert Claude，不证明生产 VPS 或真实认证。
 
-arm64 App 从最终源码 `d0851c7` 构建。独立临时版本目录的 release CLI 已从 `d0851c7` 安装，完整 named plan/submit/原 ID wait/restore、有限 adapter 与 portable 5/5 journeys 通过；App 与 CLI 均对应最终源码。不依赖 GUI。App 约 14.46 MiB，含 canonical browser host 与扩展；实际 App 包内 host/扩展资源两项独立 synthetic 安装检查通过。未安装到 Applications、激活、发行签名、公证或正式分发。此候选没有本轮新 Linux runner bundles，远端安装明确显示 bundle_unavailable；CI 的 x86_64 静态 runner 构建与隔离运行是独立证据，不能当作 App 已包含或生产主机已安装。aarch64 runtime、正式浏览器／真实认证与生产 VPS 仍未验收。
+前批 arm64 App 从最终源码 `d0851c7` 构建。独立临时版本目录的 release CLI 已从 `d0851c7` 安装，完整 named plan/submit/原 ID wait/restore、有限 adapter 与 portable 5/5 journeys 通过；App 与 CLI 均对应最终源码。不依赖 GUI。App 约 14.46 MiB，含 canonical browser host 与扩展；实际 App 包内 host/扩展资源两项独立 synthetic 安装检查通过。未安装到 Applications、激活、发行签名、公证或正式分发。此候选没有本轮新 Linux runner bundles，远端安装明确显示 bundle_unavailable；CI 的 x86_64 静态 runner 构建与隔离运行是独立证据，不能当作 App 已包含或生产主机已安装。aarch64 runtime、正式浏览器／真实认证与生产 VPS 仍未验收。
 
 工作旅程使用两个隔离 HOME 的真实 core，检查归档／保全／独立导入、错误口令、键盘和 Day/Night，以及明确标记的中断 probe 回执。App 配对使用真实 host。invoke/clipboard/SSH/service seams 为合成，不证明 native WebKit 或生产传输。下方保留此前 clean CI 与 App 的历史证据；后续文档提交不改变上面的 tested source HEAD。
 
@@ -98,9 +108,9 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 | Browser | 20 JS 与当前 13 native host Rust tests 通过；App 内置扩展安装器 12 项含包内资源测试、host 安装／更新与实际 executable 验证见上节。既有覆盖：通用 control 不能放行扩展（授权仅限安装路径）、配对码 12 hex／5 次失败作废／pending 上限、browser 由调用方身份派生、running 回执移到 durable 边界之后、DNR 读回数组序不敏感。活跃 SW 负例证实注销后仍可能回写；当前真实 Chromium 持久安装／完整退出与原生 onStartup／二次确认 smoke 已通过，详见上节。覆盖 active SW／iframe writer、五类目标存储与邻域保留、隔离／权限恢复、重复操作不重删及 Native Messaging 持久回执。正式三浏览器与 AdsPower／Firefox 容器／真实网站仍未验收 |
 | SSH | 本轮共享 crates/remote 默认 41 passed、2 independent ignored，standalone desktop 默认 24 passed、2 bundle-resource ignored（ignored 不计为通过；本机实际包资源另选 2/2 通过）；此前内置浏览器轮 57 passed、0 ignored（包含两项包内资源 opt-in，过滤独立 Linux runtime），Ubuntu 独立 OpenSSH runtime 已通过，保留既有 SSH 回归，包括上传真实字节／权限／哈希、过期目标／文件／批准拒绝、丢回包只核对、外部文件保留、平台／能力拒绝、原任务版本冻结；既有覆盖移除后保留任务／去重、具体失败分类、stderr 并发排空／限长／去敏、只读排查命令、查询原错误保留；既有严格 host key、固定命令、丢 ACK 查询继续通过。固定关闭 `ProxyCommand=none` / `RemoteCommand=none`，observe 仅采用 id 匹配的回执，私有目录校验属主。Python fake-SSH 13/13 通过，含有限 custom schema 与 stdin payload 回归。两台真实 Linux x86_64 主机已完成严格 SSH 与生产安装脚本的只读探测，OS／架构／UID／安装条件返回有效且目标身份不同；未上传、未安装、未运行 Claude 或 runner。最新隔离 VM 已验证符合条件的 system/user manager 在严格 PAM logout 后继续并完成原任务，不符合条件的 setsid 路径明确受限；真实 reboot 后原任务核对且未重发。生产 VPS 与 aarch64 runtime 未验收 |
 | Web UI | 合成 root 中计划/执行/恢复、归档解锁/阅读/冲突拒绝/新环境迁入、四清理配方、退役重新启用、支持资料保存已走通。重排后 Home 的 Day/Night、900×640布局、工作入口、口袋展开不挤动操作框、连续戳戳／躲藏／拖甩、鼠标／滚轮／模拟触摸、焦点返回和减少动态已验证；四画收星、等比例缩放、翻页，游戏跳跃／暂停／碰撞／重开与本机最高分通过。网络面板经 synthetic native-response harness 验证延迟响应隔离和停止／编辑／重启。新增安装卡合成 native bridge 验证预览前不上传、显式批准、丢回包后的状态同步、原安装只读查询、关闭／重开／迟到响应隔离与连接管理；安装卡 Day/Night 和 900×640 长路径详情已实际渲染检查，视觉仍待用户接受。F04 界面使用真实合成 CLI 完成计划／批准／解除／回执／组织条件往返；新增 SSH 合成 native-response harness 验证具体错误／摘要复制、显式重连、移除／撤销／失败保留、当前主机回本机、原任务查询和关闭面板后的迟到响应隔离；帮助链接 ID 与 900×640 长命令排版通过。其后完成纸上晨光/夜里月光环境光、首页问候纵向重排、统一柔影刻度、clay tint 选中态的 Day/Night/窄屏截图 QA；浏览器面板移除独立「允许扩展 ID」按钮（扩展授权并入用户确认的安装路径），经合成空间复核；概览「已设置关闭」计数使用各变量解析后的 configured 状态。视觉稿仍属候选 |
-| macOS | 当前 `d0851c7` arm64 App 本地构建成功，约 14.46 MiB，含六场景帮助／独立工作保全／统一 CLI 共用 core/remote、Chromium／Firefox 扩展与 browser host；没有本轮 Linux runner bundles，缺资源明确拒绝安装。默认包排除本机可选字体，typecheck、Vite 与 Tauri release 构建通过；实际包内 host/extension 2/2 synthetic 安装测试通过。本轮界面使用真实 core/host 与浏览器合成 bridge，未完成新 native WebKit／真实 VPS 交互验收；没有自动重启旧窗口。未 Developer ID 签名、公证、正式分发或 Applications 安装验收 |
+| macOS | 本轮 arm64 App 本地构建成功，约 22.52 MiB，含六场景帮助／独立工作保全／统一 CLI 共用 core/remote、Chromium／Firefox 扩展与 browser host，以及两种 static Linux runner；actual App 字节／manifest／静态 ELF 已核对。默认包排除本机可选字体，typecheck、Vite 与 Tauri release 构建通过；实际包内 host/extension 2/2 synthetic 安装测试通过。本轮界面使用真实 core/host 与浏览器合成 bridge，未完成新 native WebKit／真实 VPS 交互验收；没有自动重启旧窗口。未 Developer ID 签名、公证、正式分发或 Applications 安装验收 |
 
-统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与八条合成 journey；浏览器、Linux runtime 与 native bundle 显式选择。最终 clean `d0851c7` 的 [CI37249445342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37249445342) 默认各 17/17、独立浏览器／界面各 5/5、Ubuntu OpenSSH 1/1 与真实 VM 1/1 全部通过；六份入口报告 clean HEAD 一致，详细 startup／PAM／service／reboot／共享认证报告已核对。当前本机 App 与独立 installed CLI 均来自 `d0851c7`；本机构建／安装与包内资源核验是独立证据，后续文档提交不重跑未变更的源码验证。CI 构建并运行 x86_64 静态 musl runner；当前 App 未打包本轮 Linux runner，aarch64 runtime 仍未验收。历史与局部用例证据保留在 [acceptance-status.json](acceptance-status.json)。
+统一入口 [tests/verify.py](../tests/verify.py) 聚合 root、独立 desktop/native-host Rust、JS、Python、前端与八条合成 journey；浏览器、Linux runtime 与 native bundle 显式选择。最终 clean `d0851c7` 的 [CI37249445342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37249445342) 默认各 17/17、独立浏览器／界面各 5/5、Ubuntu OpenSSH 1/1 与真实 VM 1/1 全部通过；六份入口报告 clean HEAD 一致，详细 startup／PAM／service／reboot／共享认证报告已核对。前批本机 App 与独立 installed CLI 均来自 `d0851c7`；本机构建／安装与包内资源核验是独立证据，后续文档提交不重跑未变更的源码验证。CI 构建并运行 x86_64 静态 musl runner；本轮 App 的两种 runner 包内资源证据见上节，aarch64 runtime 仍未验收。历史与局部用例证据保留在 [acceptance-status.json](acceptance-status.json)。
 
 实际主机为 macOS arm64。Linux x86_64 musl 已有上述 CI runtime 证据；aarch64、正式 Chrome/Edge/Firefox、真实 Claude 身份与平台认证机制没有实机验收。细项证据在 [acceptance-status.json](acceptance-status.json)；局部测试不自动完成整个验收用例。
 
@@ -110,7 +120,7 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 2. **完整外发策略与强约束：** 七项自定义已接入；更多取舍、入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
 3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、符合既有条件的 system/user manager 严格 logout 后续跑、原任务完成与 reboot 后核对。setsid 不保证 logout 存活，托管路径也不保证 reboot 续跑；生产 VPS 安装与任务实跑、aarch64 runtime、其他 supervisor 和完整 G03 仍未验收。
 4. **浏览器旅程：** 独立 Chromium 临时测试 profile 已完成真实持久安装／onStartup 两阶段清理；仍需正式 Chrome、Edge、Firefox 与 AdsPower 的安装、配对与清理验收。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。
-5. **发行与维护：** 菜单栏、定时漂移、签名规则更新、卸载、升级、正式签名/公证、性能预算。
+5. **发行与维护：** 菜单栏、定时漂移、签名规则更新、App 升级／卸载、正式签名/公证、性能预算。独立 CLI 的显式版本目录切换不等于 App 自动更新。
 6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。混合状态加密备份不支持自动恢复；会话/记忆迁入不证明可以续聊。
 
 这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、生产 VPS 任务验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。
