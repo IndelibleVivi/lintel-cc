@@ -164,6 +164,10 @@ helper restores its disposable manifest byte for byte, closes the old browser
 process, then relaunches without extension-loading flags. It requires a different
 native `runtime.onStartup` generation before the second, separately approved
 deletion. No profile preferences or startup markers are written by the harness.
+After explicit isolation release, the harness waits for the completed UI update,
+checks the durable release receipt and absence of its DNR rules before navigating.
+Permission previews are visible before confirmation; clicking an asynchronous
+button alone is not completion evidence.
 The detailed `browser-smoke.json` records process IDs, loading flags, generation
 and native-host receipts. These are real-runtime observations with synthetic
 data, not claude.ai or logged-in Claude acceptance. Formal Chrome, Edge, Firefox
