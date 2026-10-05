@@ -41,6 +41,8 @@ Named CLI 与有限 SSH 的 `environment_id`、`plan_id`、`job_id` 按 schema �
 
 外层 `remote.execute` / `remote.reconnect` 的 `plan_id` 与 `remote.launch` 的 `environment_id` 也共用这条 UUID 规则，在本地记录或 SSH 前检查。`install_id` 属于安装 controller 的独立受限标识规则，使用安装预览返回值。
 
+Named execute 与有限远端新提交的 `approval` 必须是原计划返回的 64 位 lowercase hex hash。格式错误在初始化 named core 或创建远端任务 intent／调用 SSH 前拒绝，格式合法仍须由 core 核对准确 plan.hash 与当前目标。已有远端任务记录的重复 execute 保持 query-only，不因参数错误删除记录或重发；原 ID 的 reconnect 是明确恢复入口。
+
 专用真实 TTY `lintel launch ID` 与 `capabilities --environment ID` 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 `invalid_request`，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。
 
 `env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。

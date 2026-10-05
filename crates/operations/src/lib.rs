@@ -18,8 +18,18 @@ fn text() -> Value {
 fn choice(values: &[&str]) -> Value {
     json!({"type":"string","enum":values})
 }
+pub fn plan_hash_schema() -> Value {
+    json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64,"writeOnly":true})
+}
+pub fn valid_plan_hash(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 fn property(name: &str) -> Value {
     match name {
+        "approval" => plan_hash_schema(),
         "environment_id" | "plan_id" | "job_id" => {
             json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096})
         }
@@ -253,6 +263,9 @@ pub fn validate(request: &Value) -> Result<(), String> {
         if key == "unit" && !valid_service_unit(value.as_str().unwrap()) {
             return Err("unit 需要完整 service 名称；不接受 template、路径、glob 或命令".into());
         }
+        if key == "approval" && !valid_plan_hash(value.as_str().unwrap()) {
+            return Err("approval 需要原计划返回的 64 位小写 hex hash".into());
+        }
         if ["root", "archive_path", "output_path"].contains(&key.as_str())
             && !value.as_str().unwrap().starts_with('/')
         {
@@ -442,6 +455,30 @@ mod tests {
         }
         assert!(validate(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
     }
+    #[test]
+    fn execute_approval_schema_matches_plan_hash_shape() {
+        let mut request = json!({"command":"execute","plan_id":"00000000-0000-4000-8000-000000000002","approval":"x"});
+        assert!(
+            validate(&request).is_err(),
+            "Malformed plan hash passed named validation"
+        );
+        for approval in [
+            "a".repeat(63),
+            "a".repeat(65),
+            "A".repeat(64),
+            "g".repeat(64),
+        ] {
+            request["approval"] = json!(approval);
+            assert!(validate(&request).is_err());
+        }
+        request["approval"] = json!("a".repeat(64));
+        assert!(validate(&request).is_ok());
+        let approval = schema("execute").unwrap()["properties"]["approval"].clone();
+        assert_eq!(approval["pattern"], "^[a-f0-9]{64}$");
+        assert_eq!(approval["minLength"], 64);
+        assert_eq!(approval["maxLength"], 64);
+    }
+
     #[test]
     fn cleanup_work_selection_follows_the_recipe() {
         let base = json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false});

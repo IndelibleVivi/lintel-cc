@@ -74,6 +74,12 @@ def run():
                                   '00000000-0000-4000-8000-000000000000', '--categories', '', good=False)
         assert empty_selection['error']['code'] == 'invalid_request', empty_selection
         assert not state.exists(), 'Rejected launch/selection initialized core state'
+        for approval in ['x', 'a' * 63, 'a' * 65, 'A' * 64, 'g' * 64]:
+            rejected = command('job', 'submit', '--plan',
+                               '00000000-0000-4000-8000-000000000000',
+                               '--approval', approval, good=False)
+            assert rejected['error']['code'] == 'invalid_request', rejected
+            assert not state.exists(), 'Malformed approval initialized core state'
         for operation in ['execute', 'reconnect']:
             payload = {'op': operation, 'alias': 'missing-synthetic', 'plan_id': 'plan-secret'}
             if operation == 'execute':

@@ -80,7 +80,9 @@ fn property(op: &str, field: &str) -> Value {
             json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64,"writeOnly":true,"description":"原安装预览返回的准确 approval；已持久化上传 intent 的重复调用只核对原 install_id"})
         }
         "approval" => {
-            json!({"type":"string","minLength":1,"maxLength":512,"x-maxUtf8Bytes":512,"writeOnly":true,"description":"原远端计划返回的准确 approval；已有本地 plan_id 记录时只查询原任务，不重新提交"})
+            let mut property = lintel_operations::plan_hash_schema();
+            property["description"] = json!("原远端计划返回的准确 approval；新提交在记录 intent 前验证格式，已有本地 plan_id 记录时只查询原任务，不重新提交");
+            property
         }
         "archive_passphrase" => {
             json!({"type":"string","minLength":12,"writeOnly":true,"description":"只通过 SSH stdin 传递，不进入 argv、诊断 excerpt 或本地 intent；仅新提交需要验证"})
@@ -387,6 +389,10 @@ mod tests {
         let row = |op: &str| rows.iter().find(|row| row["op"] == op).unwrap();
         assert_eq!(row("execute")["recovery"]["sole_submit"], true);
         assert_eq!(row("execute")["recovery"]["operation"], "remote.reconnect");
+        let approval = &row("execute")["request_schema"]["properties"]["approval"];
+        assert_eq!(approval["pattern"], "^[a-f0-9]{64}$");
+        assert_eq!(approval["minLength"], 64);
+        assert_eq!(approval["maxLength"], 64);
         assert_eq!(row("install_runner")["recovery"]["sole_upload"], true);
         assert_eq!(
             row("install_runner")["approval"]["kind"],
