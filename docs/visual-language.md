@@ -13,6 +13,7 @@ Lintel 的图形由承重横梁、两根支撑和右下方的光标构成。横�
 | App 内小标记 | [`Brand()`](../apps/desktop/src/ui.tsx) | 32-unit 无底色图形；横梁／光标跟随 accent，支撑跟随 text，适配 Day / Night |
 | 左上角字标 | [`App.tsx`](../apps/desktop/src/App.tsx)、[`styles.css`](../apps/desktop/src/styles.css) | 保留现有 serif `lintel_`、分割线与 2.6 秒慢闪光标；reduced motion 下静止 |
 | 可编辑展示资产 | [`assets/identity`](../apps/desktop/assets/identity/README.md) | 透明、单色、outlined 字标、横向组合、16/24/32 optical 与可选 dark 图标 |
+| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、serif `lintel_` 字标与静态横梁示意；favicon 复用 32 px optical；页尾 Clawd 与 App 共用四腿动画／收星 runner，仅主动开始后运动 |
 
 文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于导出材料，界面继续使用自己的 serif 字体。静态小标记的光标不闪烁；侧栏字标的慢闪是保留的交互风格。
 
@@ -27,5 +28,7 @@ Day 的 paper / support / beam 是 `#FAF9F5` / `#3D3D3A` / `#C16A47`；Night 为
 保留右侧光标和空开口，不拉伸、加立体斜面／光晕、额外屋顶／盾牌／锁，不把光标移到开口中央。16/24/32 px 展示优先采用 optical 版本；更大的图标使用 master。主 App 图标在 OS 明暗主题中都保留浅色容器；dark 资产只是可选展示版本。
 
 ## 验收边界
+
+官网与桌面保持同一身份，但官网是独立介绍页面。首屏用门楣图形解释名字，操作区明确标为示意；小游戏、操作示意和主题不调用本机执行能力。响应式版式、日夜主题与 reduced motion 在浏览器中单独验收，不替代 App 的 native 验收，也不代表用户已接受这一版官网设计。
 
 源码接入、打包、实际桌面辨识度和用户审美接受是不同事实。发布前仍需检查 macOS Dock、Finder、Spotlight、Cmd–Tab、安装器／About，以及正式 Linux launcher／window icon；同时看明暗桌面背景和小尺寸。提供 assets 或通过 build 不代表这些环境已经验收。当前实测状态见 [current-state](current-state.md)。
