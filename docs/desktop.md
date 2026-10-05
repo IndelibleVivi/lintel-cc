@@ -70,7 +70,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 ## 帮助与开发者说明
 
-侧栏“帮助”离线提供六任务路径、目标／预览／批准／原 ID 核对四步、会话阅读与 CLI 交接说明，并提供 Faye 的 GitHub、Lintel 源码与说明，以及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 和连接排障章节。Lintel 是独立工具，项目仓库提供源码、使用说明与当前验收状态。frontend 与 native 共用 `contracts/documentation-resources.json`，桌面只通过 `resources.rs` 中有限 resource ID 打开固定 HTTPS 文档链接；clean 构建把项目 docs 链接锁定到同一源码 revision，开发构建标明 unknown／最新开发说明。不接受任意 URL，不附带配置、错误或凭据。网页预览使用普通外链，macOS App 使用系统浏览器。打开失败时保留可复制链接。
+侧栏“帮助”离线提供六任务路径、目标／预览／批准／原 ID 核对四步、会话阅读与 CLI 交接说明，并提供 Faye 的 GitHub、Lintel 源码与说明，以及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 和连接排障章节。Lintel 是独立工具，项目仓库提供源码、使用说明与当前验收状态。frontend 与 native 共用 `contracts/documentation-resources.json`，桌面只通过 `resources.rs` 中有限 resource ID 打开固定 HTTPS 文档链接；clean 构建只把 Lintel 自己的 docs 链接锁定到同一源码 revision，开发构建标明 unknown／最新开发说明。独立指南使用它自己的 main，标为“独立指南 · 最新版”。不接受任意 URL，不附带配置、错误或凭据。网页预览使用普通外链，macOS App 使用系统浏览器。打开失败时保留可复制链接。
 
 ## 远端运行器
 

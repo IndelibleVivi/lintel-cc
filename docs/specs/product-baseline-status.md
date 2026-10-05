@@ -21,9 +21,9 @@
 | A13 | D 原任务 Agent 交接 | core／remote／UI 通过 | accepted／uncertain job 和原启动 ID 均保留准确查询命令、runner binding／PATH 兼容事实；移除 alias 后保留核对，secret sentinel 不进包、argv 或普通日志 |
 | A14 | D 帮助／任务映射 | CLI 通过 | 顶层及深层 `--help` 提前只读返回；六任务／operations／schema 可解析；context、version、tasks 静态调用不建立 state |
 | A15 | A/B 结果与覆盖 | core／UI 通过 | task_result 与 coverage 分开，旧 status 保留；本地清理、部分失败、unknown 和恢复冲突分别展示，下一步沿原任务 |
-| A16 | B/E 成品与原生视觉 | UI 通过；native 部分通过 | Chromium 成品检查 1120×760／900×640／1440×900、Day／Night、长路径、侧栏、reduced motion、键盘焦点返回；默认首页无滚动、固定底栏坐标不随正文改变。native WebKit 已检查默认窗口首页／批准／结果／底栏；原生全部窗口矩阵未逐一完成 |
+| A16 | B/E 成品与原生视觉 | UI 通过；native 部分通过 | Chromium 成品检查 1120×760／900×640／1440×900、Day／Night、长路径、侧栏、reduced motion、键盘焦点返回；默认首页无滚动、固定底栏坐标不随正文改变。native WebKit 已检查默认窗口首页／批准／结果／底栏及 900×640 首页／任务入口／长路径审批／滚动后的固定底栏，Night→Day 换色与 Escape 关闭面板实际通过；宽窗口受当前屏幕限制，原生全部窗口矩阵未逐一完成 |
 | A17 | A/C/D 旧合同兼容 | core／既有旅程通过 | protocol-1、lintel.work/1、旧 import 指令目的地、旧 launch cwd、旧回执与 runner binding 保留。旧未接收的新 root 计划需重新预览，已接收旧任务先返回原回执 |
-| A18 | D/E 版本帮助／官网 | 源码／build 通过 | 固定 13 个文档资源共享表；clean docs revision 固定，dirty／unknown 标为最新开发说明。官网保持 illustrative static demo，无第三方请求，未部署、无正式下载 |
+| A18 | D/E 版本帮助／官网 | 源码／build 通过 | 固定 13 个文档资源共享表；clean revision 只固定 Lintel 自己的 docs，dirty／unknown 标为最新开发说明，独立指南保留自己的 main／最新版标识。官网保持 illustrative static demo，无第三方请求，未部署、无正式下载 |
 
 源码、合成 transport、候选构建、native WebKit、真实浏览器、Linux runtime 和真实 Claude resume 分别验收。不得用某一层通过替代其他层。
 

@@ -1,5 +1,9 @@
 //! User-clicked documentation links. The webview selects a resource, never an arbitrary URL.
 fn resource_url(resource: &str) -> Option<String> {
+    resource_url_at_revision(resource, env!("LINTEL_DOCS_REVISION"))
+}
+
+fn resource_url_at_revision(resource: &str, revision: &str) -> Option<String> {
     let table: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../contracts/documentation-resources.json"
     ))
@@ -10,11 +14,14 @@ fn resource_url(resource: &str) -> Option<String> {
     {
         return None;
     }
-    let revision = env!("LINTEL_DOCS_REVISION");
+    let source = table.get("source")?.as_str()?;
     Some(if revision == "unknown" {
         url.into()
     } else {
-        url.replace("/blob/main/docs/", &format!("/blob/{revision}/docs/"))
+        url.replace(
+            &format!("{source}/blob/main/docs/"),
+            &format!("{source}/blob/{revision}/docs/"),
+        )
     })
 }
 
@@ -47,6 +54,25 @@ pub async fn open_resource(resource: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn revision_pins_only_this_products_documentation() {
+        let revision = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(resource_url_at_revision("policy-guide", revision).unwrap(),
+            format!("https://github.com/IndelibleVivi/lintel-cc/blob/{revision}/docs/operator-guide.md#protect"));
+        assert_eq!(
+            resource_url_at_revision("operator-guide", "unknown").unwrap(),
+            "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md"
+        );
+        for (resource, file) in [
+            ("vps-basics", "01-vps-basics.md"),
+            ("ssh-troubleshooting", "08-troubleshooting.md"),
+        ] {
+            assert_eq!(
+                resource_url_at_revision(resource, revision).unwrap(),
+                format!("https://github.com/IndelibleVivi/infra-field-guide/blob/main/docs/{file}")
+            );
+        }
+    }
     #[test]
     fn only_named_https_resources_can_open() {
         for name in [

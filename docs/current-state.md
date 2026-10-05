@@ -9,7 +9,7 @@
 | 共享产品合同 | 六任务 catalog；计划新增冻结目标／完整落点与用途；结构化任务结果与覆盖；旧协议、历史计划、包与原 ID 恢复保留 |
 | App 界面 | 安静的 Clawd 首页／32 句原创时段问候，点击后展开六任务，保留持续目标；配置 root／项目 cwd 分离；资料阅读／交接稿；CLI 核对与 Agent。默认 1120、最低 900、宽 1440 成品 UI 检查通过；保护／保全／清理底栏独立于正文滚动 |
 | 会话与启动 | bounded reader、未知块与 thinking 原件保全；普通启动／独立 resume／原启动 query/list 接入。持久 intent 先于私有副本／Terminal，未知后只查询原 ID。有限 adapter 仅静态识别 2.1.283／2.1.285；inert 参数、cwd、配置根与副本机制通过，真实认证 resume 尚未验收 |
-| macOS native 候选 | unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料、检查批准弹窗与固定底栏；Day／Night 截图为本地 QA。默认窗口之外的完整原生矩阵仍未逐一验收 |
+| macOS native 候选 | unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
 | CLI 与静态检查 | context/tasks/深层嵌套帮助和原启动 query/list；App 明确 executable 的有限 native 探测。默认 19 项通过；相关最终机制补跑通过，core baseline 16 项通过；独立 8 项 UI／browser 通过，首页修订后 7 项再验通过 |
 | 资源与包装 | 本轮 macOS arm64 CLI 与两架构 Linux musl runner 已构建，canonical App bundles 已更新；native host／非 fixture Chromium 与 Firefox 扩展由原 source 生成。CLI candidate 包装含真实输入 smoke 通过；生成物不进 Git。cross-build 不证明其他架构 runtime，checksums 不证明签名或来源 |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
@@ -27,7 +27,7 @@
 | 官网、示例与 opt-in 共享游戏 | [网站](../apps/site/README.md)；尚未部署、无正式下载 |
 | core／SSH／systemd／browser／network | [core](core.md)、[remote](remote.md)、[services](services.md)、[browser](browser.md)、[network](network.md) |
 
-统一验证 owner 是 `python3 tests/verify.py`；UI／browser startup／Linux runtime 为独立 selections。dirty 开发 App 的 docs revision 为 unknown；干净候选通过固定 named HTTPS 资源指向自己的源码 revision，main 入口标为最新开发说明。不会开放任意 URL 或 shell。
+统一验证 owner 是 `python3 tests/verify.py`；UI／browser startup／Linux runtime 为独立 selections。dirty 开发 App 的 docs revision 为 unknown；干净候选的 Lintel 文档资源指向自己的源码 revision，main 入口标为最新开发说明；独立 Infra Field Guide 使用自己的 main，标为独立指南最新版。不会开放任意 URL 或 shell。
 
 仓库已公开；项目原创材料的公开复用许可证仍未选定，第三方权利独立。源码可见不构成通用复用许可。
 

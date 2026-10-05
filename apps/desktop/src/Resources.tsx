@@ -5,7 +5,8 @@ import { transport } from './api';
 import resourceTable from '../../../contracts/documentation-resources.json';
 import { buildIdentity } from './buildIdentity';
 import taskCatalog from '../../../contracts/task-catalog.json';
-const resources = Object.fromEntries(Object.entries(resourceTable).map(([key,url]) => [key, buildIdentity.docs_revision === 'unknown' ? url : url.replace('/blob/main/docs/', `/blob/${buildIdentity.docs_revision}/docs/`)])) as typeof resourceTable;
+const ownDocsPrefix = `${resourceTable.source}/blob/main/docs/`;
+const resources = Object.fromEntries(Object.entries(resourceTable).map(([key,url]) => [key, buildIdentity.docs_revision === 'unknown' ? url : url.replace(ownDocsPrefix, `${resourceTable.source}/blob/${buildIdentity.docs_revision}/docs/`)])) as typeof resourceTable;
 
 export function ResourceLink({ resource, children }: { resource: keyof typeof resources; children: ReactNode }) {
   const [error, setError] = useState('');
@@ -13,7 +14,7 @@ export function ResourceLink({ resource, children }: { resource: keyof typeof re
     if (transport !== 'native') return;
     event.preventDefault(); setError('');
     void invoke('open_resource', { resource }).catch(() => setError('浏览器未能打开。可复制链接手动访问。'));
-  }}>{children}<span aria-hidden="true"> ↗</span>{resources[resource].includes("/blob/main/docs/") && <small className="resource-version">最新开发说明</small>}</a>{error && <span className="resource-error" role="alert">{error}<code>{resources[resource]}</code></span>}</span>;
+  }}>{children}<span aria-hidden="true"> ↗</span>{resources[resource].startsWith(ownDocsPrefix) ? <small className="resource-version">最新开发说明</small> : resources[resource].includes('/blob/main/docs/') && <small className="resource-version">独立指南 · 最新版</small>}</a>{error && <span className="resource-error" role="alert">{error}<code>{resources[resource]}</code></span>}</span>;
 }
 
 export default function DeveloperResources() {
