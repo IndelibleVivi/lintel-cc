@@ -1,0 +1,154 @@
+{
+  "schema": "lintel.tasks/1",
+  "version": 1,
+  "notes": "One maintained finite task map. Labels, user-facing summaries, App routes, help anchors, related operations and runnable CLI examples are shared by the App help and the CLI tasks/capabilities commands. Metadata only: no execution layer and no capability claims. `operations` is the technical mapping; `summary` is the product wording.",
+  "tasks": [
+    {
+      "id": "reduce_egress",
+      "label": "减少外发，保留需要的功能",
+      "summary": "选择一台主机与环境，预览每项要改的设置和版本条件，批准后写入并读回。已有会话不会自动重启。",
+      "route": "#/protect",
+      "help_anchor": "protect",
+      "operations": [
+        "inspect",
+        "plan_policy",
+        "execute",
+        "plan_restore",
+        "drift",
+        "accept_drift"
+      ],
+      "cli_examples": [
+        "lintel env list",
+        "lintel policy plan --environment <ENVIRONMENT_ID> --preset reduce --keep-remote-control",
+        "lintel job submit --plan <PLAN_ID> --approval <PLAN_HASH>"
+      ],
+      "preconditions": [
+        "exact_registered_environment",
+        "no_managed_settings"
+      ],
+      "target_kinds": [
+        "local",
+        "ssh_remote"
+      ]
+    },
+    {
+      "id": "preserve_work",
+      "label": "保存工作资料，或准备新配置环境",
+      "summary": "只归档选中的工作，或归档后创建新环境并按用途迁入。旧登录和旧环境保留，新环境的保护方案与登录分别进行。",
+      "route": "#/work",
+      "help_anchor": "work",
+      "operations": [
+        "plan_archive",
+        "plan_preserve",
+        "plan_import",
+        "session_read",
+        "execute",
+        "job"
+      ],
+      "cli_examples": [
+        "lintel work archive plan --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
+        "lintel work preserve plan --environment <ENVIRONMENT_ID> --categories instructions,memory",
+        "lintel work session read --job <JOB_ID> --path CLAUDE.md"
+      ],
+      "preconditions": [
+        "exact_registered_environment",
+        "archive_passphrase_min12",
+        "session_read_secret_via_json_stdin_never_argv"
+      ],
+      "target_kinds": [
+        "local",
+        "ssh_remote"
+      ]
+    },
+    {
+      "id": "repair_cleanup_retire",
+      "label": "修复本地登录、清理重建、退役环境",
+      "summary": "先停写入者，再按批准范围处理已识别的本地状态；官方注销单独表达。归档与新环境准备先于任何删除。",
+      "route": "#/cleanup",
+      "help_anchor": "cleanup",
+      "operations": [
+        "cleanup_inspect",
+        "auth_probe",
+        "plan_cleanup"
+      ],
+      "cli_examples": [
+        "lintel call plan_cleanup"
+      ],
+      "preconditions": [
+        "writers_confirmed_stopped",
+        "exact_registered_environment"
+      ],
+      "target_kinds": [
+        "local",
+        "ssh_remote"
+      ]
+    },
+    {
+      "id": "browser_profile",
+      "label": "处理具体浏览器 profile",
+      "summary": "为某个浏览器 profile 安装 host 与扩展并完成配对；清理需要在真正重启浏览器后确认收尾。",
+      "route": "#/browser",
+      "help_anchor": "browser",
+      "operations": [],
+      "cli_examples": [
+        "lintel browser operations"
+      ],
+      "preconditions": [
+        "browser_component_available",
+        "profile_paired"
+      ],
+      "target_kinds": [
+        "local_browser"
+      ]
+    },
+    {
+      "id": "ssh_remote",
+      "label": "连接 SSH 主机并操作远端环境",
+      "summary": "选择已有的 SSH alias，核对运行器与目标后在远端执行；连接中断后只查询原任务，不重新提交。",
+      "route": "#/remote",
+      "help_anchor": "remote",
+      "operations": [
+        "discover",
+        "job",
+        "plan_show",
+        "export_support"
+      ],
+      "cli_examples": [
+        "lintel remote hosts",
+        "lintel remote job <ALIAS> <PLAN_ID>"
+      ],
+      "preconditions": [
+        "registered_literal_alias",
+        "bound_runner"
+      ],
+      "target_kinds": [
+        "ssh_remote"
+      ]
+    },
+    {
+      "id": "recover_results",
+      "label": "找回结果、恢复配置或服务",
+      "summary": "用原任务 ID 查看已完成的步骤和错误；恢复配置或恢复服务分别预览并在批准后执行。",
+      "route": "#/records",
+      "help_anchor": "recovery",
+      "operations": [
+        "jobs",
+        "job",
+        "plan_restore",
+        "plan_service_resume",
+        "plan_show"
+      ],
+      "cli_examples": [
+        "lintel job show <PLAN_ID>",
+        "lintel job wait <PLAN_ID> --timeout 30s"
+      ],
+      "preconditions": [
+        "original_job_id"
+      ],
+      "target_kinds": [
+        "local",
+        "ssh_remote"
+      ]
+    }
+  ]
+}

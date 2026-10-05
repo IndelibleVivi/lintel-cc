@@ -1,21 +1,21 @@
 //! User-clicked documentation links. The webview selects a resource, never an arbitrary URL.
-fn resource_url(resource: &str) -> Option<&'static str> {
-    match resource {
-        "developer" => Some("https://github.com/IndelibleVivi"),
-        "source" => Some("https://github.com/IndelibleVivi/lintel-cc"),
-        "operator-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md"),
-        "policy-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#protect"),
-        "work-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#work"),
-        "cleanup-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#cleanup"),
-        "recovery-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#recovery"),
-        "agent-guide" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md"),
-        "remote-setup" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md"),
-        "browser-setup" => Some("https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/browser.md"),
-        "vps-guide" => Some("https://github.com/IndelibleVivi/infra-field-guide"),
-        "vps-basics" => Some("https://github.com/IndelibleVivi/infra-field-guide/blob/main/docs/01-vps-basics.md"),
-        "ssh-troubleshooting" => Some("https://github.com/IndelibleVivi/infra-field-guide/blob/main/docs/08-troubleshooting.md"),
-        _ => None,
+fn resource_url(resource: &str) -> Option<String> {
+    let table: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../contracts/documentation-resources.json"
+    ))
+    .ok()?;
+    let url = table.get(resource)?.as_str()?;
+    if url != "https://github.com/IndelibleVivi"
+        && !url.starts_with("https://github.com/IndelibleVivi/")
+    {
+        return None;
     }
+    let revision = env!("LINTEL_DOCS_REVISION");
+    Some(if revision == "unknown" {
+        url.into()
+    } else {
+        url.replace("/blob/main/docs/", &format!("/blob/{revision}/docs/"))
+    })
 }
 
 #[tauri::command]

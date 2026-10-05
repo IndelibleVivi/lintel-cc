@@ -43,7 +43,7 @@ try{
   await page.exposeFunction('syntheticInvoke',async(command,args)=>{if(command==='open_resource'){resources.push(args.resource);return null;}assert.equal(command,'request');return core(args.payload);});
   await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'帮助',exact:true}).focus();await page.keyboard.press('Enter');
-  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'使用 Lintel',exact:true}).waitFor();assert.equal(await dialog.locator('.help-tasks section').count(),6);
+  const dialog=page.getByRole('dialog'),reader=page.locator('main .archive-panel');await dialog.getByRole('heading',{name:'使用 Lintel',exact:true}).waitFor();assert.equal(await dialog.locator('.help-tasks section').count(),6);
   await page.screenshot({path:path.join(fixture,'help-day.png')});await dialog.getByRole('link',{name:/完整人类操作指南/}).click();assert.deepEqual(resources,['operator-guide']);
   await dialog.getByRole('button',{name:/工作保全/}).click();await page.getByRole('heading',{name:'正在做的事，好好收着',exact:true}).waitFor();
   for(const [width,height,theme,button] of [[1120,800,'day','浅色 Day'],[900,640,'night','深色 Night']]){await page.setViewportSize({width,height});await page.getByRole('button',{name:button,exact:true}).click();await page.waitForFunction(expected=>document.documentElement.dataset.theme===expected,theme==='day'?'light':'dark');await page.evaluate(()=>Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect.getComputedTiming().iterations)).map(a=>a.finished.catch(()=>{}))));await page.screenshot({path:path.join(fixture,`work-${theme}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Work page horizontal overflow');await page.locator('main').evaluate(el=>el.scrollTop=el.scrollHeight);await page.screenshot({path:path.join(fixture,`work-${theme}-actions.png`)});await page.locator('main').evaluate(el=>el.scrollTop=0);}
@@ -51,8 +51,8 @@ try{
   await page.getByRole('button',{name:'预览保全计划',exact:true}).focus();await page.keyboard.press('Enter');await dialog.getByRole('heading',{name:'仅加密归档所选工作内容',exact:true}).waitFor();
   assert.equal(await dialog.locator('.plan-steps .action-description').count(),1);await approve();
   assert.equal((await data({command:'discover'})).environments.length,inventory.environments.length);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);assert.equal(await readFile(path.join(root,'.credentials.json'),'utf8'),'SYNTHETIC_CREDENTIAL');
-  await dialog.getByRole('button',{name:'查看工作归档',exact:true}).click();await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'解锁并查看',exact:true}).click();await dialog.getByRole('button',{name:/CLAUDE.md/}).click();await dialog.locator('.archive-text pre').getByText('# Synthetic instructions',{exact:false}).waitFor();
-  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();assert.ok(!(await page.evaluate(()=>JSON.stringify(localStorage))).includes(password));
+  await dialog.getByRole('button',{name:'查看工作归档',exact:true}).click();await reader.getByLabel('归档口令',{exact:true}).fill(password);await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('button',{name:/CLAUDE.md/}).click();await reader.locator('.session-reader').getByText('# Synthetic instructions',{exact:false}).waitFor();
+  await page.getByRole('button',{name:'工作保全',exact:true}).click();assert.ok(!(await page.evaluate(()=>JSON.stringify(localStorage))).includes(password));
   report.checks.push('Keyboard task help → archive-only plan/approve → real package/read; no new root, settings/auth unchanged; secret absent from storage');
   await page.getByLabel(/保全并准备新环境/).check();await page.getByLabel('新环境名称（可选）').fill('Synthetic continuation');await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
   await dialog.locator('.plan-steps .action-description').first().waitFor();assert.equal(await dialog.locator('.plan-steps .action-description').count(),3);await approve();await dialog.getByText(/工作保全已完成/).waitFor();
@@ -60,12 +60,12 @@ try{
   report.checks.push('Preserve → completed outcome → new environment policy; old root/login untouched');
   const targetHome=path.join(fixture,'target-home');await mkdir(targetHome);context={...context,HOME:targetHome,LINTEL_TEST_HOME:targetHome,LINTEL_STATE_DIR:path.join(fixture,'target-state')};
   const portable=path.join(targetHome,'portable.age');await copyFile(carried,portable);const destination=await data({command:'create_environment',name:'Synthetic destination'});
-  await page.reload();await page.getByRole('button',{name:'工作归档',exact:true}).click();assert.equal(await dialog.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
-  await dialog.getByLabel('加密包完整路径',{exact:true}).fill(portable);await dialog.getByLabel('归档口令',{exact:true}).fill('wrong-passphrase');await dialog.getByRole('button',{name:'解锁并查看',exact:true}).click();await dialog.getByRole('alert').waitFor();
-  await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'解锁并查看',exact:true}).click();await dialog.getByRole('heading',{name:'选择性迁入',exact:true}).waitFor();await dialog.getByLabel('会话资料',{exact:true}).uncheck();await dialog.getByRole('button',{name:'预览迁入计划',exact:true}).click();
+  await page.reload();await page.getByRole('button',{name:'会话与资料',exact:true}).click();assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
+  await reader.getByLabel('加密包完整路径',{exact:true}).fill(portable);await reader.getByLabel('归档口令',{exact:true}).fill('wrong-passphrase');await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('alert').waitFor();
+  await reader.getByLabel('归档口令',{exact:true}).fill(password);await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('heading',{name:'准备到另一个配置环境',exact:true}).waitFor();await reader.getByLabel('会话资料',{exact:true}).uncheck();await reader.getByRole('button',{name:'预览迁入计划',exact:true}).click();
   const mapping=dialog.getByRole('region',{name:'最终迁入清单',exact:true});await mapping.waitFor();
   assert.equal(await mapping.locator('.import-file-list>li').count(),3);
-  await mapping.getByText('lintel-imports/projects/synthetic/memory/lintel-1-MEMORY.md',{exact:true}).waitFor();
+  await mapping.locator('.destination code').filter({hasText:/lintel-imports\/projects\/synthetic\/memory\/lintel-1-MEMORY\.md$/}).waitFor();
   for(const [width,height,theme,button] of [[1120,800,'day','浅色 Day'],[900,640,'night','深色 Night']]){
     await page.setViewportSize({width,height});
     // Palette emulation for this frozen modal; real theme controls are exercised above.
@@ -86,7 +86,7 @@ try{
   await approve();
   const expectedContents={'CLAUDE.md':'# Synthetic instructions\n','projects/synthetic/memory/MEMORY.md':'Synthetic memory\n','lintel-imports/projects/synthetic/memory/MEMORY.md':'Synthetic previously imported memory\n'};
   assert.deepEqual(reviewedFiles.map(file=>file.source).sort(),Object.keys(expectedContents).sort());
-  for(const file of reviewedFiles)assert.equal(await readFile(path.join(destination.root,file.destination),'utf8'),expectedContents[file.source],'Published bytes must match the source/destination the user approved');
+  for(const file of reviewedFiles){const target=path.isAbsolute(file.destination)?file.destination:path.join(destination.root,file.destination);assert.ok(target.startsWith(`${destination.root}/`),'Reviewed destination must stay under the approved root');assert.equal(await readFile(target,'utf8'),expectedContents[file.source],'Published bytes must match the source/destination the user approved');}
   await page.screenshot({path:path.join(fixture,'portable-import-night.png')});assert.deepEqual(errors,[]);
   report.checks.push('Independent install/empty jobs → wrong-password feedback → portable selective import → real files, no original job state');
   // Explicit synthetic retained-probe receipt, read through the real core job
@@ -105,7 +105,7 @@ try{
   const executeCount=calls.filter(command=>command==='execute').length;
   for(const [theme,button] of [['night','深色 Night'],['day','浅色 Day']]){
     await page.reload();await page.getByRole('button',{name:button,exact:true}).click();
-    await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
+    await page.locator('.sidebar').getByRole('button',{name:'记录与恢复',exact:true}).click();
     await page.getByRole('button',{name:/待处理/}).click();assert.equal(await page.locator('.job-row').count(),1);
     await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
     await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
@@ -124,7 +124,7 @@ try{
   assert.equal(await readFile(path.join(probe,'placeholder'),'utf8'),'');
   await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   await page.locator('.archive-shortcut').getByRole('button').click();
-  assert.equal(await dialog.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
+  assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
   report.checks.push('Modeled retained-probe receipt → real original-job query → exact scratch path visible in Day/Night; no replay or cleanup');
   report.calls=[...new Set(calls)];report.passed=true;
   async function approve(){await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();}

@@ -85,7 +85,7 @@ impl Engine {
 
     /// Read a package, resolving either a job_id or an explicit absolute path.
     /// Job-scoped reads also confirm the recorded path matches the frozen one.
-    fn archive_package(&self, r: &Value) -> Result<(Value, String, PathBuf)> {
+    pub(crate) fn archive_package(&self, r: &Value) -> Result<(Value, String, PathBuf)> {
         let path = self.archive_source(r)?;
         let recorded_digest = if let Some(jid) = r.get("job_id").and_then(Value::as_str) {
             let record = load(&self.path("jobs", jid))?;
@@ -145,7 +145,12 @@ impl Engine {
             .into_iter()
             .filter(|file| cats.iter().any(|category| file["category"] == *category))
             .collect();
-        for (f, relative) in selected.iter().zip(work::migration_paths(&selected)?) {
+        let activation = work::activation(r, &cats);
+        let instructions_active = activation["instructions"] == true;
+        for (f, relative) in selected
+            .iter()
+            .zip(work::migration_paths(&selected, instructions_active)?)
+        {
             let p = root.join(relative);
             work::preflight_import_parent(root, &p)?;
             if p.exists() {
@@ -159,7 +164,8 @@ impl Engine {
         if files.is_empty() {
             return Err(err("empty_import", "归档中没有选中类别的文件"));
         }
-        self.plan(&e,"import","迁入选定工作内容",json!([]),vec!["目标环境现有文件","登录、hooks、MCP 与插件配置"],json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),json!({"original_job":r.get("job_id").cloned().unwrap_or(Value::Null),"archive_path":path,"archive_digest":archive_digest,"package_format":package["schema"],"package_generator":package["generator"].as_str(),"manifest":files,"categories":cats,"archive_passphrase_required":true}))
+        let frozen_target = work::freeze_existing_target(root, &files, instructions_active)?;
+        self.plan(&e,"import","迁入选定工作内容",json!([]),vec!["目标环境现有文件","登录、hooks、MCP 与插件配置"],json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),json!({"original_job":r.get("job_id").cloned().unwrap_or(Value::Null),"archive_path":path,"archive_digest":archive_digest,"package_format":package["schema"],"package_generator":package["generator"].as_str(),"manifest":files,"categories":cats,"archive_passphrase_required":true,"frozen_target":frozen_target,"work_purpose":work::purposes(&cats),"activate":activation}))
     }
 
     pub(crate) fn import_work(
@@ -183,6 +189,20 @@ impl Engine {
         }
         let files = validated_files(&package)?;
         let root = Path::new(string(e, "root")?);
+        // Recheck the frozen existing-target identity: the config root must be
+        // the same object approved at preview (plan_import uses an existing,
+        // registered root and does not require it to be absent).
+        let frozen = &p["extra"]["frozen_target"];
+        if frozen["plan_revision"] == "lintel.plan/2" {
+            let metadata = std::fs::metadata(root)?;
+            use std::os::unix::fs::MetadataExt;
+            if json!([metadata.dev(), metadata.ino()]) != frozen["new_root_parent_identity"] {
+                return Err(err(
+                    "stale_plan",
+                    "目标配置目录的对象在预览后变化，请重新预览",
+                ));
+            }
+        }
         let planned = p["extra"]["manifest"]
             .as_array()
             .ok_or_else(|| err("invalid_plan", "缺少迁入清单"))?;
@@ -196,7 +216,10 @@ impl Engine {
                     .ok_or_else(|| err("stale_archive", "归档与计划不匹配"))
             })
             .collect::<Result<_>>()?;
-        let targets: Vec<_> = work::migration_paths(&selected)?
+        let instructions_active = p["extra"]["activate"]["instructions"]
+            .as_bool()
+            .unwrap_or(true);
+        let targets: Vec<_> = work::migration_paths(&selected, instructions_active)?
             .into_iter()
             .map(|relative| root.join(relative))
             .collect();
@@ -216,7 +239,12 @@ impl Engine {
                 return Err(err("import_conflict", "预览后出现同名内容；没有覆盖"));
             }
         }
-        work::preflight_migration_paths(root, &work::migration_paths(&selected)?, j, journal)?;
+        work::preflight_migration_paths(
+            root,
+            &work::migration_paths(&selected, instructions_active)?,
+            j,
+            journal,
+        )?;
         for ((entry, f), pth) in planned.iter().zip(&selected).zip(&targets) {
             work::migration_parent(pth.parent().unwrap())?;
             let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;

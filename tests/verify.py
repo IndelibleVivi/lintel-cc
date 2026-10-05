@@ -158,6 +158,7 @@ CHECKS: List[Check] = [
                ROOT / "apps/desktop/dist/index.html"), loopback=True,
            independent=True, reason="headless Chromium UI evidence; service manager and invoke are synthetic"),
     _check("work-ui", "built App task help, independent archive/preserve and portable import (real synthetic core)", "independent", *(NODE or "node", "tests/work_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="isolated headless Chromium and invoke fixture; not native WebKit"),
+    _check("baseline-ui", "built product-baseline task/session/Agent/approval journey (real synthetic core)", "independent", *(NODE or "node", "tests/baseline_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic core; static CLI/clipboard/launch-error boundary modeled; not native WebKit/Claude"),
     _check("remote-task-ui", "built App original SSH task/reopen/conflict/separate restore (synthetic transport)",
            "independent", *(NODE or "node", "tests/remote_task_ui_journey.mjs"),
            tools=("node",), paths=(
@@ -184,6 +185,7 @@ CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and 
 # Synthetic end-to-end journeys sharing the runner-build prerequisite.
 for _id, _desc, _file in (
     ("journey-agent-cli", "agent CLI contract, portable work, independent import and original-job wait", "agent_cli_journey.py"),
+    ("journey-product-baseline", "readonly context/help, frozen targets, bounded session and immutable startup contracts", "backend_baseline_journey.py"),
     ("journey-agent-adapters", "finite CLI adapters and foreground network lifecycle", "agent_adapters_journey.py"),
     ("journey-portable-work", "portable archive in independent state and persisted failure codes", "portable_work_journey.py"),
     ("journey-cli", "CLI journey (register/preview/approve/apply/restore)", "cli_journey.py"),

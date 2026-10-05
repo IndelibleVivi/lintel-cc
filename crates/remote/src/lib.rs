@@ -911,7 +911,12 @@ const REQUEST_COMMANDS: &[&str] = &[
     "plan_cleanup",
     "archive_inspect",
     "archive_read",
+    "session_read",
     "plan_import",
+    "plan_launch",
+    "plan_resume",
+    "launch_query",
+    "launches",
     "export_support",
 ];
 fn validate_request(request: &Value) -> Result<()> {
@@ -1076,6 +1081,8 @@ impl Controller {
             valid_core_id(field(&payload, "plan_id")?)?;
         } else if op == "launch" {
             valid_core_id(field(&payload, "environment_id")?)?;
+        } else if op == "launch_request" || op == "resume_request" {
+            valid_core_id(field(&payload, "request_id")?)?;
         }
         if op == "aliases" {
             exact_operation_fields(&payload)?;
@@ -1122,8 +1129,9 @@ impl Controller {
                 }
             }
             let installs = self.install_inventory()?;
+            let launches = self.launch_inventory(None)?;
             return Ok(
-                json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks,"installations":installs}}),
+                json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks,"installations":installs,"launches":launches}}),
             );
         }
         let alias = valid_alias(field(&payload, "alias")?)?;
@@ -1180,7 +1188,23 @@ impl Controller {
                             .join(alias)
                             .join(format!("{id}.json"))
                             .exists()
-                });
+                })
+                // A frozen launch/resume record stays queryable after the alias
+                // is removed, using its pinned runner.
+                || (op == "launch_query"
+                    && valid_id(payload["request_id"].as_str().unwrap_or("")).is_ok()
+                    && self
+                        .state
+                        .join("launches")
+                        .join(alias)
+                        .join(format!("{}.json", payload["request_id"].as_str().unwrap_or("")))
+                        .exists())
+                || (op == "launches" && self.state.join("launches").join(alias).is_dir())
+                || (matches!(op, "launch_request" | "resume_request")
+                    && valid_core_id(payload["request_id"].as_str().unwrap_or("")).is_ok()
+                    && load(&self.state.join("launches").join(alias)
+                        .join(format!("{}.json", payload["request_id"].as_str().unwrap_or(""))))
+                        .is_ok_and(|record| record["attempted"] == true));
             if !existing_query {
                 return Err(failure(
                     "host_not_registered",
@@ -1190,6 +1214,17 @@ impl Controller {
         }
         match op {
             "launch" => self.launch_remote(alias, &payload),
+            "launch_request" => self.launch_request_remote(alias, &payload),
+            "resume_request" => self.resume_request_remote(alias, &payload),
+            "launch_query" | "launches" => {
+                exact_operation_fields(&payload)?;
+                if op == "launch_query" {
+                    return self.launch_query_response(alias, field(&payload, "request_id")?);
+                }
+                // Inventory is local metadata. Explicit queries use the original
+                // pinned runner; listing never fans out SSH requests.
+                Ok(json!({"ok":true,"data":{"launches":self.launch_inventory(Some(alias))?}}))
+            }
             "prepare_runner" | "install_runner" | "query_install" => {
                 self.install_dispatch(alias, &payload)
             }
@@ -1205,6 +1240,19 @@ impl Controller {
             "request" => {
                 exact_operation_fields(&payload)?;
                 validate_request(&payload["request"])?;
+                // A frozen launch/resume plan pins the current bound runner BEFORE
+                // any launch attempt, so later query/repeat uses the original
+                // binding even after the alias is removed.
+                if matches!(
+                    payload["request"]["command"].as_str(),
+                    Some("plan_launch" | "plan_resume")
+                ) {
+                    let bound = self.binding(alias)?;
+                    let response =
+                        self.runner_call(alias, &payload["request"], false, bound.as_ref())?;
+                    self.pin_launch_binding(alias, &response, bound.as_ref())?;
+                    return Ok(response);
+                }
                 if payload["request"]["command"] == "job" {
                     let id = payload["request"]["job_id"]
                         .as_str()
@@ -1962,7 +2010,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             .map(|entry| entry.unwrap().file_name())
             .collect::<BTreeSet<_>>();
         let catalog = operation_catalog();
-        assert_eq!(catalog["operations"].as_array().unwrap().len(), 12);
+        assert_eq!(catalog["operations"].as_array().unwrap().len(), 16);
         assert_eq!(
             fs::read_dir(&base)
                 .unwrap()
@@ -2117,7 +2165,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert_eq!(removed["data"]["removed"], true);
         assert_eq!(
             controller.dispatch(json!({"op":"hosts"})).unwrap()["data"],
-            json!({"hosts":[],"tasks":[],"installations":[]})
+            json!({"hosts":[],"tasks":[],"installations":[],"launches":[]})
         );
         assert_eq!(
             controller
@@ -2366,5 +2414,84 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         )
         .unwrap()
         .contains("diagnostic"));
+    }
+
+    #[test]
+    fn launch_binding_resolution_distinguishes_pinned_path_from_absent() {
+        let (temp, controller) = fixture(RECEIPT);
+        fs::create_dir_all(controller.state.join("bindings")).unwrap();
+        let request_id = "00000000-0000-4000-8000-0000000000aa";
+        let dir = controller.state.join("launches/synthetic-host");
+        fs::create_dir_all(&dir).unwrap();
+        // Pinned to PATH: runner_digest is null but the record exists.
+        save(
+            &dir.join(format!("{request_id}.json")),
+            &json!({"request_id":request_id,"runner_digest":Value::Null,"attempted":true,"status":"launch_intent"}),
+        )
+        .unwrap();
+        let (bound, pinned) = controller
+            .resolve_launch_binding("synthetic-host", request_id)
+            .unwrap();
+        assert!(
+            pinned && bound.is_none(),
+            "pinned PATH must resolve to (None, pinned=true)"
+        );
+        // Absent record falls back to the current binding (legacy), not a pin.
+        let (bound2, pinned2) = controller
+            .resolve_launch_binding("synthetic-host", "00000000-0000-4000-8000-0000000000bb")
+            .unwrap();
+        assert!(!pinned2 && bound2.is_none());
+        let _ = temp;
+    }
+
+    #[test]
+    fn launch_query_returns_binding_metadata_without_terminal() {
+        let (temp, controller) = fixture(RECEIPT);
+        let request_id = "00000000-0000-4000-8000-0000000000cc";
+        let dir = controller.state.join("launches/synthetic-host");
+        fs::create_dir_all(&dir).unwrap();
+        let sha = "a".repeat(64);
+        save(
+            &dir.join(format!("{request_id}.json")),
+            &json!({"request_id":request_id,"runner_digest":sha,"attempted":true,"status":"launch_intent","mode":"launch"}),
+        )
+        .unwrap();
+        let response = controller
+            .dispatch(json!({"op":"launch_query","alias":"synthetic-host","request_id":request_id}))
+            .unwrap();
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(response["data"]["runner_digest"], sha);
+        assert_eq!(response["data"]["binding_resolution"], "pinned_digest");
+        // The Terminal opener was never invoked for a read-only query.
+        assert!(!temp.path().join("open").exists());
+    }
+
+    #[test]
+    fn launch_record_survives_alias_removal_and_list_uses_pinned_runner() {
+        let (temp, controller) = fixture(RECEIPT);
+        let request_id = "00000000-0000-4000-8000-0000000000dd";
+        let sha = "b".repeat(64);
+        let dir = controller.state.join("launches/synthetic-host");
+        fs::create_dir_all(&dir).unwrap();
+        save(
+            &dir.join(format!("{request_id}.json")),
+            &json!({"request_id":request_id,"runner_digest":sha,"attempted":true,"status":"launch_intent","mode":"launch"}),
+        )
+        .unwrap();
+        // Removing the alias keeps the durable launch record queryable/listable.
+        controller
+            .dispatch(json!({"op":"remove_host","alias":"synthetic-host"}))
+            .unwrap();
+        let list = controller
+            .dispatch(json!({"op":"launches","alias":"synthetic-host"}))
+            .unwrap();
+        assert_eq!(list["ok"], true, "{list}");
+        let entries = list["data"]["launches"].as_array().unwrap();
+        // The list is built from the local durable record (one entry) and uses its
+        // pinned digest, whether or not the remote query succeeded.
+        assert_eq!(entries.len(), 1, "{list}");
+        assert_eq!(entries[0]["alias"], "synthetic-host");
+        assert_eq!(entries[0]["runner_digest"], sha);
+        let _ = temp;
     }
 }

@@ -1,0 +1,323 @@
+//! Explicitly selected CLI; fixed static argv, bounded output/time, no shell.
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    io::Read,
+    os::unix::fs::MetadataExt,
+    path::Path,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
+const LIMIT: u64 = 1024 * 1024;
+fn fail(code: &str, message: &str) -> Value {
+    json!({"ok":false,"error":{"code":code,"message":message}})
+}
+fn static_call(path: &Path, args: &[&str]) -> Result<Value, &'static str> {
+    use std::os::fd::AsRawFd;
+    let mut child = Command::new(path)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|_| "cli_spawn_failed")?;
+    let mut stdout = child.stdout.take().unwrap();
+    let mut stderr = child.stderr.take().unwrap();
+    for fd in [stdout.as_raw_fd(), stderr.as_raw_fd()] {
+        let ready = unsafe {
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            flags >= 0 && libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) >= 0
+        };
+        if !ready {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("cli_pipe_failed");
+        }
+    }
+    let start = Instant::now();
+    let mut bytes = Vec::new();
+    let mut errors = Vec::new();
+    fn drain(pipe: &mut impl Read, into: &mut Vec<u8>) -> Result<(), &'static str> {
+        let mut buffer = [0u8; 8192];
+        loop {
+            match pipe.read(&mut buffer) {
+                Ok(0) => return Ok(()),
+                Ok(n) => {
+                    into.extend_from_slice(&buffer[..n]);
+                    if into.len() > LIMIT as usize {
+                        return Err("cli_output_limit");
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
+                Err(_) => return Err("cli_response_failed"),
+            }
+        }
+    }
+    let status = loop {
+        if let Err(e) = drain(&mut stdout, &mut bytes).and_then(|_| drain(&mut stderr, &mut errors))
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(e);
+        }
+        match child.try_wait() {
+            Ok(Some(s)) => {
+                drain(&mut stdout, &mut bytes)?;
+                drain(&mut stderr, &mut errors)?;
+                break s;
+            }
+            Ok(None) if start.elapsed() < Duration::from_secs(5) => {
+                thread::sleep(Duration::from_millis(20))
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("cli_timeout");
+            }
+        }
+    };
+    if !status.success() {
+        return Err("cli_static_command_failed");
+    }
+    let response: Value = serde_json::from_slice(&bytes).map_err(|_| "cli_invalid_response")?;
+    if response["ok"] != true {
+        return Err("cli_interface_unavailable");
+    }
+    Ok(response["data"].clone())
+}
+fn identity(path: &Path) -> Result<(u64, u64, u64, i64, i64), &'static str> {
+    let m = fs::metadata(path).map_err(|_| "cli_not_found")?;
+    if !m.is_file() || m.mode() & 0o111 == 0 || m.mode() & 0o6000 != 0 {
+        return Err("cli_not_executable");
+    }
+    Ok((m.dev(), m.ino(), m.len(), m.mtime(), m.mtime_nsec()))
+}
+fn inspect(path: &Path) -> Result<Value, &'static str> {
+    if !path.is_absolute() {
+        return Err("cli_absolute_path_required");
+    }
+    let path = path.canonicalize().map_err(|_| "cli_not_found")?;
+    let before = identity(&path)?;
+    let mut header = [0u8; 20];
+    fs::File::open(&path)
+        .map_err(|_| "cli_not_found")?
+        .read_exact(&mut header)
+        .map_err(|_| "cli_wrong_format")?;
+    #[cfg(target_os = "macos")]
+    if &header[..4] != [0xcf, 0xfa, 0xed, 0xfe]
+        || u32::from_le_bytes(header[4..8].try_into().unwrap())
+            != if cfg!(target_arch = "aarch64") {
+                0x0100000c
+            } else {
+                0x01000007
+            }
+    {
+        return Err("cli_wrong_architecture");
+    }
+    #[cfg(target_os = "linux")]
+    if &header[..4] != b"\x7fELF"
+        || u16::from_le_bytes(header[18..20].try_into().unwrap())
+            != if cfg!(target_arch = "aarch64") {
+                183
+            } else {
+                62
+            }
+    {
+        return Err("cli_wrong_architecture");
+    }
+    let version = static_call(&path, &["version", "--json"])?;
+    if version["product"] != "Lintel" && version["product"] != "lintel" {
+        return Err("cli_wrong_product");
+    }
+    if version["protocol"] != 1 {
+        return Err("cli_protocol_mismatch");
+    }
+    let capabilities = static_call(&path, &["capabilities", "--json"])?;
+    let context = static_call(&path, &["context", "--json"])?;
+    if context["protocol"] != 1
+        || !context["user"]["uid"].is_u64()
+        || !context["user"]["euid"].is_u64()
+        || !context["user"]["home"]
+            .as_str()
+            .is_some_and(|p| Path::new(p).is_absolute())
+        || !context["state"]["path"]
+            .as_str()
+            .is_some_and(|p| Path::new(p).is_absolute())
+    {
+        return Err("cli_context_invalid");
+    }
+    let description = static_call(&path, &["describe", "job", "--json"])?;
+    let schema = static_call(&path, &["schema", "job"])?;
+    if identity(&path)? != before {
+        return Err("cli_changed_during_check");
+    }
+    let parent = path.parent().ok_or("cli_invalid_path")?;
+    let sidecar = parent.parent().unwrap_or(parent).join("candidate.json");
+    let candidate = if sidecar.exists() {
+        let m = fs::symlink_metadata(&sidecar).map_err(|_| "candidate_unreadable")?;
+        if !m.is_file() || m.len() > LIMIT {
+            return Err("candidate_invalid");
+        }
+        let v: Value =
+            serde_json::from_slice(&fs::read(&sidecar).map_err(|_| "candidate_unreadable")?)
+                .map_err(|_| "candidate_invalid")?;
+        let digest = format!(
+            "{:x}",
+            Sha256::digest(fs::read(&path).map_err(|_| "cli_not_found")?)
+        );
+        let arch = match version["architecture"].as_str() {
+            Some("aarch64") => "arm64",
+            Some(s) => s,
+            None => return Err("cli_wrong_architecture"),
+        };
+        if v["schema"] != "lintel.cli-candidate/1"
+            || v["protocol"] != version["protocol"]
+            || v["version"] != version["version"]
+            || v["platform"] != version["platform"]
+            || v["architecture"] != arch
+            || v["files"]
+                .as_array()
+                .and_then(|files| files.iter().find(|f| f["path"] == "bin/lintel"))
+                .map(|f| f["sha256"].as_str())
+                != Some(Some(digest.as_str()))
+        {
+            return Err("candidate_mismatch");
+        }
+        json!({"status":"bytes_match","identity":v["candidate_identity"],"source_revision":v["source_revision"],"signed":v["signed"],"source_authenticated":false})
+    } else {
+        json!({"status":"unknown","message":"独立构建／候选身份未知；静态接口已观察"})
+    };
+    if identity(&path)? != before {
+        return Err("cli_changed_during_check");
+    }
+    Ok(
+        json!({"executable":path,"version":version,"capabilities":capabilities,"context":context,"job_description":description,"job_schema":schema,"candidate":candidate,"checked_at":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()}),
+    )
+}
+#[tauri::command]
+pub async fn inspect_cli(executable: String) -> Value {
+    match tauri::async_runtime::spawn_blocking(move || inspect(Path::new(&executable))).await {
+        Ok(Ok(data))=>json!({"ok":true,"data":data}),
+        Ok(Err(code))=>fail(code,match code {
+            "cli_absolute_path_required"=>"请输入 Lintel CLI 的完整绝对路径；可从候选新版本目录选择 bin/lintel。",
+            "cli_not_found"=>"这个路径没有可读取的 CLI。先取得或构建当前平台产物，再选择实际 executable。",
+            "cli_wrong_architecture" | "cli_wrong_format"=>"文件格式或 CPU 架构不适用于当前 App。选择当前平台的原生 Lintel CLI；脚本和其它平台产物不能用于此核对。",
+            "cli_protocol_mismatch"=>"这份 CLI 的 protocol 与 App 不兼容。选择兼容的独立版本；保留原 state 和原任务 ID。",
+            "candidate_mismatch" | "candidate_invalid"=>"候选声明与实际 executable 不一致。按安装指南重新核验该包，选择新的准确版本目录。",
+            "cli_timeout" | "cli_output_limit"=>"CLI 的静态接口超过核对时限或输出限额，探测已停止。核对版本和来源，选择实现有限静态接口的 Lintel CLI。",
+            _=>"CLI 静态核对未完成。核对路径、静态版本和候选文件；不会自动更改 state 或 PATH。",
+        }),
+        Err(_)=>fail("cli_check_failed","CLI 核对线程未完成"),
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[test]
+    fn wrong_path_or_format_never_executes() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("wrong");
+        fs::write(&p, b"#!/bin/sh\ntouch should-never-run\n").unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(inspect(&p).unwrap_err(), "cli_wrong_architecture");
+        assert_eq!(
+            inspect(Path::new("relative")).unwrap_err(),
+            "cli_absolute_path_required"
+        );
+        assert!(!t.path().join("should-never-run").exists());
+        let mut header = [0u8; 20];
+        #[cfg(target_os = "macos")]
+        {
+            header[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+            header[4..8].copy_from_slice(
+                &(if cfg!(target_arch = "aarch64") {
+                    0x01000007u32
+                } else {
+                    0x0100000cu32
+                })
+                .to_le_bytes(),
+            );
+        }
+        #[cfg(target_os = "linux")]
+        {
+            header[..4].copy_from_slice(b"\x7fELF");
+            header[18..20].copy_from_slice(
+                &(if cfg!(target_arch = "aarch64") {
+                    62u16
+                } else {
+                    183u16
+                })
+                .to_le_bytes(),
+            );
+        }
+        fs::write(&p, header).unwrap();
+        assert_eq!(inspect(&p).unwrap_err(), "cli_wrong_architecture");
+    }
+    // Native inert executables exercise the actual process/header boundary. No
+    // shell script is admitted and no test modifies process-wide HOME/state.
+    fn native(t: &Path, protocol: u32, behavior: &str) -> std::path::PathBuf {
+        let bin = t.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        let executable = bin.join("lintel");
+        let arch = std::env::consts::ARCH;
+        let platform = std::env::consts::OS;
+        let version=json!({"ok":true,"data":{"product":"Lintel","version":"0.1.0","protocol":protocol,"platform":platform,"architecture":arch}}).to_string();
+        let context=json!({"ok":true,"data":{"protocol":1,"user":{"uid":unsafe{libc::getuid()},"euid":unsafe{libc::geteuid()},"home":t.join("isolated-home")},"state":{"path":t.join("not-created-state"),"source":"explicit"}}}).to_string();
+        let source=format!("#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\nint main(int argc,char**argv){{{} if(argc>1 && !strcmp(argv[1],\"version\")) puts({});else if(argc>1 && !strcmp(argv[1],\"context\")) puts({});else puts(\"{{\\\"ok\\\":true,\\\"data\\\":{{}}}}\");return 0;}}",behavior,serde_json::to_string(&version).unwrap(),serde_json::to_string(&context).unwrap());
+        let c = t.join("inert.c");
+        fs::write(&c, source).unwrap();
+        let output = Command::new("cc")
+            .arg(&c)
+            .arg("-o")
+            .arg(&executable)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        executable
+    }
+    #[test]
+    fn native_static_unknown_identity_and_candidate_mismatch() {
+        let t = tempfile::tempdir().unwrap();
+        let bin = native(t.path(), 1, "");
+        let result = inspect(&bin).unwrap();
+        assert_eq!(result["candidate"]["status"], "unknown");
+        assert!(!t.path().join("not-created-state").exists());
+        let sidecar = json!({"schema":"lintel.cli-candidate/1","protocol":1,"version":"0.1.0","platform":std::env::consts::OS,"architecture":if cfg!(target_arch="aarch64"){"arm64"}else{"x86_64"},"candidate_identity":"synthetic-candidate","files":[{"path":"bin/lintel","sha256":"0".repeat(64)}]});
+        fs::write(t.path().join("candidate.json"), sidecar.to_string()).unwrap();
+        assert_eq!(inspect(&bin).unwrap_err(), "candidate_mismatch");
+        let mut correct = sidecar;
+        correct["files"][0]["sha256"] =
+            json!(format!("{:x}", Sha256::digest(fs::read(&bin).unwrap())));
+        fs::write(t.path().join("candidate.json"), correct.to_string()).unwrap();
+        assert_eq!(
+            inspect(&bin).unwrap()["candidate"]["source_authenticated"],
+            false
+        );
+        assert!(!t.path().join("not-created-state").exists());
+    }
+    #[test]
+    fn native_wrong_protocol_and_bounded_process() {
+        let t = tempfile::tempdir().unwrap();
+        let bin = native(t.path(), 2, "");
+        assert_eq!(inspect(&bin).unwrap_err(), "cli_protocol_mismatch");
+        let overflow = tempfile::tempdir().unwrap();
+        let bin = native(
+            overflow.path(),
+            1,
+            "for(int i=0;i<1100000;i++) putchar('x');",
+        );
+        assert_eq!(inspect(&bin).unwrap_err(), "cli_output_limit");
+        let slow = tempfile::tempdir().unwrap();
+        let bin = native(slow.path(), 1, "sleep(20);");
+        let start = Instant::now();
+        assert_eq!(inspect(&bin).unwrap_err(), "cli_timeout");
+        assert!(start.elapsed() < Duration::from_secs(10));
+    }
+}

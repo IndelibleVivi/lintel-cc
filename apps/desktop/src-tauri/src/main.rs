@@ -2,15 +2,19 @@
 
 mod bundled_browser_extension;
 mod bundled_browser_host;
+mod cli_inspector;
 mod network;
 mod remote;
 mod resources;
 
 #[tauri::command]
-async fn request(payload: serde_json::Value) -> Result<serde_json::Value, String> {
-    tauri::async_runtime::spawn_blocking(move || lintel_core::handle_request(payload))
-        .await
-        .map_err(|error| format!("本地执行器未能完成请求：{error}"))
+async fn request(
+    state: tauri::State<'_, network::NetworkState>,
+    payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    Ok(state
+        .dispatch_core(payload, lintel_core::handle_request)
+        .await)
 }
 
 #[tauri::command]
@@ -76,7 +80,8 @@ fn main() {
             browser_request,
             network::network_request,
             remote::remote_request,
-            resources::open_resource
+            resources::open_resource,
+            cli_inspector::inspect_cli
         ])
         .run(tauri::generate_context!())
         .expect("Lintel could not start");

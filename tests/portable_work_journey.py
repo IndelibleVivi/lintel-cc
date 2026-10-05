@@ -198,8 +198,13 @@ class PortableWorkJourney(unittest.TestCase):
             if entry["source"] in expected_mapping:
                 self.assertEqual(entry["destination"], expected_mapping[entry["source"]])
         encoded = json.dumps(shown)
-        for private in [PASSPHRASE, "Synthetic instruction only.", str(dest), str(out)]:
+        # The approved plan now names the frozen target root and each file's
+        # absolute final destination (SPEC §6.1): the user must see where content
+        # lands before approving. Secrets and file bodies stay absent, and the
+        # source archive path is not part of this public manifest.
+        for private in [PASSPHRASE, "Synthetic instruction only.", str(out)]:
             self.assertNotIn(private, encoded)
+        self.assertIn(str(dest), encoded)
         receipt = target.execute(import_plan)
         self.assertEqual(receipt["status"], "completed")
         for directory, mode in existing_modes:

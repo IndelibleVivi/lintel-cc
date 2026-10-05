@@ -43,7 +43,12 @@ export function requester(alias: string | null): typeof request {
   let remoteQueue: Promise<unknown> = Promise.resolve();
   return <C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> => {
     const result = remoteQueue.then(async () => {
-      const payload = command === 'execute' || command === 'launch' ? { op:command, alias, ...fields } : { op:'request', alias, request:{command,...fields} };
+      // Remote resume asks for the package secret in its real PTY. The App's
+      // ephemeral secret is used only by the separately approved read/preview.
+      const remoteFields = command === 'resume_request'
+        ? Object.fromEntries(Object.entries(fields).filter(([key]) => key !== 'archive_passphrase'))
+        : fields;
+      const payload = command === 'execute' || command === 'launch' || command === 'launch_request' || command === 'resume_request' || command === 'launch_query' || command === 'launches' ? { op:command, alias, ...remoteFields } : { op:'request', alias, request:{command,...remoteFields} };
       const envelope = await invoke<Envelope<Api[C]['response']>>('remote_request', {payload});
       if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message,envelope.error.diagnostic);
       return envelope.data;

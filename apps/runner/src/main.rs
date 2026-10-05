@@ -5,8 +5,18 @@ use serde_json::json;
 use std::io::{self, IsTerminal, Write};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.is_empty() || args[0] == "--help" || args[0] == "help" {
+    if args.is_empty() || ((args[0] == "--help" || args[0] == "-h") && args.len() == 1) {
         print!("{}", cli::HELP);
+        return;
+    }
+    // Bare `help` prints the full static help; `help GROUP` falls through to the
+    // CLI so a group's help is answered without initializing state.
+    if args[0] == "help" && args.len() == 1 {
+        print!("{}", cli::HELP);
+        return;
+    }
+    if let Some(help) = cli::help_request(&args) {
+        println!("{help}");
         return;
     }
     if ["submit", "__worker"].contains(&args[0].as_str()) {
@@ -19,6 +29,44 @@ fn main() {
         tui();
         return;
     }
+    // Dedicated finite TTY execution; aliases share one implementation.
+    if args[0] == "launch_request" || args[0] == "resume_request" {
+        if args.len() != 3 {
+            eprintln!("Usage: lintel {} <request-id> <approval-hash>", args[0]);
+            std::process::exit(1);
+        }
+        frozen_launch(&args[0], &args[1], &args[2]);
+        return;
+    }
+    // Readonly launch-record queries go through the normal CLI (no TTY needed).
+    if args[0] == "launch" && matches!(args.get(1).map(String::as_str), Some("query" | "list")) {
+        let response = cli::run(&args);
+        println!("{response}");
+        if response["ok"] != true {
+            std::process::exit(1)
+        }
+        return;
+    }
+    // `launch request <id> <approval>` / `launch resume <id> <approval>` reuse the
+    // same finite request/approval, require a real TTY, and never take a prompt.
+    if args[0] == "launch" && matches!(args.get(1).map(String::as_str), Some("request" | "resume"))
+    {
+        let command = if args[1] == "resume" {
+            "resume_request"
+        } else {
+            "launch_request"
+        };
+        if args.len() != 4 {
+            eprintln!(
+                "Usage: lintel launch {} <request-id> <approval-hash>",
+                args[1]
+            );
+            std::process::exit(1);
+        }
+        frozen_launch(command, &args[2], &args[3]);
+        return;
+    }
+
     if args[0] == "launch" {
         if args.len() != 2 {
             eprintln!("Usage: lintel launch <environment-id>");
@@ -41,6 +89,33 @@ fn main() {
         std::process::exit(1)
     }
 }
+fn frozen_launch(command: &str, request_id: &str, approval: &str) {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        eprintln!("terminal_required: 请在真实交互终端执行原启动；隐藏管道不能启动。");
+        std::process::exit(1);
+    }
+    // Existing attempts are queried before any passphrase prompt or approval.
+    let query =
+        lintel_core::handle_request(json!({"command":"launch_query","request_id":request_id}));
+    if query["ok"] == true && query["data"]["observed"] == "record" {
+        println!("{query}");
+        return;
+    }
+    let mut request = json!({"command":command,"request_id":request_id,"approval":approval});
+    if command == "resume_request" {
+        let Some(passphrase) = secret("归档口令（至少 12 字符，不显示）: ") else {
+            eprintln!("口令输入需要交互终端；未提交续聊请求。");
+            std::process::exit(1);
+        };
+        request["archive_passphrase"] = json!(passphrase);
+    }
+    let response = lintel_core::handle_interactive_launch(request);
+    println!("{response}");
+    if response["ok"] != true {
+        std::process::exit(1);
+    }
+}
+
 fn launch_command(environment_id: &str) -> Result<std::process::Command, String> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         return Err(
@@ -270,7 +345,8 @@ fn tui() {
                 continue;
             }
             "o" => {
-                match launch_command(&read_line("环境 ID: ")) {
+                let id = read_line("环境 ID: ");
+                match launch_command(&id) {
                     Ok(mut command) => {
                         if let Err(error) = command.status() {
                             eprintln!("启动失败: {error}");

@@ -58,8 +58,32 @@ fn property(name: &str) -> Value {
                 .collect();
             json!({"type":"object","properties":properties,"additionalProperties":false})
         }
+        // Independent per-category activation choices for a migration. Absent
+        // keys keep their legacy default; this is a finite object, not a free map.
+        "activate" => {
+            let properties: Map<String, Value> = ["instructions", "memory", "sessions"]
+                .iter()
+                .map(|key| (key.to_string(), json!({"type":"boolean"})))
+                .collect();
+            json!({"type":"object","properties":properties,"additionalProperties":false})
+        }
+        "mode" => choice(&["interactive"]),
+        "input_reference" => {
+            json!({"type":"object","properties":{"files":{"type":"array","maxItems":256,"items":{
+                "type":"object","properties":{
+                    "path":text(),"digest":json!({"type":"string","pattern":"^[a-f0-9]{64}$"}),
+                    "package_digest":json!({"type":"string","pattern":"^[a-f0-9]{64}$"}),
+                    "index":json!({"type":"integer","minimum":0})},
+                "required":["path","digest"],"additionalProperties":false}}},"additionalProperties":false,"description":"有界来源元数据，仅记录路径与摘要；不含正文或秘密"})
+        }
+        "request_id" => json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096}),
+        "offset" => json!({"type":"integer","minimum":0,"maximum":9007199254740991i64}),
+        "expected_digest" => json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64}),
         "root" | "archive_path" | "output_path" => {
             json!({"type":"string","pattern":"^/","description":"目标主机上的准确绝对路径；执行器另行复查实际文件与 ownership"})
+        }
+        "project_cwd" => {
+            json!({"type":"string","pattern":"^/","description":"目标主机上独立于配置 root 的项目工作目录；执行端复查存在、可访问与身份，不为启动创建或修改"})
         }
         "proxy_url" => json!({"type":"string","description":"只接受 loopback HTTP 地址"}),
         _ => text(),
@@ -101,7 +125,7 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
         ),
         "plan_reset" => (&["environment_id", "recipe", "categories"], &[]),
         "plan_archive" => (&["environment_id", "categories"], &["output_path"]),
-        "plan_preserve" => (&["environment_id", "categories"], &["name"]),
+        "plan_preserve" => (&["environment_id", "categories"], &["name", "activate"]),
         "plan_cleanup" => (
             &[
                 "environment_id",
@@ -109,7 +133,16 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
                 "writers_confirmed_stopped",
                 "official_logout",
             ],
-            &["categories"],
+            &["categories", "activate"],
+        ),
+        "plan_launch" => (&["environment_id", "project_cwd", "mode"], &["input_reference"]),
+        "launch_request" => (&["request_id", "approval"], &[]),
+        "resume_request" => (&["request_id", "approval"], &["archive_passphrase"]),
+        "launch_query" => (&["request_id"], &[]),
+        "launches" => (&[], &[]),
+        "plan_resume" => (
+            &["environment_id", "project_cwd", "path", "archive_passphrase"],
+            &["job_id", "archive_path"],
         ),
         "service_inspect" | "plan_service_quiesce" => (&["environment_id", "manager", "unit"], &[]),
         "plan_restore" | "plan_service_resume" => (&["job_id"], &[]),
@@ -117,9 +150,13 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
         "job" => (&[], &["job_id", "plan_id"]),
         "archive_inspect" => (&["archive_passphrase"], &["job_id", "archive_path"]),
         "archive_read" => (&["archive_passphrase", "path"], &["job_id", "archive_path"]),
+        "session_read" => (
+            &["archive_passphrase", "path"],
+            &["job_id", "archive_path", "offset", "expected_digest"],
+        ),
         "plan_import" => (
             &["environment_id", "categories", "archive_passphrase"],
-            &["job_id", "archive_path"],
+            &["job_id", "archive_path", "activate"],
         ),
         "execute" => (&["plan_id", "approval"], &["archive_passphrase"]),
         _ => return None,
@@ -144,7 +181,14 @@ pub const COMMANDS: &[&str] = &[
     "plan_service_resume",
     "archive_inspect",
     "archive_read",
+    "session_read",
     "plan_import",
+    "plan_launch",
+    "launch_request",
+    "plan_resume",
+    "resume_request",
+    "launch_query",
+    "launches",
     "plan_restore",
     "plan_show",
     "execute",
@@ -182,7 +226,9 @@ pub fn schema(command: &str) -> Option<Value> {
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
     let mut value = json!({"$schema":"https://json-schema.org/draft/2020-12/schema","title":command,"type":"object","properties":properties,"required":required,"additionalProperties":false});
-    if ["archive_inspect", "archive_read", "plan_import", "job"].contains(&command) {
+    if ["archive_inspect", "archive_read", "session_read", "plan_import", "plan_resume", "job"]
+        .contains(&command)
+    {
         let alternate = if command == "job" {
             "plan_id"
         } else {
@@ -195,6 +241,11 @@ pub fn schema(command: &str) -> Option<Value> {
     }
     if command == "plan_cleanup" {
         value["allOf"] = json!([{"if":{"properties":{"recipe":{"const":"repair_login"}}},"then":{},"else":{"required":["categories"],"properties":{"categories":{"minItems":1}}}}]);
+    }
+    if ["plan_launch", "launch_request", "plan_resume"].contains(&command) {
+        // These mutate nothing by themselves except launch (which is interactive
+        // and no-prompt); validation still enforces the finite fields.
+        value["x-lintel-interactive"] = json!(command == "launch_request");
     }
     Some(value)
 }
@@ -234,12 +285,28 @@ fn check_property(value: &Value, schema: &Value) -> bool {
                     .is_some_and(|p| check_property(v, p))
             })
         }),
+        Some("integer") => value.as_u64().is_some(),
         _ => false,
     };
     typed
         && schema
             .get("enum")
             .is_none_or(|values| values.as_array().unwrap().contains(value))
+        && schema
+            .get("minimum")
+            .is_none_or(|min| value.as_i64().is_some_and(|v| v >= min.as_i64().unwrap()))
+        && schema.get("pattern").is_none_or(|pattern| {
+            let pattern = pattern.as_str().unwrap();
+            // The only patterns used here are the fixed plan-hash shape; keep the
+            // check minimal and exact rather than pulling in a regex engine.
+            if pattern == "^[a-f0-9]{64}$" {
+                value
+                    .as_str()
+                    .is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+            } else {
+                value.as_str().is_some()
+            }
+        })
 }
 
 /// Named/finite transports use this strict contract. Protocol-1 raw core callers
@@ -266,7 +333,7 @@ pub fn validate(request: &Value) -> Result<(), String> {
         if key == "approval" && !valid_plan_hash(value.as_str().unwrap()) {
             return Err("approval 需要原计划返回的 64 位小写 hex hash".into());
         }
-        if ["root", "archive_path", "output_path"].contains(&key.as_str())
+        if ["root", "archive_path", "output_path", "project_cwd"].contains(&key.as_str())
             && !value.as_str().unwrap().starts_with('/')
         {
             return Err(format!("{key} 需要绝对路径"));
@@ -312,6 +379,16 @@ pub fn validate(request: &Value) -> Result<(), String> {
     {
         return Err("reset_client/retire 需要至少一种工作类别".into());
     }
+    // Activation is only meaningful for the instruction position this round.
+    // memory/sessions cannot be registered as active native sessions; asking to
+    // do so is an explicit unsupported request, not a silent drop.
+    if let Some(activate) = request.get("activate").and_then(Value::as_object) {
+        for key in ["memory", "sessions"] {
+            if activate.get(key).and_then(Value::as_bool) == Some(true) {
+                return Err("memory/sessions 本轮没有可注册的活动会话位置；activate 只支持 instructions".into());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -320,13 +397,16 @@ pub fn describe(command: &str) -> Option<Value> {
     let planning = command.starts_with("plan_") && command != "plan_show";
     let target = match command {
         "execute" => "frozen_plan_scope",
+        "launch_request" => "start_target_process",
+        "launch_query" | "launches" => "readonly_launch_records",
         "plan_archive" | "plan_preserve" | "plan_reset" | "plan_cleanup" => {
             "read_selected_work_for_frozen_plan"
         }
+        "plan_launch" | "plan_resume" => "read_target_for_frozen_launch",
         "create_environment" => "create_config_root",
         "launch" => "start_target_process",
         "auth_probe" => "official_auth_status_process",
-        "archive_read" => "read_work_text",
+        "archive_read" | "session_read" => "read_work_text",
         "archive_inspect" | "plan_import" => "read_encrypted_work",
         _ => "inspect_or_no_target_write",
     };
@@ -335,13 +415,16 @@ pub fn describe(command: &str) -> Option<Value> {
             "update_inventory"
         }
         "job" | "jobs" => "read_journal_may_reconcile_interrupted_job",
+        "launch_query" | "launches" => "read_launch_records_only",
         "accept_drift" => "write_baseline",
         "execute" => "persist_receipt_and_recovery",
         _ if planning => "persist_frozen_plan",
         _ => "state_directory_and_operation_lock",
     };
     let transports = match command {
-        "launch" | "launch_context" => vec!["core_json", "runner_json", "named_cli"],
+        "launch" | "launch_context" | "plan_launch" | "launch_request" | "plan_resume" => {
+            vec!["core_json", "runner_json", "named_cli"]
+        }
         "execute" => vec!["core_json", "runner_json", "named_cli", "finite_ssh_submit"],
         _ => vec![
             "core_json",
@@ -350,17 +433,22 @@ pub fn describe(command: &str) -> Option<Value> {
             "finite_ssh_request",
         ],
     };
+    let launch_conditions = match command {
+        "launch" => json!({"named_cli":"real_TTY_required_no_prompt","named_cli_entry":"lintel launch <environment-id>","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"}),
+        "plan_launch" | "launch_request" | "plan_resume" => json!({"named_cli":"real_TTY_required_no_prompt","core_json":"macos_Terminal_only","finite_ssh":"bound_runner_request_id_only","prompt":false,"queue":false}),
+        _ => Value::Null,
+    };
     Some(json!({
         "id":command,"protocol":1,"implementation":"implemented","transports":transports,
         "platforms":if command.contains("service") {vec!["linux"]} else {vec!["macos","linux"]},
         "target_conditions":if command.contains("service") {vec!["exact_root_bound_systemd_unit","user_manager_or_current_root"]} else {vec!["explicit_registered_environment_or_original_task_where_required"]},
         "applicability":{"status":"not_evaluated","reason":"静态描述不检查个人环境；运行相应 inspect 取得目标事实"},
-        "effects":{"target":target,"lintel_state":state,"external":match command {"auth_probe"=>"official_auth_status_process","launch"=>"start_target_process","execute"=>"exact_plan_actions_may_include_official_logout",_=>"none"}},
+        "effects":{"target":target,"lintel_state":state,"external":match command {"auth_probe"=>"official_auth_status_process","launch"=>"start_target_process","launch_request"=>"start_target_process","execute"=>"exact_plan_actions_may_include_official_logout",_=>"none"}},
         "requires_plan":command=="execute","approval":if command=="execute" {"exact_plan_hash_with_existing_user_authority"} else {"operation_specific_explicit_request"},
         "secret_fields":if s["properties"].get("archive_passphrase").is_some() {vec!["archive_passphrase"]} else {vec![]},
         "request_schema":s,
         "result":{"envelope":"ok/data or ok/error(code,message)","receipt_states":["accepted","executing","verifying","completed","partially_completed","needs_reconciliation","interrupted"],"recovery":["query_original","repreview","resolve_conflict"]},
-        "launch_conditions":if command=="launch" {json!({"named_cli":"real_TTY_required_no_prompt","named_cli_entry":"lintel launch <environment-id>","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"})}else{Value::Null},
+        "launch_conditions":launch_conditions,
         "compatibility":"协议 1 的 raw core request 保留历史可选字段/default；named CLI 与有限 SSH 使用明确字段合同"
     }))
 }
@@ -372,6 +460,17 @@ pub fn catalog() -> Value {
         {"id":"network","transport":"foreground_egress_ndjson","execution_owner":"calling_process","coverage":"proxy_connections_only","gui_owner":"desktop_app_process","shared_gui_control":false},
         {"id":"remote","transport":"finite_openssh","execution_owner":"bound_remote_runner","conditions":["registered_literal_alias","strict_host_key","runner_available"],"recovery":"query_original"}
     ]})
+}
+
+/// The one maintained finite task map, embedded at compile time from the single
+/// source `contracts/task-catalog.json` that the App help and website also import.
+/// Metadata only: no home/state/executable is read. Each task names its stable
+/// ID, zh label, App route, help anchor, related operations and runnable CLI
+/// examples; `task_catalog_matches_schema` asserts the file parses and is finite.
+const TASK_CATALOG_JSON: &str = include_str!("../../../contracts/task-catalog.json");
+
+pub fn tasks() -> Value {
+    serde_json::from_str(TASK_CATALOG_JSON).expect("embedded task catalog is valid JSON")
 }
 
 #[cfg(test)]
@@ -531,6 +630,72 @@ mod tests {
         );
         for command in COMMANDS {
             assert!(schema(command).is_some());
+        }
+    }
+
+    #[test]
+    fn session_read_is_bounded_and_exact_source() {
+        let ok = json!({"command":"session_read","archive_path":"/tmp/synthetic.age","archive_passphrase":"synthetic-only","path":"projects/p/s.jsonl"});
+        assert!(validate(&ok).is_ok(), "{ok}");
+        // Exactly one source; both or neither is rejected.
+        assert!(validate(&json!({"command":"session_read","job_id":"00000000-0000-4000-8000-000000000001","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x"})).is_err());
+        assert!(validate(&json!({"command":"session_read","archive_passphrase":"synthetic-only","path":"x"})).is_err());
+        // offset bounded integer; digest lowercase hex only.
+        assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","offset":-1})).is_err());
+        assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","offset":10})).is_ok());
+        assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","expected_digest":"A".repeat(64)})).is_err());
+        assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","expected_digest":"a".repeat(64)})).is_ok());
+        assert_eq!(schema("session_read").unwrap()["properties"]["archive_passphrase"]["writeOnly"], true);
+    }
+
+    #[test]
+    fn launch_and_resume_are_finite() {
+        let base = json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"interactive"});
+        assert!(validate(&base).is_ok(), "{base}");
+        assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"tmp/relative","mode":"interactive"})).is_err());
+        assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"shell"})).is_err());
+        let reference = json!({"files":[{"path":"projects/p/s.jsonl","digest":"a".repeat(64),"package_digest":"b".repeat(64),"index":0}]});
+        assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"interactive","input_reference":reference})).is_ok());
+        assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"interactive","input_reference":{"body":"secret"}})).is_err());
+        assert!(validate(&json!({"command":"launch_request","request_id":"00000000-0000-4000-8000-000000000001","approval":"a".repeat(64)})).is_ok());
+        assert!(validate(&json!({"command":"launch_request","request_id":"not-a-uuid","approval":"a".repeat(64)})).is_err());
+        assert!(validate(&json!({"command":"plan_resume","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","job_id":"00000000-0000-4000-8000-000000000002","archive_passphrase":"synthetic-only","path":"p/s.jsonl"})).is_ok());
+        assert_eq!(schema("launch_request").unwrap()["x-lintel-interactive"], json!(true));
+    }
+
+    #[test]
+    fn activation_is_finite_and_rejects_unavailable_positions() {
+        let base = json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"],"activate":{"instructions":true}});
+        assert!(validate(&base).is_ok(), "{base}");
+        assert!(validate(&json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"],"activate":{"instructions":"yes"}})).is_err());
+        assert!(validate(&json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"],"activate":{"credentials":true}})).is_err());
+        let bad = json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"activate":{"sessions":true}});
+        assert!(validate(&bad).is_err(), "activating an unavailable session position must be refused");
+    }
+
+    #[test]
+    fn task_catalog_is_one_finite_map_of_six_tasks() {
+        let catalog = tasks();
+        assert_eq!(catalog["schema"], "lintel.tasks/1");
+        assert_eq!(catalog["version"], 1);
+        let list = catalog["tasks"].as_array().unwrap();
+        assert_eq!(list.len(), 6);
+        let ids: Vec<&str> = list.iter().map(|t| t["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["reduce_egress", "preserve_work", "repair_cleanup_retire", "browser_profile", "ssh_remote", "recover_results"]);
+        // Every referenced operation must be a real operation this catalog owns.
+        for task in list {
+            for op in task["operations"].as_array().unwrap() {
+                assert!(schema(op.as_str().unwrap()).is_some(), "task references unknown operation {op}");
+            }
+            assert!(task["route"].as_str().unwrap().starts_with('#'), "route");
+            assert!(!task["help_anchor"].as_str().unwrap().is_empty(), "help_anchor");
+            assert!(!task["label"].as_str().unwrap().is_empty(), "label");
+            assert!(!task["summary"].as_str().unwrap().is_empty(), "summary");
+            // Every CLI example must invoke `lintel` with a real top-level grammar.
+            for example in task["cli_examples"].as_array().unwrap() {
+                let example = example.as_str().unwrap();
+                assert!(example.contains("lintel "), "cli example grammar: {example}");
+            }
         }
     }
 }

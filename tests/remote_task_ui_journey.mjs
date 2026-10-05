@@ -16,6 +16,9 @@ const alias='synthetic-writing-server';
 const local={id:'11111111-1111-4111-8111-111111111111',name:'Synthetic local workspace',host:'local',surface:'claude-code',root:'/synthetic/local',executable:null,ownership:'registered',status:'discovered'};
 const remote={...local,id:'22222222-2222-4222-8222-222222222222',name:'Synthetic remote workspace',host:alias,root:'/synthetic/remote'};
 const original='33333333-3333-4333-8333-333333333333',restoreId='44444444-4444-4444-8444-444444444444';
+const launchId='55555555-5555-4555-8555-555555555555';
+const launches=[{alias,request_id:launchId,status:'launch_attempt',mode:'interactive',runner_digest:'c'.repeat(64),binding_resolution:'original_launch_record'}];
+const executionContext={product:'Lintel',version:'0.1.0',protocol:1,platform:'macos',architecture:'aarch64',user:{uid:1000,euid:1000,home:'/synthetic/home'},state:{source:'LINTEL_STATE_DIR',path:'/synthetic/state',exists:true},config_home:{path:'/synthetic/home/.claude',exists:false},executable:'/synthetic/bin/lintel',initialized:false};
 const calls=[],receipts=[],tasks=[],installations=[];
 const installation={install_id:'synthetic-install',alias,probe:{os:'Linux',architecture:'x86_64',uid:'1000'},bundle:{version:'0.1.0',target:'x86_64-unknown-linux-musl',bytes:1024,sha256:'b'.repeat(64)},destination:'$HOME/.local/share/lintel/runners/'+ 'b'.repeat(64) +'/lintel',approval:'synthetic-install-approval',status:'previewed',effects:['Synthetic frozen approval']};let removed=false,conflict=false;
 let heldDiscover,heldJob,discoverRequested=false,jobRequested=false;
@@ -23,9 +26,10 @@ function plan(restore=false){return {id:restore?restoreId:original,hash:restore?
 const ok=data=>({ok:true,data});
 async function invoke(command,args){
   const p=args.payload;calls.push({command,...p});
+  if(command==='inspect_cli')return ok({executable:args.executable,version:{version:'0.1.0',protocol:1,platform:'macos',architecture:'aarch64'},context:executionContext,candidate:{status:'unknown'},checked_at:Date.now()});
   if(command==='remote_request'){
     switch(p.op){
-      case 'hosts':return ok({hosts:removed?[]:[{alias}],tasks,installations});
+      case 'hosts':return ok({hosts:removed?[]:[{alias}],tasks,installations,launches});
       case 'aliases':return ok({aliases:[alias],coverage:'Synthetic SSH inventory; no real connection'});
       case 'prepare_runner':return ok({...installation});
       case 'install_runner':
@@ -35,6 +39,7 @@ async function invoke(command,args){
       case 'connect':assert.equal(p.alias,alias);return ok({status:'connected'});
       case 'remove_host':removed=true;return ok({status:'removed'});
       case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok(await core({command:'job',job_id:p.plan_id},true));
+      case 'launch_query':assert.equal(p.alias,alias);assert.equal(p.request_id,launchId);return ok({...launches[0],root:remote.root,project_cwd:'/synthetic/project',message:'Synthetic original launch remains query-only'});
       case 'request':assert.equal(p.alias,alias);return ok(await core(p.request,true));
       case 'execute':assert.equal(p.alias,alias);return ok(await core({...p,command:'execute'},true));
       default:throw new Error('unexpected remote operation: '+p.op);
@@ -45,6 +50,8 @@ async function invoke(command,args){
 async function core(p,isRemote){
   const environment=isRemote?remote:local;
   switch(p.command){
+    case 'context':return executionContext;
+    case 'launches':return {launches:[]};
     case 'discover':
       if(isRemote && heldDiscover){discoverRequested=true;await heldDiscover.promise;}
       return {environments:[environment],capabilities:[]};
@@ -95,6 +102,8 @@ try{
   await dialog.getByRole('button',{name:'收起',exact:true}).click();
   report.checks.push('unresolved installation diagnostic renders; direct original-install query exposes superseded binding without another upload');
   await dialog.getByRole('button',{name:'连接并管理',exact:true}).click();
+  await page.getByRole('button',{name:'开始一项任务',exact:true}).click();
+  await page.locator('.task-home [data-task-id="reduce_egress"]').getByRole('button',{name:'选择保护方案',exact:true}).click();
   await page.getByRole('button',{name:'预览变更',exact:true}).click();await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();
   await dialog.getByRole('heading',{name:'结果待核对',exact:true}).waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
@@ -162,6 +171,22 @@ try{
   if(artifacts)await page.screenshot({path:path.join(artifacts,'remote-task-night-removed.png')});
   const cursor=await page.locator('.brand strong .brand-cursor').evaluate(el=>({animation:getComputedStyle(el).animationName,duration:getComputedStyle(el).animationDuration}));assert.deepEqual(cursor,{animation:'brand-blink',duration:'2.6s'});
   await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.brand strong .brand-cursor').evaluate(el=>getComputedStyle(el).animationName),'none');assert.deepEqual(errors,[]);
+  await dialog.locator('.remote-launch-records').getByRole('button',{name:'查询原启动',exact:true}).click();
+  await dialog.getByText('Synthetic original launch remains query-only',{exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'把原启动请求交给 Agent',exact:true}).click();
+  await page.getByLabel('Lintel CLI 完整路径',{exact:true}).fill('/synthetic/bin/lintel');
+  await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();
+  const packet=JSON.parse(await page.getByRole('textbox',{name:'Agent 操作交接包',exact:true}).inputValue());
+  assert.equal(packet.launch_request.request_id,launchId);
+  assert.equal(packet.target.host.alias,alias);
+  assert.equal(packet.target.host.runner_digest,'c'.repeat(64));
+  assert.equal(packet.target.host.binding_observed,true);
+  assert.equal(packet.next_action.mode,'query_original_only');
+  assert.match(packet.next_action.commands[0],/remote launch query/);
+  assert.match(packet.next_action.commands[0],new RegExp(launchId));
+  assert.equal(calls.some(c=>['launch_request','resume_request'].includes(c.op)),false);
+  assert.equal(calls.filter(c=>c.op==='execute').length,2);
+  report.checks.push('removed alias startup metadata opens original pinned-runner query and Agent packet, without reopening a Terminal or submitting again');
   report.checks.push('removed alias remains query-only; Day/Night 1120/900 layout; wordmark slow blink/reduced motion preserved');report.passed=true;
   console.log('PASS: built App synthetic remote task reopen/query/conflict/separate restore journey');
   async function pageBusy(){return page.getByRole('button',{name:alias,exact:true}).isDisabled();}

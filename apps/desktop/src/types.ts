@@ -25,10 +25,17 @@ export interface Plan {
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
   policy?: PolicyAssessment;
   service?: ServicePlan;
+  plan_revision?: string;
+  planned_target?: { new_environment_id: string|null; new_root: string; create: boolean; files: {source:string;destination:string;category:string;size:number;sha256:string}[]; purposes: Record<string,string>; activation: Record<string,boolean> };
+  launch_request?: { id:string;environment_id:string;project_cwd:string;config_root:string;executable:string;client_version:string|null;mode:string;input_reference?:unknown;created_at:string };
+  resume?: { supported:boolean;reason:string|null;mode:string;source:unknown;transcript_path:string;private_copy_path:string;config_root:string;project_cwd:string;client_version:string|null;client_support:unknown;archive_unmodified:boolean;auth_unverified:boolean;attach_risk:string;write_scope?:{config_root:string;project_cwd?:string;note:string} };
   import_manifest?: {
     package: { format: string; generator: string | null; sha256: string };
     files: { source: string; destination: string; category: string; size: number; sha256: string }[];
   };
+}
+export interface LaunchRecord {
+  request_id:string; status:string; mode?:string; environment_id?:string; root?:string; config_root?:string; project_cwd?:string; executable?:string; recorded_at?:string; created_at?:string; message?:string; observed?:string; private_copy_path?:string; alias?:string; runner_digest?:string|null; binding_resolution?:string; error?:{code:string;message:string};
 }
 export interface Receipt {
   id: string; plan_id: string; environment_id: string; title: string; status: string;
@@ -37,6 +44,7 @@ export interface Receipt {
   policy?: PolicyAssessment;
   service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
   service_restorable?: boolean;
+  task_result?: { outcome:string; title?:string; primary?:string; selected_steps:{id:string;done:boolean;note:string}[]; coverage:{scope:string;state:string;detail:string}[];next_actions:{label:string;entry:string}[] };
   settings_recovery?: { state: "written" | "not_written" | "ownership_unproven"; reason: string; message: string };
   execution?: { mode: 'setsid' | 'system_manager' | 'user_manager'; manager: 'system' | 'user' | null; unit: string | null; continuation: string; limitation: string | null; reboot_survival: false };
   migration_probe?: { path: string; status: 'executing' | 'removed' | 'retained' };
@@ -61,16 +69,27 @@ export interface ServiceInspection {
   bound: boolean; quiesced: boolean; quiesce_job_id: string | null;
   hold: { path: string; persistent: true } | null; limitations: string[];
 }
+export interface SessionRecord { index:number; kind:string; text?:unknown;tool?:unknown;record?:unknown;block?:unknown;raw?:string;timestamp?:string;name?:string;opaque?:boolean;unknown?:boolean }
+export interface SessionPage { path:string;content_kind:string;records:SessionRecord[];raw_text?:string;next_offset:number|null;done:boolean;total_bytes:number;digest:string;source:{archive_path:string;job_id?:string;package_digest:string} }
+export interface ExecutionContext { product:string;version:string;protocol:number;platform:string;architecture:string;user:{uid:number;euid:number;home:string};state:{source:string;path:string;exists:boolean};config_home:{path:string;exists:boolean};executable:string|null;initialized:boolean }
 export interface Api {
+  context: {request:{};response:ExecutionContext};
+  session_read: { request:{job_id?:string;archive_path?:string;archive_passphrase:string;path:string;offset?:number;expected_digest?:string};response:SessionPage };
+  plan_launch: { request:{environment_id:string;project_cwd:string;mode:'interactive';input_reference?:unknown;proxy_url?:string};response:Plan };
+  plan_resume: { request:{environment_id:string;project_cwd:string;job_id?:string;archive_path?:string;archive_passphrase:string;path:string};response:Plan };
+  launch_query: { request:{request_id:string};response:LaunchRecord };
+  launches: { request:{};response:{launches:LaunchRecord[]} };
+  launch_request: { request:{request_id:string;approval:string};response:{status:string;request_id:string;project_cwd:string;root:string;executable:string;message:string} };
+  resume_request: { request:{request_id:string;approval:string;archive_passphrase:string};response:{status:string;request_id:string;project_cwd:string;root:string;executable:string;message:string} };
   discover: { request: {}; response: { environments: Environment[]; capabilities: Capability[] } };
   register: { request: { name: string; root: string }; response: Environment };
   create_environment: { request: { name: string }; response: Environment };
   inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
   plan_policy: { request: { environment_id: string; preset: PolicyPreset; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[]; custom_settings?: CustomSettings }; response: Plan };
   plan_archive: { request: { environment_id: string; categories: string[]; output_path?: string }; response: Plan };
-  plan_preserve: { request: { environment_id: string; categories: string[]; name?: string }; response: Plan };
+  plan_preserve: { request: { environment_id: string; categories: string[]; activate?:{instructions:boolean}; name?: string }; response: Plan };
   plan_show: { request: { plan_id: string }; response: Plan };
-  plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[] }; response: Plan };
+  plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[]; activate?:{instructions:boolean} }; response: Plan };
   plan_restore: { request: { job_id: string }; response: Plan };
   execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
   cleanup_inspect: { request: { environment_id: string }; response: CleanupInspection };
@@ -78,11 +97,11 @@ export interface Api {
   plan_service_quiesce: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: Plan };
   plan_service_resume: { request: { job_id: string }; response: Plan };
   auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; remote_revocation: string } };
-  plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[] }; response: Plan };
+  plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[]; activate?:{instructions:boolean} }; response: Plan };
   reactivate_environment: { request: { environment_id: string }; response: { status: string } };
   archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };
   archive_read: { request: { job_id?: string; archive_path?: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };
-  plan_import: { request: { environment_id: string; job_id?: string; archive_path?: string; categories: string[]; archive_passphrase: string }; response: Plan };
+  plan_import: { request: { environment_id: string; job_id?: string; archive_path?: string; categories: string[]; activate?:{instructions:boolean}; archive_passphrase: string }; response: Plan };
   jobs: { request: {}; response: { jobs: Receipt[] } };
   job: { request: { job_id: string }; response: Receipt };
   drift: { request: { environment_id: string }; response: Drift };

@@ -75,7 +75,7 @@
 
 工作类别为 `instructions`、`memory`、`sessions`。执行归档类计划需额外 `archive_passphrase`（至少 12 个字符），只能在此次请求内传递；不进入计划、journal 或支持资料。
 
-`plan_archive` 只加密归档选中的工作内容，`outcome` 为 `archive_only`：不新建环境、不改 settings、不碰凭据，原文件保持不变。可选绝对 `output_path` 会在预览时冻结路径与父目录的 device/inode，接受执行和实际发布前都核对同一目录对象。目录替换返回 `stale_plan`；缺少身份的旧显式输出计划须重新预览，已完成原任务继续查询、不重跑。该路径必须不存在，core 不覆盖已有文件，也不替调用者创建父目录；未给出时归档留在私有 state，receipt 里的 `archive_path` 指回它。`plan_preserve` 在此之上建立新根并迁入所选内容，`outcome` 为 `preserve`：receipt 以 `outcome:"preserved"` 完成，`coverage` 声明 `old_login`/`old_root` 保留、`service_binding:"unchanged"`，`next_steps` 列出在新环境采用保护方案、正常登录与运行验证，并说明迁移内容不会自动启用、原 root 的 service 绑定不改。旧环境的保留步骤以 `preserved`（保留）呈现，不是未完成项。`plan_show` 读回已冻结计划供 CLI 展示，返回与预览相同的字段并剥离私有原始快照、根身份与 `extra`；迁入计划另投影公开清单，见下文；口令从不写入计划，因此不会泄出。
+`plan_archive` 只加密归档选中的工作内容，`outcome` 为 `archive_only`：不新建环境、不改 settings、不碰凭据，原文件保持不变。可选绝对 `output_path` 会在预览时冻结路径与父目录的 device/inode，接受执行和实际发布前都核对同一目录对象。目录替换返回 `stale_plan`；缺少身份的旧显式输出计划须重新预览，已完成原任务继续查询、不重跑。该路径必须不存在，core 不覆盖已有文件，也不替调用者创建父目录；未给出时归档留在私有 state，receipt 里的 `archive_path` 指回它。`plan_preserve` 在此之上建立新根并迁入所选内容，`outcome` 为 `preserve`：receipt 以 `outcome:"preserved"` 完成，`coverage` 声明 `old_login`/`old_root` 保留、`service_binding:"unchanged"`，`next_steps` 列出在新环境采用保护方案、正常登录与运行验证，并按用途说明待用资料与显式启用的个人指令，原 root 的 service 绑定不改。旧环境的保留步骤以 `preserved`（保留）呈现，不是未完成项。`plan_show` 读回已冻结计划供 CLI 展示，返回与预览相同的字段并剥离私有原始快照、根身份与 `extra`；迁入计划另投影公开清单与批准中的完整目标：新增 `planned_target` 包含准确新 root／ID、文件完整落点、用途与启用选择，执行使用这份冻结分配而不重新生成第二 root；旧 `import_manifest` 的相对路径保持兼容。见下文；口令从不写入计划，因此不会泄出。
 
 `plan_reset` 仍只接受 `recipe: "rebuild"`，语义不变：仅归档后建立新根并迁入，旧 root/登录保留，receipt 维持 `partially_completed`（旧登录/客户端清理步骤未完成）；历史 receipt 不复绿。
 
@@ -103,6 +103,10 @@ TUI 通过 `lintel tui` 提供上述配方、认证检查、归档阅读/迁入�
 
 ## 启动与支持资料
 
+`crates/core/src/session.rs` 拥有有界 `session_read`：按工作包 source＋文件摘要读取一页，返回字节继续位置、结构化记录及 raw text。未知／损坏记录不从原件删除；thinking／signature 是不透明块。正文与口令不进普通 journal。旧 `archive_read` 保留其既有兼容行为。
+
+`crates/core/src/launch.rs` 拥有 `plan_launch`／`launch_request`、独立 `plan_resume`／`resume_request` 以及只读 `launch_query`／`launches`。配置 root 决定状态，项目 cwd 决定工作目录。预览冻结 target／程序／静态版本；首次执行复查，Terminal／PTY 前持久 intent。重复与中断按原 ID 核对，不能重放启动。resume 准备私有字节副本，不把 archive 原件交给客户端写；有限支持政策、真实认证／实际恢复限制与写入范围见原计划和 [操作指南](operator-guide.md)。
+
 macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确配置根，使用 `CLAUDE_CONFIG_DIR`；有 loopback 通道时，只给新启动传入大小写 HTTP(S) proxy 变量。不会关闭已有会话或消除 `NO_PROXY` 的分流。`launch_requested` 仅表示启动请求已送达，实际 Claude 使用与网络效果未验证。
 
 独立终端用 `lintel launch <environment-id>`，由 CLI exec 目标程序，stdin/stdout 都必须是 TTY，且只接受一个环境 ID；不在隐藏管道内启动交互 agent，不接受 prompt 参数。TUI 的 `o 打开 Claude` 使用同一启动路径，退出 Claude 后返回菜单。
@@ -125,3 +129,5 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。
 
 原子不覆盖 rename 的平台合同见 [Linux rename manual](https://www.man7.org/linux/man-pages/man2/rename.2.html) 与 [Apple rename manual source](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/rename.2)。
+
+新增的创建新 root 计划在批准前冻结完整落点。尚未接受且缺少该字段的旧创建计划返回 `stale_plan`，需重新预览；已经接受的历史任务仍先读原 ID 的回执，不重新创建目录。旧 portable import 计划省略 activation 时保留根 CLAUDE.md 的原目的地，旧协议与包不改写。

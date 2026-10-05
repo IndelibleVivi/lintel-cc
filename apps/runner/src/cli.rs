@@ -5,7 +5,51 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const HELP: &str = "Lintel — Claude environment control\n\n  lintel version [--json]                     Static build/protocol identity\n  lintel capabilities [--environment ID]       Operation catalog; optional target inspection\n  lintel describe OPERATION [--json]           Parameters, effects, approval and recovery\n  lintel schema OPERATION                     JSON Schema envelope, no discovery\n  lintel env list | inspect ID | create --name NAME | register --name NAME --root PATH\n  lintel policy plan --environment ID --preset reduce --keep-remote-control\n  lintel plan show ID                         Read original frozen plan\n  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n  lintel job submit --plan ID --approval HASH  Durable ACK; secret fields via JSON stdin\n  lintel restore plan --job ID                Prepare an independent restoration\n  lintel work archive plan --environment ID --categories instructions,memory,sessions\n  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n  lintel browser operations [--instance ID]    Static actions; optional pairing/online facts\n  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n  lintel browser submit | query | control    Finite host control; JSON stdin\n  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n  lintel remote operations                   Static finite SSH schemas, no state\n  lintel remote hosts | aliases | inspect ALIAS\n  lintel remote request ALIAS | submit ALIAS   JSON stdin; submit only execute\n  lintel remote job ALIAS PLAN_ID             Query original; no resubmission\n  lintel remote launch ALIAS ENVIRONMENT_ID    Real TTY, macOS Terminal, no prompt\n  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\nLegacy: request, submit, discover, inspect ID, jobs, job ID, launch ID, tui.\nOrdinary commands print one ok/data or ok/error envelope. Network serve is explicitly NDJSON.\nPassphrases never belong in argv or persistent request files. No blanket --yes.\nStatic catalog commands do not initialize state. Protocol-1 request retains historical defaults.\n";
+pub const HELP: &str = concat!(
+  "Lintel — Claude environment control\n\n",
+  "  lintel version [--json]                     Static build/protocol identity\n",
+  "  lintel capabilities [--environment ID]       Operation catalog; optional target inspection\n",
+  "  lintel describe OPERATION [--json]           Parameters, effects, approval and recovery\n",
+  "  lintel schema OPERATION                     JSON Schema envelope, no discovery\n",
+  "  lintel context [--json]                      Readonly state/user/executable facts; no state made\n",
+  "  lintel tasks [--json]                        The one finite six-task map; no state made\n",
+  "  lintel help [GROUP]                         Static help; GROUP ∈ env/policy/work/job/restore/remote/launch/session\n",
+  "  lintel env list | inspect ID | create --name NAME | register --name NAME --root PATH\n",
+  "  lintel policy plan --environment ID --preset reduce --keep-remote-control\n",
+  "  lintel plan show ID                         Read original frozen plan\n",
+  "  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n",
+  "  lintel job submit --plan ID --approval HASH  Durable ACK; secret fields via JSON stdin\n",
+  "  lintel restore plan --job ID                Prepare an independent restoration\n",
+  "  lintel work archive plan --environment ID --categories instructions,memory,sessions\n",
+  "  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n",
+  "  lintel work session read                    Bounded paged read; passphrase via JSON stdin\n",
+  "  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n",
+  "  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n",
+  "  lintel launch ID                            Legacy real TTY, root as cwd, no prompt\n",
+  "  lintel launch request ID HASH               Frozen interactive start; no prompt; real TTY\n",
+  "  lintel launch resume ID HASH                Frozen native resume; passphrase via no-echo TTY; real TTY\n",
+  "  lintel launch query REQUEST_ID              Readonly: find one original startup request\n",
+  "  lintel launch list                          Readonly: list durable startup requests\n",
+  "  lintel browser operations [--instance ID]    Static actions; optional pairing/online facts\n",
+  "  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n",
+  "  lintel browser submit | query | control    Finite host control; JSON stdin\n",
+  "  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n",
+  "  lintel remote operations                   Static finite SSH schemas, no state\n",
+  "  lintel remote hosts | aliases | inspect ALIAS\n",
+  "  lintel remote request ALIAS | submit ALIAS   JSON stdin; submit only execute\n",
+  "  lintel remote job ALIAS PLAN_ID             Query original; no resubmission\n",
+  "  lintel remote launch ALIAS ENVIRONMENT_ID    Real TTY, macOS Terminal, no prompt\n",
+  "  lintel remote launch request ALIAS ID HASH   Approved frozen cwd/config; macOS Terminal\n",
+  "  lintel remote launch resume ALIAS ID HASH    Finite resume; secret entered in SSH TTY\n",
+  "  lintel remote launch query ALIAS ID          Query original runner; no Terminal\n",
+  "  lintel remote launch list ALIAS              Local original-launch metadata; no SSH\n",
+  "  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n",
+  "  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\n",
+  "Legacy: request, submit, discover, inspect ID, jobs, job ID, launch ID, tui.\n",
+  "Ordinary commands print one ok/data or ok/error envelope. Network serve is explicitly NDJSON.\n",
+  "Passphrases never belong in argv or persistent request files. No blanket --yes.\n",
+  "Static catalog commands do not initialize state. Protocol-1 request retains historical defaults.\n",
+);
 
 pub fn error(code: &str, message: impl AsRef<str>) -> Value {
     json!({"ok":false,"error":{"code":code,"message":message.as_ref()}})
@@ -47,6 +91,19 @@ pub fn dispatch(request: Value) -> Value {
         "version" => {
             json!({"ok":true,"data":{"product":"Lintel","version":env!("CARGO_PKG_VERSION"),"protocol":1,"catalog_version":1,"platform":std::env::consts::OS,"architecture":std::env::consts::ARCH}})
         }
+        // Readonly execution context. Uses core's resolver, which constructs no
+        // Engine: it never creates state or runs discovery.
+        "context" => json!({"ok":true,"data":lintel_core::execution_context()}),
+        // One finite task map shared with the frontend/website. Static metadata.
+        "tasks" => json!({"ok":true,"data":lintel_operations::tasks()}),
+        // Frozen launch/resume execution is only reachable through the dedicated
+        // real-TTY CLI branch in main.rs (which calls core's interactive handler
+        // directly). The generic static dispatcher — including hidden `lintel call`
+        // or `request` JSON — must never open a Terminal or start a client.
+        "launch_request" | "resume_request" => error(
+            "terminal_required",
+            "此启动只能通过真实交互终端入口（lintel launch request|resume <ID> <HASH>）执行；JSON/管道调用不会启动客户端。",
+        ),
         "capabilities" => {
             let mut catalog = lintel_operations::catalog();
             catalog["remote_control"] = lintel_remote::operation_catalog();
@@ -241,9 +298,78 @@ fn timeout(raw: &str) -> Option<Duration> {
     (milliseconds <= 3600 * 1000).then(|| Duration::from_millis(milliseconds))
 }
 
+/// Named subcommand help. Handled before any state initialization or parameter
+/// execution, so `lintel <group> help` never creates state. Each entry lists
+/// only real parser/schema operations.
+const GROUP_HELP: &[(&str, &str)] = &[
+    ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
+    ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
+    ("network", "network serve --config PATH\n  明确前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
+    ("env", "env list | inspect ID | create --name NAME | register --name NAME --root PATH\n  list/inspect 只读；create/register 只建立或登记明确的配置目标。"),
+    ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
+    ("work", "work archive plan|list|inspect|read | preserve plan | import plan | session read\n  session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}；不修改原件。"),
+    ("job", "job show ID | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
+    ("restore", "restore plan --job ID\n  为仍属于本工具的字段准备独立恢复预览。"),
+    ("remote", "remote hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID | control\n  remote launch request|resume ALIAS REQUEST_ID APPROVAL；remote launch query ALIAS REQUEST_ID | remote launch list ALIAS。有限 OpenSSH controller；execute 只走 submit，恢复只查询原任务。"),
+    ("launch", "launch ENVIRONMENT_ID\n  launch request REQUEST_ID APPROVAL | launch resume REQUEST_ID APPROVAL\n  launch query REQUEST_ID | launch list\n  真实 TTY 直接交互、无 prompt；旧入口以 root 为 cwd，新请求冻结独立 cwd。resume 的口令在该 TTY 无回显输入；请求以不可变 request ID 解析，重复只查询。"),
+    ("session", "session read\n  work session read 的别名：需要 --job ID 或 --archive-path PATH、--path PATH 与 stdin 口令。"),
+];
+
+fn group_help(group: &str) -> Value {
+    GROUP_HELP
+        .iter()
+        .find(|(name, _)| *name == group)
+        .map_or_else(
+            || error("unknown_command", format!("没有子命令组 {group}")),
+            |(name, text)| {
+                json!({"ok":true,"data":{"group":name,"help":text,"static":true,"notes":"此帮助不初始化 state、不执行操作。"}})
+            },
+        )
+}
+
+/// All named nested help is resolved before TTY, stdin or state initialization.
+pub fn help_request(args: &[String]) -> Option<Value> {
+    let first = args.first()?.as_str();
+    let help = args
+        .get(1)
+        .is_some_and(|s| ["help", "--help", "-h"].contains(&s.as_str()))
+        || args
+            .last()
+            .is_some_and(|s| ["help", "--help", "-h"].contains(&s.as_str()));
+    (help && GROUP_HELP.iter().any(|(group, _)| *group == first)).then(|| group_help(first))
+}
+
 pub fn run(args: &[String]) -> Value {
+    if let Some(help) = help_request(args) {
+        return help;
+    }
     let word = |i: usize| args.get(i).map(String::as_str).unwrap_or("");
     match word(0) {
+        // `--help` / `-h` anywhere as the only argument prints static help before
+        // touching state or parameters.
+        "--help" | "-h" => json!({"ok":true,"data":{"help":HELP,"static":true}}),
+        "help" => {
+            if word(1).is_empty() {
+                json!({"ok":true,"data":{"help":HELP,"static":true}})
+            } else {
+                group_help(word(1))
+            }
+        }
+        // Any group's trailing `help` is answered before touching state/params.
+        group
+            if matches!(
+                args.get(1).map(String::as_str),
+                Some("help" | "--help" | "-h")
+            ) =>
+        {
+            group_help(group)
+        }
+        "context" | "tasks" => {
+            if args[1..].iter().any(|a| a != "--json") {
+                return error("invalid_argument", "该静态命令只接受 --json");
+            }
+            dispatch(json!({"command":word(0)}))
+        }
         "version" | "capabilities" => {
             let command = word(0);
             let r = match flags(&args[1..], json!({"command":command})) {
@@ -269,6 +395,17 @@ pub fn run(args: &[String]) -> Value {
             Ok(r) => dispatch(r),
             Err(e) => e,
         },
+        // Top-level alias for `work session read`.
+        "session" if word(1) == "read" => named("session_read", &args[2..], json!({}), true),
+        // Readonly launch/resume record queries (no approval, no passphrase, no
+        // Terminal). `query` finds one original request; `list` shows all.
+        "launch" if word(1) == "query" && !word(2).is_empty() => named(
+            "launch_query",
+            &args[3..],
+            json!({"request_id":word(2)}),
+            false,
+        ),
+        "launch" if word(1) == "list" => named("launches", &args[2..], json!({}), false),
         "call" => {
             if args.len() != 2 {
                 return error(
@@ -342,12 +479,13 @@ pub fn run(args: &[String]) -> Value {
                 ("archive", "list", _) => ("jobs", 3, false),
                 ("archive", "inspect", _) => ("archive_inspect", 3, true),
                 ("archive", "read", _) => ("archive_read", 3, true),
+                ("session", "read", _) => ("session_read", 3, true),
                 ("preserve", "plan", _) => ("plan_preserve", 3, false),
                 ("import", "plan", _) => ("plan_import", 3, true),
                 _ => {
                     return error(
                         "invalid_argument",
-                        "work archive plan/list/inspect/read | preserve plan | import plan",
+                        "work archive plan/list/inspect/read | session read | preserve plan | import plan",
                     )
                 }
             };
@@ -468,6 +606,21 @@ fn browser(args: &[String]) -> Value {
     }
 }
 
+/// Run one read-only remote operation with the same runner-bundle resolution as
+/// the other remote CLI paths. Used by `remote launch query|list`.
+fn remote_pinned(payload: Value) -> Value {
+    let bundles = std::env::var_os("LINTEL_RUNNER_BUNDLES")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::env::current_exe()
+                .unwrap_or_default()
+                .parent()
+                .unwrap_or(std::path::Path::new("."))
+                .join("remote-runners")
+        });
+    lintel_remote::control(payload, bundles)
+}
+
 fn remote(args: &[String]) -> Value {
     let word = |i: usize| args.get(i).map(String::as_str).unwrap_or("");
     if word(1) == "operations" {
@@ -478,6 +631,50 @@ fn remote(args: &[String]) -> Value {
         };
     }
     if word(1) == "launch" {
+        // `remote launch request ALIAS ID HASH` / `remote launch resume ALIAS ID HASH` reuse
+        // the same finite ID; `remote launch ALIAS ENVIRONMENT_ID` keeps the
+        // legacy environment launch.
+        // Readonly record queries (no TTY, no approval, no Terminal).
+        if word(2) == "query" && !word(3).is_empty() && !word(4).is_empty() {
+            return remote_pinned(
+                json!({"op":"launch_query","alias":word(3),"request_id":word(4)}),
+            );
+        }
+        if word(2) == "list" && !word(3).is_empty() {
+            return remote_pinned(json!({"op":"launches","alias":word(3)}));
+        }
+        if word(2) == "request" || word(2) == "resume" {
+            if args.len() != 6 {
+                return error(
+                    "invalid_argument",
+                    "remote launch request|resume ALIAS REQUEST_ID APPROVAL；不接受额外字段",
+                );
+            }
+            if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+                return error(
+                    "interactive_launch_required",
+                    "请在真实交互终端使用 lintel remote launch；不从隐藏管道打开 Terminal",
+                );
+            }
+            let op = if word(2) == "resume" {
+                "resume_request"
+            } else {
+                "launch_request"
+            };
+            // Only the validated alias/request-id/approval enter the payload; a
+            // resume passphrase is entered again without echo in the remote TTY.
+            let payload = json!({"op":op,"alias":word(3),"request_id":word(4),"approval":word(5)});
+            let bundles = std::env::var_os("LINTEL_RUNNER_BUNDLES")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| {
+                    std::env::current_exe()
+                        .unwrap_or_default()
+                        .parent()
+                        .unwrap_or(std::path::Path::new("."))
+                        .join("remote-runners")
+                });
+            return lintel_remote::control(payload, bundles);
+        }
         if args.len() != 4 {
             return error(
                 "invalid_argument",
@@ -504,6 +701,7 @@ fn remote(args: &[String]) -> Value {
         }
         "job" if !word(2).is_empty()&&!word(3).is_empty()=>json!({"op":"request","alias":word(2),"request":{"command":"job","job_id":word(3)}}),
         "launch" => json!({"op":"launch","alias":word(2),"environment_id":word(3)}),
+        "query" if !word(2).is_empty()&&!word(3).is_empty()=>json!({"op":"launch_query","alias":word(2),"request_id":word(3)}),
         _=>return error("invalid_argument","remote control | hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID"),
     };
     if word(1) != "launch" && payload["op"] == "launch" {

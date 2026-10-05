@@ -1,10 +1,17 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
 
+function buildInfo() {
+  try {
+    const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    const dirty = !!execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { encoding: 'utf8' }).trim();
+    return { version: '0.1.0', docs_revision: dirty ? 'unknown' : revision, source_dirty: dirty };
+  } catch { return { version: '0.1.0', docs_revision: 'unknown', source_dirty: true }; }
+}
 const fixturePort = Number(process.env.LINTEL_FIXTURE_PORT ?? '1420');
 function fixtureBridge(): Plugin {
   const fixture = process.env.LINTEL_FIXTURE_ROOT;
@@ -12,7 +19,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {
@@ -27,13 +34,16 @@ function fixtureBridge(): Plugin {
           let payload: Record<string, unknown>;
           try { payload = JSON.parse(body); } catch { res.statusCode = 400; res.end('Invalid JSON'); return; }
           if (!allowed.has(String(payload.command))) { res.statusCode = 400; res.end('Unsupported fixture command'); return; }
+          if (['launch','launch_request','resume_request'].includes(String(payload.command))) {
+            res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:false,error:{code:'FIXTURE_NATIVE_LAUNCH',message:'合成开发预览只核对启动计划；实际 Terminal／PTY 使用独立的 inert 客户端旅程验收。此页面不会启动真实 Claude。'}}));return;
+          }
           // Registration stays inside this synthetic home even though the UI
           // accepts arbitrary paths in the real native application.
           const home = path.join(fixture, 'home');
           if (payload.command === 'register' && (typeof payload.root !== 'string' || !path.resolve(payload.root).startsWith(home + path.sep))) {
             res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '合成预览只能登记此临时测试目录中的环境。真实路径请使用桌面应用。' } })); return;
           }
-          for (const key of ['output_path', 'archive_path']) {
+          for (const key of ['output_path', 'archive_path', 'project_cwd']) {
             if (payload[key] !== undefined && (typeof payload[key] !== 'string' || ![home, realpathSync(home)].some(base => path.resolve(String(payload[key])).startsWith(base + path.sep)))) {
               res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '测试空间只允许读取或另存此合成 home 内的工作包。' } })); return;
             }
@@ -61,5 +71,5 @@ export default defineConfig(({ command, mode }) => {
   // public/ currently contains only optional operator-supplied fonts. Ordinary
   // candidate builds must not carry those local assets into someone else's App.
   const localAssets = command === 'serve' || mode === 'local-candidate';
-  return { define: { __LINTEL_LOCAL_FONTS__: JSON.stringify(localAssets ? localFontUrls : []) }, publicDir: localAssets ? 'public' : false, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false };
+  return { define: { __LINTEL_BUILD__: JSON.stringify(buildInfo()), __LINTEL_LOCAL_FONTS__: JSON.stringify(localAssets ? localFontUrls : []) }, publicDir: localAssets ? 'public' : false, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false };
 });

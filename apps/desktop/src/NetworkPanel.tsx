@@ -42,10 +42,10 @@ function RuleReadback({ rules }: { rules: Rule[] }) {
 }
 // The key owns the whole request lifetime, so even start/stop replies from the
 // previous environment cannot update the newly selected environment's panel.
-export default function NetworkPanel(props: { environmentId: string; executable: boolean }) {
+export default function NetworkPanel(props: { environmentId: string; executable: boolean; onLaunch:(proxyUrl:string)=>void }) {
   return <EnvironmentNetworkPanel key={props.environmentId} {...props}/>;
 }
-function EnvironmentNetworkPanel({ environmentId, executable }: { environmentId: string; executable: boolean }) {
+function EnvironmentNetworkPanel({ environmentId, executable,onLaunch }: { environmentId: string; executable: boolean;onLaunch:(proxyUrl:string)=>void }) {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [draft, setDraft] = useState<Draft>(() => drafts.get(environmentId) ?? emptyDraft());
   const [busy, setBusy] = useState(transport === 'native');
@@ -71,12 +71,11 @@ function EnvironmentNetworkPanel({ environmentId, executable }: { environmentId:
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; mounted.current = false; };
   }, [environmentId]);
-  async function act(op: 'start' | 'stop' | 'status' | 'launch') {
+  async function act(op: 'start' | 'stop' | 'status') {
     setBusy(true); setError(''); setMessage('');
     try {
       const payload = { op, environment_id: environmentId, ...(op === 'start' ? { config: { ...draft.limits, default_action: draft.defaultAction, blocked: parseRules(draft.blocked), allowed: parseRules(draft.allowed), upstream: draft.upstream.trim() || null } } : {}) };
-      if (op === 'launch') { const result = await network<{ message: string }>(payload); if (mounted.current) setMessage(result.message); }
-      else { const result = await network<Channel>(payload); if (mounted.current) receive(result); }
+      const result = await network<Channel>(payload); if (mounted.current) receive(result);
     } catch (err) { if (mounted.current) setError(err instanceof Error ? err.message : String(err)); }
     finally { if (mounted.current) setBusy(false); }
   }
@@ -104,7 +103,7 @@ function EnvironmentNetworkPanel({ environmentId, executable }: { environmentId:
           {draft.limits && <p className="small-print">沿用已读回的资源限制：最多 {draft.limits.max_connections} 个连接，连接超时 {draft.limits.connect_timeout_seconds} 秒，连接寿命 {draft.limits.connection_lifetime_seconds} 秒。</p>}
         </details>
         {channel?.address && <div className="fact-row"><span>{channel.running ? '本地地址' : '原监听地址（已停止）'}</span><code>http://{channel.address}</code></div>}
-        <div className="button-row network-controls">{channel?.address ? <button disabled={busy} onClick={() => void act('stop')}>{channel.running ? '停止通道' : '清除旧通道'}</button> : <button disabled={busy || !channel} onClick={() => void act('start')}>启动通道</button>}<button className="primary" disabled={busy || !channel?.running || !executable} onClick={() => void act('launch')}>通过通道打开 Claude<Icon name="arrow" size={15}/></button><button className="text-button" disabled={busy} onClick={() => void act('status')}>刷新连接</button></div>
+        <div className="button-row network-controls">{channel?.address ? <button disabled={busy} onClick={() => void act('stop')}>{channel.running ? '停止通道' : '清除旧通道'}</button> : <button disabled={busy || !channel} onClick={() => void act('start')}>启动通道</button>}<button className="primary" disabled={busy || !channel?.running || !channel.address || !executable} onClick={() => onLaunch('http://' + channel!.address)}>通过通道打开 Claude<Icon name="arrow" size={15}/></button><button className="text-button" disabled={busy} onClick={() => void act('status')}>刷新连接</button></div>
         {channel?.events.length ? <div className="connection-log">{channel.events.slice(-12).reverse().map((event,index) => <div key={`${event.timestamp_unix_ms}-${index}`}><code>{event.destination_host ?? '未知目标'}{event.destination_port ? `:${event.destination_port}` : ''}</code><span>{event.outcome === 'blocked' ? '已阻止' : event.outcome}</span></div>)}</div> : <p className="small-print">暂无已记录的通道连接。</p>}
       </>}
       {message && <p role="status" className="network-message">{message}</p>}{error && <div role="alert"><Notice tone="error">{error}</Notice></div>}

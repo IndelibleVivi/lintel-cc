@@ -264,7 +264,15 @@ impl Engine {
         if recipe == "retire" {
             actions.push(json!({"id":"retire","label":"从可启动环境中退役；保留原工作目录","reversible":true}));
         }
-        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"]}))
+        // reset_client creates a fresh root: freeze its planned identity and the
+        // import mapping now, in the same approved plan.
+        let activation = work::activation(r, &categories);
+        let frozen_target = if recipe == "reset_client" {
+            work::freeze_new_target(&self.state, &manifest, activation["instructions"] == true)?
+        } else {
+            Value::Null
+        };
+        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"],"frozen_target":frozen_target,"work_purpose":work::purposes(&categories),"activate":activation}))
     }
 
     fn check_auth_scope(&self) -> Result<()> {

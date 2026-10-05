@@ -5,6 +5,7 @@ import { Icon, Notice, formatDate } from './ui';
 import Clawd from './Clawd';
 import BrowserHostSetup from './BrowserHostSetup';
 import { ResourceLink } from './Resources';
+import RequestFailure, {asError} from './RequestFailure';
 
 type Instance = { instance_id: string; label: string; browser: string; extension_id: string; paired: boolean; conflict: boolean; last_seen: number; online: boolean };
 type SavedOperation = {id:string;instance_id:string;kind?:string};
@@ -34,7 +35,7 @@ export default function BrowserPanel() {
   const [uncertain, setUncertain] = useState(false);
   const [setting, setSetting] = useState('disable_non_proxied_udp');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<Error|null>(null);
   const [note, setNote] = useState('');
   const feedback = useRef<HTMLDivElement>(null);
   const [operationHistory, setOperationHistory] = useState<SavedOperation[]>(history);
@@ -43,7 +44,8 @@ export default function BrowserPanel() {
     const [items, requests] = await Promise.all([browserRequest<Instance[]>({ op: 'instances' }), browserRequest<Pending[]>({ op: 'pair_pending' })]);
     setInstances(items); setPending(requests); setSelectedInstance(current => items.some(item => item.instance_id === current) ? current : items[0]?.instance_id ?? '');
   }
-  async function run(work: () => Promise<void>) { setBusy(true); setError(''); setNote(''); try { await work(); } catch (error) { setError(error instanceof Error ? error.message : '浏览器模块请求未完成'); } finally { setBusy(false); } }
+  const actionLock=useRef(false);
+  async function run(work: () => Promise<void>) { if(actionLock.current)return;actionLock.current=true;setBusy(true); setError(null); setNote(''); try { await work(); } catch (error) { setError(asError(error)); } finally { actionLock.current=false;setBusy(false); } }
   useEffect(() => { if (transport === 'native') void run(refresh); }, []);
   useEffect(() => { if (error || note) feedback.current?.scrollIntoView({ block: 'nearest' }); }, [error, note]);
   async function query(chosen?: SavedOperation) { const target = chosen ?? operation ?? savedOperation; if (target) { setSavedOperation(target); setOperation(await browserRequest<Operation>({ op: 'query', instance_id: target.instance_id, operation_id: target.id })); setUncertain(false); } }
@@ -62,8 +64,8 @@ export default function BrowserPanel() {
   const awaiting = uncertain || (!!savedOperation && (!operation || !['completed','failed','canceled','expired','rejected'].includes(operation.phase)));
   const unsupported = firefox && ['sitePermission','proxy'].includes(kind);
   const invalid = (needsOrigins && !origins.length) || (kind === 'clear' && (!types.length || (firefox && types.some(type => ['cacheStorage','cache'].includes(type))))) || (kind === 'proxy' && (!Number.isInteger(Number(port)) || Number(port) < 1 || Number(port) > 65535)) || (kind === 'pauseRules' && (!Number.isInteger(Number(minutes)) || Number(minutes) < 1 || Number(minutes) > 60));
-  return <section className="browser-panel"><div className="module-intro"><Clawd small mood="care"/><div><h3>一份 profile，一份明确的授权</h3><p>桌面准备请求；目标扩展展示实际范围，再由你确认。</p></div></div>{!native && <Notice>合成测试空间没有连接真实浏览器。下面展示可用操作；配对与执行只在桌面应用中启用。</Notice>}<div className="browser-panel-heading"><h3>浏览器伴随扩展</h3><button disabled={busy || !native} onClick={() => void run(refresh)}><Icon name="refresh" size={14}/>检查配对</button></div><p>每个 profile 单独配对。先在目标 profile 安装伴随扩展，再由 App 安装本地连接组件。批准安装会授权这个精确扩展 ID；profile 短码需要另行核对。</p>
-    {error && <div ref={feedback} role="alert"><Notice tone="error">{error}</Notice></div>}{note && <div ref={feedback} role="status"><Notice>{note}</Notice></div>}
+  return <section className="browser-panel"><div className="browser-local-scope"><Icon name="terminal" size={16}/><strong>本机浏览器 · 精确 profile</strong><span>此工作空间始终属于当前 Mac；首页 SSH 选择不改变它的作用对象。</span></div><div className="module-intro"><Clawd small mood="care"/><div><h3>一份 profile，一份明确的授权</h3><p>桌面准备请求；目标扩展展示实际范围，再由你确认。</p></div></div>{!native && <Notice>合成测试空间没有连接真实浏览器。下面展示可用操作；配对与执行只在桌面应用中启用。</Notice>}<div className="browser-panel-heading"><h3>浏览器伴随扩展</h3><button disabled={busy || !native} onClick={() => void run(refresh)}><Icon name="refresh" size={14}/>检查配对</button></div><p>每个 profile 单独配对。先在目标 profile 安装伴随扩展，再由 App 安装本地连接组件。批准安装会授权这个精确扩展 ID；profile 短码需要另行核对。</p>
+    {error && <div ref={feedback}><RequestFailure error={error} context="浏览器 profile"/></div>}{note && <div ref={feedback} role="status"><Notice>{note}</Notice></div>}
     <details className="browser-setup"><summary>连接一个新的 profile</summary><p className="small-print">App 已包含扩展与本地连接组件。按下面三步连接目标 profile；各浏览器的开发加载限制见 <ResourceLink resource="browser-setup">浏览器指南</ResourceLink>（当前需仓库权限）。</p><BrowserHostSetup native={native} busy={busy} request={browserRequest} run={run} onInstalled={setNote}/><h4 className="browser-setup-step browser-pairing-heading"><span>3</span>核对这份 profile</h4><div className="button-row section-action"><button disabled={busy || !native} onClick={() => void run(async () => { setPairing(await browserRequest<Pairing>({ op: 'pair_create' })); })}>生成配对请求</button></div>{pairing && <div className="pairing-code"><span>配对短码</span><strong>{pairing.code}</strong><p>在目标 profile 的扩展面板输入这份 12 位短码，提交请求后核对两端短码，再在这里批准。有效期至 {formatDate(String(pairing.expires_at))}。</p><button className="text-button" onClick={() => void run(async () => { await navigator.clipboard.writeText(pairing.code); setNote('已复制配对短码'); })}><Icon name="copy" size={14}/>复制配对短码</button></div>}{pending.map(item => <div className="pending-pair" key={item.challenge}><strong>{item.label} · {item.browser}</strong><p>短码 {item.code} · 实例 {item.instance_id}</p><code>{item.extension_id}</code><button disabled={busy || !native} onClick={() => void run(async () => { await browserRequest({ op: 'pair_approve', challenge: item.challenge }); setPairing(null); await refresh(); setNote('已批准配对。在线状态以实际收到的浏览器轮询为准。'); })}>短码一致，批准此 profile</button></div>)}</details>
     <div className="browser-instances">{instances.length === 0 ? <p className="empty-inline">尚无已配对的浏览器 profile。</p> : instances.map(item => <div className="browser-instance" key={item.instance_id}><div><strong>{item.label}</strong><span>{item.browser} · {item.paired ? '已配对' : '未配对'} · {item.online ? '最近 20 秒收到轮询' : '当前离线'}</span><code>{item.instance_id}</code></div>{item.conflict && <span className="conflict-label">身份冲突，需重新配对</span>}</div>)}</div>
     <div className="browser-actions"><label className="field">目标 profile<select disabled={!instances.length || busy} value={selectedInstance} onChange={event => setSelectedInstance(event.target.value)}>{!instances.length && <option value="">等待连接浏览器 profile</option>}{instances.map(item => <option key={item.instance_id} value={item.instance_id}>{item.label} · {item.browser}</option>)}</select></label>

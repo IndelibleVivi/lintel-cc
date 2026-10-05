@@ -104,7 +104,15 @@ ssh -T -oBatchMode=yes -oStrictHostKeyChecking=yes -oUpdateHostKeys=no \
 
 ## 从 App 打开远端会话
 
-连接并选择环境后，在“环境详情 → 启动与来源”或已完成任务回执点击“打开 Claude”。App 先通过 `launch_context` 核对准确环境、退役状态和程序，再打开 macOS Terminal。Terminal 使用固定严格 SSH 选项、同一个 alias 与绑定 runner，分配真实 PTY 并执行 `lintel launch <environment-id>`。环境 ID 先限制字符，再由远端 core 验证 UUID 和登记；程序路径及配置根只在远端解析，远端返回的字符串不放进本机 shell。
+连接并选择环境后，在“环境详情 → 启动与来源”或已完成任务回执点击“打开 Claude”，输入独立的项目工作目录。新入口通过 `plan_launch` 冻结环境、配置 root、项目 cwd、客户端静态身份和启动模式；批准当前预览后，使用同一个 `request_id` 与准确 hash 请求打开 Terminal。配置目录不再自动充当项目目录。归档、导入或重建结束不会自动启动客户端。
+
+Terminal 使用固定严格 SSH 选项和真实 PTY，调用预览时冻结的 runner 的 `launch_request ID HASH`；原生续聊调用 `resume_request ID HASH`。本机脚本只拼接有限 alias、经验证的 UUID/hash 与本地持久 runner binding；远端返回的配置 root、项目路径或 Claude executable 都不进入本机 shell。远端 core 在第一次尝试前重新核对冻结身份，并先保存启动 intent。
+
+controller 在打开 Terminal 前保存原启动 ID、原 runner binding 与一次尝试意图。重复点击、打开结果不确定或 App 重开后只查询 `launch_query`，不会再次打开窗口；“记录 → 会话启动记录”可把同一 ID 交给 Agent。移除 alias 或升级 runner 不删除这些记录，也不改变已有请求的查询版本。若 Terminal 尚未将请求送到远端，查询到 `planned` 仍不代表可以重发；应保留原请求并在已打开的终端核对。
+
+归档阅读和 `plan_resume` 的口令仅走本次有限请求 stdin。远端续聊执行时，用户在新开的 SSH Terminal 再次无回显输入同一包的口令；App 不把口令放进脚本、argv、环境或启动记录。支持判断按静态版本和 transcript 结构给出；不支持时仍可阅读、提取上下文和打开新会话。支持时用私有 `0600` 副本与 `--resume ABSOLUTE_COPY --fork-session`，保留加密包及原件字节；这不证明真实认证、模型接收或原会话是否仍在运行，客户端仍可能重读当前配置、hooks/MCP 和原项目路径。
+
+旧 `launch` / `lintel launch ENV_ID` 为已有 caller 保留：只读 `launch_context` 后使用旧 root-as-cwd 默认。新 App 使用上述批准过的独立 cwd 请求；交互启动与 detached mutation job 是不同记录，互不冒充 accepted Receipt。
 
 runner 按 PATH 优先定位 Claude；找不到时，静态检查当前 SSH 用户官方 native 安装位置 `~/.local/bin/claude`，不加载 shell rc、不扫描其他用户，也不为发现版本而运行 Claude。此路径来自[官方安装说明](https://code.claude.com/docs/en/setup#auto-updates)。目标用户未安装时返回 `executable_missing`，不会自动安装或登录 Claude。
 
@@ -128,19 +136,23 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 | `install_runner` | `alias`, `install_id`, `approval` | 批准准确预览，重查目标与本地文件；一次上传，核验后绑定。重复调用只核对 |
 | `query_install` | `alias`, `install_id` | 核对原安装；已移除 alias 的已有安装也可查询，不上传 |
 | `launch` | `alias`, `environment_id` | 只读 launch_context 核对后请求 macOS Terminal：固定严格 SSH＋PTY＋绑定 runner `launch id`，返回 `{status:"launch_requested",message}`；不接受 proxy、prompt、命令或路径 |
+| `launch_request` | `alias`, `request_id`, `approval` | 批准原 `plan_launch`，持久一次尝试后打开固定 Terminal／PTY；重复调用只查原启动记录 |
+| `resume_request` | `alias`, `request_id`, `approval` | 批准原 `plan_resume`；包口令在远端 Terminal 无回显输入，原件保持不变；重复调用只查原记录 |
+| `launch_query` | `alias`, `request_id` | 只读核对原启动 ID；已保存的请求使用冻结 runner，移除 alias 后仍可查询 |
+| `launches` | `alias` | 只列出该 alias 的本机原启动元数据；不连接 SSH，不启动客户端。实时核对单独使用 launch_query |
 | `connect` | `alias` | 远端 `discover` 的 `{environments,capabilities}` |
 | `request` | `alias`, `request` | 允许的 core 请求原有 `data`；不再嵌套 Envelope |
 | `execute` | `alias`, `plan_id`, `approval`，可选 `archive_passphrase` | 一次 `lintel submit`，返回 durable Receipt；重复调用只查原 job |
 | `reconnect` | `alias`, `plan_id` | 通过保存的 lookup ID 查询原 Receipt；已移除主机的已有任务也可查询，从不提交执行 |
 
-连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install 对已移除 alias 仅开放本地仍有持久记录的原任务或安装，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
+连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install / launch_query 对已移除 alias 仅开放本地仍有持久记录的原任务、安装或启动，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
 
 - `discover`、`inspect`、`register`、`create_environment`；
-- `plan_policy`、`plan_reset`、`plan_cleanup`、`plan_restore`、`plan_import`；
-- `cleanup_inspect`、`auth_probe`、`archive_inspect`、`archive_read`；
+- `plan_policy`、`plan_reset`、`plan_archive`、`plan_preserve`、`plan_cleanup`、`plan_restore`、`plan_import`、`plan_launch`、`plan_resume`；
+- `cleanup_inspect`、`auth_probe`、`archive_inspect`、`archive_read`、`session_read`、`service_inspect`、`plan_service_quiesce`、`plan_service_resume`；
 - `jobs`、`job`、`drift`、`accept_drift`、`reactivate_environment`、`export_support`。
 
-字段与 core 协议一致；未知字段或任意 shell / generic file 命令被拒绝。`execute` 不能从普通 `request` 绕过持久意图记录。归档内容只在用户明确调用 archive 操作时经响应返回；口令只进入本次请求的 stdin，不进入 SSH argv 或控制端记录。此 bridge 不提供远端 interactive launch、系统 service 管理、通用安装或强约束网络组件操作；相应能力必须由所属模块实现并独立验收。
+字段与 core 协议一致；未知字段或任意 shell / generic file 命令被拒绝。`execute` 不能从普通 `request` 绕过持久意图记录。归档正文只在明确阅读请求中经响应返回，不写入普通任务或诊断；口令只进入本次 stdin，不进入 SSH argv 或控制端记录。启动由有限 Terminal owner、服务暂停/恢复由 core service owner 独立核验；此 bridge 不提供任意命令、通用安装或强约束网络组件操作。
 
 ## 连接错误与本机诊断
 

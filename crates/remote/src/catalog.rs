@@ -15,6 +15,10 @@ const OPERATIONS: &[&str] = &[
     "install_runner",
     "query_install",
     "launch",
+    "launch_request",
+    "resume_request",
+    "launch_query",
+    "launches",
 ];
 
 // Field ownership is shared by runtime exact-field checks and this catalog.
@@ -33,6 +37,11 @@ pub(super) fn operation_fields(
         "install_runner" => (&["op", "alias", "install_id", "approval"], &[]),
         "query_install" => (&["op", "alias", "install_id"], &[]),
         "launch" => (&["op", "alias", "environment_id"], &[]),
+        "launch_request" => (&["op", "alias", "request_id", "approval"], &[]),
+        // The archive passphrase is entered in the interactive Terminal (no-echo), never carried in the finite request fields.
+        "resume_request" => (&["op", "alias", "request_id", "approval"], &[]),
+        "launch_query" => (&["op", "alias", "request_id"], &[]),
+        "launches" => (&["op", "alias"], &[]),
         _ => return None,
     })
 }
@@ -70,6 +79,9 @@ fn property(op: &str, field: &str) -> Value {
             json!({"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]*$","not":{"pattern":"[^A-Za-z0-9._-]"},"maxLength":128})
         }
         "plan_id" | "environment_id" => {
+            json!({"type":"string","format":"uuid","minLength":36,"maxLength":36})
+        }
+        "request_id" => {
             json!({"type":"string","format":"uuid","minLength":36,"maxLength":36})
         }
         "install_id" => {
@@ -163,14 +175,38 @@ fn describe(op: &str) -> Value {
             "readonly_launch_context_then_interactive_runner_launch",
             "macos_Terminal_fixed_openssh_PTY_session",
         ),
+        "launch_request" => (
+            "persist_private_fixed_command_for_frozen_request_id_and_bound_runner",
+            "readonly_frozen_plan_show_then_interactive_runner_launch_request",
+            "macos_Terminal_fixed_openssh_PTY_session",
+        ),
+        "resume_request" => (
+            "persist_private_fixed_command_and_local_attempt_before_opening_terminal",
+            "interactive_runner_resume_request_private_running_copy_passphrase_entered_in_terminal",
+            "macos_Terminal_fixed_openssh_PTY_session",
+        ),
+        "launch_query" => (
+            "read_original_launch_record_via_bound_runner_no_terminal",
+            "readonly_launch_record_query",
+            "fixed_openssh_request",
+        ),
+        "launches" => (
+            "read_local_original_launch_metadata_no_terminal",
+            "readonly_launch_records_list",
+            "none",
+        ),
         _ => unreachable!("finite operation owner"),
     };
-    let local_only = ["aliases", "hosts", "add_host", "remove_host"].contains(&op);
+    let local_only = ["aliases", "hosts", "add_host", "remove_host", "launches"].contains(&op);
     let installation = ["prepare_runner", "install_runner", "query_install"].contains(&op);
     let registry_condition = match op {
         "query_install" => "registered_literal_alias_or_retained_original_install_query",
         "reconnect" => "registered_literal_alias_or_retained_original_job_reconnect",
         "request" => "registered_literal_alias_or_retained_original_job_lookup_only",
+        "launch_query" | "launches" => "registered_literal_alias_or_retained_original_launch_query",
+        "launch_request" | "resume_request" => {
+            "registered_literal_alias_or_retained_attempt_query_only"
+        }
         _ => "registered_literal_alias",
     };
     let conditions = if local_only {
@@ -279,7 +315,7 @@ mod tests {
     fn catalog_exact_fields_share_runtime_owner_for_all_operations() {
         let catalog = operation_catalog();
         let rows = catalog["operations"].as_array().unwrap();
-        assert_eq!(rows.len(), 12);
+        assert_eq!(rows.len(), OPERATIONS.len());
         assert_eq!(
             rows.iter()
                 .map(|row| row["id"].as_str().unwrap().to_string())

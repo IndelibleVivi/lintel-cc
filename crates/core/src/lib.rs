@@ -1,10 +1,15 @@
 //! Lintel's single filesystem plan/execution authority.
 mod archive;
+#[cfg(test)]
+mod baseline_tests;
 mod cleanup;
+mod context;
+mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
 mod policy;
 mod service;
+mod session;
 mod settings;
 #[cfg(test)]
 mod settings_tests;
@@ -15,8 +20,9 @@ mod work_tests;
 use fs2::FileExt;
 use policy::RULE;
 use serde_json::{json, Value};
+use std::process::Command;
 #[cfg(target_os = "macos")]
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::{
     fs::{self, OpenOptions},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
@@ -75,6 +81,44 @@ fn find_executable(home: &Path, path: Option<&std::ffi::OsStr>) -> Option<String
         .find_map(|p| p.canonicalize().ok())
         .map(|p| p.to_string_lossy().into_owned())
 }
+
+/// Direct-TTY launch used by the trusted dedicated CLI branch and, on non-macOS,
+/// the headless runner. It requires a real interactive TTY, then execs the fixed
+/// client with the frozen cwd/config/argv. On success `exec` replaces this
+/// process, so the durable launch record stays at its "attempted/pending" state
+/// rather than claiming the client completed; only a failed exec returns.
+fn direct_tty_launch(
+    config_root: &Path,
+    project_cwd: &Path,
+    executable: &str,
+    proxy_url: Option<&str>,
+    extra_args: &[String],
+) -> Result<Value> {
+    use std::io::IsTerminal;
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        return Err(err(
+            "terminal_required",
+            "此启动需要真实交互终端（stdin 与 stdout 均为 TTY）；不会在隐藏管道中启动。",
+        ));
+    }
+    let mut command = Command::new(executable);
+    command
+        .current_dir(project_cwd)
+        .env("CLAUDE_CONFIG_DIR", config_root);
+    if let Some(url) = proxy_url {
+        for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
+            command.env(key, url);
+        }
+    }
+    command.args(extra_args);
+    use std::os::unix::process::CommandExt;
+    let failure = command.exec();
+    Err(err(
+        "launch_failed",
+        &format!("无法启动客户端进程：{failure}"),
+    ))
+}
+
 fn physical(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute()
         || path
@@ -97,12 +141,21 @@ pub struct Engine {
     // set only through the internal builder below, never from request JSON, so a
     // caller cannot forge a systemd-grade survival claim.
     execution_context: Option<Value>,
+    // Internal direct-TTY launch mode, set only by the trusted runner CLI
+    // interactive branch (never from request JSON or an environment variable), so
+    // a JSON/pipe caller can never select a direct exec in place of the App's
+    // macOS Terminal opener.
+    interactive_direct: bool,
     #[cfg(test)]
     service_fixture: Option<PathBuf>,
     #[cfg(test)]
     settings_write_hook: Option<fn(&str)>,
     #[cfg(test)]
     executable_search_path: Option<std::ffi::OsString>,
+    // Test-only fixed opener: intercepts the App macOS Terminal script so unit
+    // tests never spawn a real Terminal. Never present in production.
+    #[cfg(test)]
+    launch_opener: Option<fn(&Path, &str) -> Result<Value>>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -120,12 +173,15 @@ impl Engine {
             state,
             accept_hook: None,
             execution_context: None,
+            interactive_direct: false,
             #[cfg(test)]
             service_fixture: None,
             #[cfg(test)]
             settings_write_hook: None,
             #[cfg(test)]
             executable_search_path: None,
+            #[cfg(test)]
+            launch_opener: None,
         })
     }
     fn executable(&self) -> Option<String> {
@@ -243,6 +299,27 @@ impl Engine {
             save(path, receipt)?;
         }
         private_dir(&root)?;
+        self.register_with_id(name, &root, true, &environment_id)
+    }
+    /// Create the exact environment frozen at preview time. Rechecks the frozen
+    /// parent identity and the absence of the planned root before any creation,
+    /// so a plan can never silently land on a different/newer root.
+    fn create_frozen(
+        &self,
+        name: &str,
+        frozen: &Value,
+        journal: Option<(&mut Value, &Path)>,
+    ) -> Result<Value> {
+        let plan = json!({"extra":{"frozen_target":frozen}});
+        let root = work::check_frozen_target(&plan)?;
+        let environment_id = string(frozen, "new_environment_id")?.to_string();
+        if let Some((receipt, path)) = journal {
+            receipt["new_environment_id"] = json!(environment_id);
+            receipt["new_root"] = json!(root);
+            save(path, receipt)?;
+        }
+        private_dir(&root)?;
+        let root = physical(&root)?;
         self.register_with_id(name, &root, true, &environment_id)
     }
     fn settings(&self, e: &Value) -> Result<(PathBuf, Value, Value)> {
@@ -453,18 +530,16 @@ impl Engine {
                     json!({"original_job":jid}),
                 )
             }
-            "plan_reset" => {
-                let e = self.env(r)?;
-                if string(r, "recipe")? != "rebuild" {
-                    return Err(err("unsupported_recipe", "当前支持新环境重建配方"));
-                }
-                let categories = work::categories(r)?;
-                let manifest = work::manifest(Path::new(string(&e, "root")?), &categories)?;
-                self.plan(&e,"rebuild","保留内容，准备新环境",json!([]),vec!["原环境全部内容（尚未注销或删除）","未选中的实例与项目文件"],json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false},{"id":"create","label":"创建新的配置目录","reversible":false},{"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false},{"id":"credentials","label":"旧登录及客户端状态尚需独立处理","reversible":false}]),json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true}))
-            }
+            "plan_reset" => self.plan_rebuild(r),
             "plan_archive" => self.plan_archive(r),
             "plan_preserve" => self.plan_preserve(r),
             "plan_show" => self.plan_show(r),
+            "plan_launch" => self.plan_launch(r),
+            "launch_request" => self.launch_request(r),
+            "plan_resume" => self.plan_resume(r),
+            "resume_request" => self.resume_request(r),
+            "launch_query" => self.launch_query(r),
+            "launches" => self.launches(),
             "service_inspect" => self.service_inspect(r),
             "plan_service_quiesce" => self.plan_service_quiesce(r),
             "plan_service_resume" => self.plan_service_resume(r),
@@ -484,6 +559,7 @@ impl Engine {
             }
             "archive_inspect" => self.archive_inspect(r),
             "archive_read" => self.archive_read(r),
+            "session_read" => self.session_read(r),
             "plan_import" => self.plan_import(r),
             "execute" => self.execute(r),
             "jobs" => {
@@ -522,6 +598,15 @@ impl Engine {
                     save(&p, &j)?;
                 } else if reconciled {
                     save(&p, &j)?;
+                }
+                // Recompute the structured result so a queried receipt always
+                // carries it even if it was written by an earlier version.
+                if let Some(plan_id) = j["plan_id"].as_str() {
+                    if let Ok(plan) = load(&self.path("plans", plan_id)) {
+                        if plan["kind"] != "launch" && plan["kind"] != "resume" {
+                            j["task_result"] = task_result(&plan, &j);
+                        }
+                    }
                 }
                 Ok(j)
             }
@@ -635,6 +720,17 @@ impl Engine {
                     "目标程序或产品版本在预览后改变，请重新预览",
                 ));
             }
+        }
+        // New-environment plans freeze their planned root/identity at preview.
+        // Reject an occupied or externally-changed target before any side effect,
+        // and fail a pre-freeze legacy plan as stale_plan.
+        if ["rebuild", "preserve"].contains(&p["kind"].as_str().unwrap_or("")) {
+            work::check_frozen_target(&p)?;
+        }
+        // reset_client creates a fresh root too: recheck its frozen target before
+        // any source read, archive publication or removal.
+        if p["kind"] == "cleanup" && p["extra"]["recipe"] == "reset_client" {
+            work::check_frozen_target(&p)?;
         }
         if p["kind"] == "rebuild" {
             work::check_passphrase(r)?;
@@ -812,8 +908,97 @@ impl Engine {
                 .unwrap()
                 .push(json!(failure.message));
         }
+        j["task_result"] = task_result(&p, &j);
         save(&jp, &j)?;
         Ok(j)
+    }
+    /// The one macOS Terminal/PTY entry used by both the plain `launch` and the
+    /// finite launch-request path. It writes a frozen script that sets cwd to the
+    /// project directory and CLAUDE_CONFIG_DIR to the config root, then asks
+    /// Terminal to open it. No prompt, no hidden pipe, no remote path.
+    fn terminal_launch(
+        &self,
+        label: &str,
+        config_root: &Path,
+        project_cwd: &Path,
+        executable: &str,
+        proxy_url: Option<&str>,
+    ) -> Result<Value> {
+        self.terminal_launch_args(label, config_root, project_cwd, executable, proxy_url, &[])
+    }
+
+    /// The same Terminal/PTY entry with a finite extra argv (for native resume:
+    /// `--resume <abs-copy> --fork-session`). Extra argv is never user text; the
+    /// caller passes fixed flags and an already-validated absolute path.
+    fn terminal_launch_args(
+        &self,
+        _label: &str,
+        config_root: &Path,
+        project_cwd: &Path,
+        executable: &str,
+        proxy_url: Option<&str>,
+        extra_args: &[String],
+    ) -> Result<Value> {
+        // Direct-TTY mode is selected only by the trusted runner CLI interactive
+        // branch. It requires a real TTY and execs the fixed client with the
+        // frozen cwd/config/argv on every Unix platform.
+        if self.interactive_direct {
+            return direct_tty_launch(config_root, project_cwd, executable, proxy_url, extra_args);
+        }
+        // App/legacy path: macOS opens a Terminal with a frozen script. On other
+        // platforms (headless runner) the same direct-TTY requirement applies.
+        #[cfg(target_os = "macos")]
+        {
+            let path = self.state.join(format!("{_label}.command"));
+            let quote = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
+            let proxy_args = proxy_url
+                .map(|url| {
+                    format!(
+                        " HTTP_PROXY={} HTTPS_PROXY={} http_proxy={} https_proxy={}",
+                        quote(url),
+                        quote(url),
+                        quote(url),
+                        quote(url)
+                    )
+                })
+                .unwrap_or_default();
+            let extra = extra_args
+                .iter()
+                .map(|arg| format!(" {}", quote(arg)))
+                .collect::<String>();
+            let content = format!(
+                "#!/bin/sh\ncd {} || exit 1\nexec env CLAUDE_CONFIG_DIR={}{} {}{}\n",
+                quote(&project_cwd.to_string_lossy()),
+                quote(&config_root.to_string_lossy()),
+                proxy_args,
+                quote(executable),
+                extra
+            );
+            atomic(&path, content.as_bytes(), 0o700)?;
+            // Test-only fixed-opener fixture: never spawns a real Terminal.
+            #[cfg(test)]
+            if let Some(opener) = &self.launch_opener {
+                return opener(&path, &content);
+            }
+            let status = Command::new("/usr/bin/open")
+                .arg("-a")
+                .arg("Terminal")
+                .arg(&path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+            if !status.success() {
+                return Err(err("launch_failed", "Terminal 未接受启动请求"));
+            }
+            Ok(
+                json!({"status":"launch_requested","message":"已请求在 Terminal 打开指定项目目录与配置目录；未声称当前进程或凭据完全隔离。"}),
+            )
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            direct_tty_launch(config_root, project_cwd, executable, proxy_url, extra_args)
+        }
     }
     fn launch(&self, e: &Value, proxy_url: Option<&str>) -> Result<Value> {
         if e["status"] == "retired" {
@@ -841,68 +1026,166 @@ impl Engine {
         })?;
         let root = PathBuf::from(string(e, "root")?);
         guard(&root)?;
-        // A terminal launcher must not silently run in a hidden pipe or feed an agent prompt.
-        #[cfg(target_os = "macos")]
-        {
-            let path = self
-                .state
-                .join(format!("launch-{}.command", string(e, "id")?));
-            let quote = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
-            let proxy_args = route
-                .as_ref()
-                .map(|url| {
-                    format!(
-                        " HTTP_PROXY={} HTTPS_PROXY={} http_proxy={} https_proxy={}",
-                        quote(url),
-                        quote(url),
-                        quote(url),
-                        quote(url)
-                    )
-                })
-                .unwrap_or_default();
-            let content = format!(
-                "#!/bin/sh\ncd {} || exit 1\nexec env CLAUDE_CONFIG_DIR={}{} {}\n",
-                quote(&root.to_string_lossy()),
-                quote(&root.to_string_lossy()),
-                proxy_args,
-                quote(&exe)
-            );
-            atomic(&path, content.as_bytes(), 0o700)?;
-            let status = Command::new("/usr/bin/open")
-                .arg("-a")
-                .arg("Terminal")
-                .arg(&path)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()?;
-            if !status.success() {
-                return Err(err("launch_failed", "Terminal 未接受启动请求"));
-            }
-            Ok(
-                json!({"status":"launch_requested","message":"已请求在 Terminal 打开指定配置目录；未声称当前进程或凭据完全隔离。"}),
-            )
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = (exe, route);
-            Ok(
-                json!({"status":"terminal_required","message":"在交互终端运行 lintel launch <环境ID>。"}),
-            )
-        }
+        let label = format!("launch-{}", string(e, "id")?);
+        let proxy = route.as_deref();
+        self.terminal_launch(&label, &root, &root, &exe, proxy)
     }
 }
+
+/// A structured, message-independent task result. It states what the selected
+/// steps actually did, which scopes were not requested/checked/verified, and
+/// which next action entry applies. Legacy `status`/`steps`/`coverage` stay.
+fn task_result(plan: &Value, receipt: &Value) -> Value {
+    let outcome = match receipt["status"].as_str().unwrap_or("") {
+        "completed" => "completed",
+        "partially_completed" => "partial",
+        "needs_reconciliation" => "uncertain",
+        "failed" => "failed",
+        "" => "unknown",
+        _ => "in_progress",
+    };
+    let selected_steps: Vec<Value> = receipt["steps"]
+        .as_array()
+        .map(|steps| {
+            steps
+                .iter()
+                .map(|step| {
+                    json!({
+                        "id": step["id"],
+                        "done": matches!(step["status"].as_str(), Some("completed" | "preserved")),
+                        "note": step["message"],
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut coverage = vec![];
+    let kind = plan["kind"].as_str().unwrap_or("");
+    let logout = plan["extra"]["official_logout"] == true;
+    // Did every selected step actually complete? Message text is never
+    // consulted; only per-step status counts, and an empty step list is not a
+    // success (a receipt accepted but not yet executed has no completed step).
+    let steps_array = receipt["steps"].as_array();
+    let has_steps = steps_array.is_some_and(|steps| !steps.is_empty());
+    let selected_done = has_steps
+        && steps_array.unwrap().iter().all(|step| {
+            matches!(
+                step["status"].as_str(),
+                Some("completed" | "preserved" | "skipped")
+            )
+        });
+    // A specific step status, so coverage never claims a target was produced
+    // just because a plan froze it.
+    let step_done = |id: &str| {
+        steps_array
+            .and_then(|steps| steps.iter().find(|step| step["id"] == id))
+            .and_then(|step| step["status"].as_str())
+            .is_some_and(|status| matches!(status, "completed" | "preserved"))
+    };
+    if kind == "cleanup" {
+        let logout_state = if !logout {
+            "not_requested"
+        } else if step_done("logout") {
+            "done"
+        } else {
+            "unverified"
+        };
+        coverage.push(json!({
+            "scope": "official_logout",
+            "state": logout_state,
+            "detail": match logout_state {
+                "done" => "官方注销步骤已完成并读回；服务端撤销未独立验证",
+                "not_requested" => "未请求官方注销",
+                _ => "官方注销步骤未确认完成；未继续删除",
+            },
+        }));
+        coverage.push(json!({
+            "scope": "server_state",
+            "state": "not_checked",
+            "detail": "服务端 token 撤销与 Keychain 状态未独立核验",
+        }));
+        coverage.push(json!({
+            "scope": "scope",
+            "state": "not_checked",
+            "detail": "仅覆盖预览列出的 Claude Code 状态；浏览器、Desktop/IDE 与目录外 profile 不在本次范围",
+        }));
+    }
+    if plan["extra"]["frozen_target"].is_object() {
+        // The frozen mapping is a *plan* fact. Only report the target as done
+        // when the create/import step actually completed; otherwise it stays
+        // not_checked (accepted but not executed) or unverified (uncertain).
+        let target_state = if step_done("create") || step_done("import") {
+            "done"
+        } else if receipt["status"] == "needs_reconciliation" {
+            "unverified"
+        } else {
+            "not_checked"
+        };
+        coverage.push(json!({
+            "scope": "planned_target",
+            "state": target_state,
+            "detail": format!("计划目标 {}；执行时按冻结映射复查，冻结本身不代表已创建或已迁入", plan["extra"]["frozen_target"]["new_root"]),
+        }));
+    }
+    let primary = if kind == "cleanup" && plan["extra"]["official_logout"] != true {
+        // The selected local steps are the whole requested scope here; report
+        // them as completed and state the unrequested/unchecked scopes separately.
+        if selected_done && receipt["status"] != "needs_reconciliation" {
+            "所选本地清理已完成"
+        } else {
+            "所选的本地清理尚未全部完成；请查看步骤"
+        }
+    } else if receipt["status"] == "completed" {
+        "所选步骤已完成"
+    } else if receipt["status"] == "partially_completed" {
+        "部分阶段已完成，其余需独立处理"
+    } else if receipt["status"] == "needs_reconciliation" {
+        "结果不确定；请查询原任务，不要重新提交"
+    } else {
+        "请查看原任务记录"
+    };
+    let mut next_actions = vec![];
+    if receipt["status"] == "needs_reconciliation" {
+        next_actions.push(json!({"label": "查询原任务", "entry": format!("job {}", receipt["id"].as_str().unwrap_or(""))}));
+    }
+    if kind == "cleanup" && plan["extra"]["official_logout"] != true {
+        next_actions.push(json!({"label": "需要时另选官方注销配方", "entry": "plan_cleanup(recipe=repair_login|reset_client, official_logout=true)"}));
+    }
+    if let Some(steps) = receipt["next_steps"].as_array() {
+        for step in steps {
+            next_actions.push(json!({"label": step, "entry": "see_original_job"}));
+        }
+    }
+    json!({
+        "outcome": outcome,
+        "title": receipt["title"],
+        "primary": primary,
+        "selected_steps": selected_steps,
+        "coverage": coverage,
+        "next_actions": next_actions,
+    })
+}
+
 fn public_plan(mut p: Value) -> Result<Value> {
     if p["kind"] == "import" {
-        let root = Path::new(string(&p, "root")?);
-        let files: Vec<Value> = p["extra"]["manifest"]
+        // `import_manifest` keeps its historical relative `destination` (the
+        // path inside the frozen root) for existing callers. The absolute final
+        // location is published separately under `planned_target.files`.
+        let root = PathBuf::from(string(&p, "root")?);
+        let root_str = root.to_string_lossy().into_owned();
+        let entries = p["extra"]["manifest"]
             .as_array()
             .ok_or_else(|| err("invalid_plan", "缺少迁入清单"))?
+            .clone();
+        let files: Vec<Value> = entries
             .iter()
             .map(|entry| {
-                let destination = Path::new(string(entry, "destination")?).strip_prefix(root)
-                    .map_err(|_| err("invalid_plan", "迁入目标超出冻结 root"))?;
-                Ok(json!({"source":entry["path"],"destination":destination,"category":entry["category"],"size":entry["bytes"],"sha256":entry["digest"]}))
+                let absolute = string(entry, "destination")?;
+                let relative = absolute
+                    .strip_prefix(&root_str)
+                    .map(|tail| tail.trim_start_matches('/'))
+                    .unwrap_or(absolute);
+                Ok(json!({"source":entry["path"],"destination":relative,"category":entry["category"],"size":entry["bytes"],"sha256":entry["digest"]}))
             })
             .collect::<Result<_>>()?;
         p["import_manifest"] = json!({"package":{"format":p["extra"]["package_format"].as_str().unwrap_or("lintel.work/1"),"generator":p["extra"]["package_generator"],"sha256":p["extra"]["archive_digest"]},"files":files});
@@ -921,8 +1204,54 @@ fn public_plan(mut p: Value) -> Result<Value> {
         p["archive_passphrase_required"] = json!(true);
         p["file_count"] = json!(p["extra"]["manifest"].as_array().map_or(0, Vec::len));
     }
+    // Frozen new-target/import mapping, published for the same allowlist the App
+    // and CLI render. The private raw snapshot and root identity stay stripped.
+    let frozen_target = p["extra"]["frozen_target"].clone();
+    if frozen_target.is_object() {
+        let frozen = &frozen_target;
+        let files: Vec<Value> = frozen["import_manifest"]
+            .as_array()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .map(|entry| {
+                        json!({
+                            "source": entry["path"],
+                            "category": entry["category"],
+                            "size": entry["bytes"],
+                            "sha256": entry["digest"],
+                            "destination": entry["destination"],
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut counts = serde_json::Map::new();
+        for category in ["instructions", "memory", "sessions"] {
+            let count = files.iter().filter(|f| f["category"] == category).count();
+            counts.insert(category.into(), json!(count));
+        }
+        p["plan_revision"] = frozen["plan_revision"].clone();
+        p["planned_target"] = json!({
+            "new_environment_id": frozen["new_environment_id"],
+            "new_root": frozen["new_root"],
+            "create": frozen["new_environment_id"].is_string(),
+            "files": files,
+            "counts": Value::Object(counts),
+            "purposes": p["extra"]["work_purpose"],
+            "activation": p["extra"]["activate"],
+        });
+    }
     if p["extra"]["outcome"].is_string() {
         p["outcome"] = p["extra"]["outcome"].clone();
+    }
+    // Finite launch/resume plans publish their frozen request at the top level so
+    // the App and CLI resolve one immutable ID; the private `extra` stays hidden.
+    if p["extra"]["launch_request"].is_object() {
+        p["launch_request"] = p["extra"]["launch_request"].clone();
+    }
+    if p["extra"]["resume"].is_object() {
+        p["resume"] = p["extra"]["resume"].clone();
     }
     if p["extra"]["output_path"].is_string() {
         p["output_path"] = p["extra"]["output_path"].clone();
@@ -965,6 +1294,15 @@ pub fn handle_request_with_execution(
     handle_request_inner(request, context, hook)
 }
 fn handle_request_inner(request: Value, context: Option<Value>, hook: Option<fn(&Value)>) -> Value {
+    // Static, state-free commands are answered before any Engine::new(), so a
+    // `context`/`tasks` request never creates the state directory.
+    if let Some(command) = request["command"].as_str() {
+        match command {
+            "context" => return json!({"ok":true,"data":context::context_value()}),
+            "tasks" => return json!({"ok":true,"data":lintel_operations::tasks()}),
+            _ => {}
+        }
+    }
     let result = (|| {
         let (home, state) = runtime_paths()?;
         Engine::new(home, state)
@@ -980,6 +1318,31 @@ fn handle_request_inner(request: Value, context: Option<Value>, hook: Option<fn(
 }
 pub fn decode_request(bytes: &[u8]) -> Result<Value> {
     parse(bytes)
+}
+
+/// Trusted entry used ONLY by the dedicated runner CLI interactive branch
+/// (`lintel launch request|resume <ID> <HASH>`). It enables the internal
+/// direct-TTY mode so the frozen client is exec'd in the caller's real terminal.
+/// It is deliberately a separate function — never reachable from request JSON or
+/// an environment variable — so a pipe/JSON caller cannot select direct exec.
+pub fn handle_interactive_launch(request: Value) -> Value {
+    let result = (|| {
+        let (home, state) = runtime_paths()?;
+        Engine::new(home, state)
+    })();
+    match result {
+        Ok(mut engine) => {
+            engine.interactive_direct = true;
+            engine.request(request)
+        }
+        Err(e) => json!({"ok":false,"error":{"code":e.code,"message":e.message}}),
+    }
+}
+
+/// Readonly execution-context descriptor. Constructs no `Engine`, so the CLI
+/// can describe state/executable facts before any state directory exists.
+pub fn execution_context() -> Value {
+    context::context_value()
 }
 
 pub fn parse_request(bytes: &[u8]) -> Value {

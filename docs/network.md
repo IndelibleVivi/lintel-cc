@@ -41,6 +41,8 @@ Tauri 注册 `network_request` command，调用形式为 `invoke("network_reques
 | `stop` | `environment_id` | 关闭监听及已建立连接，等待代理结束后返回 stopped 状态；释放该环境的内存事件。没有实例时返回相同 stopped 状态。不会终止已经启动的 Claude 进程，也不改系统代理。 |
 | `launch` | `environment_id` | 必须有运行中的通道。向共享 core 发送 `launch` 与该通道的 `proxy_url`，原样返回 core envelope。该操作属于用户明确选择的启动动作，不能在 `start` / `status` 时自动调用。 |
 
+新 App 的“通过通道打开 Claude”进入独立启动预览：输入项目 cwd，`request` bridge 的 `plan_launch` 冻结配置 root、cwd 和当前通道地址；批准后使用同一 `launch_request`。`NetworkState::dispatch_core` 在预览及首次尝试时核对这份地址确属该环境的 live App 通道，并串行化与 stop 的竞争。已存在的原启动 record 只查询，通道停用不妨碍找回它；仅有 `planned` 预览不能跳过 live 通道核验。旧 `network_request.launch` 为已有调用者保留。
+
 `start` / `status` / `stop` 的 `data` 固定包括：
 
 ```json
@@ -69,7 +71,7 @@ CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo check --manifest-path apps/d
 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml network::tests
 ```
 
-Synthetic bridge 测试通过 fake core 核对 inspect / launch 请求形状，通过真实 loopback socket 检查拒绝与停止。它们不调用实际 Claude、Terminal、系统代理切换或公网探针。
+Synthetic bridge 测试核对 inspect／启动请求形状，区分 `planned` 与已尝试 record，覆盖冻结地址变化、停止后拒绝新尝试及原请求查询；真实 loopback socket 检查拒绝与停止。它们不调用实际 Claude、Terminal、系统代理切换或公网探针。
 
 ## 规则与实际支持范围
 

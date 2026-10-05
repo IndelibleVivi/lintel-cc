@@ -152,6 +152,144 @@ pub fn categories(r: &Value) -> Result<Vec<String>> {
     }
     Ok(out)
 }
+
+/// The purpose of each selected category. Only CLAUDE.md (instructions) has a
+/// position the client auto-discovers; memory/sessions stay in the reference
+/// area and are never registered as active native sessions this round.
+pub(crate) fn purposes(categories: &[String]) -> Value {
+    let mut out = serde_json::Map::new();
+    for category in ["instructions", "memory", "sessions"] {
+        let selected = categories.iter().any(|c| c == category);
+        let purpose = if category == "instructions" && selected {
+            "instructions"
+        } else if selected {
+            "reference"
+        } else {
+            "not_selected"
+        };
+        out.insert(category.into(), json!(purpose));
+    }
+    Value::Object(out)
+}
+
+/// Activation choices per category with their legacy defaults. A protocol-1
+/// raw caller that omits `activate` keeps the historical behavior (instructions
+/// land at the discovered root CLAUDE.md); strict named callers state it.
+pub(crate) fn activation(r: &Value, categories: &[String]) -> Value {
+    let requested = r.get("activate").and_then(Value::as_object);
+    let mut out = serde_json::Map::new();
+    for category in ["instructions", "memory", "sessions"] {
+        let selected = categories.iter().any(|c| c == category);
+        let default = category == "instructions";
+        let value = requested
+            .and_then(|map| map.get(category))
+            .and_then(Value::as_bool)
+            .unwrap_or(default);
+        out.insert(category.into(), json!(selected && value));
+    }
+    Value::Object(out)
+}
+
+/// Freeze the full planned migration for a plan that will create a new root:
+/// the planned environment ID, the planned root under the state environments
+/// directory, the parent directory identity and the per-file final
+/// destinations. This does not create anything; execution rechecks it.
+pub(crate) fn freeze_new_target(
+    base: &Path,
+    manifest: &[Value],
+    instructions_active: bool,
+) -> Result<Value> {
+    let environments = base.join("environments");
+    guard(&environments)?;
+    let metadata = fs::metadata(&environments)
+        .map_err(|_| err("invalid_state", "无法读取 environments 目录"))?;
+    let new_environment_id = crate::id();
+    let new_root = environments.join(&new_environment_id);
+    let targets = migration_paths(manifest, instructions_active)?;
+    let files = manifest
+        .iter()
+        .zip(targets)
+        .map(|(f, relative)| {
+            json!({
+                "path": f["path"],
+                "category": f["category"],
+                "bytes": f["bytes"],
+                "digest": f["digest"],
+                "destination": new_root.join(&relative),
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "plan_revision": "lintel.plan/2",
+        "new_environment_id": new_environment_id,
+        "new_root": new_root,
+        "new_root_parent_identity": [metadata.dev(), metadata.ino()],
+        "import_manifest": files,
+    }))
+}
+
+/// Freeze the planned migration into an already-registered existing root.
+pub(crate) fn freeze_existing_target(
+    root: &Path,
+    manifest: &[Value],
+    instructions_active: bool,
+) -> Result<Value> {
+    guard(root)?;
+    let metadata = fs::metadata(root)?;
+    let targets = migration_paths(manifest, instructions_active)?;
+    let files = manifest
+        .iter()
+        .zip(targets)
+        .map(|(f, relative)| {
+            json!({
+                "path": f["path"],
+                "category": f["category"],
+                "bytes": f["bytes"],
+                "digest": f["digest"],
+                "destination": root.join(&relative),
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "plan_revision": "lintel.plan/2",
+        "new_environment_id": Value::Null,
+        "new_root": root,
+        "new_root_parent_identity": [metadata.dev(), metadata.ino()],
+        "import_manifest": files,
+    }))
+}
+
+/// Recheck a frozen new-root target at execution: the parent directory identity
+/// must be unchanged and the planned root must still be absent. Returns an
+/// explicit stale_plan for a legacy plan that did not freeze these fields.
+pub(crate) fn check_frozen_target(plan: &Value) -> Result<PathBuf> {
+    let extra = &plan["extra"];
+    let frozen = &extra["frozen_target"];
+    if frozen["plan_revision"] != "lintel.plan/2" {
+        return Err(err(
+            "stale_plan",
+            "此创建新环境的旧计划未冻结目标身份，请在接受前重新预览",
+        ));
+    }
+    let new_root = frozen["new_root"]
+        .as_str()
+        .ok_or_else(|| err("invalid_plan", "计划缺少规划的新 root"))?;
+    let parent = Path::new(new_root)
+        .parent()
+        .ok_or_else(|| err("invalid_plan", "规划的新 root 缺少父目录"))?;
+    guard(parent)?;
+    let metadata = fs::metadata(parent)?;
+    if json!([metadata.dev(), metadata.ino()]) != frozen["new_root_parent_identity"] {
+        return Err(err("stale_plan", "规划目标的父目录对象已变化，请重新预览"));
+    }
+    if Path::new(new_root).exists() {
+        return Err(err(
+            "stale_plan",
+            "规划的新 root 已被占用；不会在既有目录上继续，请重新预览",
+        ));
+    }
+    Ok(PathBuf::from(new_root))
+}
 pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     let name = relative.file_name()?.to_str()?;
     if relative == Path::new("CLAUDE.md") {
@@ -177,13 +315,21 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
 /// Map one selected batch into the inactive work area. Reserve every original
 /// name first, then disambiguate colliding file/ancestor names without changing suffixes
 /// or wrapping already imported paths. Preserve and portable import share this.
-pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
+///
+/// `instructions_active` selects whether the `instructions` category lands at
+/// the discovered root instruction position (the legacy default) or is kept,
+/// like memory/sessions, in the `lintel-imports` reference area. The same flag
+/// drives the frozen plan, the published manifest and the actual execution, so a
+/// plan and its receipt can never disagree about where CLAUDE.md goes.
+pub(crate) fn migration_paths(files: &[Value], instructions_active: bool) -> Result<Vec<PathBuf>> {
     let preferred: Vec<PathBuf> = files
         .iter()
         .map(|file| {
             let relative = Path::new(string(file, "path")?);
             Ok(
-                if file["category"] == "instructions" || relative.starts_with("lintel-imports") {
+                if (file["category"] == "instructions" && instructions_active)
+                    || relative.starts_with("lintel-imports")
+                {
                     relative.to_path_buf()
                 } else {
                     Path::new("lintel-imports").join(relative)
@@ -660,6 +806,9 @@ impl Engine {
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .unwrap_or("保全");
+        let activation = activation(r, &categories);
+        let frozen_target =
+            freeze_new_target(&self.state, &manifest, activation["instructions"] == true)?;
         let actions = json!([
             {"id":"archive","label":"加密归档选中的工作内容","reversible":false},
             {"id":"create","label":"创建新的配置目录","reversible":false},
@@ -672,8 +821,23 @@ impl Engine {
             json!([]),
             vec!["原环境全部内容（不注销、不删除、不停止进程）", "settings、hooks、MCP 与插件文件"],
             actions,
-            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"preserve_name":name,"outcome":"preserve"}),
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"preserve_name":name,"outcome":"preserve","frozen_target":frozen_target,"work_purpose":purposes(&categories),"activate":activation}),
         )
+    }
+
+    /// Reset/rebuild plan. Freezes the planned new environment identity and the
+    /// whole import mapping so a receipt never has to invent a target.
+    pub(crate) fn plan_rebuild(&self, r: &Value) -> Result<Value> {
+        let e = self.env(r)?;
+        if string(r, "recipe")? != "rebuild" {
+            return Err(err("unsupported_recipe", "当前支持新环境重建配方"));
+        }
+        let categories = categories(r)?;
+        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let activation = activation(r, &categories);
+        let frozen_target =
+            freeze_new_target(&self.state, &manifest, activation["instructions"] == true)?;
+        self.plan(&e,"rebuild","保留内容，准备新环境",json!([]),vec!["原环境全部内容（尚未注销或删除）","未选中的实例与项目文件"],json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false},{"id":"create","label":"创建新的配置目录","reversible":false},{"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false},{"id":"credentials","label":"旧登录及客户端状态尚需独立处理","reversible":false}]),json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"frozen_target":frozen_target,"work_purpose":purposes(&categories),"activate":activation}))
     }
 
     /// Preserve execution: archive the selection, then create a fresh owned root
@@ -694,6 +858,8 @@ impl Engine {
             &files,
             j,
             journal,
+            Some(&p["extra"]["frozen_target"]),
+            &p["extra"]["activate"],
         )?;
         // Preservation keeps the source install untouched; that is the desired
         // outcome, not an outstanding task. Report it as retained with explicit
@@ -702,12 +868,21 @@ impl Engine {
         j["coverage"] = json!({
             "categories": p["extra"]["categories"],
             "file_count": p["extra"]["manifest"].as_array().map_or(0, Vec::len),
+            "work_purpose": p["extra"]["work_purpose"],
+            "activation": p["extra"]["activate"],
             "old_login": "retained",
             "old_root": "retained",
             "service_binding": "unchanged"
         });
         j["next_steps"] = json!([
-            "在新环境采用自己的保护方案并完成一次真实启动，再核对运行效果；迁移内容不会自动启用。",
+            if p["extra"]["activate"]["instructions"]
+                .as_bool()
+                .unwrap_or(true)
+            {
+                "在新环境采用自己的保护方案并完成一次真实启动；已启用的 CLAUDE.md 位于根指令位置，其余资料在 lintel-imports 参考区、未注册为活动会话。"
+            } else {
+                "在新环境采用自己的保护方案并完成一次真实启动；CLAUDE.md 与其余资料保留在 lintel-imports 参考区，未启用为指令或活动会话。"
+            },
             "在新环境按官方流程正常登录；旧登录仍在原 root。",
             "原 root 的后台服务/进程绑定保持不变，Lintel 不会把新 root 改绑到已有 service。"
         ]);
@@ -725,20 +900,35 @@ impl Engine {
         files: &[Value],
         j: &mut Value,
         journal: &Path,
+        frozen_target: Option<&Value>,
+        activate: &Value,
     ) -> Result<()> {
-        let targets = migration_paths(files)?;
+        let instructions_active = activate["instructions"].as_bool().unwrap_or(true);
+        let targets = migration_paths(files, instructions_active)?;
         preflight_migration_paths(&self.state.join("environments"), &targets, j, journal)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
-        let new = self.create(
-            &format!("{} · {}", string(e, "name")?, label),
-            Some((j, journal)),
-        )?;
+        let new = match frozen_target {
+            Some(frozen) => self.create_frozen(
+                &format!("{} · {}", string(e, "name")?, label),
+                frozen,
+                Some((j, journal)),
+            )?,
+            None => self.create(
+                &format!("{} · {}", string(e, "name")?, label),
+                Some((j, journal)),
+            )?,
+        };
         j["new_environment_id"] = new["id"].clone();
         j["new_root"] = new["root"].clone();
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"});
         save(journal, j)?;
         let destination = PathBuf::from(string(&new, "root")?);
+        let instruction_note = if instructions_active {
+            "CLAUDE.md 放入新 root 指令位置（客户端会发现）；"
+        } else {
+            "CLAUDE.md 放入 lintel-imports 参考区，未放到指令位置；"
+        };
         j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"executing","message":"正在迁入并核验工作内容；失败时新 root 可能已有部分文件，请核对原任务。"}));
         save(journal, j)?;
         for (f, relative) in files.iter().zip(targets) {
@@ -754,7 +944,7 @@ impl Engine {
                 return Err(err("migration_failed", "迁入文件校验失败"));
             }
         }
-        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"});
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migrate","label":"选择性迁入","status":"completed","message":format!("{instruction_note}会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。")});
         save(journal, j)?;
         Ok(())
     }
@@ -765,7 +955,7 @@ impl Engine {
     pub(crate) fn migrate_to_new_root(
         &self,
         e: &Value,
-        _p: &Value,
+        p: &Value,
         r: &Value,
         j: &mut Value,
         journal: &Path,
@@ -782,7 +972,15 @@ impl Engine {
             ));
         }
         let files = validate_package_files(&package)?;
-        self.migrate_files(e, "重建", &files, j, journal)
+        self.migrate_files(
+            e,
+            "重建",
+            &files,
+            j,
+            journal,
+            Some(&p["extra"]["frozen_target"]),
+            &p["extra"]["activate"],
+        )
     }
 
     pub(crate) fn rebuild(
@@ -794,7 +992,15 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let files = self.archive_work(e, p, r, j, journal)?;
-        self.migrate_files(e, "重建", &files, j, journal)?;
+        self.migrate_files(
+            e,
+            "重建",
+            &files,
+            j,
+            journal,
+            Some(&p["extra"]["frozen_target"]),
+            &p["extra"]["activate"],
+        )?;
         if p["kind"] == "rebuild" {
             j["steps"].as_array_mut().unwrap().push(json!({"id":"credentials","label":"旧登录与客户端状态","status":"not_completed","message":"旧环境没有注销、删除或停进程；完整处理请使用清理配方。"}));
             j["status"] = json!("partially_completed");
@@ -830,7 +1036,15 @@ mod tests {
         // Only this synthetic inventory is changed.
         save(&engine.state.join("inventory.json"), &json!({})).unwrap();
         let failure = engine
-            .migrate_files(&environment, "synthetic", &[], &mut receipt, &journal)
+            .migrate_files(
+                &environment,
+                "synthetic",
+                &[],
+                &mut receipt,
+                &journal,
+                None,
+                &json!({"instructions": true}),
+            )
             .unwrap_err();
         assert_eq!(failure.code, "invalid_inventory");
         let stored = load(&journal).unwrap();
@@ -961,8 +1175,18 @@ mod tests {
         ];
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
+        // Legacy raw callers omit `activate`; the mapping keeps its historical
+        // default where instructions land at the root position.
         let failure = engine
-            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .migrate_files(
+                &environment,
+                "synthetic",
+                &files,
+                &mut receipt,
+                &journal,
+                None,
+                &json!({"instructions": true}),
+            )
             .unwrap_err();
         assert_eq!(failure.code, "migration_failed");
         let stored = load(&journal).unwrap();
@@ -1038,7 +1262,15 @@ mod tests {
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
         engine
-            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .migrate_files(
+                &environment,
+                "synthetic",
+                &files,
+                &mut receipt,
+                &journal,
+                None,
+                &json!({"instructions": true}),
+            )
             .unwrap();
         let destination = Path::new(receipt["new_root"].as_str().unwrap());
         for (relative, bytes) in [
@@ -1078,7 +1310,7 @@ mod tests {
             .unwrap()
             .contains("lintel-imports/lintel-imports")));
         assert_eq!(
-            migration_paths(&again).unwrap(),
+            migration_paths(&again, false).unwrap(),
             again
                 .iter()
                 .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
@@ -1144,8 +1376,15 @@ mod tests {
             .into_iter().map(|(path, bytes)| json!({"path":path,"category":"sessions","digest":digest(bytes),"data":bytes})).collect();
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
-        let result =
-            engine.migrate_files(&environment, "synthetic", &files, &mut receipt, &journal);
+        let result = engine.migrate_files(
+            &environment,
+            "synthetic",
+            &files,
+            &mut receipt,
+            &journal,
+            None,
+            &json!({"instructions": true}),
+        );
         if folds_case {
             assert_eq!(result.unwrap_err().code, "migration_path_conflict");
             assert!(receipt["new_root"].is_null());

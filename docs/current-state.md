@@ -1,83 +1,35 @@
 # 当前状态
 
-2026-10-05 · **0.1.0 开发候选**。完整 [SPEC](SPEC.md) 与四条完整旅程 G01–G04 尚未交付。本轮补齐独立安装候选与双架构 runner，整合原任务恢复、批准一致性和浏览器跨入口接续修复；不代表正式发行、真实认证或生产 VPS 激活。
+2026-10-05 · **0.1.0 产品基线源码交付与本地候选**。本轮从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
 
-## 这份候选包含什么
+## 当前交付与证据
 
-本轮通过 [PR #2](https://github.com/IndelibleVivi/lintel-cc/pull/2) 合并独立安装候选，并整合 `e276f67` 的恢复／审批修复和官网／共享游戏。tested source 为 clean `25fdb43`，本地候选身份为 `0.1.0-candidate-25fdb4305785`。产品版本仍为 0.1.0，不能只凭版本号认定两个候选相同；candidate 身份与字节核验另行记录。
-
-| 对象 | 当前证据与边界 |
+| 对象 | 当前事实与验收边界 |
 | --- | --- |
-| 源码 | clean `25fdb43` 已合并；包含恢复／审批／浏览器修复、官网／共享游戏与独立 CLI 打包 |
-| CLI | Mac arm64、Linux x86_64／aarch64 三份实际归档已核对输入、manifest 与全部文件 checksum；本机新 release CLI 的完整 native 安装／升级旅程通过，旧版本、state 和原 ID 保留。CI 另在 Mac／Ubuntu 执行其 native 包；aarch64 runtime 未验证 |
-| macOS App | arm64 `Lintel.app` 22.63 MiB，包含本轮修复与共享 Clawd；路径 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app` |
-| Linux runner | 新构建 x86_64／aarch64 musl；App `remote-runners` 的 bytes／SHA-256 与各自产物一致，aarch64 runtime 未验证 |
-| 浏览器资源 | Chromium／Firefox 非 fixture 扩展与当前 arm64 native host 已入包；包内文件与 source／manifest 核对一致，直接使用包内资源的两个 synthetic 安装测试通过 |
-| 安装与发行 | 仅 linker ad-hoc signature；无 Applications 安装、生产远端部署、Developer ID 签名、公证或正式发布 |
+| 共享产品合同 | 六任务 catalog；计划新增冻结目标／完整落点与用途；结构化任务结果与覆盖；旧协议、历史计划、包与原 ID 恢复保留 |
+| App 界面 | 安静的 Clawd 首页／32 句原创时段问候，点击后展开六任务，保留持续目标；配置 root／项目 cwd 分离；资料阅读／交接稿；CLI 核对与 Agent。默认 1120、最低 900、宽 1440 成品 UI 检查通过；保护／保全／清理底栏独立于正文滚动 |
+| 会话与启动 | bounded reader、未知块与 thinking 原件保全；普通启动／独立 resume／原启动 query/list 接入。持久 intent 先于私有副本／Terminal，未知后只查询原 ID。有限 adapter 仅静态识别 2.1.283／2.1.285；inert 参数、cwd、配置根与副本机制通过，真实认证 resume 尚未验收 |
+| macOS native 候选 | unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料、检查批准弹窗与固定底栏；Day／Night 截图为本地 QA。默认窗口之外的完整原生矩阵仍未逐一验收 |
+| CLI 与静态检查 | context/tasks/深层嵌套帮助和原启动 query/list；App 明确 executable 的有限 native 探测。默认 19 项通过；相关最终机制补跑通过，core baseline 16 项通过；独立 8 项 UI／browser 通过，首页修订后 7 项再验通过 |
+| 资源与包装 | 本轮 macOS arm64 CLI 与两架构 Linux musl runner 已构建，canonical App bundles 已更新；native host／非 fixture Chromium 与 Firefox 扩展由原 source 生成。CLI candidate 包装含真实输入 smoke 通过；生成物不进 Git。cross-build 不证明其他架构 runtime，checksums 不证明签名或来源 |
+| 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
 
-## 独立安装候选与双架构 runner
+[基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存 25fdb43 与更早候选的 CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
 
-独立 CLI 打包入口为 `scripts/package-cli.mjs`：明确提供 macOS arm64 Mach-O、Linux x86_64／aarch64 static ELF 与 canonical runner-bundles，核对 Linux CLI 与对应 runner 字节相同，生成三份 archive、`SHA256SUMS` 与候选身份索引。checksum 包含 payload、`candidate.json` 和 `README.txt`，只排除自身；source_revision 是调用方声明，不是签名或认证 provenance。每个 runner 遵守 SSH installer 的 32 MiB 上限。
+## 入口与权威
 
-[安装与升级指南](agents.md) 使用系统 checksum 工具，目标端不需要 Rust、GUI 或 Node runtime。安装选择尚不存在的新版本目录，保留旧 executable、state 和原 job ID；archive／索引／版本目录不覆盖。打包或索引发布报错时只回收本次未被外部替换或编辑的 owned 文件，不承诺骤然进程死亡后的自动恢复。其它架构的格式 fixtures 不构成实际 runtime 验收。
-
-`cli-candidate` 在 macOS／Ubuntu CI 通过同一 canonical entrypoint 执行 native 解包、version／capabilities／schema 和原 state/job 保留旅程。本轮 fresh Mac release／双架构 Linux cross-build／App 构建及 actual App 两项 synthetic 资源安装均通过。Ubuntu CI 实际运行其同源码原生 x86_64 static musl build；本地 Linux cross-built archives 只核对包内字节／checksum，未在 Mac 执行，CI 的另一份构建不能证明它们的 runtime。正式发布、Applications 激活和真实 VPS 安装仍是独立步骤。
-
-当前本地候选 App 的包内资源身份可按下表核对；SHA-256 为完整摘要，来自本地构建和 source/resource 比对，不表示这些二进制已经发行。路径相对于 `Lintel.app/Contents`。
-
-| 对象 | 路径 | SHA-256 |
-| --- | --- | --- |
-| macOS arm64 App executable | `MacOS/lintel-desktop` | `274c34b4c895c610967ede5cd6af296f74da83d41759e8457f15eaf2fe07cde5` |
-| Linux x86_64 runner | `Resources/remote-runners/x86_64-unknown-linux-musl/lintel` | `9eb09f30bec1660914440aa1959f527a53d8afde5426a4322611036248018da6` |
-| Linux aarch64 runner | `Resources/remote-runners/aarch64-unknown-linux-musl/lintel` | `907e122d9d897335606bfa8ec4400df9c68224417bf455f10b8108f0806a13a0` |
-
-## 阶段修复的合同
-
-- **配置中断恢复：** settings 原子发布前持久记录具体 staged 对象与冻结计划。原任务查询核对当前文件；确认已发布才开放独立恢复预览。未写入或被外部替换保留具体说明，不从意图推断成功。正常完成的字段恢复继续保留无关后续编辑。
-- **清理批准：** 注销前比较计划冻结 executable、当前 inventory 与实时发现；重新 discover 不能改变旧批准含义。工作归档／迁入后，无论是否选择官方注销，都在第一破坏性动作前再次检查写入者与冻结范围。
-- **迁入审批：** CLI `plan show` 与 App 展示同一受限 `import_manifest`，列出准确包身份、选中文件来源、最终相对位置、类别、大小与摘要；同名分配已经包含在批准中，不暴露正文或口令。
-- **远端安装：** 预览冻结前置 binding（包括 install ID）；上传入口在锁内重查原未确认安装。旧安装查询可核实文件与运行能力，但不能覆盖后来绑定；历史记录可只核验而不自动启用。原任务 runner pin 与 no-replay 保留。
-- **浏览器：** ACK 元数据与操作消费标记共用 Engine 的串行更新入口；App 清理经 popup 继续时保留原／子任务关联。过期与取消预览退出待批准队列，新尝试需要新 ID 与独立批准。DNR 恢复按规则集合比较，不依赖 API 数组顺序。
-- **界面：** 最终迁入清单、配置核对说明和后续步骤进入审批／回执；记录页可筛选待处理任务，未决安装可直接查询原 ID。弹窗正文独立滚动，操作区随实际高度排布。暖纸／月光、Clawd 与侧栏字标保留。
-
-状态更新仍由各领域 owner 负责：core 管文件／journal，remote controller 管安装／任务绑定，browser Engine 管 profile 操作，native host 管桥接回执。查询核对事实，不重新执行副作用。
-
-## 官网与共享 Clawd 游戏（源码／前端候选）
-
-[`apps/site`](../apps/site/README.md) 是独立静态官网：产品介绍、显式示例的计划／回执、日夜主题、真实开发状态与页尾游戏。无新增生产依赖、native/core 通道、analytics 或远程字体请求；未绑定域名或部署。网页的品牌与能力文案依据现有产品合同，视觉仍待作者验收。
-
-官网与 App 共用 `apps/site/clawd-game.mjs`／CSS：四腿交替、收脚／落地反馈、石头与书本、星星计分、暂停／重试；旧 App runner 已移除，风景册和原成绩保留。浏览器与 App webview 分别存储主题／成绩。前端 build、7 项游戏机制检查、官网响应式与交互、App 隔离 Chromium 的挂载／卸载／主题旅程分别验收；共享游戏现已进入本节列明的 App 构建；前端检查仍不证明 native WebKit、安装或正式发行。测试入口是 `site-game-test`、独立 `site-ui` 与 `clawd-app-ui`。
-
-## 已有能力与入口
-
-| 范围 | 当前入口与权威说明 |
+| 读者／任务 | 权威入口 |
 | --- | --- |
-| 环境、七项保护设置、字段恢复、漂移 | [core](core.md)、[人类操作指南](operator-guide.md#protect) |
-| 独立 archive-only／preserve、portable work 与清理保全顺序 | [工作流程](operator-guide.md#work)、[Agent CLI](agents.md) |
-| 精确 systemd 暂停／恢复与原任务托管 | [服务](services.md)、[远程](remote.md) |
-| App 内置扩展与 host 准备、配对、两阶段清理 | [浏览器](browser.md) |
-| loopback 通道、明确生效配置与连接观察 | [网络](network.md)；仅覆盖经过代理的连接 |
-| Day／Night／System、Clawd、任务帮助与审批 | [桌面](desktop.md)、[视觉身份](visual-language.md) |
+| 人类任务、保全／重建、继续工作、原任务核对 | [操作指南](operator-guide.md) |
+| 独立 CLI、用户候选安装、stdin、schema 与 Agent | [Agent CLI](agents.md) |
+| 前端构图、组件入口与 Selen 后续工作 | [桌面](desktop.md)、[视觉身份](visual-language.md) |
+| 当前 native／browser／Linux 验证边界 | [验证说明](verification.md)、[验收记录](specs/product-baseline-status.md) |
+| 官网、示例与 opt-in 共享游戏 | [网站](../apps/site/README.md)；尚未部署、无正式下载 |
+| core／SSH／systemd／browser／network | [core](core.md)、[remote](remote.md)、[services](services.md)、[browser](browser.md)、[network](network.md) |
 
-## 验证与历史
+统一验证 owner 是 `python3 tests/verify.py`；UI／browser startup／Linux runtime 为独立 selections。dirty 开发 App 的 docs revision 为 unknown；干净候选通过固定 named HTTPS 资源指向自己的源码 revision，main 入口标为最新开发说明。不会开放任意 URL 或 shell。
 
-统一入口是 `python3 tests/verify.py`；浏览器启动、App 渲染、Linux OpenSSH／VM 和 App 包内资源是独立检查。每份报告的源码 HEAD／dirty、fixture、runtime 和跳过状态分别记录；构建成功不代表实际安装或 runtime 验收。详细验收用例继续见 [acceptance-status.json](acceptance-status.json)，局部通过不自动关闭完整用例。
-
-本轮 clean `25fdb43` 的 [push CI37267381234](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37267381234) 与 [PR CI37267385529](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37267385529) 均通过。八份入口报告记录同一 HEAD、`dirty=false`；忽略项不计通过。
-
-| 检查 | macOS arm64 | Ubuntu x86_64 |
-| --- | --- | --- |
-| 默认合成验证 | 18/18 | 18/18 |
-| native CLI candidate 安装／升级 | 1/1 | 1/1 |
-| 独立 browser／App／官网 UI | 7/7 | 7/7 |
-| 静态 musl runner 的真实 OpenSSH | 不适用 | 1/1 |
-| 一次性 Linux VM 生命周期 | 不适用 | 1/1 |
-
-两平台 Chromium 报告均有完整 12 项 smoke，包含 App clear → 实际进程退出／新 onStartup → popup 继续 → 原 App 最终回执；提交一次，取消预览回传也通过。VM 报告为 `evidence_complete`，覆盖真实 systemd/PAM/logout/cgroup/reboot 与服务恢复，证据限于一次性 guest。本地实际候选归档核对、提取后 named CLI／finite-adapter 旅程、完整 native 安装／升级和 34 项验证入口自检通过；实际 App 包内 host／extension 的 synthetic 安装检查为 2/2。
-
-此前 `e276f67` 阶段的本地默认 18/18、29 项 Engine 单测及 UI／配置恢复证据仍有其边界；本轮 fresh CI 另验整合源码。较早候选与 CI 引用保留在 [候选历史](candidate-history.md) 和 [验证说明](verification.md)，不替代本次源码验证。
-
-仓库已公开；项目原创材料的公开复用许可证仍未选定，源码可见不构成通用复用许可，第三方权利保持独立。
+仓库已公开；项目原创材料的公开复用许可证仍未选定，第三方权利独立。源码可见不构成通用复用许可。
 
 ## 完整目标仍缺少
 

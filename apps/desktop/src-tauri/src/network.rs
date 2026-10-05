@@ -45,6 +45,66 @@ fn stopped_status() -> Value {
 // The production command always selects the shared core. The private function
 // boundary lets synthetic tests observe launch payloads without starting Claude.
 impl NetworkState {
+    /// New frozen launches retain the same owned-channel guarantee as the
+    /// legacy network launcher. Hold the channel lock through the sole attempt
+    /// so stop cannot change the reviewed address halfway through dispatch.
+    pub(crate) async fn dispatch_core<F>(&self, payload: Value, core: F) -> Value
+    where
+        F: Fn(Value) -> Value + Send + 'static,
+    {
+        let command = payload["command"].as_str().unwrap_or("");
+        let target = if command == "plan_launch" {
+            payload.clone()
+        } else if command == "launch_request" {
+            let query = core(json!({"command":"launch_query","request_id":payload["request_id"]}));
+            if query["ok"] == true && query["data"]["observed"] == "record" {
+                return match tauri::async_runtime::spawn_blocking(move || core(payload)).await {
+                    Ok(result) => result,
+                    Err(_) => error("launch_uncertain", "原启动请求核对未完成；保留原 ID"),
+                };
+            }
+            let plan = core(json!({"command":"plan_show","plan_id":payload["request_id"]}));
+            if plan["ok"] != true {
+                return plan;
+            }
+            plan["data"]["launch_request"].clone()
+        } else {
+            Value::Null
+        };
+        let proxy = target["proxy_url"].as_str().filter(|s| !s.is_empty());
+        if let Some(proxy) = proxy {
+            let channels = self.channels.lock().await;
+            let Some(channel) = target["environment_id"]
+                .as_str()
+                .and_then(|id| channels.get(id))
+            else {
+                return error(
+                    "channel_missing",
+                    "批准中的本机通道已不存在；请启动通道后重新核对目标",
+                );
+            };
+            if channel.task.is_finished() || proxy != format!("http://{}", channel.address) {
+                return error(
+                    "channel_changed",
+                    "通道已停止或地址已变化；请重新核对启动目标",
+                );
+            }
+            let result = match tauri::async_runtime::spawn_blocking(move || core(payload)).await {
+                Ok(result) => result,
+                Err(_) => error(
+                    "launch_uncertain",
+                    "启动请求未完成；核对原启动 ID，不重新提交",
+                ),
+            };
+            drop(channels);
+            result
+        } else {
+            match tauri::async_runtime::spawn_blocking(move || core(payload)).await {
+                Ok(result) => result,
+                Err(_) => error("core_request_failed", "本地执行器未能完成请求"),
+            }
+        }
+    }
     async fn dispatch(&self, payload: Value, core: fn(Value) -> Value) -> Value {
         let Some(id) = payload["environment_id"]
             .as_str()
@@ -195,6 +255,86 @@ mod tests {
     };
 
     const ENVIRONMENT: &str = "00000000-0000-4000-8000-000000000001";
+    #[tokio::test]
+    async fn frozen_proxy_requires_owned_live_address_but_original_query_survives_stop() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let state = NetworkState::default();
+        let started=state.dispatch(json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"deny"}}),synthetic_core).await;
+        assert_eq!(started["ok"], true, "{started}");
+        let address = started["data"]["address"].as_str().unwrap().to_string();
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let core = |address: String, attempts: Arc<AtomicUsize>| {
+            move |request: Value| match request["command"].as_str().unwrap() {
+                "launch_query" if request["request_id"] == "recorded" => {
+                    json!({"ok":true,"data":{"status":"launch_requested","observed":"record"}})
+                }
+                "launch_query" => {
+                    json!({"ok":true,"data":{"status":"planned","observed":"plan","request_id":request["request_id"]}})
+                }
+                "plan_show" => {
+                    json!({"ok":true,"data":{"launch_request":{"environment_id":ENVIRONMENT,"proxy_url":format!("http://{address}")}}})
+                }
+                "launch_request" => {
+                    if request["request_id"] != "recorded" {
+                        attempts.fetch_add(1, Ordering::SeqCst);
+                    }
+                    json!({"ok":true,"data":{"status":"launch_requested"}})
+                }
+                "plan_launch" => json!({"ok":true,"data":request}),
+                _ => panic!("unexpected synthetic core command"),
+            }
+        };
+        let preview = json!({"command":"plan_launch","environment_id":ENVIRONMENT,"proxy_url":format!("http://{address}")});
+        assert_eq!(
+            state
+                .dispatch_core(preview, core(address.clone(), attempts.clone()))
+                .await["ok"],
+            true
+        );
+        let wrong = state
+            .dispatch_core(
+                json!({"command":"launch_request","request_id":"new"}),
+                core("127.0.0.1:1".into(), attempts.clone()),
+            )
+            .await;
+        assert_eq!(wrong["error"]["code"], "channel_changed");
+        assert_eq!(attempts.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            state
+                .dispatch_core(
+                    json!({"command":"launch_request","request_id":"new"}),
+                    core(address.clone(), attempts.clone())
+                )
+                .await["ok"],
+            true
+        );
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+        state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(
+            state
+                .dispatch_core(
+                    json!({"command":"launch_request","request_id":"new"}),
+                    core(address.clone(), attempts.clone())
+                )
+                .await["error"]["code"],
+            "channel_missing"
+        );
+        assert_eq!(
+            state
+                .dispatch_core(
+                    json!({"command":"launch_request","request_id":"recorded"}),
+                    core(address, attempts.clone())
+                )
+                .await["ok"],
+            true
+        );
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    }
     fn synthetic_core(request: Value) -> Value {
         match request["command"].as_str() {
             Some("inspect") => json!({"ok":true,"data":{"environment":{"id":ENVIRONMENT}}}),
