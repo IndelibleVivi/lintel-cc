@@ -38,25 +38,38 @@ REVISION = "a239123903b620171877498a8af1da349c701060"
 SECOND_REVISION = "b0001234567890abcdef1234567890abcdef1234"
 
 
-def elf(machine: int, interp: bool = False) -> bytes:
+def elf(machine: int, interp: bool = False, *, file_type: int = 2,
+        entry: int = 0x401000, needed: bool = False, dynamic: bool = False) -> bytes:
     header = bytearray(64)
     header[0:4] = b"\x7fELF"
     header[4] = 2
     header[5] = 1
+    header[6] = 1
+    struct.pack_into("<H", header, 16, file_type)
     struct.pack_into("<H", header, 18, machine)
-    phoff, phentsize, phnum = 64, 56, 1
+    struct.pack_into("<I", header, 20, 1)
+    struct.pack_into("<Q", header, 24, entry)
+    struct.pack_into("<H", header, 52, 64)
+    phoff, phentsize, phnum = 64, 56, 2 if needed or dynamic else 1
     struct.pack_into("<Q", header, 32, phoff)
     struct.pack_into("<H", header, 54, phentsize)
     struct.pack_into("<H", header, 56, phnum)
     program = bytearray(56)
-    struct.pack_into("<I", program, 0, 3 if interp else 1)
-    return bytes(header) + bytes(program) + b"\x90" * 256
+    payload_offset = phoff + phentsize * phnum
+    struct.pack_into("<IIQQQQQQ", program, 0, 3 if interp else 1, 5,
+                     payload_offset, 0x401000, 0x401000, 256, 256, 1)
+    payload = bytearray(b"\x90" * 256)
+    if needed or dynamic:
+        dynamic_program = struct.pack("<IIQQQQQQ", 2, 4, payload_offset, 0x401000, 0x401000, 32, 32, 8)
+        payload[:32] = struct.pack("<QQQQ", 1 if needed else 0, 1, 0, 0)
+        program += dynamic_program
+    return bytes(header) + bytes(program) + bytes(payload)
 
 
-def macho_arm64() -> bytes:
+def macho_arm64(file_type: int = 2) -> bytes:
     # Visibly synthetic Mach-O header, used only off macOS to exercise format
     # validation. Never executed and never claimed as a real build.
-    return struct.pack("<II", 0xFEEDFACF, 0x0100000C) + b"\x00" * 128
+    return struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, file_type, 0, 0, 0, 0) + b"\x00" * 128
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -199,6 +212,77 @@ def documented_unpack(archive: Path, parent: Path, identity: str) -> subprocess.
     dest = parent / identity
     script = f'mkdir -p "{parent}"\ndest="{dest}"\nmkdir "$dest" && tar -xzf "{archive}" -C "$dest"'
     return subprocess.run(["bash", "-c", script], text=True, capture_output=True, check=False)
+
+
+def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> None:
+    failures = []
+    for name, payload, code in (("truncated-macho", macho_arm64()[:20], "wrong_format"),
+                                ("macho-object", macho_arm64(1), "not_executable"),
+                                ("macho-dylib", macho_arm64(6), "not_executable")):
+        binary = journey.base / name
+        binary.write_bytes(payload)
+        output = journey.base / (name + "-out")
+        result = journey.package(output, dict(inputs, macos=binary), version=version)
+        if result.returncode == 0 or code not in result.stderr or output.exists():
+            failures.append((name, result.returncode, result.stderr, output.exists()))
+    for key, triple, machine in (("x86", "x86_64-unknown-linux-musl", 62),
+                                ("arm", "aarch64-unknown-linux-musl", 183)):
+        for kind, payload, code in (("object", elf(machine, file_type=1), "not_executable"),
+                                    ("shared", elf(machine, file_type=3, entry=0), "not_executable"),
+                                    ("needed", elf(machine, file_type=3, needed=True), "dynamic_dependency")):
+            name = f"{key}-{kind}"
+            runners = journey.base / (name + "-runners")
+            shutil.copytree(inputs["runners"], runners)
+            binary = runners / triple / "lintel"
+            binary.write_bytes(payload)
+            manifest_path = runners / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            meta = next(r for r in manifest["runners"] if r["target"] == triple)
+            meta.update(bytes=len(payload), sha256=sha256_bytes(payload))
+            manifest_path.write_text(json.dumps(manifest))
+            supplied = dict(inputs, runners=runners)
+            supplied[key] = binary
+            output = journey.base / (name + "-out")
+            result = journey.package(output, supplied, version=version)
+            if result.returncode == 0 or code not in result.stderr or output.exists():
+                failures.append((name, result.returncode, result.stderr, output.exists()))
+    if journey.host == "macos-arm64":
+        source = journey.base / "unsafe-version.c"
+        payload = json.dumps({"ok": True, "data": {"product": "Lintel", "version": "1/unsafe",
+                              "protocol": 1, "catalog_version": 1}})
+        source.write_text('#include <stdio.h>\nint main(void) { puts(' + json.dumps(payload) + '); return 0; }\n')
+        binary = journey.base / "unsafe-version"
+        subprocess.run(["cc", str(source), "-o", str(binary)], check=True, capture_output=True)
+        runners = journey.base / "unsafe-version-runners"
+        shutil.copytree(inputs["runners"], runners)
+        manifest_path = runners / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        for meta in manifest["runners"]:
+            meta["version"] = "1/unsafe"
+        manifest_path.write_text(json.dumps(manifest))
+        output = journey.base / "unsafe-version-out"
+        result = journey.package(output, dict(inputs, macos=binary, runners=runners))
+        if result.returncode == 0 or "invalid_argument" not in result.stderr or output.exists():
+            failures.append(("unsafe-version", result.returncode, result.stderr, output.exists()))
+    assert not failures, failures
+    # Static PIE can have a dynamic table for self-relocations without any
+    # external dependency; do not reject ET_DYN/PT_DYNAMIC categorically.
+    runners = journey.base / "static-pie-runners"
+    shutil.copytree(inputs["runners"], runners)
+    manifest_path = runners / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    supplied = dict(inputs, runners=runners)
+    for key, triple, machine in (("x86", "x86_64-unknown-linux-musl", 62),
+                                ("arm", "aarch64-unknown-linux-musl", 183)):
+        payload = elf(machine, file_type=3, dynamic=True)
+        binary = runners / triple / "lintel"
+        binary.write_bytes(payload)
+        supplied[key] = binary
+        meta = next(r for r in manifest["runners"] if r["target"] == triple)
+        meta.update(bytes=len(payload), sha256=sha256_bytes(payload))
+    manifest_path.write_text(json.dumps(manifest))
+    result = journey.package(journey.base / "static-pie-out", supplied, version=version)
+    assert result.returncode == 0, result.stderr
 
 
 def manifest_snapshot(journey: PackageJourney, inputs: dict, version: str) -> None:
@@ -389,6 +473,7 @@ def main() -> int:
         for code, outcome in cases.items():
             assert outcome.returncode != 0 and code in outcome.stderr, (code, outcome.stderr)
         assert not rejected.exists(), "a rejected run still wrote output"
+        executable_inputs(journey, inputs, version)
 
         for key, triple in (("x86", "x86_64-unknown-linux-musl"),
                             ("arm", "aarch64-unknown-linux-musl")):

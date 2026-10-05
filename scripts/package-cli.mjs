@@ -47,6 +47,7 @@ const PROTOCOL = 1;
 const CATALOG_VERSION = 1;
 // crates/remote/src/remote_install.rs caps each uploaded runner at 32 MiB.
 const MAX_RUNNER_BYTES = 32 * 1024 * 1024;
+const VERSION_PATTERN = /^[0-9][0-9A-Za-z.\-+]*$/;
 
 const TARGETS = {
   'macos-arm64': { platform: 'macos', architecture: 'aarch64', triple: 'aarch64-apple-darwin' },
@@ -91,17 +92,24 @@ function required(flags, name) {
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 // --- binary format checks -----------------------------------------------------
-// Mach-O arm64: 64-bit magic (0xfeedfacf) + CPU_TYPE_ARM64.
+// Mach-O arm64: complete mach_header_64, CPU_TYPE_ARM64 and MH_EXECUTE.
 function verifyMachOArm64(bytes, label) {
-  if (bytes.length < 8 || bytes.readUInt32LE(0) !== 0xfeedfacf) {
+  if (bytes.length < 32 || bytes.readUInt32LE(0) !== 0xfeedfacf) {
     fail('wrong_format', `${label}: not a 64-bit little-endian Mach-O executable`);
   }
   if (bytes.readUInt32LE(4) !== 0x0100000c) {
     fail('wrong_architecture', `${label}: Mach-O is not arm64 (cputype=0x${bytes.readUInt32LE(4).toString(16)})`);
   }
+  if (bytes.readUInt32LE(12) !== 2) {
+    fail('not_executable', `${label}: Mach-O filetype must be MH_EXECUTE`);
+  }
+  if (32 + bytes.readUInt32LE(20) > bytes.length) {
+    fail('wrong_format', `${label}: Mach-O load commands are truncated`);
+  }
 }
 
-// Static Linux musl ELF: ELF64 little-endian, matching e_machine, no PT_INTERP.
+// ELF64 executable/static PIE: loaded entry point, no PT_INTERP or DT_NEEDED.
+// Field layouts/tags follow https://gabi.xinuos.com/elf/.
 function verifyStaticElf(bytes, machine, label) {
   if (bytes.length < 64 || bytes.readUInt32BE(0) !== 0x7f454c46) {
     fail('wrong_format', `${label}: not an ELF executable`);
@@ -109,21 +117,57 @@ function verifyStaticElf(bytes, machine, label) {
   if (bytes[4] !== 2 || bytes[5] !== 1) {
     fail('wrong_format', `${label}: not a 64-bit little-endian ELF`);
   }
+  if (bytes[6] !== 1 || bytes.readUInt32LE(20) !== 1 || bytes.readUInt16LE(52) !== 64) {
+    fail('wrong_format', `${label}: invalid ELF64 header version/size`);
+  }
   const found = bytes.readUInt16LE(18);
   if (found !== machine) {
     fail('wrong_architecture', `${label}: ELF e_machine=${found}, expected ${machine}`);
   }
+  const fileType = bytes.readUInt16LE(16);
+  const entry = bytes.readBigUInt64LE(24);
+  if (![2, 3].includes(fileType) || entry === 0n) {
+    fail('not_executable', `${label}: ELF must be an executable/static PIE with an entry point`);
+  }
   const phoff = Number(bytes.readBigUInt64LE(32));
   const phentsize = bytes.readUInt16LE(54);
   const phnum = bytes.readUInt16LE(56);
-  if (phentsize === 0 || phoff + phentsize * phnum > bytes.length) {
+  if (phentsize < 56 || phnum === 0 || phoff + phentsize * phnum > bytes.length) {
     fail('wrong_format', `${label}: ELF program headers are unreadable`);
   }
+  let loadedEntry = false;
   for (let i = 0; i < phnum; i += 1) {
-    if (bytes.readUInt32LE(phoff + i * phentsize) === 3) {
+    const header = phoff + i * phentsize;
+    const type = bytes.readUInt32LE(header);
+    if (type === 3) {
       fail('dynamic_loader', `${label}: ELF requests a dynamic loader (PT_INTERP); a static musl build is required`);
     }
+    if (type === 1 || type === 2) {
+      const offset = bytes.readBigUInt64LE(header + 8);
+      const size = bytes.readBigUInt64LE(header + 32);
+      if (offset + size > BigInt(bytes.length)) {
+        fail('wrong_format', `${label}: ELF segment is truncated`);
+      }
+      if (type === 1) {
+        const address = bytes.readBigUInt64LE(header + 16);
+        if ((bytes.readUInt32LE(header + 4) & 1) !== 0 && entry >= address && entry < address + size) {
+          loadedEntry = true;
+        }
+      } else {
+        if (size % 16n !== 0n) fail('wrong_format', `${label}: ELF dynamic entries are truncated`);
+        let terminated = false;
+        for (let pos = Number(offset); pos < Number(offset + size); pos += 16) {
+          const tag = bytes.readBigUInt64LE(pos);
+          if (tag === 0n) { terminated = true; break; }
+          if (tag === 1n) {
+            fail('dynamic_dependency', `${label}: ELF has DT_NEEDED dependencies; a static build is required`);
+          }
+        }
+        if (!terminated) fail('wrong_format', `${label}: ELF dynamic entries lack DT_NULL`);
+      }
+    }
   }
+  if (!loadedEntry) fail('not_executable', `${label}: ELF entry point is outside executable file-backed segments`);
 }
 
 // Validate the caller-supplied canonical remote-runners directory the way the
@@ -170,7 +214,7 @@ const HELP = 'See the header of scripts/package-cli.mjs for usage.';
 
 // Ask the macOS binary for its true static identity. This executes only the
 // "version" command, which is documented not to initialize state. Returns null
-// when the binary cannot run on this host (e.g. packaging on Linux).
+// when it cannot run here or returns no successful identity data.
 function readBinaryIdentity(binary) {
   try {
     const out = execFileSync(binary, ['version', '--json'], {
@@ -265,7 +309,7 @@ async function main() {
 
   const runners = await verifyRunnerBundles(runnerDir);
   const declared = flags.get('version');
-  if (declared && !/^[0-9][0-9A-Za-z.\-+]*$/.test(declared)) {
+  if (declared && !VERSION_PATTERN.test(declared)) {
     fail('invalid_argument', '--version must be a version string like 0.1.0');
   }
   if (probed) {
@@ -277,14 +321,17 @@ async function main() {
     }
   }
   // When the macOS binary runs here its self-report is authoritative and any
-  // --version must agree. When it cannot run, an explicit --version is required
+  // --version must agree. Without verified identity, an explicit --version is required
   // and every target records that its identity was declared, not executed.
   if (probed && declared && probed.version !== declared) {
     fail('version_mismatch', `--version ${declared} does not match the macOS binary self-report ${probed.version}`);
   }
   const version = probed ? probed.version : declared;
   if (typeof version !== 'string' || version.length === 0) {
-    fail('version_unverified', 'cannot determine candidate version; pass --version (the macOS binary could not be executed on this host)');
+    fail('version_unverified', 'cannot determine candidate version; pass --version (the macOS input returned no verified identity)');
+  }
+  if (!VERSION_PATTERN.test(version)) {
+    fail('invalid_argument', 'candidate version must be a safe version string like 0.1.0');
   }
   // Both canonical runner manifest entries must declare the candidate version.
   for (const entry of runners.manifest.runners) {

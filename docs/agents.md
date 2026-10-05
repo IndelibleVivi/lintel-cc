@@ -24,6 +24,8 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 每个 canonical Linux runner 不得超过现有 SSH installer 的 32 MiB 上传上限；超限返回 `runner_too_large`，在生成任何 archive／索引之前停止。
 
+格式检查要求 macOS 输入有完整 Mach-O 64-bit header、arm64 CPU 和 `MH_EXECUTE` 类型；Linux 输入有 ELF64 executable／static PIE 类型、位于文件支持的 executable segment 内的非零入口，且没有 `PT_INTERP` 或 `DT_NEEDED` 动态依赖。截断 header、object／dylib／无入口 shared object 拒绝；格式检查仍不替代其它架构的实际执行。probe 与显式声明的版本都先通过相同的安全版本语法，才用于候选身份与输出路径。
+
 先在 macOS 上用 `target/release/lintel` 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：
 
 ```sh
