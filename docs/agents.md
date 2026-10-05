@@ -16,6 +16,68 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 升级时在核对新 checkout 后选择**另一个版本目录**重新运行安装，检查 `version`、`capabilities` 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 `0.1.0` 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。
 
+### 可移植候选包（无需 Rust/GUI）
+
+`scripts/package-cli.mjs` 把**明确提供的** canonical 构建产物打成候选归档：一个 macOS arm64 Mach-O、两个静态 Linux musl ELF（x86_64 与 aarch64），以及 CLI 自己解析的 canonical `remote-runners` 目录。打包器**不编译、不下载、不签名**，只核对格式与字节；缺少、架构错误、带动态加载器或与 canonical runner 字节不一致的 Linux 输入会以具体错误拒绝。两个 Linux CLI 输入必须与该架构的 canonical runner 逐字节相同，旧输入／混合输入不能被标成同一个 candidate。归档是扁平的运行时布局：`bin/lintel`、`bin/remote-runners/manifest.json`、`bin/remote-runners/<triple>/lintel`（两个 Linux runner）、`candidate.json`、`SHA256SUMS`、`README.txt`；CLI 在 `dirname(executable)/remote-runners` 找 runner，所以是 `bin/remote-runners`，不是归档根。
+
+验证与归档使用同一次读取的 manifest bytes；资源目录在打包期间重建时，不把后读的 manifest 混入已验证的 runner snapshot。
+
+每个 canonical Linux runner 不得超过现有 SSH installer 的 32 MiB 上传上限；超限返回 `runner_too_large`，在生成任何 archive／索引之前停止。
+
+格式检查要求 macOS 输入有完整 Mach-O 64-bit header、arm64 CPU 和 `MH_EXECUTE` 类型；Linux 输入有 ELF64 executable／static PIE 类型、位于文件支持的 executable segment 内的非零入口，load segment 的 file size 不超过 memory size，且没有 `PT_INTERP` 或 `DT_NEEDED` 动态依赖。截断 header、object／dylib／无入口 shared object 拒绝；格式检查仍不替代其它架构的实际执行。probe 与显式声明的版本都先通过相同的安全版本语法，才用于候选身份与输出路径。
+
+Mach-O 逐条核对 load-command 数量、边界与 segment／section 结构，并要求 `LC_MAIN` 或 ARM64 `LC_UNIXTHREAD` 入口位于文件支持的 executable segment。只有 header、没有入口、未映射入口或不可执行 segment 的输入均拒绝。打包／最终索引发布报错时，回收本次已发布且 identity／大小／mtime 仍未变化的 links，保留既有文件与可检测到的外部替换或编辑，然后可重试；不承诺进程突然终止后的自动 transaction 恢复。
+
+macOS 输入必须带 `LC_BUILD_VERSION` 的 macOS 平台标记，或 legacy `LC_VERSION_MIN_MACOSX`；其它 Apple 平台和缺少平台标记的输入拒绝。打包器移除子进程的 `TAR_OPTIONS`，并在发布前核对归档成员恰好等于声明清单，避免继承的 tar 配置漏掉或改名 executable。
+
+先在 macOS 上用 `target/release/lintel` 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：
+
+```sh
+rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+cargo zigbuild --locked --release -p lintel-runner --bin lintel \
+  --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
+# 生成 canonical runner 资源（写入被忽略的 runner-bundles）
+node apps/desktop/scripts/prepare-remote-runners.mjs
+```
+
+产出 `target/x86_64-unknown-linux-musl/release/lintel` 与 `target/aarch64-unknown-linux-musl/release/lintel`；macOS CLI 由 `cargo build --locked --release -p lintel-runner --bin lintel` 得到 `target/release/lintel`。生成流程见 [remote.md](remote.md#准备-app-内置资源)。在仓库根目录打包；输出目录必须是被忽略或调用方自选的临时目录。
+
+```sh
+node scripts/package-cli.mjs \
+  --macos-arm64 target/release/lintel \
+  --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
+  --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
+  --linux-runners apps/desktop/src-tauri/runner-bundles \
+  --revision "$(git rev-parse HEAD)" \
+  --out candidate-packages
+```
+
+candidate 的身份是 `<version>-candidate-<revision 前 12 位>`，因此裸 `0.1.0` 从来不是唯一身份；索引写成 `candidates-<identity>.json`，不会覆盖其它身份的索引。`--revision` 必须是精确的完整小写十六进制 git object id（40 或 64 位），它是调用方声明的构建身份，不由 digest 或探测证明。`candidate.json` 记录 product/version/protocol/catalog、`source_revision`、target、payload 文件的字节数与 SHA-256、`signed:false`、`release:false`、平台限制，以及**逐目标**的 `identity_source`：只有 macOS 输入成功返回身份数据时才标为 `macos_input_executed`，Linux 目标标为 `declared_static`。macOS 输入成功探测时其自报 `version` 权威并要求 manifest 一致；不能执行或未返回身份数据时（如 Linux 打包）必须显式传 `--version`，并记录 `identity_verified_executed:false`，否则拒绝。已有归档（包括悬空符号链接）或已有同身份索引都会在任何写入前被拒绝，绝不覆盖。
+
+安装与升级只用最简单可检视的机制：解到明确选择的**新身份目录**。先只创建父目录，再用普通 `mkdir "$dest"`（目录已存在会失败）作为是否解包的条件，因此绝不会覆盖已有版本：
+
+```sh
+parent="${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}"
+mkdir -p "$parent"
+# 用实际索引名替换：<version>-candidate-<revision 前 12 位>
+identity="0.1.0-candidate-a239123903b6"
+dest="$parent/$identity"
+mkdir "$dest" && tar -xzf "candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz" -C "$dest"
+```
+
+安装后从选定目录核对实际字节；**目标主机不需要 Node**，用系统 `shasum`／`sha256sum` 校验随包生成的 `SHA256SUMS`。清单覆盖全部 payload、`candidate.json` 与 `README.txt`，只排除清单自身；它证明这些文件的字节一致，不提供签名或可信源码 provenance。再运行绝对路径：
+
+```sh
+cd "$dest"
+shasum -a 256 -c SHA256SUMS      # macOS
+# Linux 上改用：sha256sum -c SHA256SUMS
+"$dest/bin/lintel" version --json
+"$dest/bin/lintel" capabilities --json
+```
+
+升级时把**另一个**身份归档解到另一个目录，重跑上面的校验与 `version`/`capabilities`，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。candidate 不是签名发行：Linux 归档在 macOS 上只做格式与字节检查，没有 Linux 运行时证据；只有本机架构匹配时才在本机执行所选 executable。
+
+
 源码构建的 debug 入口是 `cargo build -p lintel-runner` 后的 `target/debug/lintel`。独立 Native Messaging 可执行文件另行从 `extensions/browser/native-host` 安装；在 Mac 上 `lintel browser control` 的安装预览仍需准确 `host_path`，不会假定 GUI 或 PATH 已提供它。扩展开发包从 canonical extension source 准备，步骤与平台限制见 [browser.md](browser.md)。
 
 远端 runner 的静态资源与 App 使用同一 [生成流程](remote.md#准备-app-内置资源)。仅从明确核对的 canonical bundles 调用 `lintel remote control --bundles /absolute/runner-bundles`，或配置 `LINTEL_RUNNER_BUNDLES`；默认查当前 executable 旁的 `remote-runners`。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。

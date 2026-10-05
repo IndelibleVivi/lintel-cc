@@ -4,7 +4,7 @@
 
 ## 这份候选包含什么
 
-本轮 runtime 源码是 [`e276f67`](https://github.com/IndelibleVivi/lintel-cc/commit/e276f6711b461901fe6b9f41b7a1b6285efaa80c)，包含独立官网／共享游戏提交 [`896d38a`](https://github.com/IndelibleVivi/lintel-cc/commit/896d38adb00b3e5cbff70e95107c515c4993c8cf)。版本仍为 0.1.0，不能只凭版本号认定两个候选相同。以下 App 在提交前从相同 runtime 源码构建；随后只补文档和验证入口元数据。
+本轮候选来自同一工作树的阶段修复与官网／共享游戏源码。版本仍为 0.1.0，不能只凭版本号认定两个候选相同。阶段修复源码为 `e276f67`；独立 CLI 打包与该源码已经整合，整合候选的重建、安装和跨平台 CI 完成后在本节记录准确引用。下表已有构建事实属于此前阶段候选。
 
 | 对象 | 当前证据与边界 |
 | --- | --- |
@@ -15,7 +15,15 @@
 | 浏览器资源 | Chromium／Firefox 非 fixture 扩展与当前 arm64 native host 已入包；包内文件与 source／manifest 核对一致，直接使用包内资源的两个 synthetic 安装测试通过 |
 | 安装与发行 | 仅 linker ad-hoc signature；无 Applications 安装、生产远端部署、Developer ID 签名、公证或正式发布 |
 
-包内资源身份可按下表核对；SHA-256 为完整摘要，来自本地构建和 source/resource 比对，不表示这些二进制已经发行。路径相对于 `Lintel.app/Contents`。
+## 独立安装候选与双架构 runner
+
+独立 CLI 打包入口为 `scripts/package-cli.mjs`：明确提供 macOS arm64 Mach-O、Linux x86_64／aarch64 static ELF 与 canonical runner-bundles，核对 Linux CLI 与对应 runner 字节相同，生成三份 archive、`SHA256SUMS` 与候选身份索引。checksum 包含 payload、`candidate.json` 和 `README.txt`，只排除自身；source_revision 是调用方声明，不是签名或认证 provenance。每个 runner 遵守 SSH installer 的 32 MiB 上限。
+
+[安装与升级指南](agents.md) 使用系统 checksum 工具，目标端不需要 Rust、GUI 或 Node runtime。安装选择尚不存在的新版本目录，保留旧 executable、state 和原 job ID；archive／索引／版本目录不覆盖。打包或索引发布报错时只回收本次未被外部替换或编辑的 owned 文件，不承诺骤然进程死亡后的自动恢复。其它架构的格式 fixtures 不构成实际 runtime 验收。
+
+`cli-candidate` 在 macOS／Ubuntu CI 通过同一 canonical entrypoint 执行 native 解包、version／capabilities／schema 和原 state/job 保留旅程。当前整合源码的 CI 与重新构建资源尚待读回；旧候选的本机 Mac 安装旅程通过，不能替代这次 runtime 的新验证。正式发布、Applications 激活和真实 VPS 安装仍是独立步骤。
+
+此前 `e276f67` 阶段 App 的包内资源身份可按下表核对；SHA-256 为完整摘要，来自本地构建和 source/resource 比对，不表示这些二进制已经发行。路径相对于 `Lintel.app/Contents`。
 
 | 对象 | 路径 | SHA-256 |
 | --- | --- | --- |
@@ -55,7 +63,7 @@
 
 统一入口是 `python3 tests/verify.py`；浏览器启动、App 渲染、Linux OpenSSH／VM 和 App 包内资源是独立检查。每份报告的源码 HEAD／dirty、fixture、runtime 和跳过状态分别记录；构建成功不代表实际安装或 runtime 验收。详细验收用例继续见 [acceptance-status.json](acceptance-status.json)，局部通过不自动关闭完整用例。
 
-本轮 clean `e276f67` 的 [CI 37263003720](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37263003720) 全部通过；下载核对的六份入口 JSON 均记录同一 HEAD、`dirty=false`。
+此前阶段 clean `e276f67` 的 [CI 37263003720](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37263003720) 全部通过；下载核对的六份入口 JSON 均记录同一 HEAD、`dirty=false`。
 
 | 检查 | macOS arm64 | Ubuntu x86_64 |
 | --- | --- | --- |

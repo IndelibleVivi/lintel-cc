@@ -84,6 +84,9 @@ jobs:
         if: runner.os == 'Linux'
         run: python3 tests/verify.py --checks linux-ssh-runtime --json "$RUNNER_TEMP/lintel-verify/linux-ssh-runtime.json"
 
+      - name: Independent CLI candidate packaging and upgrade
+        run: python3 tests/verify.py --checks cli-candidate --json "$RUNNER_TEMP/lintel-verify/cli-candidate.json"
+
       - name: Independent browser runtime and App pairing
         env:
           LINTEL_PAIRING_UI_REPORT: ${{ runner.temp }}/lintel-verify/browser-pairing-ui.json
