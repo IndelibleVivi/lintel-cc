@@ -130,8 +130,10 @@ function verifyStaticElf(bytes, machine, label) {
 async function verifyRunnerBundles(dir) {
   const manifestPath = path.join(dir, 'manifest.json');
   let manifest;
+  let manifestBytes;
   try {
-    manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    manifestBytes = await readFile(manifestPath);
+    manifest = JSON.parse(manifestBytes.toString('utf8'));
   } catch {
     fail('missing_runner_bundles', `canonical remote-runners manifest not readable: ${manifestPath}`);
   }
@@ -155,7 +157,6 @@ async function verifyRunnerBundles(dir) {
     files.push({ source: runnerPath, archive: `bin/remote-runners/${triple}/lintel`, bytes });
     bytesByTarget[targetId] = { bytes, digest };
   }
-  const manifestBytes = await readFile(manifestPath);
   files.push({ source: manifestPath, archive: 'bin/remote-runners/manifest.json', bytes: manifestBytes });
   return { files, manifest, bytesByTarget };
 }

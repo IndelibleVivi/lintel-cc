@@ -17,6 +17,7 @@ python3 tests/cli_package_journey.py <native-lintel>
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 NODE = shutil.which("node") or "node"
@@ -196,6 +198,54 @@ def documented_unpack(archive: Path, parent: Path, identity: str) -> subprocess.
     return subprocess.run(["bash", "-c", script], text=True, capture_output=True, check=False)
 
 
+def manifest_snapshot(journey: PackageJourney, inputs: dict, version: str) -> None:
+    # The synthetic FIFO blocks the first runner read *after* the manifest was
+    # parsed. Change the manifest before releasing bytes, without timing races
+    # or a production test hook. The archive must retain the validated snapshot.
+    runners = journey.base / "snapshot-runners"
+    shutil.copytree(inputs["runners"], runners)
+    manifest_path = runners / "manifest.json"
+    original = manifest_path.read_bytes()
+    fifo = runners / "x86_64-unknown-linux-musl/lintel"
+    payload = fifo.read_bytes()
+    fifo.unlink()
+    os.mkfifo(fifo)
+    out = journey.base / "snapshot-out"
+    argv = [NODE, str(SCRIPT), "--macos-arm64", str(inputs["macos"]),
+            "--linux-x86_64", str(inputs["x86"]), "--linux-aarch64", str(inputs["arm"]),
+            "--linux-runners", str(runners), "--revision", REVISION,
+            "--version", version, "--out", str(out)]
+    proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 30
+        while True:
+            try:
+                fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+                break
+            except OSError as error:
+                if error.errno != errno.ENXIO:  # Reader has not opened the FIFO yet.
+                    raise
+                assert proc.poll() is None and time.monotonic() < deadline, "packager never reached runner read"
+                time.sleep(0.01)
+        os.set_blocking(fd, True)
+        with os.fdopen(fd, "wb") as writer:
+            changed = json.loads(original)
+            changed["runners"][0]["sha256"] = "0" * 64
+            manifest_path.write_text(json.dumps(changed) + "\n")
+            writer.write(payload)
+        stdout, stderr = proc.communicate(timeout=180)
+        assert proc.returncode == 0, stderr
+        summary = json.loads(stdout)
+        for record in summary["archives"]:
+            with tarfile.open(out / record["archive"]) as archive:
+                packed = archive.extractfile("bin/remote-runners/manifest.json").read()
+                assert packed == original, "archive mixed regenerated manifest with validated runner bytes"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
 def main() -> int:
     journey = PackageJourney()
     base = journey.base
@@ -347,6 +397,8 @@ def main() -> int:
         assert index_run.returncode != 0 and "output_exists" in index_run.stderr, index_run.stderr
         assert not list(index_out.glob("*.tar.gz")), "index refusal still wrote an archive"
         assert dangling_index.is_symlink() and os.readlink(dangling_index) == "/nonexistent/index"
+
+        manifest_snapshot(journey, inputs, version)
 
         # --- optional full-real-input smoke (never replaces native acceptance) -
         real_note = "skipped (canonical inputs absent)"

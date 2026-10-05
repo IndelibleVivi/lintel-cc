@@ -20,6 +20,8 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 `scripts/package-cli.mjs` 把**明确提供的** canonical 构建产物打成候选归档：一个 macOS arm64 Mach-O、两个静态 Linux musl ELF（x86_64 与 aarch64），以及 CLI 自己解析的 canonical `remote-runners` 目录。打包器**不编译、不下载、不签名**，只核对格式与字节；缺少、架构错误、带动态加载器或与 canonical runner 字节不一致的 Linux 输入会以具体错误拒绝。两个 Linux CLI 输入必须与该架构的 canonical runner 逐字节相同，旧输入／混合输入不能被标成同一个 candidate。归档是扁平的运行时布局：`bin/lintel`、`bin/remote-runners/manifest.json`、`bin/remote-runners/<triple>/lintel`（两个 Linux runner）、`candidate.json`、`SHA256SUMS`、`README.txt`；CLI 在 `dirname(executable)/remote-runners` 找 runner，所以是 `bin/remote-runners`，不是归档根。
 
+验证与归档使用同一次读取的 manifest bytes；资源目录在打包期间重建时，不把后读的 manifest 混入已验证的 runner snapshot。
+
 先在 macOS 上用 `target/release/lintel` 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：
 
 ```sh
