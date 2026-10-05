@@ -269,11 +269,13 @@ scp -o StrictHostKeyChecking=yes /absolute/path/work-package.age approved-alias:
 4. 若仍“已接收 / 执行中 / 待核对”，继续核对原结果；只有看到明确的逐步结果后，才决定恢复或另建新的后续计划。
 5. 配置恢复点“预览恢复”，服务恢复点“预览恢复服务”，各自批准。
 
+远端结果窗的“查询最新结果”同样查询原任务，并保留提交时冻结的 runner 版本；主机 runner 升级后，旧任务的查询仍使用原绑定，不重新提交。
+
 主机列表的“移除”只移除 Lintel 登记，原任务、系统 SSH 配置与远端文件保留。“撤销移除”可重新登记。已经移除的 alias 仍可查原任务，要打开完整恢复流程需先重新登记；移除不是取消或删除任务。
 
 要开始交互使用，从“环境详情 → 启动与来源 → 打开 Claude”，或结束状态的任务回执点“打开 Claude”。App 请求 macOS Terminal 通过同一严格 SSH alias、绑定 runner 和真实终端启动选定环境，不发送 prompt。**这个交互会话随 SSH 连接结束，与后台变更任务不同。** “已请求启动”以后，去 Terminal 确认真实会话。
 
-仓库已有隔离 OpenSSH 与真实 disposable Linux VM 的证据，但最新 managed 任务托管的 logout 验收仍在候选阶段，生产 VPS 与普通用户 manager 生命周期不能据此宣称完成。遇到中断只核对原任务，Lintel 不自动启用 linger、改登录策略或换一种启动方式再发一次。
+隔离 OpenSSH 与真实 disposable Linux VM 已验证符合既有条件的 system/user manager 在真实 PAM logout 后继续并完成原任务，以及 reboot 后按原 ID 核对；不符合条件的 setsid 路径受限。生产 VPS、aarch64 runtime 与所有普通用户 manager 场景仍未验收。遇到中断只核对原任务，Lintel 不自动启用 linger、改登录策略或换一种启动方式再发一次。
 
 ### 5.3 暂停一个明确绑定的 systemd 服务
 
@@ -371,7 +373,7 @@ lintel restore plan --job <original-job-id>
 | 配置、归档、清理与恢复 | 合成目录中的真实 core／CLI 执行、字段冲突、加密归档、TUI 等旅程 | 真实 Claude 登录、Keychain、全部 Desktop／IDE 入口已经验收 |
 | 浏览器 | 独立 Chromium 真进程、持久安装、原生启动世代与合成站点数据；真实 Native Messaging 往返 | 正式 Chrome／Edge／Firefox／AdsPower、真实 claude.ai 认证与非开发者安装全部通过 |
 | 网络通道 | 真实 loopback socket 的规则与停止检查；native 配置读回 | 真实 Claude 公网效果、直接连接无法绕过、进程级强约束 |
-| 远端 | 隔离 OpenSSH 上的真实 x86_64 runner 安装、原任务查询、PTY；真实 disposable VM 的有限服务与中断核对 | 生产 VPS、aarch64 runtime、最新 managed logout 与所有 user manager 行为已完成 |
+| 远端 | 隔离 OpenSSH 上的真实 x86_64 runner 安装、原任务查询、PTY；真实 disposable VM 的有限服务、符合条件的 system/user manager 在 PAM logout 后完成及 reboot 核对 | 生产 VPS、aarch64 runtime 与所有 user manager 行为已完成 |
 | 桌面 UI | 构建页面及真实 core／host 配合合成 invoke／SSH／clipboard 的旅程；部分历史 native 观察 | 所有最新界面都已经在 native WebKit、Finder、Terminal 与真实账号环境完整验收 |
 
 完整目标仍包括更多认证与入口适配、系统级网络约束、浏览器持久安装与专用启动、服务迁移闭环、定时漂移、菜单栏、升级卸载与正式签名分发。这些继续属于 Lintel 的范围，不能通过从使用指南中删掉它们就视为整版完成。

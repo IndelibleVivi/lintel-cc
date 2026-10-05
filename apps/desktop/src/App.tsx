@@ -123,7 +123,7 @@ export default function App() {
     if (!flow?.plan) return; const source = flow;
     void perform('reconcile', async () => { const found = hostAlias ? await remoteRequest<Receipt>({op:'reconnect',alias:hostAlias,plan_id:source.plan!.id}) : await request('job', { job_id: source.plan!.id }); if (activeHost.current !== hostAlias) return; setFlow(value => value === source ? { ...source, receipt: found, uncertain: false, initialPassphrase: undefined } : value); await refresh(); });
   }
-  function refreshReceipt() { if (!flow?.receipt) return; const source = flow; void perform('query', async () => { const receipt = await request('job', { job_id: source.receipt!.id }); if (activeHost.current !== hostAlias) return; setFlow(value => value === source ? { ...source, receipt, initialPassphrase: undefined } : value); await refresh(); }); }
+  function refreshReceipt() { if (!flow?.receipt) return; const source = flow; void perform('query', async () => { const receipt = hostAlias ? await remoteRequest<Receipt>({ op:'reconnect', alias:hostAlias, plan_id:source.receipt!.plan_id }) : await request('job', { job_id: source.receipt!.id }); if (activeHost.current !== hostAlias) return; setFlow(value => value === source ? { ...source, receipt, initialPassphrase: undefined } : value); await refresh(); }); }
   function restore(receipt: Receipt) {
     const source = flow; const target = environments.find(env => env.id === receipt.environment_id);
     if (!target) { setError('原环境不在当前清单中，无法准备恢复。请重新检查环境。'); return; }
