@@ -45,6 +45,8 @@ import path from 'node:path';
 const PRODUCT = 'Lintel';
 const PROTOCOL = 1;
 const CATALOG_VERSION = 1;
+// crates/remote/src/remote_install.rs caps each uploaded runner at 32 MiB.
+const MAX_RUNNER_BYTES = 32 * 1024 * 1024;
 
 const TARGETS = {
   'macos-arm64': { platform: 'macos', architecture: 'aarch64', triple: 'aarch64-apple-darwin' },
@@ -149,6 +151,9 @@ async function verifyRunnerBundles(dir) {
     const bytes = await readFile(runnerPath).catch(() => {
       fail('missing_runner_bundles', `remote-runners file not readable: ${runnerPath}`);
     });
+    if (bytes.length > MAX_RUNNER_BYTES) {
+      fail('runner_too_large', `${triple}: runner exceeds the installer's 32 MiB limit`);
+    }
     verifyStaticElf(bytes, targetId === 'linux-x86_64' ? 62 : 183, `remote-runners/${triple}/lintel`);
     const digest = sha256(bytes);
     if (meta.bytes !== bytes.length || meta.sha256 !== digest) {

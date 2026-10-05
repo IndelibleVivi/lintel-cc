@@ -22,6 +22,8 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 验证与归档使用同一次读取的 manifest bytes；资源目录在打包期间重建时，不把后读的 manifest 混入已验证的 runner snapshot。
 
+每个 canonical Linux runner 不得超过现有 SSH installer 的 32 MiB 上传上限；超限返回 `runner_too_large`，在生成任何 archive／索引之前停止。
+
 先在 macOS 上用 `target/release/lintel` 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：
 
 ```sh

@@ -390,6 +390,26 @@ def main() -> int:
             assert outcome.returncode != 0 and code in outcome.stderr, (code, outcome.stderr)
         assert not rejected.exists(), "a rejected run still wrote output"
 
+        for key, triple in (("x86", "x86_64-unknown-linux-musl"),
+                            ("arm", "aarch64-unknown-linux-musl")):
+            oversized_runners = base / f"oversized-runners-{key}"
+            shutil.copytree(inputs["runners"], oversized_runners)
+            oversized_cli = oversized_runners / triple / "lintel"
+            with oversized_cli.open("ab") as handle:
+                handle.truncate(32 * 1024 * 1024 + 1)
+            oversized_bytes = oversized_cli.read_bytes()
+            manifest_path = oversized_runners / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            meta = next(r for r in manifest["runners"] if r["target"] == triple)
+            meta.update(bytes=len(oversized_bytes), sha256=sha256_bytes(oversized_bytes))
+            manifest_path.write_text(json.dumps(manifest))
+            oversized_inputs = dict(inputs, runners=oversized_runners)
+            oversized_inputs[key] = oversized_cli
+            oversized_out = base / f"oversized-out-{key}"
+            outcome = journey.package(oversized_out, oversized_inputs, version=version)
+            assert outcome.returncode != 0 and "runner_too_large" in outcome.stderr, (key, outcome.stderr)
+            assert not oversized_out.exists(), "oversized runner still published output"
+
         # --- no-replace: archive, dangling symlink, dangling index -------------
         again = journey.package(out, inputs, version=version)
         assert again.returncode != 0 and "output_exists" in again.stderr, again.stderr
