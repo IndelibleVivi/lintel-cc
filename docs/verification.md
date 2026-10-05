@@ -364,6 +364,58 @@ Earlier browser source acceptance: clean `93c3f74` [CI run 37163091952](https://
 `work-ui` is an independent selection: built frontend + real core processes with isolated synthetic homes, invoke fixture and headless Playwright Chromium. It verifies task help, archive-only, preservation and portable selective import; it does not prove native WebKit or production transfer.
 
 
+Latest installable-candidate source acceptance: clean `25fdb43`
+([push CI37267381234](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37267381234),
+[PR CI37267385529](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37267385529))
+passed macOS arm64/Ubuntu x86_64 defaults 18/18 each, native CLI candidate
+packaging/upgrade 1/1 each, independent browser/UI 7/7 each, Ubuntu OpenSSH 1/1
+and disposable Linux VM 1/1. All eight entrypoint reports record the same clean
+source HEAD. Both native checks extract and execute the supplied executable,
+inspect version/capabilities/schema, retain the original environment/job across
+new version directories and reject overwrite. Ignored tests are not passes.
+
+The local candidate identity is `0.1.0-candidate-25fdb4305785`. Actual Mac arm64 and
+both Linux archives match the fresh current-runtime build inputs and carry both
+canonical static Linux runners beside bin/lintel. SHA256SUMS covers every file
+except itself, including candidate.json/README.txt; source revision remains
+caller-declared, not authenticated provenance. The actual local Mac archive was extracted and its version/capabilities/schema
+executed; the same release input passed the complete native/upgrade journey
+with synthetic version identities. The actual extracted CLI also passed the
+named CLI and finite-adapter journeys. Ubuntu CI
+executes its own native static x86_64 build; it does not establish runtime of the
+local cross-built Linux archive bytes. Other-architecture fixtures and host-metadata
+selection checks are synthetic; aarch64 runtime remains unverified.
+
+Focused regressions cover metadata/instruction corruption, missing Mac probe
+identity, manifest snapshot preservation, both architectures' 32 MiB installer
+limit, unsafe version paths, ELF static entry/load/memory/dependency constraints
+including the exact program-header size/table limit,
+and Mach-O command/entry/macOS platform constraints. Unsupported native hosts
+including Intel macOS skip before launching. Static PIE with larger
+zero-filled memory, macOS legacy platform/thread commands remain accepted.
+Inherited TAR_OPTIONS cannot change members; the actual member list is checked
+before publication. Reported tar/index failures roll back only unchanged files
+owned by the current invocation; external replacements/edits survive. Abrupt
+process death is not claimed to have automatic transaction recovery.
+
+The local App (22.63 MiB) was rebuilt after integrating `e276f67` recovery,
+browser and shared-game source. It includes both fresh cross-built Linux runners
+plus canonical browser host/Chromium/Firefox resources. Actual App/ZIP runner
+bytes, manifest and CRC match the inputs; two actual App resource synthetic
+installation tests passed. Later changes are packaging/tests/docs only and leave
+these runtime bytes unchanged. The site journey waits for the real responsive
+media notification before asserting orientation; a delayed-notification regression
+fails with the former immediate read and passes with the bounded wait. These are
+local development candidates: no Applications activation, Developer ID signing,
+notarization, formal release or production VPS installation.
+
+Earlier recovery/browser source acceptance: clean `e276f67`
+[CI37263003720](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37263003720)
+passed macOS/Ubuntu defaults 18/18 each, independent browser/UI 7/7 each,
+Ubuntu OpenSSH 1/1 and disposable Linux VM 1/1. This earlier stage predates
+the explicit CLI-candidate CI selection; it does not replace the current
+installable-candidate evidence above.
+
 Earlier unified CLI/work-preservation source acceptance: clean `d0851c7`
 [CI37249445342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37249445342)
 passed macOS arm64/Ubuntu x86_64 defaults 17/17 each, independently selected
