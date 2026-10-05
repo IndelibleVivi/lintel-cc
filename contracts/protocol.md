@@ -12,7 +12,7 @@ Commands and data:
 - `plan_preserve` + `environment_id`, `categories`, optional `name` → Plan (`kind:"preserve"`, `outcome:"preserve"`) that encrypts the selected work, creates a fresh owned root and migrates the selected categories. The receipt completes with `outcome:"preserved"` and a `coverage` block (`old_login`/`old_root` retained, `service_binding:"unchanged"`) and `next_steps`; the retained old environment is reported as a `preserved` step, not an outstanding task.
 - `plan_show` + `plan_id` → the deeply frozen Plan as a preview would render it (private raw snapshot, root identity and `extra` stripped). No passphrase or secret is ever stored in a plan, so none can be returned. Missing/damaged plan is a specific error.
 - `cleanup_inspect` + `environment_id` → `{files,writers,services,shared_profile_present,official_logout_available,coverage}`. Metadata only. `services` is an array of live-verified owned holds (`manager`, `unit`, `quiesced`, `quiesce_job_id`), or `{code,message}` when service inspection fails. The latter does not authorize cleanup; plan creation and execution must recheck service state successfully.
-- `service_inspect` + `environment_id`, `manager` (`user`|`system`), exact `unit` (`.service`) → binding, effective unit/restart/process/cgroup facts, owned persistent hold and original quiesce job. Linux only; system manager requires the current runner to be root, with no automatic sudo.
+- `service_inspect` + `environment_id`, `manager` (`user`|`system`), exact `unit` (`.service`, instantiated names such as `example@synthetic.service` allowed; uninstantiated `example@.service`, paths/globs/commands rejected) → binding, effective unit/restart/process/cgroup facts, owned persistent hold and original quiesce job. Linux only; system manager requires the current runner to be root, with no automatic sudo.
 - `plan_service_quiesce` + the same fields → Plan with frozen unit sources, original state and one persistent owned start blocker. `plan_service_resume` + original `job_id` → independently approved Plan; changed sources or hold ownership block restoration. Both execute through the existing exact approval/journal path. See [service scope](../docs/services.md).
 - `auth_probe` + `environment_id` → sanitized `{auth_method,logged_in,...}`. Explicitly runs the target CLI auth status; requires matching configDirectory.
 - `plan_cleanup` + `environment_id`, `recipe` (`repair_login`|`reset_client`|`retire`), `writers_confirmed_stopped:true`, `official_logout:boolean`, `categories` (nonempty for strict reset_client/retire; absent/empty allowed for repair_login) → Plan. Scope/executable/files are checked again at execution; reset/retire require an archive passphrase. Canonical reset order is frozen in `actions` and reproduced in the ordered receipt `steps`: quiescence recheck → state backup + encrypted work archive → (reset_client) fresh root + migration → official logout (if selected) → exact local file removal → (retire) retirement. No destructive step precedes preservation; reset_client rechecks its just-written archive against the receipt digest before creating/migrating into a new root, rejecting replacement as stale_archive; a failed logout retains the archives, the prepared new root and its completed steps, and performs no local removal.
@@ -58,3 +58,50 @@ archive 发布前持久记录执行中的步骤、archive_path 和 archive_inten
 Approved preserve/reset/import execution preflights the whole destination batch with zero-byte placeholders in a private scratch directory on that actual filesystem. Case/normalization-equivalent paths return migration_path_conflict before creating a new environment or copying any archived contents. Preview does not perform this write. Normal return removes only created files/empty directories; the original package and source contents remain available for inspection/read.
 
 Receipt.migration_probe is `{path,status:"executing"|"removed"|"retained"}`. Its exact path and executing migration_preflight step are durable before scratch creation. Normal cleanup updates the step/result; retained scratch stops migration. An interrupted original-job query preserves this intent and never deletes or replays it. The App displays unresolved probe paths.
+
+State-backup publication records the executing `state_backup` step and exact
+`state_archive_path` durably before publishing the encrypted file. A recorded
+path is intent, not proof of a complete backup; only successful readback marks
+completion. Query the original job after interruption without overwriting or
+replaying. State backups remain independent of portable work-package import.
+
+Portable import checks the entire batch's actual destination ancestors during
+preview and before writing any content. The path guard rejects non-directory
+ancestors (`path_unreadable`); existing ancestors inside the approved root must
+belong to the current effective UID (`wrong_owner`) and permit effective search
+access plus writes to the nearest existing parent
+(`migration_destination_unwritable`). Known barriers reject before publication.
+Existing root and parent directory permissions are preserved; Lintel does not
+automatically chmod/chown them. The shared migration writer creates only
+missing parents with mode `0700` and publishes imported files with mode `0600`.
+
+Strict named CLI and finite SSH requests enforce `format:"uuid"` on
+`environment_id`, `plan_id` and `job_id`: case-insensitive ASCII hex in
+8-4-4-4-12 hyphenated form. Malformed IDs return `invalid_request` before
+state initialization or an SSH invocation. Raw protocol-1 core callers retain
+their existing ID validation rules.
+
+Outer `remote.execute`/`remote.reconnect` plan IDs and `remote.launch`
+environment IDs use the same UUID helper before local state initialization,
+recording or SSH. Persisted lookup IDs and received core receipt IDs must also
+match it; invalid records are retained without replay. Installation-controller
+`install_id` retains its separate bounded identity rule.
+
+Named job wait validates its original job request once with the shared operation schema before polling or initializing state. Malformed UUIDs return invalid_request and a nonzero CLI exit; timeout never resubmits the original job.
+
+Dedicated real-TTY launch validates launch_context, and capabilities with an explicit environment validates inspect, before invoking core. Both reuse the shared operation schema and reject malformed UUIDs without initializing state; launch keeps its TTY requirement and writes failure diagnostics to stderr.
+
+Explicit archive output stores the parent directory's device/inode in the hashed
+private plan. Acceptance and publication recheck that identity alongside the
+unused path. Replacement directories and legacy explicit-output plans without
+identity return stale_plan and require a fresh preview. Existing original jobs
+remain query-only; completed archives and portable package format are unchanged.
+These checks do not provide OS-level CAS over non-cooperating external writers.
+
+App reset_client/retire previews require at least one selected work category; repair_login remains independent of work selection. The shared strict named/SSH schema accepts omitted or empty categories for repair_login and requires a nonempty selection for reset_client/retire. Raw protocol-1 category compatibility remains unchanged.
+
+Shared preserve/rebuild/reset-client creation allocates new_root and new_environment_id and durably records them with an executing create step before mkdir. It registers that same ID after creating the directory. A journal failure creates no root; registration failure or interruption leaves the exact intent queryable under the original job, without replay or cleanup. Intent does not prove a registered environment: the completed create step establishes successful registration, and the App exposes policy actions only for inventory entries.
+
+New-file publication uses native no-replace rename: macOS renameatx_np(RENAME_EXCL), Linux renameat2(RENAME_NOREPLACE). It consumes the staging name and publishes a single-link destination in one operation, retaining no post-publication hard-link cleanup window. Unsupported kernel/filesystem capability returns atomic_publication_unsupported with no overwrite or hard-link fallback. Archive paths remain intent until archive_digest or a completed archive step proves readback; the App shares that condition between the view action and task-archive list. Work/state backup paths without completion are displayed as pending verification.
+
+Remote receipt refresh uses reconnect with the original plan_id and the durable task’s pinned runner_digest. Manual App ID lookup and CLI remote job use request.job: existing records retain their pinned runner; unknown IDs are read-only lookups via the current alias runner without creating a task/dedup record or consuming an unsubmitted plan’s submission slot. Existing execute/reconnect no-replay semantics and local receipt lookup remain unchanged.

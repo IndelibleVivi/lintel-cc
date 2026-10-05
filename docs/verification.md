@@ -268,7 +268,7 @@ and reconciliation evidence, **not reliable logout-surviving execution**.
 The VM and its overlay/seed/keys were cleaned up. This historical run used
 setsid and is not evidence for the new manager path.
 
-Latest clean `7a05291` [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079)
+Earlier clean `7a05291` [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079)
 passed macOS/Ubuntu defaults 13/13 each, independently selected browser/UI
 checks 4/4 each, Ubuntu OpenSSH 1/1 and real Linux VM 1/1. All six entrypoint
 reports identify the same clean HEAD. The VM report is `evidence_complete`:
@@ -331,3 +331,44 @@ Earlier custom-policy source acceptance: clean `1fb9ab6` [CI run 37125403657](ht
 Earlier browser source acceptance: clean `93c3f74` [CI run 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) passed 12/12 defaults and 2/2 explicitly selected browser checks on both macOS arm64 and Ubuntu x86_64. Detailed Chromium 151.0.7922.34 reports retain all 11 smoke assertions, actual process exit/replacement, a new production `runtime.onStartup` generation, no relaunch extension-loading flags, retained identity and completed native receipt. The App copy-to-real-host pairing report passes with synthetic invoke/clipboard. Ubuntu OpenSSH runtime also passes 1/1 with 0 ignored. All five entrypoint reports record the same clean HEAD; packaged-App opt-ins and local Chromium 155 evidence remain separate. Formal browser distributions, AdsPower, real Claude/auth, native WebKit/OS clipboard and non-developer installation remain unverified.
 
 `work-ui` is an independent selection: built frontend + real core processes with isolated synthetic homes, invoke fixture and headless Playwright Chromium. It verifies task help, archive-only, preservation and portable selective import; it does not prove native WebKit or production transfer.
+
+
+Latest unified CLI/work-preservation source acceptance: clean `d0851c7`
+[CI37249445342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37249445342)
+passed macOS arm64/Ubuntu x86_64 defaults 17/17 each, independently selected
+browser/UI checks 5/5 each, Ubuntu OpenSSH 1/1 and disposable Linux VM 1/1.
+All six entrypoint reports record the same clean source HEAD. Both detailed
+Chromium reports retain all 11 assertions, actual process exit/replacement,
+production `runtime.onStartup`, no relaunch extension-loading flags and completed
+native receipts. The VM report is `evidence_complete`, including eligible
+system/user-manager continuation after real PAM logout, exact unit cgroups,
+original-job completion, real-reboot reconciliation and persistent service-hold
+recovery. All data/accounts/Claude programs are synthetic; production VPS,
+aarch64 runtime, real authentication and formal browser/native WebKit acceptance
+remain independent.
+
+The local arm64 App was built from final source `d0851c7`; its two actual
+App-resource tests passed. The release CLI independently installed from
+`d0851c7` passed named/adapter journeys and portable 5/5. App and CLI correspond to the final source. The built App rejects empty reset/retire work selections while repair
+login remains independent. Shared strict named/SSH validation accepts omitted or empty repair-login categories while reset/retire require a nonempty selection; operations 6/6 and the real CLI journey cover this distinction. The work fixture serializes requests from its window
+and assertions, preserving each original home rather than racing core locks. Malformed wait, real-PTY launch and
+target-capabilities IDs reject before state initialization. Explicit archive
+output freezes the parent device/inode and rechecks it before acceptance and
+publication; changed directories and legacy explicit-output plans without that
+identity require a fresh preview. Existing directory permissions are preserved
+and missing work parents are private. Preview and execution preflight every
+actual import parent inside the approved root for effective UID ownership and
+search/write access before any archived content is published; known barriers
+reject without automatic chmod/chown. The App includes browser host and
+extensions, but no current Linux runner bundles; CI's static x86_64 build and
+runtime do not establish App bundling or a production install.
+
+New-root creation allocates and journals the exact new_root/new_environment_id before mkdir, then registers the same ID through the canonical path. Journal failure prevents creation; registration failure and interrupted original-job queries retain the intent without replay. The App labels unfinished intents as pending verification and offers policy editing only for inventory entries. Local core 80/80 includes registration-failure recovery, journal-failure no-write and successful identity checks.
+
+The atomic_new publisher uses native no-replace rename on macOS/Linux, consuming the staged name and publishing a single-link destination in one operation. Unsupported filesystem/kernel capability returns atomic_publication_unsupported without hard-link/overwrite fallback. The publication-boundary regression recovers the package before any later cleanup/readback (it failed on the old two-link state); core 80/80 passed. The App labels unfinished archive/state-backup paths as pending verification and uses shared readback evidence for both viewing and task-archive selection; the work journey retains completed archive read/import and checks the incomplete intent paths without replay.
+
+Remote receipt refresh uses original-task reconnect. Manual App ID lookup and CLI remote job use read-only request.job; the shared controller preserves an existing task’s frozen runner and allocates no task record for an unknown ID, leaving unsubmitted plans eligible for their first approved submission. The rendered regression rejected the former generic job request and passed after the fix, preserving original-ID query and late-response suppression. Browser smoke awaits the actual asynchronous preview/release completion and reads back removed isolation rules; all original startup/storage/neighbor/native assertions remain.
+
+Shared remote tests: 41 passed, 2 independent ignored. The installed-runner upgrade check covers reconnect and both job lookup fields; unknown-ID lookup creates no task/dedup record, later execute submits once, and repeats query. The real installed-CLI regression also proves that a manual job lookup bypasses submission storage without opening SSH. A new explicit reconnect durably captures the current runner binding before its first query; three fixture queries retain that binding across an alias upgrade with no submission. Retained original-job lookups remain available after alias removal. The unchanged stdin-transport/no-task-directory assertion and shared current-HOME journey passed.
+
+Shared plan-hash shape is exactly 64 lowercase hex characters for strict named execute and new remote submissions. Malformed approval rejects before named core state or remote task intent/SSH; existing task records remain query-only. Old controller/schema regressions failed, then operations 6/6, remote 41 passed/2 ignored and the actual CLI journey passed; schemas use the same owner. Raw protocol-1 core approval checks remain compatible.
