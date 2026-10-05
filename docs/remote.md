@@ -14,7 +14,7 @@
 
 “移除主机”只移除 Lintel 的主机列表登记，不修改系统 SSH config、known_hosts 或远端文件，也不取消已提交的任务。持久任务及去重记录保留；已移除主机的任务仍出现在 `hosts.tasks`，可通过原 `plan_id` 查询。重新添加同一 alias 后，旧计划仍只查询原 job，不能借移除/添加来重新执行。
 
-远端回执的“查询最新结果”、持久记录的“查询原任务”和记录页的原任务 ID 查询都使用 reconnect，读取已有提交记录中冻结的 runner 版本；alias 升级不会将这些查询切换到新绑定，也不会重新提交。没有本地绑定记录的旧任务仍使用既有 PATH 查询兼容路径。
+远端回执的“查询最新结果”和持久记录的“查询原任务”使用 reconnect；记录页手填 ID 使用只读 job lookup。共同 controller 对已有任务记录都读取冻结的 runner，alias 升级不会切换这些任务的查询。手填未知 ID 只通过当前 alias runner 查询，不创建提交／去重记录，查询未提交的计划不会占用它的提交位置。已有但无 digest 的旧记录保留 PATH 查询兼容路径；已提交或不确定任务仍只查询，不删除记录后重发。
 
 已有 SSH host key 必须先通过用户正常的可信流程核对。控制端固定设置 `StrictHostKeyChecking=yes` 与 `UpdateHostKeys=no`，不会自动接受首次 key、忽略变化或更新 known_hosts。连接失败后应在用户自己的 SSH 工具中核对主机身份，再从 Lintel 连接；不能改成自动忽略模式。
 

@@ -1199,6 +1199,29 @@ impl Controller {
             "request" => {
                 exact_operation_fields(&payload)?;
                 validate_request(&payload["request"])?;
+                if payload["request"]["command"] == "job" {
+                    let id = payload["request"]["job_id"]
+                        .as_str()
+                        .or_else(|| payload["request"]["plan_id"].as_str())
+                        .unwrap(); // The shared schema requires exactly one UUID.
+                    let path = self
+                        .state
+                        .join("tasks")
+                        .join(alias)
+                        .join(format!("{id}.json"));
+                    if path.exists() {
+                        let (path, _held) = self.record(alias, id)?;
+                        return self.query(alias, &path, self.checked_record(&path, id)?);
+                    }
+                    // A read-only lookup may name an unsubmitted plan. Keep its
+                    // submission slot unused; only execute/reconnect create intent.
+                    return self.runner_call(
+                        alias,
+                        &payload["request"],
+                        false,
+                        self.binding(alias)?.as_ref(),
+                    );
+                }
                 self.runner_call(
                     alias,
                     &payload["request"],
@@ -1489,6 +1512,45 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             .unwrap()
             .lines()
             .any(|v| v == "submit"));
+    }
+
+    #[test]
+    fn unrecorded_job_lookup_does_not_consume_submission_slot() {
+        let (temp, controller) = fixture(&format!(
+            "if grep -q '\"command\":\"job\"' input && ! test -f submitted; then\nprintf '%s\\n' '{{\"ok\":false,\"error\":{{\"code\":\"job_not_found\",\"message\":\"synthetic unsubmitted plan\"}}}}'; exit 1\nfi\ntouch submitted\n{RECEIPT}"
+        ));
+        let id = "00000000-0000-4000-8000-000000000002";
+        let path = controller
+            .state
+            .join("tasks/synthetic-host")
+            .join(format!("{id}.json"));
+        for field in ["job_id", "plan_id"] {
+            let mut request = json!({"command":"job"});
+            request[field] = json!(id);
+            let response = controller
+                .dispatch(json!({"op":"request","alias":"synthetic-host","request":request}))
+                .unwrap();
+            assert_eq!(response["error"]["code"], "job_not_found");
+            assert!(
+                !path.exists(),
+                "Read-only lookup allocated a submission record"
+            );
+        }
+        let execute = json!({"op":"execute","alias":"synthetic-host","plan_id":id,"approval":"SYNTHETIC_APPROVAL"});
+        assert_eq!(
+            controller.dispatch(execute.clone()).unwrap()["data"]["status"],
+            "completed"
+        );
+        assert!(path.exists());
+        assert_eq!(controller.dispatch(execute).unwrap()["data"]["id"], id);
+        assert_eq!(
+            fs::read_to_string(temp.path().join("args"))
+                .unwrap()
+                .lines()
+                .filter(|arg| *arg == "submit")
+                .count(),
+            1
+        );
     }
 
     #[test]

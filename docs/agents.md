@@ -181,6 +181,8 @@ aliases 只解析当前 HOME 的系统 SSH config；add/remove 只改变 Lintel 
 
 `remote request ALIAS` 从 stdin 接收 schema 允许的有限 core JSON；远端 execute 必须 `remote submit ALIAS`（stdin 必须是 execute 请求），先冻结本地 intent 再使用 runner submit。`remote job ALIAS PLAN_ID` 为 query-only reconnect：保留原 ID、原 runner digest、去重状态，remove alias 不抹掉历史任务。
 
+只读查找未知 ID 可通过 `remote request` 发送 `{"command":"job","job_id":"<id>"}`（或互斥 `plan_id`）。已有任务记录使用原冻结 runner；没有记录时采用 alias 当前 runner，不创建提交记录，也不占用尚未提交计划的提交位置。`remote job`／reconnect 用于原提交的核对，会持久记录 query-only 意图；不要用它探测尚未提交的计划。已有无 digest 的旧任务记录保留 PATH 兼容，去重／不确定提交仍不得删除或重发。
+
 ```sh
 lintel remote request approved-alias <<'JSON'
 {"command":"plan_policy","environment_id":"<remote-id>","preset":"reduce","keep_remote_control":false}

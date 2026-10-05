@@ -653,16 +653,24 @@ eval "$last"
         )
         .unwrap();
         drop(held);
-        let result =
-            c.dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000007"}));
-        assert!(result.is_err()); // inert fixture's discover is not a matching receipt
-        let commands =
-            fs::read_to_string(c.transport.ssh.parent().unwrap().join("commands")).unwrap();
-        assert!(commands
-            .lines()
-            .last()
-            .unwrap()
-            .contains(p["bundle"]["sha256"].as_str().unwrap()));
-        assert!(!commands.lines().last().unwrap().contains(&"b".repeat(64)));
+        for request in [
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000007"}),
+            json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"00000000-0000-4000-8000-000000000007"}}),
+            json!({"op":"request","alias":"synthetic-host","request":{"command":"job","plan_id":"00000000-0000-4000-8000-000000000007"}}),
+        ] {
+            let result = c.dispatch(request);
+            assert!(result.is_err()); // inert fixture's discover is not a matching receipt
+            let commands =
+                fs::read_to_string(c.transport.ssh.parent().unwrap().join("commands")).unwrap();
+            assert!(
+                commands
+                    .lines()
+                    .last()
+                    .unwrap()
+                    .contains(p["bundle"]["sha256"].as_str().unwrap()),
+                "Original task query switched to upgraded alias runner"
+            );
+            assert!(!commands.lines().last().unwrap().contains(&"b".repeat(64)));
+        }
     }
 }
