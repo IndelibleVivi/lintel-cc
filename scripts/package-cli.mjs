@@ -171,7 +171,10 @@ function readBinaryIdentity(binary) {
     const out = execFileSync(binary, ['version', '--json'], {
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000,
     });
-    return JSON.parse(out).data;
+    const result = JSON.parse(out);
+    return result?.ok === true && result.data !== null
+      && typeof result.data === 'object' && !Array.isArray(result.data)
+      ? result.data : null;
   } catch {
     return null;
   }
@@ -369,14 +372,6 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
       bytes: entry.bytes.length,
       sha256: sha256(entry.bytes),
     }));
-    // A portable, Node-free verification artifact for the installed bytes.
-    const sums = entries
-      .map((entry) => `${sha256(entry.bytes)}  ${entry.archive}`)
-      .sort()
-      .join('\n');
-    await writeFile(path.join(stage, 'SHA256SUMS'), `${sums}\n`);
-    entries.push({ archive: 'SHA256SUMS', bytes: null });
-
     const manifest = {
       schema: 'lintel.cli-candidate/1',
       product: PRODUCT,
@@ -400,8 +395,9 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
         : ['static musl build; remote browser component reports browser_component_unavailable'],
       files: fileEntries,
     };
-    await writeFile(path.join(stage, 'candidate.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-    entries.push({ archive: 'candidate.json', bytes: null });
+    const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+    await writeFile(path.join(stage, 'candidate.json'), manifestBytes);
+    entries.push({ archive: 'candidate.json', bytes: manifestBytes });
 
     const readme = [
       `${PRODUCT} CLI candidate ${identity} (${targetId})`,
@@ -430,8 +426,19 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
       'Both canonical Linux remote runners ship at bin/remote-runners, resolved next to bin/lintel.',
       '',
     ].join('\n');
-    await writeFile(path.join(stage, 'README.txt'), readme);
-    entries.push({ archive: 'README.txt', bytes: null });
+    const readmeBytes = Buffer.from(readme);
+    await writeFile(path.join(stage, 'README.txt'), readmeBytes);
+    entries.push({ archive: 'README.txt', bytes: readmeBytes });
+
+    // Verify every archived file except the checksum list itself, including
+    // the candidate identity/limitations and the installation instructions.
+    const sums = entries
+      .map((entry) => `${sha256(entry.bytes)}  ${entry.archive}`)
+      .sort()
+      .join('\n');
+    const sumsBytes = Buffer.from(`${sums}\n`);
+    await writeFile(path.join(stage, 'SHA256SUMS'), sumsBytes);
+    entries.push({ archive: 'SHA256SUMS', bytes: sumsBytes });
 
     // Build the archive in a private temp file, then publish with true
     // no-replace so an existing archive (regular file, directory or dangling

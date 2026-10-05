@@ -171,12 +171,15 @@ class PackageJourney:
         return manifest
 
     @staticmethod
-    def check_sums(root: Path) -> str:
+    def check_sums(root: Path, valid: bool = True) -> str:
         tool = shutil.which("shasum")
         args = [tool, "-a", "256", "-c", "SHA256SUMS"] if tool else ["sha256sum", "-c", "SHA256SUMS"]
         proc = subprocess.run(args, cwd=str(root), text=True, capture_output=True, check=False)
-        assert proc.returncode == 0, (args, proc.stdout, proc.stderr)
-        assert "OK" in proc.stdout and "FAILED" not in proc.stdout, proc.stdout
+        assert (proc.returncode == 0) is valid, (args, proc.stdout, proc.stderr)
+        if valid:
+            assert "OK" in proc.stdout and "FAILED" not in proc.stdout, proc.stdout
+        else:
+            assert "FAILED" in proc.stdout, proc.stdout
         return Path(args[0]).name
 
     @staticmethod
@@ -297,6 +300,14 @@ def main() -> int:
         native_cli = native_root / "bin/lintel"
         assert os.access(native_cli, os.X_OK), native_cli
         assert native_cli.read_bytes() == native_bytes, "packaged native CLI bytes differ from the supplied input"
+        for name in ("candidate.json", "README.txt"):
+            metadata = native_root / name
+            original = metadata.read_bytes()
+            try:
+                metadata.write_bytes(original + b"Synthetic corruption.\n")
+                journey.check_sums(native_root, valid=False)
+            finally:
+                metadata.write_bytes(original)
         # Execute the extracted native package (not the source tree).
         home = base / "home"
         home.mkdir()
@@ -399,6 +410,24 @@ def main() -> int:
         assert dangling_index.is_symlink() and os.readlink(dangling_index) == "/nonexistent/index"
 
         manifest_snapshot(journey, inputs, version)
+
+        if journey.host == "macos-arm64":
+            # A native Mach-O may exit successfully without returning identity
+            # data. It must use declared identity, never claim a verified probe.
+            source = base / "missing-identity.c"
+            source.write_text('#include <stdio.h>\nint main(void) { puts("{\\"ok\\":true}"); return 0; }\n')
+            stub = base / "missing-identity"
+            subprocess.run(["cc", str(source), "-o", str(stub)], check=True, capture_output=True)
+            probe_out = base / "missing-identity-out"
+            malformed = journey.package(probe_out, dict(inputs, macos=stub), version=version)
+            assert malformed.returncode == 0, malformed.stderr
+            probe_summary = json.loads(next(probe_out.glob("candidates-*.json")).read_text())
+            mac_archive = next(a for a in probe_summary["archives"] if a["target"] == "macos-arm64")
+            probe_root = base / "missing-identity-extract"
+            journey.extract(probe_out / mac_archive["archive"], probe_root)
+            probe_manifest = json.loads((probe_root / "candidate.json").read_text())
+            assert probe_manifest["identity_source"] == "declared_static", probe_manifest
+            assert probe_manifest["identity_verified_executed"] is False, probe_manifest
 
         # --- optional full-real-input smoke (never replaces native acceptance) -
         real_note = "skipped (canonical inputs absent)"

@@ -44,7 +44,7 @@ node scripts/package-cli.mjs \
   --out candidate-packages
 ```
 
-candidate 的身份是 `<version>-candidate-<revision 前 12 位>`，因此裸 `0.1.0` 从来不是唯一身份；索引写成 `candidates-<identity>.json`，不会覆盖其它身份的索引。`--revision` 必须是精确的完整小写十六进制 git object id（40 或 64 位），它是调用方声明的构建身份，不由 digest 或探测证明。`candidate.json` 记录真实 product/version/protocol/catalog、`source_revision`、target、每个受校验文件的字节数与 SHA-256、`signed:false`、`release:false`、平台限制，以及**逐目标**的 `identity_source`：只有能在本机执行的 macOS 输入才标为 `macos_input_executed`，Linux 目标标为 `declared_static`。macOS 输入能在本机执行时其自报 `version` 权威并要求 manifest 一致；不能执行时（如 Linux 打包）必须显式传 `--version`，否则拒绝。已有归档（包括悬空符号链接）或已有同身份索引都会在任何写入前被拒绝，绝不覆盖。
+candidate 的身份是 `<version>-candidate-<revision 前 12 位>`，因此裸 `0.1.0` 从来不是唯一身份；索引写成 `candidates-<identity>.json`，不会覆盖其它身份的索引。`--revision` 必须是精确的完整小写十六进制 git object id（40 或 64 位），它是调用方声明的构建身份，不由 digest 或探测证明。`candidate.json` 记录 product/version/protocol/catalog、`source_revision`、target、payload 文件的字节数与 SHA-256、`signed:false`、`release:false`、平台限制，以及**逐目标**的 `identity_source`：只有 macOS 输入成功返回身份数据时才标为 `macos_input_executed`，Linux 目标标为 `declared_static`。macOS 输入成功探测时其自报 `version` 权威并要求 manifest 一致；不能执行或未返回身份数据时（如 Linux 打包）必须显式传 `--version`，并记录 `identity_verified_executed:false`，否则拒绝。已有归档（包括悬空符号链接）或已有同身份索引都会在任何写入前被拒绝，绝不覆盖。
 
 安装与升级只用最简单可检视的机制：解到明确选择的**新身份目录**。先只创建父目录，再用普通 `mkdir "$dest"`（目录已存在会失败）作为是否解包的条件，因此绝不会覆盖已有版本：
 
@@ -57,7 +57,7 @@ dest="$parent/$identity"
 mkdir "$dest" && tar -xzf "candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz" -C "$dest"
 ```
 
-安装后从选定目录核对实际字节；**目标主机不需要 Node**，用系统 `shasum`／`sha256sum` 校验随包生成的 `SHA256SUMS`，再运行绝对路径：
+安装后从选定目录核对实际字节；**目标主机不需要 Node**，用系统 `shasum`／`sha256sum` 校验随包生成的 `SHA256SUMS`。清单覆盖全部 payload、`candidate.json` 与 `README.txt`，只排除清单自身；它证明这些文件的字节一致，不提供签名或可信源码 provenance。再运行绝对路径：
 
 ```sh
 cd "$dest"
