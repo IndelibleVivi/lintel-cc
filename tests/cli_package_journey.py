@@ -66,10 +66,25 @@ def elf(machine: int, interp: bool = False, *, file_type: int = 2,
     return bytes(header) + bytes(program) + bytes(payload)
 
 
-def macho_arm64(file_type: int = 2) -> bytes:
-    # Visibly synthetic Mach-O header, used only off macOS to exercise format
-    # validation. Never executed and never claimed as a real build.
-    return struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, file_type, 0, 0, 0, 0) + b"\x00" * 128
+def macho_arm64(file_type: int = 2, *, entry: bool = True,
+                entryoff: int | None = None, executable: bool = True,
+                legacy: bool = False) -> bytes:
+    # Synthetic format fixture, never counted as native runtime acceptance.
+    command_size = 72 + ((288 if legacy else 24) if entry else 0) + (0 if legacy else 32)
+    payload_offset = 32 + command_size
+    file_size = payload_offset + 256
+    segment = struct.pack("<II16sQQQQIIII", 0x19, 72, b"__TEXT", 0x100000000,
+                          0x4000, 0, file_size, 5, 5 if executable else 1, 0, 0)
+    main = struct.pack("<IIQQ", 0x80000028, 24,
+                       payload_offset if entryoff is None else entryoff, 0) if entry else b""
+    if entry and legacy:
+        state = bytearray(272)
+        struct.pack_into("<Q", state, 256, 0x100000000 + payload_offset)
+        main = struct.pack("<IIII", 5, 288, 6, 68) + state
+    dyld = struct.pack("<III", 0xe, 32, 12) + b"/usr/lib/dyld\0" + b"\0" * 6
+    header = struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, file_type,
+                         1 + int(entry) + int(not legacy), command_size, 0, 0)
+    return header + segment + main + (b"" if legacy else dyld) + b"\x20\x00\x80\x52\xc0\x03\x5f\xd6" + b"\0" * 248
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -155,7 +170,8 @@ class PackageJourney:
         return inputs
 
     def package(self, out: Path, inputs: dict, *, version: str | None = None,
-                revision: str = REVISION, x86: Path | None = None) -> subprocess.CompletedProcess[str]:
+                revision: str = REVISION, x86: Path | None = None,
+                env: dict | None = None) -> subprocess.CompletedProcess[str]:
         argv = [NODE, str(SCRIPT),
                 "--macos-arm64", str(inputs["macos"]),
                 "--linux-x86_64", str(x86 if x86 is not None else inputs["x86"]),
@@ -165,7 +181,7 @@ class PackageJourney:
                 "--out", str(out)]
         if version is not None:
             argv += ["--version", version]
-        return subprocess.run(argv, text=True, capture_output=True, cwd=ROOT, timeout=180, check=False)
+        return subprocess.run(argv, text=True, capture_output=True, cwd=ROOT, timeout=180, check=False, env=env)
 
     @staticmethod
     def extract(archive: Path, destination: Path) -> None:
@@ -216,9 +232,17 @@ def documented_unpack(archive: Path, parent: Path, identity: str) -> subprocess.
 
 def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> None:
     failures = []
+    header_only = struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, 2, 0, 0, 0, 0)
+    broken_command = bytearray(macho_arm64())
+    struct.pack_into("<I", broken_command, 36, 4)
     for name, payload, code in (("truncated-macho", macho_arm64()[:20], "wrong_format"),
                                 ("macho-object", macho_arm64(1), "not_executable"),
-                                ("macho-dylib", macho_arm64(6), "not_executable")):
+                                ("macho-dylib", macho_arm64(6), "not_executable"),
+                                ("macho-header-only", header_only, "not_executable"),
+                                ("macho-no-entry", macho_arm64(entry=False), "not_executable"),
+                                ("macho-unmapped-entry", macho_arm64(entryoff=99999), "not_executable"),
+                                ("macho-nonexec", macho_arm64(executable=False), "not_executable"),
+                                ("macho-broken-command", broken_command, "wrong_format")):
         binary = journey.base / name
         binary.write_bytes(payload)
         output = journey.base / (name + "-out")
@@ -283,6 +307,63 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
     manifest_path.write_text(json.dumps(manifest))
     result = journey.package(journey.base / "static-pie-out", supplied, version=version)
     assert result.returncode == 0, result.stderr
+    legacy = journey.base / "arm64-thread-macho"
+    legacy.write_bytes(macho_arm64(legacy=True))
+    result = journey.package(journey.base / "thread-macho-out", dict(inputs, macos=legacy), version=version)
+    assert result.returncode == 0, result.stderr
+
+
+def publication_failure(journey: PackageJourney, inputs: dict, version: str) -> None:
+    identity = f"{version}-candidate-{REVISION[:12]}"
+    real_tar = shutil.which("tar")
+    failures = []
+    for mode in ("tar-later", "index-race", "replaced-archive", "modified-archive"):
+        output = journey.base / (mode + "-out")
+        output.mkdir()
+        keep = output / "KEEP"
+        keep.write_text("unrelated output\n")
+        index = output / f"candidates-{identity}.json"
+        first = output / f"lintel-cli-{identity}-macos-arm64.tar.gz"
+        tools = journey.base / (mode + "-tools")
+        tools.mkdir()
+        count = tools / "count"
+        wrapper = tools / "tar"
+        wrapper.write_text(f'''#!{sys.executable}
+import pathlib,subprocess,sys
+count=pathlib.Path({str(count)!r})
+n=int(count.read_text())+1 if count.exists() else 1
+count.write_text(str(n))
+mode={mode!r}
+if mode=='tar-later' and n==2: sys.exit(42)
+if mode!='tar-later' and n==3:
+    pathlib.Path({str(index)!r}).write_text('external index')
+    if mode=='replaced-archive':
+        first=pathlib.Path({str(first)!r})
+        first.rename(first.parent/'moved-original')
+        first.write_text('external replacement')
+    if mode=='modified-archive':
+        pathlib.Path({str(first)!r}).write_text('external replacement')
+sys.exit(subprocess.call([{real_tar!r},*sys.argv[1:]]))
+''')
+        wrapper.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"])
+        result = journey.package(output, inputs, version=version, env=env)
+        archives = sorted(p.name for p in output.glob("*.tar.gz"))
+        expected = [first.name] if mode in ("replaced-archive", "modified-archive") else []
+        if result.returncode == 0 or archives != expected:
+            failures.append((mode, result.returncode, archives, result.stderr))
+            continue
+        assert keep.read_text() == "unrelated output\n"
+        if mode != "tar-later":
+            assert index.read_text() == "external index"
+            if mode in ("replaced-archive", "modified-archive"):
+                assert first.read_text() == "external replacement"
+                continue
+            index.unlink()  # Own synthetic collision fixture, never product cleanup.
+        retry = journey.package(output, inputs, version=version)
+        assert retry.returncode == 0 and index.is_file(), retry.stderr
+        assert keep.read_text() == "unrelated output\n"
+    assert not failures, failures
 
 
 def manifest_snapshot(journey: PackageJourney, inputs: dict, version: str) -> None:
@@ -474,6 +555,7 @@ def main() -> int:
             assert outcome.returncode != 0 and code in outcome.stderr, (code, outcome.stderr)
         assert not rejected.exists(), "a rejected run still wrote output"
         executable_inputs(journey, inputs, version)
+        publication_failure(journey, inputs, version)
 
         for key, triple in (("x86", "x86_64-unknown-linux-musl"),
                             ("arm", "aarch64-unknown-linux-musl")):

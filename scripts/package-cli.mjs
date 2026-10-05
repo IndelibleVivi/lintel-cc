@@ -103,9 +103,52 @@ function verifyMachOArm64(bytes, label) {
   if (bytes.readUInt32LE(12) !== 2) {
     fail('not_executable', `${label}: Mach-O filetype must be MH_EXECUTE`);
   }
-  if (32 + bytes.readUInt32LE(20) > bytes.length) {
+  const count = bytes.readUInt32LE(16);
+  const end = 32 + bytes.readUInt32LE(20);
+  if (end > bytes.length) {
     fail('wrong_format', `${label}: Mach-O load commands are truncated`);
   }
+  if (count === 0) fail('not_executable', `${label}: Mach-O has no load/entry commands`);
+  const segments = [];
+  let entryOffset = null;
+  let entryAddress = null;
+  let cursor = 32;
+  for (let i = 0; i < count; i += 1) {
+    if (cursor + 8 > end) fail('wrong_format', `${label}: Mach-O command header is truncated`);
+    const command = bytes.readUInt32LE(cursor);
+    const size = bytes.readUInt32LE(cursor + 4);
+    if (size < 8 || size % 8 !== 0 || cursor + size > end) {
+      fail('wrong_format', `${label}: invalid Mach-O command size`);
+    }
+    if (command === 0x19) { // LC_SEGMENT_64
+      if (size < 72 || 72 + bytes.readUInt32LE(cursor + 64) * 80 > size) {
+        fail('wrong_format', `${label}: Mach-O segment/sections are truncated`);
+      }
+      const address = bytes.readBigUInt64LE(cursor + 24);
+      const memorySize = bytes.readBigUInt64LE(cursor + 32);
+      const offset = bytes.readBigUInt64LE(cursor + 40);
+      const fileSize = bytes.readBigUInt64LE(cursor + 48);
+      if (offset + fileSize > BigInt(bytes.length) || fileSize > memorySize) {
+        fail('wrong_format', `${label}: Mach-O segment is not file-backed`);
+      }
+      if ((bytes.readUInt32LE(cursor + 60) & 4) !== 0) segments.push({ address, offset, fileSize });
+    } else if (command === 0x80000028) { // LC_MAIN
+      if (size !== 24 || entryOffset !== null) fail('wrong_format', `${label}: invalid LC_MAIN`);
+      entryOffset = bytes.readBigUInt64LE(cursor + 8);
+    } else if (command === 5) { // LC_UNIXTHREAD, ARM_THREAD_STATE64
+      if (size !== 288 || bytes.readUInt32LE(cursor + 8) !== 6
+        || bytes.readUInt32LE(cursor + 12) !== 68 || entryAddress !== null) {
+        fail('wrong_format', `${label}: invalid ARM64 thread entry state`);
+      }
+      entryAddress = bytes.readBigUInt64LE(cursor + 272);
+    }
+    cursor += size;
+  }
+  if (cursor !== end) fail('wrong_format', `${label}: Mach-O command count/size disagree`);
+  const loadedEntry = segments.some(({ address, offset, fileSize }) =>
+    (entryOffset !== null && entryOffset > 0n && entryOffset >= offset && entryOffset < offset + fileSize)
+    || (entryAddress !== null && entryAddress > 0n && entryAddress >= address && entryAddress < address + fileSize));
+  if (!loadedEntry) fail('not_executable', `${label}: Mach-O lacks a file-backed executable entry point`);
 }
 
 // ELF64 executable/static PIE: loaded entry point, no PT_INTERP or DT_NEEDED.
@@ -248,16 +291,18 @@ async function entryExists(absolutePath) {
 // and fails EEXIST if anything already occupies the final path, so an
 // interrupted or failed write cannot surface a truncated final archive. The
 // owned temporary is unlinked afterward. No journal or broader installer.
-async function publishNoReplace(absolutePath, bytes, mode, tempDir) {
+async function publishNoReplace(absolutePath, bytes, mode, tempDir, published) {
   if (await entryExists(absolutePath)) {
     fail('output_exists', `refusing to overwrite an existing path: ${absolutePath}`);
   }
   const staged = path.join(tempDir, `publish-${process.pid}-${Math.random().toString(36).slice(2)}`);
   let handle;
+  let owned;
   try {
     handle = await open(staged, 'wx', mode);
     await handle.writeFile(bytes);
     await handle.sync();
+    owned = await handle.stat({ bigint: true });
     await handle.close();
     handle = undefined;
   } finally {
@@ -265,6 +310,8 @@ async function publishNoReplace(absolutePath, bytes, mode, tempDir) {
   }
   try {
     await link(staged, absolutePath);
+    published.push({ path: absolutePath, dev: owned.dev, ino: owned.ino,
+      size: owned.size, mtimeNs: owned.mtimeNs });
   } catch (error) {
     if (error.code === 'EEXIST') {
       fail('output_exists', `refusing to overwrite an existing path: ${absolutePath}`);
@@ -368,8 +415,9 @@ async function main() {
   // Hard-link publication requires the staged file and destination to share a
   // filesystem; keep our private staging directory inside the selected output.
   const publishDir = await mkdtemp(path.join(outDir, '.lintel-publish-'));
+  const published = [];
   try {
-    const archives = await buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed });
+    const archives = await buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed, published });
     const summary = {
       schema: 'lintel.cli-candidates/1',
       version,
@@ -380,15 +428,33 @@ async function main() {
       source_revision_note: 'caller-declared build identity; not derived from a digest or probe',
       archives,
     };
-    await publishNoReplace(indexPath, Buffer.from(`${JSON.stringify(summary, null, 2)}\n`), 0o644, publishDir);
+    await publishNoReplace(indexPath, Buffer.from(`${JSON.stringify(summary, null, 2)}\n`), 0o644, publishDir, published);
     console.log(JSON.stringify(summary, null, 2));
     return undefined;
+  } catch (error) {
+    // A reported failure must not strand our partial candidate set. Preserve
+    // pre-existing entries and any published path subsequently changed by
+    // another writer; only unchanged links still owned by this call are removed.
+    const failures = [];
+    for (const entry of published.reverse()) {
+      try {
+        const current = await lstat(entry.path, { bigint: true });
+        if (current.dev === entry.dev && current.ino === entry.ino
+          && current.size === entry.size && current.mtimeNs === entry.mtimeNs) {
+          await rm(entry.path);
+        }
+      } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') failures.push(`${entry.path}: ${cleanupError.message}`);
+      }
+    }
+    if (failures.length) error.message += `; candidate rollback incomplete: ${failures.join('; ')}`;
+    throw error;
   } finally {
     await rm(publishDir, { recursive: true, force: true });
   }
 }
 
-async function buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed }) {
+async function buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed, published }) {
 
   const archives = [];
   // Refuse every occupied archive path (regular file, directory, dangling
@@ -510,7 +576,7 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
     });
     const archiveBytes = await readFile(tempArchive);
     try {
-      await publishNoReplace(archivePath, archiveBytes, 0o644, publishDir);
+      await publishNoReplace(archivePath, archiveBytes, 0o644, publishDir, published);
     } finally {
       await rm(tempArchive, { force: true });
       await rm(stage, { recursive: true, force: true });
