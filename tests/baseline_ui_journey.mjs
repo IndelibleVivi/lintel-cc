@@ -55,6 +55,19 @@ try{
   await page.screenshot({path:path.join(fixture,'quiet-home-'+width+'-'+theme+'.png')});
  }
  await page.setViewportSize({width:1120,height:760});
+ // A background native window can suspend animation progress. A selected
+ // palette must still leave working controls readable in that state.
+ for (const theme of ['dark','light']) {
+  const palette=await page.evaluate(theme=>{
+   document.documentElement.dataset.theme=theme;
+   const button=document.querySelector('.nav-item:not(.active)');
+   getComputedStyle(button).color; // Resolve the change before freezing transitions.
+   for(const animation of document.getAnimations())if(animation instanceof CSSTransition)animation.pause();
+   return {body:getComputedStyle(document.body).color,nav:getComputedStyle(button).color,prompt:getComputedStyle(document.querySelector('.home-task-prompt')).color};
+  },theme);
+  assert.equal(palette.nav,palette.body,'paused theme transitions must not leave navigation in the previous palette');
+  assert.equal(palette.prompt,palette.body,'paused theme transitions must not leave the task prompt in the previous palette');
+ }
  await page.getByRole('button',{name:'开始一项任务',exact:true}).click();assert.equal(await page.locator('.task-home [data-task-id]').count(),6);
  await page.keyboard.press('Escape');await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor({state:'visible'});
  assert.equal(await page.getByRole('button',{name:'开始一项任务',exact:true}).evaluate(el=>el===document.activeElement),true);

@@ -8,7 +8,7 @@
 *{box-sizing:border-box}
 body{margin:0;color:var(--text);background:var(--bg)}
 button,input,select,textarea{font:inherit}
-button{color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:9px;min-height:38px;padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background .16s,color .16s,box-shadow .16s}
+button{color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:9px;min-height:38px;padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:box-shadow .16s}
 button:hover:not(:disabled){background:var(--soft);border-color:var(--muted)}
 button:active:not(:disabled){transform:translateY(1px)}
 button:disabled{cursor:default;opacity:.48}
@@ -109,7 +109,7 @@ input[type=text],input:not([type]),textarea{border:1px solid var(--line);border-
 .asset-row:last-child{border-bottom:0}
 .section-action{margin-top:10px}
 .preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;border:0;padding:0;margin:0 0 28px}
-.preset{position:relative;display:flex;gap:14px;align-items:flex-start;padding:23px 22px;background:transparent;border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:border-color .16s,background .16s}
+.preset{position:relative;display:flex;gap:14px;align-items:flex-start;padding:23px 22px;background:transparent;border:1px solid var(--line);border-radius:12px;cursor:pointer}
 .preset.chosen{background:var(--soft);border-color:color-mix(in srgb,var(--muted) 40%,var(--line))}
 .preset input{position:absolute;right:22px;top:24px}
 .preset strong{font-size:15px;font-weight:550;display:block;padding-right:22px}
@@ -633,7 +633,7 @@ button:disabled{opacity:.6}
 /* Six tasks are independent choices; guidance is continuous content. */
 .task-home>h3{font-size:15px;letter-spacing:.2px;margin-bottom:14px}
 .task-home .help-tasks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin-top:0}
-.task-home .help-tasks>section{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:color-mix(in srgb,var(--paper) 64%,transparent);display:flex;flex-direction:column;gap:8px;min-width:0;transition:border-color .16s,background .16s}
+.task-home .help-tasks>section{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:color-mix(in srgb,var(--paper) 64%,transparent);display:flex;flex-direction:column;gap:8px;min-width:0}
 .task-home .help-tasks>section:hover{border-color:color-mix(in srgb,var(--accent) 48%,var(--line));background:var(--paper)}
 .task-home h4{font-size:15px;line-height:1.6;color:var(--text)}
 .task-home .help-tasks p{font-size:13px;line-height:1.8;margin:0;flex:1}
