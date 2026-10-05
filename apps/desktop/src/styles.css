@@ -445,7 +445,7 @@ h1,.brand strong{font-family:var(--serif)}
 /* The home is a quiet companion; tasks open when the user chooses them. */
 .main-content.home-content{padding:26px 38px 32px}
 .home-stage{max-width:640px;min-height:100%;margin:0 auto;display:flex;flex-direction:column;justify-content:center}
-.home-greeting{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:42px;margin-bottom:28px;text-align:center}
+.home-greeting{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;margin-bottom:28px;text-align:center}
 .home-title{font-family:var(--serif);font-size:30px;line-height:1.4;font-weight:400;letter-spacing:-.5px;margin:0}
 .home-greeting p{font-size:14px;margin-top:8px;color:var(--muted)}
 .home-tools{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 0 12px}

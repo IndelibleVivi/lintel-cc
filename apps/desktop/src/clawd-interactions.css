@@ -1,7 +1,7 @@
 .main-content.home-content{position:relative;overscroll-behavior-y:contain}
 .home-content:has(.is-pulling){user-select:none}
 .home-greeting>.clawd{z-index:5}
-.clawd-flight{position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);z-index:6;width:max-content}
+.clawd-flight{position:relative;margin-top:2px;z-index:6;width:max-content}
 .clawd-pull-trigger{position:relative;gap:5px;min-height:30px;padding:4px 9px;border:0;background:transparent;color:var(--muted);font:11px/1.5 var(--sans);border-radius:6px}
 .clawd-pull-trigger:hover:not(:disabled){background:var(--soft);color:var(--text)}
 .clawd-pull-trigger>svg{transform:rotate(90deg);transition:transform .18s}

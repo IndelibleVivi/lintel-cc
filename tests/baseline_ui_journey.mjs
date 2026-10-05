@@ -49,6 +49,8 @@ try{
  for (const [width,height,theme] of [[1120,760,'light'],[900,640,'dark'],[1440,900,'light']]) {
   await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
   assert.ok(await page.locator('.home-content').evaluate(el=>el.scrollHeight<=el.clientHeight+1),'quiet home fits without scrolling');
+  const play=await page.locator('.clawd-pull-trigger').boundingBox(),greeting=await page.locator('.home-title').boundingBox();
+  assert.ok(play.y+play.height+4<=greeting.y,'Clawd play button stays above the greeting at every window size');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(fixture,'quiet-home-'+width+'-'+theme+'.png')});
  }
