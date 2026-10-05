@@ -2,6 +2,9 @@
 node_modules/
 dist/
 .DS_Store
+# Keep editor recovery files local without deleting them.
+*.swp
+*.swo
 .env
 .env.*
 !.env.example

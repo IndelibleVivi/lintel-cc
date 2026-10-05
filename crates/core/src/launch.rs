@@ -56,7 +56,22 @@ fn fs_symlink(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink())
 }
 
-/// Project working directory identity: device, inode and owner, frozen at
+/// A directory's birth time distinguishes immediately reused inode numbers.
+/// It stays stable when ordinary project files are added or removed. Refuse a
+/// new frozen launch on filesystems that cannot provide this evidence.
+fn directory_generation(metadata: &std::fs::Metadata) -> Result<Value> {
+    let created = metadata
+        .created()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .ok_or_else(|| err(
+            "directory_identity_unsupported",
+            "当前文件系统未提供可核对的目录创建时间，无法冻结启动目标；请使用支持目录创建时间的文件系统。",
+        ))?;
+    Ok(json!({"seconds":created.as_secs(),"nanoseconds":created.subsec_nanos()}))
+}
+
+/// Project working directory identity: device, inode, birth time and owner, frozen at
 /// preview and rechecked before any launch so a same-path replacement is stale.
 fn project_identity(path: &Path) -> Result<Value> {
     use std::os::unix::fs::MetadataExt;
@@ -72,6 +87,7 @@ fn project_identity(path: &Path) -> Result<Value> {
         "inode": metadata.ino(),
         "device": metadata.dev(),
         "owner": metadata.uid(),
+        "generation": directory_generation(&metadata)?,
     }))
 }
 
@@ -108,7 +124,7 @@ impl ResumeSupport {
     }
 }
 
-/// Directory identity for a config root: device, inode and owner. Frozen at
+/// Directory identity for a config root: device, inode, birth time and owner. Frozen at
 /// preview and rechecked at execution so a same-path replacement is stale.
 fn dir_identity(path: &Path) -> Result<Value> {
     use std::os::unix::fs::MetadataExt;
@@ -124,6 +140,7 @@ fn dir_identity(path: &Path) -> Result<Value> {
         "inode": metadata.ino(),
         "device": metadata.dev(),
         "owner": metadata.uid(),
+        "generation": directory_generation(&metadata)?,
     }))
 }
 
@@ -961,6 +978,24 @@ mod tests {
     use super::*;
     use std::fs;
 
+    #[test]
+    fn directory_generation_distinguishes_reuse_without_freezing_project_contents() {
+        let fixture = tempfile::tempdir().unwrap();
+        let project = fixture.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let original = project_identity(&project).unwrap();
+        std::fs::write(project.join("draft.txt"), "new ordinary project file").unwrap();
+        assert_eq!(project_identity(&project).unwrap(), original);
+        assert_eq!(dir_identity(&project).unwrap(), original);
+        std::fs::remove_file(project.join("draft.txt")).unwrap();
+        std::fs::remove_dir(&project).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        std::fs::create_dir(&project).unwrap();
+        let mut replacement = project_identity(&project).unwrap();
+        // Model immediate inode reuse while retaining the real new birth time.
+        replacement["inode"] = original["inode"].clone();
+        assert_ne!(replacement, original);
+    }
     #[test]
     fn project_cwd_is_never_created() {
         let temp = tempfile::tempdir().unwrap();

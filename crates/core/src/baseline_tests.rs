@@ -606,7 +606,7 @@ fn launch_rechecks_stale_project_and_executable_before_intent() {
         &engine,
         json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
     );
-    // Now replace the project directory object (same path, new inode).
+    // Replace the directory, including filesystems that may reuse its inode.
     fs::remove_dir(&project).unwrap();
     fs::create_dir(&project).unwrap();
     let request_id = plan["id"].as_str().unwrap().to_string();

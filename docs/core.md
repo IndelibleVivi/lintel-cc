@@ -107,6 +107,8 @@ TUI 通过 `lintel tui` 提供上述配方、认证检查、归档阅读/迁入�
 
 `crates/core/src/launch.rs` 拥有 `plan_launch`／`launch_request`、独立 `plan_resume`／`resume_request` 以及只读 `launch_query`／`launches`。配置 root 决定状态，项目 cwd 决定工作目录。预览冻结 target／程序／静态版本；首次执行复查，Terminal／PTY 前持久 intent。重复与中断按原 ID 核对，不能重放启动。resume 准备私有字节副本，不把 archive 原件交给客户端写；有限支持政策、真实认证／实际恢复限制与写入范围见原计划和 [操作指南](operator-guide.md)。
 
+启动目录身份使用 device／inode／owner 加创建时间，避免 Linux 删除重建时立即复用 inode 漏过复查；普通项目内容变化不冻结。创建时间不可用时明确拒绝新预览；旧未启动计划缺少该证据须重新预览，原记录优先查询语义不变。这是写前身份检查，不是对外部 writer 的 OS 级 CAS。
+
 macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确配置根，使用 `CLAUDE_CONFIG_DIR`；有 loopback 通道时，只给新启动传入大小写 HTTP(S) proxy 变量。不会关闭已有会话或消除 `NO_PROXY` 的分流。`launch_requested` 仅表示启动请求已送达，实际 Claude 使用与网络效果未验证。
 
 独立终端用 `lintel launch <environment-id>`，由 CLI exec 目标程序，stdin/stdout 都必须是 TTY，且只接受一个环境 ID；不在隐藏管道内启动交互 agent，不接受 prompt 参数。TUI 的 `o 打开 Claude` 使用同一启动路径，退出 Claude 后返回菜单。

@@ -37,6 +37,8 @@ App 发起的浏览器清理可在浏览器完整重启后从 popup 续办，最
 
 App 的“帮助”包含六个任务入口、人类指南、Agent CLI 指南、开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；项目仓库保留完整目标、实际验收证据与当前限制。
 
+独立项目 cwd 的新 launch／resume 预览需要文件系统提供目录创建时间；缺少时明确返回限制，资料阅读仍可用。旧未启动预览需重新核对，已经尝试的启动继续按原 ID 查询。普通项目文件新增／删除不使目录身份失效。
+
 ## 本地构建与试用
 
 需要 Rust stable、Node.js 与 npm；macOS 桌面构建还需要 Xcode Command Line Tools。当前本地构建与测试主机为 macOS arm64，Linux 源码已在 Ubuntu CI 通过合成旅程、独立 OpenSSH 与真实 systemd/PAM/reboot VM 检查；具体范围见[验证指南](docs/verification.md)，真实认证和生产 VPS 状态分别验收。

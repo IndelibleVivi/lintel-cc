@@ -173,6 +173,8 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 `CLAUDE_CONFIG_DIR` 指向已登记配置 root；`project_cwd` 是目标主机上已存在、当前用户可用的项目目录。它们可以不同，Lintel 不代为创建或改变项目权限。新启动先预览实际目录、程序和静态版本，再批准这一份不可变请求：
 
+新 launch／resume 计划同时冻结目录的 device、inode、owner 与创建时间，以识别 Linux 立即复用 inode 的目录替换；普通新增／删除项目文件不改变目录创建时间。文件系统不能提供创建时间时返回 `directory_identity_unsupported`，不打开客户端。缺少这份身份的旧未启动计划须重新预览；已有原启动记录仍先只读查询，不重放。
+
 ```sh
 lintel call plan_launch <<'JSON'
 {"environment_id":"<environment-id>","project_cwd":"/absolute/project","mode":"interactive"}
