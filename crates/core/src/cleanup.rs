@@ -303,8 +303,9 @@ impl Engine {
             work::check_passphrase(r)?;
         }
         if p["extra"]["official_logout"] == true {
-            if self.executable().as_deref() != e["executable"].as_str() {
-                #[cfg(not(test))]
+            if p["extra"]["executable"] != e["executable"]
+                || self.executable().as_deref() != e["executable"].as_str()
+            {
                 return Err(err("executable_changed", "Claude 启动来源改变，请重新检查"));
             }
             let auth = self.auth_probe(&json!({"environment_id":e["id"]}))?;
@@ -368,12 +369,17 @@ impl Engine {
         if recipe == "reset_client" {
             self.migrate_to_new_root(e, p, r, j, journal)?;
         }
+        // Preservation can take time. Recheck both recipes at the common first
+        // destructive boundary, including local-only cleanup without logout.
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"quiescence","label":"破坏性操作前复查","status":"executing","message":"复查写入进程、service hold 与冻结文件；失败时保留已完成工作产物。"}));
+        save(journal, j)?;
+        self.check_cleanup(e, p, r)?;
+        j["steps"].as_array_mut().unwrap().last_mut().unwrap()["status"] = json!("completed");
+        save(journal, j)?;
         // Step 4: official logout (may contact the server), rechecked against the
         // approved scope. A failure here stops the run with the archives and the
         // prepared new root retained, and no approved local file deleted.
         if p["extra"]["official_logout"] == true {
-            // Archiving can take time: repeat the approved scope immediately before logout.
-            self.check_cleanup(e, p, r)?;
             j["steps"].as_array_mut().unwrap().push(json!({"id":"logout","label":"官方注销","status":"executing","message":"命令结果不确定时不会自动重跑。"}));
             save(journal, j)?;
             let (code, _) = bounded(self.auth_command(e, "logout")?)?;

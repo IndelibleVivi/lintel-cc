@@ -137,8 +137,10 @@ fn retirement_and_reactivation_do_not_delete_work() {
 
 #[test]
 fn official_logout_uses_target_config_and_sanitizes_status() {
-    let (_tmp, engine, mut e, root) = fixture();
-    let script = engine.home.join("fake-claude");
+    let (_tmp, mut engine, mut e, root) = fixture();
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    let script = engine.home.join(".local/bin/claude");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
     fs::write(&script,r##"#!/bin/sh
 case "$2" in
 status)

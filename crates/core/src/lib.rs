@@ -5,6 +5,9 @@ mod cleanup;
 mod lifecycle_tests;
 mod policy;
 mod service;
+mod settings;
+#[cfg(test)]
+mod settings_tests;
 mod storage;
 mod work;
 #[cfg(test)]
@@ -96,6 +99,10 @@ pub struct Engine {
     execution_context: Option<Value>,
     #[cfg(test)]
     service_fixture: Option<PathBuf>,
+    #[cfg(test)]
+    settings_write_hook: Option<fn(&str)>,
+    #[cfg(test)]
+    executable_search_path: Option<std::ffi::OsString>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -115,9 +122,17 @@ impl Engine {
             execution_context: None,
             #[cfg(test)]
             service_fixture: None,
+            #[cfg(test)]
+            settings_write_hook: None,
+            #[cfg(test)]
+            executable_search_path: None,
         })
     }
     fn executable(&self) -> Option<String> {
+        #[cfg(test)]
+        if let Some(path) = &self.executable_search_path {
+            return find_executable(&self.home, Some(path));
+        }
         find_executable(&self.home, std::env::var_os("PATH").as_deref())
     }
     fn path(&self, dir: &str, id: &str) -> PathBuf {
@@ -298,7 +313,7 @@ impl Engine {
         if p["hash"] != digest(&serde_json::to_vec(&unhashed)?) {
             return Err(err("plan_changed", "保存的计划已变化，无法据此读取"));
         }
-        Ok(public_plan(p))
+        public_plan(p)
     }
     fn plan(
         &self,
@@ -341,7 +356,7 @@ impl Engine {
         }
         p["hash"] = json!(digest(&serde_json::to_vec(&p)?));
         save(&self.path("plans", string(&p, "id")?), &p)?;
-        Ok(public_plan(p))
+        public_plan(p)
     }
     fn dispatch(&self, r: &Value) -> Result<Value> {
         match string(r, "command")? {
@@ -399,7 +414,7 @@ impl Engine {
             }
             "plan_restore" => {
                 let jid = safe_id(r, "job_id")?;
-                let job = load(&self.path("jobs", &jid))?;
+                let job = self.dispatch(&json!({"command":"job","job_id":jid}))?;
                 if job["restorable"] != true {
                     return Err(err("not_restorable", "此任务没有可恢复的配置改动"));
                 }
@@ -412,7 +427,7 @@ impl Engine {
                 if old["hash"] != digest(&serde_json::to_vec(&unhashed)?) {
                     return Err(err("plan_changed", "保存的计划已变化，无法据此恢复"));
                 }
-                let e = self.env(&json!({"environment_id":old["environment_id"]}))?;
+                let e = self.settings_plan_environment(&old)?;
                 let (path, doc, _) = self.settings(&e)?;
                 let mut changes = vec![];
                 for c in old["changes"]
@@ -494,6 +509,7 @@ impl Engine {
                     return Err(err("job_not_found", "任务尚未持久接收；没有执行证据"));
                 }
                 let mut j = load(&p)?;
+                let reconciled = self.reconcile_settings_write(&mut j);
                 if ["accepted", "executing", "verifying"]
                     .iter()
                     .any(|s| j["status"] == *s)
@@ -503,6 +519,8 @@ impl Engine {
                         .as_array_mut()
                         .unwrap()
                         .push(json!("先前执行被中断；不要重试破坏性步骤。"));
+                    save(&p, &j)?;
+                } else if reconciled {
                     save(&p, &j)?;
                 }
                 Ok(j)
@@ -732,7 +750,23 @@ impl Engine {
             } else {
                 0o600
             };
-            atomic(&path, &serde_json::to_vec_pretty(&doc)?, mode)?;
+            atomic_recorded(&path, &serde_json::to_vec_pretty(&doc)?, mode, |staged| {
+                if snapshot(&path)? != snap {
+                    return Err(err("stale_plan", "发布前发现配置变化"));
+                }
+                j["settings_write"] = json!({"state":"prepared","plan_hash":p["hash"],"before":snap,"after":snapshot(staged)?});
+                save(&jp, &j)?;
+                #[cfg(test)]
+                if let Some(hook) = self.settings_write_hook {
+                    hook("prepared");
+                }
+                Ok(())
+            })?;
+            #[cfg(test)]
+            if let Some(hook) = self.settings_write_hook {
+                hook("published");
+            }
+            j["settings_write"]["state"] = json!("written");
             j["status"] = json!("verifying");
             j["restorable"] = json!(true);
             save(&jp, &j)?;
@@ -858,7 +892,21 @@ impl Engine {
         }
     }
 }
-fn public_plan(mut p: Value) -> Value {
+fn public_plan(mut p: Value) -> Result<Value> {
+    if p["kind"] == "import" {
+        let root = Path::new(string(&p, "root")?);
+        let files: Vec<Value> = p["extra"]["manifest"]
+            .as_array()
+            .ok_or_else(|| err("invalid_plan", "缺少迁入清单"))?
+            .iter()
+            .map(|entry| {
+                let destination = Path::new(string(entry, "destination")?).strip_prefix(root)
+                    .map_err(|_| err("invalid_plan", "迁入目标超出冻结 root"))?;
+                Ok(json!({"source":entry["path"],"destination":destination,"category":entry["category"],"size":entry["bytes"],"sha256":entry["digest"]}))
+            })
+            .collect::<Result<_>>()?;
+        p["import_manifest"] = json!({"package":{"format":p["extra"]["package_format"].as_str().unwrap_or("lintel.work/1"),"generator":p["extra"]["package_generator"],"sha256":p["extra"]["archive_digest"]},"files":files});
+    }
     if p["extra"]["service"].is_object() {
         p["service"] =
             service::public_service(&p["extra"]["service"], p["kind"] == "service_resume");
@@ -880,7 +928,7 @@ fn public_plan(mut p: Value) -> Value {
         p["output_path"] = p["extra"]["output_path"].clone();
     }
     p.as_object_mut().unwrap().remove("extra");
-    p
+    Ok(p)
 }
 
 /// Canonical runner/core configuration paths, including the platform default.

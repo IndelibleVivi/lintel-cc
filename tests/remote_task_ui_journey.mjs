@@ -16,7 +16,8 @@ const alias='synthetic-writing-server';
 const local={id:'11111111-1111-4111-8111-111111111111',name:'Synthetic local workspace',host:'local',surface:'claude-code',root:'/synthetic/local',executable:null,ownership:'registered',status:'discovered'};
 const remote={...local,id:'22222222-2222-4222-8222-222222222222',name:'Synthetic remote workspace',host:alias,root:'/synthetic/remote'};
 const original='33333333-3333-4333-8333-333333333333',restoreId='44444444-4444-4444-8444-444444444444';
-const calls=[],receipts=[],tasks=[];let removed=false,conflict=false;
+const calls=[],receipts=[],tasks=[],installations=[];
+const installation={install_id:'synthetic-install',alias,probe:{os:'Linux',architecture:'x86_64',uid:'1000'},bundle:{version:'0.1.0',target:'x86_64-unknown-linux-musl',bytes:1024,sha256:'b'.repeat(64)},destination:'$HOME/.local/share/lintel/runners/'+ 'b'.repeat(64) +'/lintel',approval:'synthetic-install-approval',status:'previewed',effects:['Synthetic frozen approval']};let removed=false,conflict=false;
 let heldDiscover,heldJob,discoverRequested=false,jobRequested=false;
 function plan(restore=false){return {id:restore?restoreId:original,hash:restore?'synthetic-restore-approval':'synthetic-policy-approval',environment_id:remote.id,title:restore?'恢复原任务配置':'减少外发',changes:[],preserves:['后续编辑与邻居环境'],warnings:[],actions:[{id:'settings',label:restore?'恢复本任务原值':'写入当前环境设置',reversible:!restore}],created_at:new Date().toISOString(),status:'planned'};}
 const ok=data=>({ok:true,data});
@@ -24,8 +25,13 @@ async function invoke(command,args){
   const p=args.payload;calls.push({command,...p});
   if(command==='remote_request'){
     switch(p.op){
-      case 'hosts':return ok({hosts:removed?[]:[{alias}],tasks,installations:[]});
+      case 'hosts':return ok({hosts:removed?[]:[{alias}],tasks,installations});
       case 'aliases':return ok({aliases:[alias],coverage:'Synthetic SSH inventory; no real connection'});
+      case 'prepare_runner':return ok({...installation});
+      case 'install_runner':
+        installations.push({...installation,install_id:'original-install',status:'needs_reconciliation'});
+        return {ok:false,error:{code:'install_reconciliation_required',message:'Synthetic original install still needs reconciliation',diagnostic:{stage:'local',reason:'install_reconciliation_required',summary:'先核对原安装',next_steps:['查询原安装，保留现有版本绑定。'],submission_uncertain:false,alias,install_id:'original-install'}}};
+      case 'query_install':assert.equal(p.install_id,'original-install');installations[0]={...installations[0],status:'superseded'};return ok({...installations[0]});
       case 'connect':assert.equal(p.alias,alias);return ok({status:'connected'});
       case 'remove_host':removed=true;return ok({status:'removed'});
       case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok(await core({command:'job',job_id:p.plan_id},true));
@@ -78,7 +84,17 @@ try{
   await page.exposeFunction('syntheticInvoke',invoke);
   await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'本机',exact:true}).click();
-  const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'连接并管理',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'检查并准备运行器',exact:true}).click();
+  await dialog.getByRole('button',{name:'批准并安装这个运行器',exact:true}).click();
+  await dialog.getByRole('button',{name:'核对这份未确认安装',exact:false}).click();
+  await dialog.getByText('已核实 · 当前绑定已更新',{exact:true}).waitFor();
+  await dialog.getByText(/查询旧记录不会切回旧版本/).waitFor();
+  assert.equal(calls.filter(c=>c.op==='install_runner').length,1);
+  assert.equal(calls.filter(c=>c.op==='query_install').length,1);
+  await dialog.getByRole('button',{name:'收起',exact:true}).click();
+  report.checks.push('unresolved installation diagnostic renders; direct original-install query exposes superseded binding without another upload');
+  await dialog.getByRole('button',{name:'连接并管理',exact:true}).click();
   await page.getByRole('button',{name:'预览变更',exact:true}).click();await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();
   await dialog.getByRole('heading',{name:'结果待核对',exact:true}).waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,1);

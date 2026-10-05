@@ -6,6 +6,7 @@ export type RequestDiagnostic = {
   stage: 'local' | 'ssh' | 'runner' | 'response'; reason: string; summary: string;
   next_steps: string[]; command?: string; exit_code?: number; stderr_excerpt?: string;
   stderr_truncated?: boolean; submission_uncertain: boolean;
+  alias?: string; install_id?: string;
 };
 export class RequestError extends Error {
   constructor(public code: string, message: string, public diagnostic?: RequestDiagnostic) { super(message); }

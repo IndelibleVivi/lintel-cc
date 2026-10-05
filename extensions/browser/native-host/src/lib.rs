@@ -298,7 +298,7 @@ pub fn operation_catalog() -> Value {
         if matches!(*op,"installation_plan"|"install_native_host") {
             request_schema["allOf"]=json!([{"if":{"properties":{"browser":{"const":"firefox"}}},"then":{"properties":{"extension_id":{"const":FIREFOX_EXTENSION_ID}}},"else":{"properties":{"extension_id":chromium_extension_schema()}}}]);
         }
-        json!({"id":format!("browser.{op}"),"request_schema":request_schema,"effects":{"profile":if *op=="submit"{"native_browser_api_after_extension_approval"}else{"none"},"lintel_state":if *op=="installation_plan"{"read_registration_and_resources"}else if *op=="install_native_host"{"manual_current_user_host_and_registration"}else{"host_journal_transaction"}},"approval":if *op=="submit" {"extension_confirmation_and_native_permission"}else{"explicit_operation_request"},"result":{"phases":["awaiting-browser-confirmation","running","awaiting-browser-restart","completed","uncertain","rejected","failed"],"recovery":"query_original_instance_and_operation_id"},"limitations":["profile pairing and current online evidence are separate","Firefox proxy/sitePermission/cache behavior remains limited","clear requires actual runtime.onStartup then separately approved finishClear"]})
+        json!({"id":format!("browser.{op}"),"request_schema":request_schema,"effects":{"profile":if *op=="submit"{"native_browser_api_after_extension_approval"}else{"none"},"lintel_state":if *op=="installation_plan"{"read_registration_and_resources"}else if *op=="install_native_host"{"manual_current_user_host_and_registration"}else{"host_journal_transaction"}},"approval":if *op=="submit" {"extension_confirmation_and_native_permission"}else{"explicit_operation_request"},"result":{"phases":["awaiting-browser-confirmation","running","awaiting-browser-restart","completed","uncertain","rejected","failed","canceled","expired"],"recovery":"query_original_instance_and_operation_id"},"limitations":["profile pairing and current online evidence are separate","Firefox proxy/sitePermission/cache behavior remains limited","clear requires actual runtime.onStartup then separately approved finishClear"]})
     }).collect();
     json!({"operations":operations,"execution_owner":"paired_extension_native_browser_api","installation":"manual_host_path_cli_only"})
 }
@@ -604,18 +604,39 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                 fields(&request, &["op", "request_id", "instance_id", "token"])?;
                 auth(db, &request, extension, connection)?;
                 let i = string(&request, "instance_id")?;
-                let proposals: Vec<Value> = db["operations"]
+                // Rotate the bounded frame through all pending IDs. An old
+                // unconfirmed preview must not starve later proposals.
+                let cursor = db["instances"][i]["proposal_cursor"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_owned();
+                let pending: Vec<_> = db["operations"]
                     .as_object()
                     .unwrap()
-                    .values()
-                    .filter(|v| {
+                    .iter()
+                    .filter(|(_, v)| {
                         v["instance_id"] == i && v["phase"] == "awaiting-browser-confirmation"
                     })
-                    .take(2)
-                    .cloned()
                     .collect();
+                let selected: Vec<_> = pending
+                    .iter()
+                    .filter(|(key, _)| key.as_str() > cursor.as_str())
+                    .chain(
+                        pending
+                            .iter()
+                            .filter(|(key, _)| key.as_str() <= cursor.as_str()),
+                    )
+                    .take(2)
+                    .collect();
+                let proposals: Vec<Value> =
+                    selected.iter().map(|(_, value)| (*value).clone()).collect();
+                let next_cursor = selected.last().map(|(key, _)| (*key).clone());
+                if let Some(cursor) = next_cursor {
+                    db["instances"][i]["proposal_cursor"] = json!(cursor);
+                }
                 Ok(json!({"paired":true,"proposals":proposals}))
             }
+
             "receipt" => {
                 fields(
                     &request,
@@ -633,6 +654,8 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                             | "uncertain"
                             | "rejected"
                             | "awaiting-browser-restart"
+                            | "canceled"
+                            | "expired"
                     )
                 ) {
                     return Err("invalid_receipt_phase".into());
@@ -647,7 +670,7 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                 }
                 if matches!(
                     operation["phase"].as_str(),
-                    Some("completed" | "uncertain" | "rejected")
+                    Some("completed" | "uncertain" | "rejected" | "canceled" | "expired")
                 ) {
                     return Ok(operation.clone());
                 }
@@ -834,6 +857,81 @@ mod tests {
                 "one"
             )["ok"],
             false
+        );
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn pending_previews_rotate_and_terminal_refusals_never_replay() {
+        let p = path();
+        let (ext, token) = setup(&p);
+        for index in 0..7 {
+            assert_eq!(
+                control_at(
+                    &p,
+                    json!({"op":"submit","instance_id":"instance-one","operation_id":format!("queued-{index}"),"action":{"kind":"webrtc","setting":"default"}})
+                )["ok"],
+                true
+            );
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..4 {
+            let poll = native_at(
+                &p,
+                json!({"op":"poll","instance_id":"instance-one","token":token}),
+                &ext,
+                "one",
+            );
+            assert_eq!(poll["ok"], true);
+            let batch = poll["data"]["proposals"].as_array().unwrap();
+            assert!(batch.len() <= 2);
+            for proposal in batch {
+                seen.insert(proposal["id"].as_str().unwrap().to_owned());
+            }
+        }
+        assert_eq!(seen.len(), 7);
+        for (id, phase) in [("queued-0", "canceled"), ("queued-1", "expired")] {
+            let ack = native_at(
+                &p,
+                json!({"op":"receipt","instance_id":"instance-one","token":token,"receipt":{"id":id,"phase":phase}}),
+                &ext,
+                "one",
+            );
+            assert_eq!(ack["ok"], true);
+            let delayed = native_at(
+                &p,
+                json!({"op":"receipt","instance_id":"instance-one","token":token,"receipt":{"id":id,"phase":"running"}}),
+                &ext,
+                "one",
+            );
+            assert_eq!(delayed["data"]["phase"], phase);
+        }
+        // Same original clear ID can advance only after the browser sends its
+        // durable final receipt; a delayed preparation ACK cannot roll it back.
+        control_at(
+            &p,
+            json!({"op":"submit","instance_id":"instance-one","operation_id":"clear-original","action":{"kind":"clear","origins":["https://claude.ai"],"types":["serviceWorkers","cookies"]}}),
+        );
+        for phase in [
+            "awaiting-browser-restart",
+            "completed",
+            "awaiting-browser-restart",
+        ] {
+            let ack = native_at(
+                &p,
+                json!({"op":"receipt","instance_id":"instance-one","token":token,"receipt":{"id":"clear-original","phase":phase,"result":{"continuedBy":"popup-child"}}}),
+                &ext,
+                "one",
+            );
+            assert_eq!(ack["ok"], true);
+        }
+        let original = control_at(
+            &p,
+            json!({"op":"query","instance_id":"instance-one","operation_id":"clear-original"}),
+        );
+        assert_eq!(original["data"]["phase"], "completed");
+        assert_eq!(
+            original["data"]["receipt"]["result"]["continuedBy"],
+            "popup-child"
         );
         fs::remove_dir_all(p).unwrap();
     }

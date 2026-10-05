@@ -25,6 +25,10 @@ export interface Plan {
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
   policy?: PolicyAssessment;
   service?: ServicePlan;
+  import_manifest?: {
+    package: { format: string; generator: string | null; sha256: string };
+    files: { source: string; destination: string; category: string; size: number; sha256: string }[];
+  };
 }
 export interface Receipt {
   id: string; plan_id: string; environment_id: string; title: string; status: string;
@@ -33,6 +37,7 @@ export interface Receipt {
   policy?: PolicyAssessment;
   service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
   service_restorable?: boolean;
+  settings_recovery?: { state: "written" | "not_written" | "ownership_unproven"; reason: string; message: string };
   execution?: { mode: 'setsid' | 'system_manager' | 'user_manager'; manager: 'system' | 'user' | null; unit: string | null; continuation: string; limitation: string | null; reboot_survival: false };
   migration_probe?: { path: string; status: 'executing' | 'removed' | 'retained' };
   error?: { code: string; message: string; phase: string; step_id?: string | null; recovery?: string; next_action?: string; uncertain_side_effects?: boolean };

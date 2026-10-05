@@ -411,8 +411,10 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
     let home = base.join("home");
     let root = home.join("cc");
     fs::create_dir_all(&root).unwrap();
-    let engine = Engine::new(home.clone(), base.join("state")).unwrap();
-    let script = home.join("fake-claude");
+    let mut engine = Engine::new(home.clone(), base.join("state")).unwrap();
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    let script = home.join(".local/bin/claude");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
     fs::write(
         &script,
         "#!/bin/sh\ncase \"$2\" in\n status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n logout) exit 3;;\nesac\nexit 9\n",

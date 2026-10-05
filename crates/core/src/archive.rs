@@ -159,7 +159,7 @@ impl Engine {
         if files.is_empty() {
             return Err(err("empty_import", "归档中没有选中类别的文件"));
         }
-        self.plan(&e,"import","迁入选定工作内容",json!([]),vec!["目标环境现有文件","登录、hooks、MCP 与插件配置"],json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),json!({"original_job":r.get("job_id").cloned().unwrap_or(Value::Null),"archive_path":path,"archive_digest":archive_digest,"manifest":files,"categories":cats,"archive_passphrase_required":true}))
+        self.plan(&e,"import","迁入选定工作内容",json!([]),vec!["目标环境现有文件","登录、hooks、MCP 与插件配置"],json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),json!({"original_job":r.get("job_id").cloned().unwrap_or(Value::Null),"archive_path":path,"archive_digest":archive_digest,"package_format":package["schema"],"package_generator":package["generator"].as_str(),"manifest":files,"categories":cats,"archive_passphrase_required":true}))
     }
 
     pub(crate) fn import_work(

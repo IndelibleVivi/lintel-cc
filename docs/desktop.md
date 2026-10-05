@@ -84,11 +84,11 @@ Day / Night / System 直接切换外观，并在当前 webview 记住选择。�
 
 “去看月亮”打开四幅自行绘制的字符点阵风景：月下山湖、雨夜小屋、海边灯塔、星野营火。深浅字符绘制云、山、水和建筑；Clawd 用独立的橙色块面、两只眼睛及四只脚保持清楚轮廓。整幅画按比例缩放，不压扁角色。画中 Clawd 可收集小星星，风景册独立切换暖纸／夜色。风景参考了 [Claude Code 整幅夜景截图](https://miro.medium.com/v2/resize%3Afit%3A1358/format%3Awebp/1%2AgcjPv1ITZ6YpPwlMmveADA.png) 的负空间、点阵层次和角色关系；图形由本地代码绘制，不分发该截图。下拉菜单依据产品要求自行实现，未声称逐帧复刻官方移动端动效。
 
-“Clawd 跳一跳”提供开始、空格／上方向键／点击跳跃、暂停、碰撞重开和逐渐加速。离开游戏或切换窗口会暂停，关闭面板停止动画；最高分只保存在本机 webview 的 localStorage。它不依赖网络、模型或外部服务，界面说明也可从游戏中查看。
+“Clawd 跳一跳”与官网共用一个游戏实现：四条腿交替迈步、起跳收脚、落地压低与尘点，跳过石头／书本并收集星星（每颗 +25 分）。空格／上方向键／点击跳跃，P 或按钮暂停，碰撞可重开，速度渐增；落地前的短暂输入可接续下一跳。离开游戏、切换窗口或跑道离屏会暂停；切去风景册、关闭面板会释放动画与监听，再次打开只启动一个实例。Day／Night／System 跟随 App；减少动态效果时停用背景移动、尘点与落地缩放，主动游戏中的迈腿与跳跃保留。最高分沿用本机 webview 的 `lintel.clawd.runner.best`，官网在各自浏览器保存独立成绩。它不依赖网络、模型或外部服务。
 
 首页 Clawd 采用固定 SVG 像素几何，小游戏复用该轮廓，风景册用固定字符网格避免字体改变角色比例。形状对照 [Clawd 形象参考](https://pbs.twimg.com/tweet_video_thumb/G2C8pCLaMAAy2P1.jpg) 与 [Claude Code TUI 实际截图](https://zenn.dev/tutupizizizi/articles/claude-code-clawd-mascot)，自行编写渲染与场景，不下载参考图作为产品资源。Clawd 形象属于 Anthropic；Lintel 是独立工具。
 
-`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册交互与小游戏，`src/clawd-landscapes.ts` 负责四幅字符画。互动与游乐室样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
+`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册与小游戏的 React 挂载／卸载，`src/clawd-landscapes.ts` 负责四幅字符画。小游戏的唯一实现是 [`apps/site/clawd-game.mjs`](../apps/site/clawd-game.mjs) 与同名 CSS，由官网直接加载、App 通过 Vite 打包；旧 React runner 已移除。角色互动与风景册样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
 
 ```sh
 cd apps/desktop
@@ -120,3 +120,9 @@ npm run desktop:build
 同时开发时可用 `LINTEL_FIXTURE_PORT=1422 npm run dev:synthetic`，默认仍是 1420。fixture bridge 的端口、Origin 与 Host 校验使用同一配置。合成模式所有 core 状态与发现都位于临时目录，界面持续标明测试空间；原生浏览器、SSH、认证命令与网络模块不会在网页中伪造成功。新增请求必须进入明确 allowlist；登记路径不能逃出合成 home。
 
 主要桌面尺寸为 1120×760，最低 900×640，可收起侧栏。浏览器渲染不能代替 WebKit/native runtime、真实主机或正式浏览器验收。未完成的安装、发行和全产品能力以 [当前状态](current-state.md) 为准；本文件描述源码接入，不将它等同于正式发布。
+
+## 审批与结果接续
+
+迁入审批展示 core 冻结的最终清单：来源／目标相对路径、类别与大小，摘要与包身份可展开；文件长路径可换行，保留准确原值。计划的配置字段和文件迁入分开呈现。弹窗标题、目标与操作区保持可见，正文按可用高度独立滚动，多项回执动作允许换行。
+
+记录页保留环境筛选与搜索，另有“待处理”集中呈现执行中、中断和未完成结果。配置中断核对说明、独立恢复入口与任务 next_steps 跟随实际回执显示；未决运行器安装错误可直接查询原 install ID。旧安装已被取代与已核实但未绑定分别显示，不暗示当前版本被切换。

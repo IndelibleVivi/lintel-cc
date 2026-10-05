@@ -105,3 +105,23 @@ Shared preserve/rebuild/reset-client creation allocates new_root and new_environ
 New-file publication uses native no-replace rename: macOS renameatx_np(RENAME_EXCL), Linux renameat2(RENAME_NOREPLACE). It consumes the staging name and publishes a single-link destination in one operation, retaining no post-publication hard-link cleanup window. Unsupported kernel/filesystem capability returns atomic_publication_unsupported with no overwrite or hard-link fallback. Archive paths remain intent until archive_digest or a completed archive step proves readback; the App shares that condition between the view action and task-archive list. Work/state backup paths without completion are displayed as pending verification.
 
 Remote receipt refresh uses reconnect with the original plan_id and the durable task’s pinned runner_digest. Manual App ID lookup and CLI remote job use request.job: existing records retain their pinned runner; unknown IDs are read-only lookups via the current alias runner without creating a task/dedup record or consuming an unsubmitted plan’s submission slot. Existing execute/reconnect no-replay semantics and local receipt lookup remain unchanged.
+
+`Plan.import_manifest` exposes the frozen final file mapping without private `extra`:
+`{package:{format,generator,sha256},files:[{source,destination,category,size,sha256}]}`.
+Both paths are package/root-relative; generator is a package declaration, not an
+independently authenticated author. Approval covers this mapping and package.
+
+Before settings publication, the core receipt records `settings_write` with the
+frozen plan hash, before snapshot and staged-object after snapshot. A lock-owning
+original-job query reconciles only this prepared publication. Public
+`settings_recovery:{state,reason,message}` distinguishes `written`, `not_written`
+and `ownership_unproven`; only exact published-object evidence enables a new
+restore plan. This does not turn an interrupted job into a completed job or
+provide filesystem CAS against outside writers.
+
+Browser receipts also admit terminal `canceled` and `expired` for previews that
+never executed. Poll rotates bounded batches across pending IDs. The Engine
+atomically publishes a finishClear child's outcome with its consumed original
+clear's outcome, retaining `result.continuedBy`; the native host receives the
+original ID's final receipt through the existing authenticated receipt operation.
+No arbitrary caller-provided parent routing or new native protocol is required.

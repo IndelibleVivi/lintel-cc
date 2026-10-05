@@ -73,13 +73,18 @@ impl Controller {
             .wire(alias, payload, submit, &bytes, &command)
     }
     pub(super) fn binding(&self, alias: &str) -> Result<Option<Value>> {
+        Ok(self
+            .binding_record(alias)?
+            .map(|value| value["digest"].clone()))
+    }
+    fn binding_record(&self, alias: &str) -> Result<Option<Value>> {
         let path = self.state.join("bindings").join(format!("{alias}.json"));
         if !path.exists() {
             return Ok(None);
         }
         let value = load(&path)?;
         checked_digest(&value["digest"])?;
-        Ok(Some(value["digest"].clone()))
+        Ok(Some(value))
     }
     fn probe(&self, alias: &str) -> Result<Value> {
         let script = format!("{PROBE_BODY}{PROBE_END}");
@@ -214,23 +219,38 @@ impl Controller {
         }
         Ok(result)
     }
+    fn require_reconciled_installs(&self, alias: &str) -> Result<()> {
+        if let Some(record) = self
+            .install_inventory()?
+            .iter()
+            .find(|r| r["alias"] == alias && r["status"] == "needs_reconciliation")
+        {
+            return Err(Failure {
+                code: "install_reconciliation_required",
+                message: "此主机有结果未确认的安装；请先核对原安装，不能再次上传".into(),
+                diagnostic: Some(json!({
+                    "stage":"local",
+                    "reason":"install_reconciliation_required",
+                    "summary":"此主机的原安装结果尚未确认；本次没有上传。",
+                    "next_steps":["使用所列 alias 和 install_id 核对原安装；确认结果前不能批准另一份上传。"],
+                    "submission_uncertain":false,
+                    "stderr_truncated":false,
+                    "alias":alias,
+                    "install_id":record["install_id"]
+                })),
+            });
+        }
+        Ok(())
+    }
     pub(super) fn install_dispatch(&self, alias: &str, payload: &Value) -> Result<Value> {
         if payload["op"] == "prepare_runner" {
             exact_operation_fields(payload)?;
             let root = self.install_root(alias)?;
             let _held = lock(&root.join("install.lock"))?;
-            if self
-                .install_inventory()?
-                .iter()
-                .any(|r| r["alias"] == alias && r["status"] == "needs_reconciliation")
-            {
-                return Err(failure(
-                    "install_reconciliation_required",
-                    "此主机有结果未确认的安装；请先核对原安装，不能再次上传",
-                ));
-            }
+            self.require_reconciled_installs(alias)?;
             let probe = self.probe(alias)?;
             let bundle = self.bundle(field(&probe, "target")?)?;
+            let previous_binding = self.binding_record(alias)?;
             let stamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -240,7 +260,7 @@ impl Controller {
                 "install-{}",
                 &hash(&json!([alias, probe, bundle.meta, stamp]))[..24]
             );
-            let mut plan = json!({"install_id":id,"alias":alias,"probe":probe,"bundle":bundle.meta,"destination":format!("$HOME/.local/share/lintel/runners/{}/lintel",bundle.meta["sha256"].as_str().unwrap()),"effects":["上传本次调用提供的静态 runner 到当前 SSH 用户的专用版本目录","核验 SHA-256 与执行权限，再用 discover 核验 durable submit 能力","成功后 Lintel 绑定此版本；已有任务继续使用原 runner"],"status":"previewed","created_at":stamp});
+            let mut plan = json!({"install_id":id,"alias":alias,"probe":probe,"bundle":bundle.meta,"previous_binding":previous_binding,"destination":format!("$HOME/.local/share/lintel/runners/{}/lintel",bundle.meta["sha256"].as_str().unwrap()),"effects":["上传本次调用提供的静态 runner 到当前 SSH 用户的专用版本目录","核验 SHA-256 与执行权限，再用 discover 核验 durable submit 能力","成功且预览时的绑定未变化后 Lintel 绑定此版本；已有任务继续使用原 runner"],"status":"previewed","created_at":stamp});
             plan["approval"] = json!(hash(&plan));
             save(&root.join(format!("{id}.json")), &plan)?;
             return Ok(json!({"ok":true,"data":plan}));
@@ -258,6 +278,22 @@ impl Controller {
         if payload["op"] == "query_install" && record["status"] == "previewed" {
             return Ok(json!({"ok":true,"data":record}));
         }
+        if payload["op"] == "install_runner" && record["status"] == "previewed" {
+            if payload["approval"] != record["approval"] {
+                return Err(failure("approval_required", "请批准本次具体安装预览"));
+            }
+            // Another preview may have been approved since this one was created.
+            // Check under install.lock before persisting any new upload intent.
+            self.require_reconciled_installs(alias)?;
+            if record.get("previous_binding")
+                != Some(&self.binding_record(alias)?.unwrap_or(Value::Null))
+            {
+                return Err(failure(
+                    "stale_install_binding",
+                    "预览时的 runner 绑定已变化或旧预览未记录绑定；请重新预览，没有上传",
+                ));
+            }
+        }
         let probe = self.probe(alias)?;
         if probe["identity"] != record["probe"]["identity"]
             || probe["target"] != record["probe"]["target"]
@@ -268,9 +304,6 @@ impl Controller {
             ));
         }
         if payload["op"] == "install_runner" && record["status"] == "previewed" {
-            if payload["approval"] != record["approval"] {
-                return Err(failure("approval_required", "请批准本次具体安装预览"));
-            }
             let bundle = self.bundle(field(&probe, "target")?)?;
             if bundle.meta != record["bundle"] {
                 return Err(failure(
@@ -302,7 +335,8 @@ impl Controller {
                 }
             }
         }
-        // Repeated install and query_install are read-only from this point.
+        // Repeated install and query_install only read the remote host; local
+        // activation still requires the frozen binding precondition below.
         self.verify_install(alias, &path, record)
     }
     fn upload_script(&self, record: &Value) -> Result<String> {
@@ -375,20 +409,31 @@ fi"#
             save(path, &record)?;
             return Ok(json!({"ok":true,"data":record}));
         }
-        if record["activated"] == true {
-            record["status"] = json!("ready");
-            save(path, &record)?;
-            return Ok(json!({"ok":true,"data":record}));
-        }
         let dir = self.state.join("bindings");
         private_dir(&dir)?;
         let _held = lock(&dir.join(format!("{alias}.lock")))?;
-        save(
-            &dir.join(format!("{alias}.json")),
-            &json!({"digest":record["bundle"]["sha256"],"install_id":record["install_id"]}),
-        )?;
-        record["status"] = json!("ready");
-        record["activated"] = json!(true);
+        let current = self.binding_record(alias)?.unwrap_or(Value::Null);
+        let installed =
+            json!({"digest":record["bundle"]["sha256"],"install_id":record["install_id"]});
+        if current == installed {
+            // Also recover a crash after binding publication but before record save.
+            record["status"] = json!("ready");
+            record["activated"] = json!(true);
+        } else if record["activated"] == true {
+            record["status"] = json!("superseded");
+        } else if let Some(previous) = record.get("previous_binding") {
+            if current == *previous {
+                save(&dir.join(format!("{alias}.json")), &installed)?;
+                record["status"] = json!("ready");
+                record["activated"] = json!(true);
+            } else {
+                record["status"] = json!("superseded");
+            }
+        } else {
+            // Legacy records remain queryable, but cannot retroactively approve
+            // replacing a binding that their preview never captured.
+            record["status"] = json!("verified");
+        }
         record["last_error"] = Value::Null;
         save(path, &record)?;
         Ok(json!({"ok":true,"data":record}))
@@ -565,6 +610,199 @@ eval "$last"
         c.dispatch(json!({"op":"remove_host","alias":"synthetic-host"}))
             .unwrap();
         assert_eq!(query(&c, &p).unwrap()["data"]["status"], "ready");
+        assert_eq!(
+            fs::read_to_string(root.join("commands"))
+                .unwrap()
+                .matches("uploaded")
+                .count(),
+            1
+        );
+    }
+    #[test]
+    fn unactivated_old_install_cannot_replace_a_new_binding() {
+        let (t, c) = fixture();
+        let root = fs::canonicalize(t.path()).unwrap();
+        let current_bundle = fs::read(c.bundles.join("x86_64-unknown-linux-musl/lintel")).unwrap();
+        write_bundle(&c, b"#!/bin/sh\ncat >/dev/null\nif [ -f \"$HOME/discover-busy\" ]; then printf '%s\\n' '{\"ok\":false,\"error\":{\"code\":\"target_busy\",\"message\":\"Synthetic target is busy\"}}'; else printf '%s\\n' '{\"ok\":true,\"data\":{\"capabilities\":[{\"name\":\"detached_submission\",\"status\":\"available\"}]}}'; fi\n");
+        fs::write(root.join("home/discover-busy"), "").unwrap();
+        let old = prepare(&c);
+        assert_eq!(
+            install(&c, &old).unwrap()["data"]["status"],
+            "installed_unverified"
+        );
+        assert!(c.binding("synthetic-host").unwrap().is_none());
+        write_bundle(&c, &current_bundle);
+        let new = prepare(&c);
+        assert_eq!(install(&c, &new).unwrap()["data"]["status"], "ready");
+        fs::remove_file(root.join("home/discover-busy")).unwrap();
+        let response = query(&c, &old).unwrap();
+        assert_eq!(
+            c.binding("synthetic-host").unwrap(),
+            Some(new["bundle"]["sha256"].clone())
+        );
+        assert_eq!(response["data"]["status"], "superseded");
+        assert_ne!(response["data"]["activated"], true);
+        assert_eq!(install(&c, &old).unwrap()["data"]["status"], "superseded");
+        assert_eq!(
+            fs::read_to_string(root.join("commands"))
+                .unwrap()
+                .matches("uploaded")
+                .count(),
+            2
+        );
+    }
+    #[test]
+    fn preexisting_preview_cannot_upload_while_original_install_is_unresolved() {
+        let (t, c) = fixture();
+        let root = fs::canonicalize(t.path()).unwrap();
+        let original = prepare(&c);
+        let other = prepare(&c);
+        fs::write(root.join("lose-ack"), "").unwrap();
+        assert!(install(&c, &original).is_err());
+        let error = install(&c, &other).unwrap_err();
+        assert_eq!(error.code, "install_reconciliation_required");
+        let diagnostic = error.diagnostic.unwrap();
+        assert_eq!(diagnostic["install_id"], original["install_id"]);
+        assert_eq!(diagnostic["stage"], "local");
+        assert!(!diagnostic["next_steps"].as_array().unwrap().is_empty());
+        assert_eq!(diagnostic["submission_uncertain"], false);
+        let error = c
+            .dispatch(json!({"op":"prepare_runner","alias":"synthetic-host"}))
+            .unwrap_err();
+        assert_eq!(error.code, "install_reconciliation_required");
+        assert_eq!(
+            error.diagnostic.unwrap()["install_id"],
+            original["install_id"]
+        );
+        assert_eq!(query(&c, &other).unwrap()["data"]["status"], "previewed");
+        assert_eq!(install(&c, &original).unwrap()["data"]["status"], "ready");
+        assert_eq!(
+            fs::read_to_string(root.join("commands"))
+                .unwrap()
+                .matches("uploaded")
+                .count(),
+            1
+        );
+    }
+    #[test]
+    fn approval_freezes_the_previous_binding_including_its_install_id() {
+        let (t, c) = fixture();
+        let root = fs::canonicalize(t.path()).unwrap();
+        let first = prepare(&c);
+        assert!(first.get("previous_binding").unwrap().is_null());
+        install(&c, &first).unwrap();
+        let stale = prepare(&c);
+        assert_eq!(
+            stale["previous_binding"],
+            json!({"digest":first["bundle"]["sha256"],"install_id":first["install_id"]})
+        );
+        let mut approved = stale.clone();
+        approved.as_object_mut().unwrap().remove("approval");
+        assert_eq!(stale["approval"], hash(&approved));
+        approved["previous_binding"] = Value::Null;
+        assert_ne!(stale["approval"], hash(&approved));
+        // An independently approved installation of the same bytes is still a
+        // new binding generation; comparing only its digest would miss it.
+        let replacement = prepare(&c);
+        assert_eq!(
+            install(&c, &replacement).unwrap()["data"]["status"],
+            "ready"
+        );
+        let commands = fs::read_to_string(root.join("commands")).unwrap();
+        assert_eq!(
+            install(&c, &stale).unwrap_err().code,
+            "stale_install_binding"
+        );
+        assert_eq!(fs::read_to_string(root.join("commands")).unwrap(), commands);
+        assert_eq!(query(&c, &stale).unwrap()["data"]["status"], "previewed");
+        assert_eq!(query(&c, &first).unwrap()["data"]["status"], "superseded");
+        assert_eq!(
+            load(&c.state.join("bindings/synthetic-host.json")).unwrap()["install_id"],
+            replacement["install_id"]
+        );
+        let mut bytes = fs::read(c.bundles.join("x86_64-unknown-linux-musl/lintel")).unwrap();
+        bytes.extend_from_slice(b"# Updated synthetic runner\n");
+        write_bundle(&c, &bytes);
+        let update = prepare(&c);
+        assert_eq!(install(&c, &update).unwrap()["data"]["status"], "ready");
+        assert_eq!(
+            c.binding("synthetic-host").unwrap(),
+            Some(update["bundle"]["sha256"].clone())
+        );
+    }
+    #[test]
+    fn legacy_previews_require_fresh_approval_and_legacy_queries_only_verify() {
+        let (t, c) = fixture();
+        let root = fs::canonicalize(t.path()).unwrap();
+        let mut legacy = prepare(&c);
+        let path = c
+            .install_root("synthetic-host")
+            .unwrap()
+            .join(format!("{}.json", legacy["install_id"].as_str().unwrap()));
+        legacy.as_object_mut().unwrap().remove("previous_binding");
+        save(&path, &legacy).unwrap();
+        let commands = fs::read_to_string(root.join("commands")).unwrap();
+        assert_eq!(
+            install(&c, &legacy).unwrap_err().code,
+            "stale_install_binding"
+        );
+        assert_eq!(fs::read_to_string(root.join("commands")).unwrap(), commands);
+        let installed = prepare(&c);
+        install(&c, &installed).unwrap();
+        // This legacy record has an uploaded file, but no approved replacement
+        // precondition. Querying it may confirm the file, not replace a binding.
+        legacy["status"] = json!("needs_reconciliation");
+        save(&path, &legacy).unwrap();
+        assert_eq!(query(&c, &legacy).unwrap()["data"]["status"], "verified");
+        assert_eq!(install(&c, &legacy).unwrap()["data"]["status"], "verified");
+        assert_eq!(
+            load(&c.state.join("bindings/synthetic-host.json")).unwrap()["install_id"],
+            installed["install_id"]
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("commands"))
+                .unwrap()
+                .matches("uploaded")
+                .count(),
+            1
+        );
+        let path = c.install_root("synthetic-host").unwrap().join(format!(
+            "{}.json",
+            installed["install_id"].as_str().unwrap()
+        ));
+        let mut legacy_active = load(&path).unwrap();
+        legacy_active
+            .as_object_mut()
+            .unwrap()
+            .remove("previous_binding");
+        save(&path, &legacy_active).unwrap();
+        assert_eq!(
+            query(&c, &legacy_active).unwrap()["data"]["status"],
+            "ready"
+        );
+    }
+    #[test]
+    fn published_binding_recovers_without_reupload_or_a_second_activation() {
+        let (t, c) = fixture();
+        let root = fs::canonicalize(t.path()).unwrap();
+        let p = prepare(&c);
+        install(&c, &p).unwrap();
+        let path = c
+            .install_root("synthetic-host")
+            .unwrap()
+            .join(format!("{}.json", p["install_id"].as_str().unwrap()));
+        let mut incomplete = p.clone();
+        incomplete["status"] = json!("needs_reconciliation");
+        save(&path, &incomplete).unwrap();
+        let binding_path = c.state.join("bindings/synthetic-host.json");
+        let binding_before = fs::metadata(&binding_path).unwrap().modified().unwrap();
+        let recovered = query(&c, &p).unwrap();
+        assert_eq!(recovered["data"]["status"], "ready");
+        assert_eq!(recovered["data"]["activated"], true);
+        assert_eq!(
+            fs::metadata(&binding_path).unwrap().modified().unwrap(),
+            binding_before
+        );
         assert_eq!(
             fs::read_to_string(root.join("commands"))
                 .unwrap()

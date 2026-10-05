@@ -34,6 +34,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `native-host-rust-test` | rust | `cargo test --manifest-path extensions/browser/native-host/Cargo.toml` (standalone crate) |
 | `runner-build` | rust | `cargo build -p lintel-runner` |
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
+| `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared runner gait/jump/stars/collision/pause physics, no dependencies) |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |
@@ -51,6 +52,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 The two standalone Rust entrypoints beyond the root workspace (`apps/desktop/src-tauri`,
 `extensions/browser/native-host`) are listed because the root `Cargo.toml`
 excludes them; verifying only `cargo test --workspace` would silently skip them.
+
+The standalone website has an independent `site-ui` check: `python3 tests/verify.py --checks site-game-test,site-ui` runs game physics and an isolated Chromium journey for responsive layout, theme persistence, illustrative plan/receipt tabs, game lifecycle, keyboard/pointer controls, reduced motion, unavailable storage and absence of external requests. It serves only `apps/site` on an ephemeral loopback port and uses the existing Playwright installation (or `PLAYWRIGHT_MODULE`). It does not open a personal browser profile or exercise the App/core/native bridge. See the [website guide](../apps/site/README.md) for local preview; there is no website build step. Independent `clawd-app-ui` (`node tests/clawd_app_ui_journey.mjs`) exercises the same runner through the built App pocket menu with an empty synthetic inventory: existing score retention, a single animation loop, disposal on tab/modal exit, focus return, landscape interaction and Day/Night/System. Build the App frontend first; this is Chromium UI evidence, not native WebKit or an installed bundle.
 
 Toolchains (`cargo`, `node`, `npm`, `python3`) are resolved from the caller's
 `PATH` and environment. The entrypoint does not install anything, does not probe
@@ -389,3 +392,12 @@ Remote receipt refresh uses original-task reconnect. Manual App ID lookup and CL
 Shared remote tests: 41 passed, 2 independent ignored. The installed-runner upgrade check covers reconnect and both job lookup fields; unknown-ID lookup creates no task/dedup record, later execute submits once, and repeats query. The real installed-CLI regression also proves that a manual job lookup bypasses submission storage without opening SSH. A new explicit reconnect durably captures the current runner binding before its first query; three fixture queries retain that binding across an alias upgrade with no submission. Retained original-job lookups remain available after alias removal. The unchanged stdin-transport/no-task-directory assertion and shared current-HOME journey passed.
 
 Shared plan-hash shape is exactly 64 lowercase hex characters for strict named execute and new remote submissions. Malformed approval rejects before named core state or remote task intent/SSH; existing task records remain query-only. Old controller/schema regressions failed, then operations 6/6, remote 41 passed/2 ignored and the actual CLI journey passed; schemas use the same owner. Raw protocol-1 core approval checks remain compatible.
+
+Browser smoke also renders the built App through a synthetic invoke adapter to
+real core/native-host processes. Build the desktop frontend first. Its additional
+App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
+process exit and production runtime.onStartup, popup continuation, original-ID
+query, and unexecuted-preview cancellation. It never visits the Claude service.
+The default group includes 18 checks; the CI independent browser/UI group includes
+browser-smoke, browser-pairing-ui, service-ui, work-ui, remote-task-ui, site-ui and
+clawd-app-ui. Linux OpenSSH and VM remain separate jobs within the same CI owner.

@@ -20,3 +20,6 @@ target/
 /apps/desktop/src-tauri/runner-bundles/*/lintel
 /apps/desktop/src-tauri/browser-host-bundle/manifest.json
 /apps/desktop/src-tauri/browser-host-bundle/lintel-browser-host
+
+# Local visual QA captures; keep evidence outside the public source tree.
+/qa/
