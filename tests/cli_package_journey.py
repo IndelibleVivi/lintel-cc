@@ -172,8 +172,8 @@ class PackageJourney:
 
     @staticmethod
     def check_sums(root: Path, valid: bool = True) -> str:
-        tool = shutil.which("shasum")
-        args = [tool, "-a", "256", "-c", "SHA256SUMS"] if tool else ["sha256sum", "-c", "SHA256SUMS"]
+        args = (["shasum", "-a", "256", "-c", "SHA256SUMS"] if platform.system() == "Darwin"
+                else ["sha256sum", "-c", "SHA256SUMS"])
         proc = subprocess.run(args, cwd=str(root), text=True, capture_output=True, check=False)
         assert (proc.returncode == 0) is valid, (args, proc.stdout, proc.stderr)
         if valid:

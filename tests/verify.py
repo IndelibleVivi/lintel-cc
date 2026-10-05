@@ -83,6 +83,8 @@ def _check(
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
 _CLI_PACKAGE_BINARY = ROOT / ("target/x86_64-unknown-linux-musl/release/lintel"
                              if platform.system() == "Linux" else "target/debug/lintel")
+_CLI_PACKAGE_TOOLS = (("node", "tar", "cc", "shasum") if platform.system() == "Darwin"
+                      else ("node", "tar", "sha256sum"))
 
 CHECKS: List[Check] = [
     _check("cargo-workspace-test", "cargo test --workspace (core, operations, remote, egress, runner)", "rust",
@@ -110,8 +112,8 @@ CHECKS: List[Check] = [
     # Independent / real-runtime evidence: never in the implicit default group.
     _check("cli-candidate", "portable CLI package/extract/native execution and retained-state upgrade", "independent",
            PYTHON, "tests/cli_package_journey.py", str(_CLI_PACKAGE_BINARY),
-           tools=("node", "tar"), paths=(_CLI_PACKAGE_BINARY,),
-           independent=True, requires="macOS arm64 native CLI or Linux x86_64 static musl CLI; Node for packaging; tar and platform checksum tool",
+           tools=_CLI_PACKAGE_TOOLS, paths=(_CLI_PACKAGE_BINARY,),
+           independent=True, requires="macOS arm64 native CLI or Linux x86_64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum for test fixtures/checksums",
            reason="executes the native extracted package; other architectures use visibly synthetic format fixtures"),
     _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
            PYTHON, "tests/remote_linux_ssh_journey.py", "target/x86_64-unknown-linux-musl/release/lintel",
@@ -411,6 +413,21 @@ def run_self_test() -> int:
         expect(run_check(ok(independent=True, reason="x", paths=(Path(temp) / "absent",)),
                          opted_in)["status"] == SKIP,
                "opted-in independent check skips (not passes) when prerequisites are missing")
+
+        from unittest.mock import patch
+        candidate = next(c for c in CHECKS if c.id == "cli-candidate")
+        prebuilt = Path(temp) / "native-cli"
+        prebuilt.touch()
+        candidate = dataclasses.replace(candidate, paths=(prebuilt,))
+        missing_tools = ("cc", "shasum") if platform.system() == "Darwin" else ("sha256sum",)
+        for missing in missing_tools:
+            with patch.object(shutil, "which", side_effect=lambda name, missing=missing: None if name == missing else "/synthetic/tool"), \
+                 patch(__name__ + ".run", return_value={"exit_code": 3, "duration_seconds": 0,
+                       "timed_out": False, "stdout": "", "stderr": "unexpected journey launch"}) as launched:
+                result = run_check(candidate, opted_in)
+                expect(result["status"] == SKIP and missing in result.get("reason", "")
+                       and not launched.called,
+                       f"candidate skips missing {missing} before launching a prebuilt-native journey")
 
         now = _dt.datetime.now(_dt.timezone.utc)
         doc = build_evidence([run_check(ok(), args)], args, now, now)
