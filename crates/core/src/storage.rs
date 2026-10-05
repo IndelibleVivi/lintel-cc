@@ -9,6 +9,7 @@ use std::{
     fmt,
     fs::{self, OpenOptions},
     io::{Read, Write},
+    os::unix::ffi::OsStrExt,
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Component, Path},
 };
@@ -73,6 +74,73 @@ pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+    write_atomic(path, bytes, mode, true)
+}
+/// Publish a complete new file without replacing a concurrently created target.
+/// The temporary file and destination share a directory/filesystem. Native
+/// no-replace rename consumes the staged name and publishes the single-link
+/// destination in one operation, including the interruption boundary.
+pub fn atomic_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
+    write_atomic(path, bytes, mode, false)
+}
+fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    return Err(err(
+        "atomic_publication_unsupported",
+        "此平台不支持所需的原子不覆盖发布",
+    ));
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        let from = std::ffi::CString::new(tmp.as_os_str().as_bytes())
+            .map_err(|_| err("invalid_path", "发布路径含无效字符"))?;
+        let to = std::ffi::CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| err("invalid_path", "发布路径含无效字符"))?;
+        #[cfg(target_os = "macos")]
+        let status = unsafe {
+            libc::renameatx_np(
+                libc::AT_FDCWD,
+                from.as_ptr(),
+                libc::AT_FDCWD,
+                to.as_ptr(),
+                libc::RENAME_EXCL,
+            )
+        };
+        #[cfg(target_os = "linux")]
+        let status = unsafe {
+            // Rust's bundled musl can lack the renameat2 wrapper even when the
+            // binding is declared. Use the fixed kernel operation directly.
+            libc::syscall(
+                libc::SYS_renameat2,
+                libc::AT_FDCWD as libc::c_long,
+                from.as_ptr(),
+                libc::AT_FDCWD as libc::c_long,
+                to.as_ptr(),
+                libc::RENAME_NOREPLACE,
+            )
+        };
+        if status == 0 {
+            return Ok(());
+        }
+        let failure = std::io::Error::last_os_error();
+        if failure.kind() == std::io::ErrorKind::AlreadyExists {
+            return Err(err(
+                "target_exists",
+                "目标文件已经出现；原内容保持不变，请核对原任务",
+            ));
+        }
+        if matches!(
+            failure.raw_os_error(),
+            Some(libc::ENOSYS | libc::ENOTSUP | libc::EINVAL)
+        ) {
+            return Err(err(
+                "atomic_publication_unsupported",
+                "目标文件系统或内核不支持原子不覆盖发布；未退回覆盖式写入",
+            ));
+        }
+        Err(failure.into())
+    }
+}
+fn write_atomic(path: &Path, bytes: &[u8], mode: u32, overwrite: bool) -> Result<()> {
     guard(path)?;
     let parent = path
         .parent()
@@ -88,7 +156,11 @@ pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
         f.sync_all()?;
         fs::set_permissions(&tmp, fs::Permissions::from_mode(mode))?;
         guard(path)?;
-        fs::rename(&tmp, path)?;
+        if overwrite {
+            fs::rename(&tmp, path)?;
+        } else {
+            publish_new(&tmp, path)?;
+        }
         std::fs::File::open(parent)?.sync_all()?;
         Ok(())
     })();
@@ -99,6 +171,35 @@ pub fn atomic(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
 }
 pub fn save(path: &Path, value: &Value) -> Result<()> {
     atomic(path, &serde_json::to_vec_pretty(value)?, 0o600)
+}
+
+#[cfg(test)]
+mod publication_tests {
+    use super::*;
+
+    #[test]
+    fn published_package_is_recoverable_before_any_followup_cleanup() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let staged = base.join(".lintel-staged.tmp");
+        let published = base.join("work.age");
+        let pass = "synthetic publication passphrase";
+        let package = serde_json::json!({"schema":"lintel.work/1","files":[]});
+        fs::write(&staged, crate::archive::seal(&package, pass).unwrap()).unwrap();
+        // Exercise the actual publication primitive without executing the
+        // writer's later cleanup/fsync/readback statements. This is the
+        // filesystem state retained if the process exits at that boundary.
+        publish_new(&staged, &published).unwrap();
+        let recovered = crate::work::read_package(&published, pass);
+        assert!(
+            recovered.is_ok(),
+            "Published package cannot be recovered: {:?}",
+            recovered.as_ref().err()
+        );
+        assert_eq!(recovered.unwrap().0, package);
+        assert_eq!(fs::metadata(&published).unwrap().nlink(), 1);
+        assert!(!staged.exists());
+    }
 }
 pub fn load(path: &Path) -> Result<Value> {
     parse(&read(path, 16 * 1024 * 1024)?)

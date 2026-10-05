@@ -4,6 +4,16 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 人类任务、agent CLI 与独立工作保全（本轮源码候选）
+
+已接入六个 App 任务帮助入口及[人类指南](operator-guide.md)、[Agent CLI 指南](agents.md)。工作保全独立于清理：archive-only 只生成加密包；preserve 归档后建立新根并迁入，成功按本任务显示完成，旧登录／设置／服务绑定保留。旧 plan_reset/rebuild 与历史部分完成回执仍兼容。工作包保留 lintel.work/1 格式，可用目标主机的显式 archive_path 独立检查、阅读、选择性迁入，不依赖原 job/state；密文由明确的系统工具传输，已有文件不覆盖，包内容与目标在批准执行时再核对。
+
+现有 lintel runner 提供静态 version/capabilities/describe/schema、named core 操作、冻结 plan show 和原 ID job wait。GUI 与 CLI 共用 crates/remote 的有限 SSH controller；Mac CLI 接现有 browser-host control，浏览器人工确认／真正重启仍由目标 profile 拥有。network serve 与既有 egress 共用前台生命周期，明确 owner/PID/实际 active_config；不能查询或停止 App 进程内通道。discover 两入口的 runner capabilities 一致，submit 拒绝退出非零。清理预览与执行都先保全／新根迁入，再批准的注销与精确删除；接受后失败回执保留 code/message/真实 phase/step/不确定副作用与原任务恢复指引。
+
+本机 macOS arm64 clean `a959d8a` 的默认 17 项检查全部通过。根 workspace（core 62、shared remote 37 passed／2 independent ignored）、standalone desktop/native-host、JS/Python、frontend build 与 CLI journeys 通过；ignored 不计通过。新的 work-ui 及 browser-pairing-ui/service-ui/remote-task-ui 四项通过，工作旅程使用两个隔离 HOME 的真实 core，检查归档／保全／独立导入、错误口令、键盘和 Day/Night；invoke/clipboard/SSH/service seams 为合成，不证明 native WebKit 或生产主机。当前 App 包内 host/扩展资源的两项独立 synthetic 安装检查也通过。现有 CI owner 已接 work-ui；本轮 fresh Linux CI 尚未运行。
+
+全新临时版本目录的 release CLI 已安装并通过 named plan/submit/原 ID wait/restore、portable package 和有限 adapter journeys；不依赖 GUI。当前源码的 arm64 App 已构建（约 14.42 MiB，含 canonical browser host 与扩展），未安装、激活、签名公证或正式发行；此候选没有本轮新 Linux runner bundles，远端安装明确显示 bundle_unavailable，不能把前轮静态 runner 当成新增 API 已安装。新 Linux CLI build/runtime、正式浏览器／真实认证与生产 VPS 仍需独立证据。上面的源码交付不改写下方历史 clean CI 和 App 证据。
+
 ## SSH 原任务与恢复入口（候选）
 
 主机面板查询原任务后可直接查看完整回执与恢复，进入准确 alias／环境的记录；已移除主机保留 query-only。恢复依旧独立预览和批准。TypeScript/Vite 与 `remote-task-ui`、`service-ui` 本机渲染检查通过，涵盖丢 ACK 后 App reload、一次原提交、查询更新、关闭面板后的迟到响应、后续编辑冲突、独立恢复和 Day/Night 1120／900 布局。clean `7a05291` 的 [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079) 也已通过 macOS／Ubuntu 默认各 13/13、独立 browser/UI 各 4/4（启动、配对、服务、原任务）。`remote-task-ui` 的 SSH/invoke/持久 registry 为合成；不代表 native WebKit、真实 SSH 或生产 VPS。
@@ -69,8 +79,8 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 - core / runner：环境登记与建立、版本化外发设置计划/批准/读回、字段恢复、漂移、脱敏支持资料；有限登录修复/客户端重建/退役；加密归档、文本阅读与选择性迁入。清理范围是预览中的准确文件和可显式调用的官方认证入口，不等于全客户端清场。概览统计与归档准入解耦（大文件不阻断 inspect）；二次重建会把此前迁入 lintel-imports 的工作重新计入归档；损坏 settings 不阻断不修改 settings 的保全计划；各变量分别按官方非空值或 boolean 语义判断；静态识别 native/npm 产品版本，Remote Control 按版本／Trusted Devices 条件评估，未知条件显式标注。冲突旧值通过用户选定的准确删除 diff 解除；预览冻结策略与产品版本，变更后拒绝执行。
 - 桌面：同一套本机/SSH 环境、计划、清理、归档和任务界面；浏览器模块全操作入口、Native Messaging 注册计划与配对；本机代理启停/连接观察。所有修改先生成计划或独立确认。
 - 界面：聊天式首页按角色招呼、操作框、一行工作入口重排，玩耍入口集中到不挤动工作区的口袋菜单。Clawd 支持摸摸／拖抱／弹飞／连续戳戳害羞与躲藏、下拉起飞；四幅重新绘制的字符风景保留清楚角色轮廓与画面比例，另有跳跃小游戏。提供 Day / Night / System、可选本地字体、键盘操作及减少动态效果。字体文件不进入 Git，干净 checkout 使用系统 fallback。
-- SSH：native Rust bridge 使用系统 OpenSSH、静态 alias、严格 host key 与有限 JSON 请求；`lintel submit` 持久接收后返回 ACK，符合既有条件的 Linux 使用有限单任务 system/user transient service，其他路径保留 setsid 与明确续跑限制，重连只查询原任务。桌面可移除／撤销移除 alias；原任务与去重记录保留。新增用户批准的 Linux x86_64 / arm64 runner 探测、安装预览、内置文件上传、SHA／权限／能力核验与 alias 版本绑定；上传前持久 intent，丢 ACK 只核对原安装，原任务冻结 runner。安装仅写用户专用版本目录，不修改 PATH／系统服务／Claude。错误提供阶段、具体原因、排查步骤、退出码、限长 stderr 与只读核验命令，查询错误同样保留诊断。Python controller 是可选 CLI，不是桌面依赖，也未接入这一轮的结构化诊断。
-- 帮助：App 内提供开发者 GitHub、Lintel 源码说明、Infra Field Guide 的 VPS 101 与 SSH 排障入口。macOS native 仅打开固定 HTTPS 文档资源；远端准备文档区分 App 批准安装与独立 CLI 的手工 PATH 准备。
+- SSH：native Rust bridge 使用系统 OpenSSH、静态 alias、严格 host key 与有限 JSON 请求；`lintel submit` 持久接收后返回 ACK，符合既有条件的 Linux 使用有限单任务 system/user transient service，其他路径保留 setsid 与明确续跑限制，重连只查询原任务。桌面可移除／撤销移除 alias；原任务与去重记录保留。新增用户批准的 Linux x86_64 / arm64 runner 探测、安装预览、内置文件上传、SHA／权限／能力核验与 alias 版本绑定；上传前持久 intent，丢 ACK 只核对原安装，原任务冻结 runner。安装仅写用户专用版本目录，不修改 PATH／系统服务／Claude。错误提供阶段、具体原因、排查步骤、退出码、限长 stderr 与只读核验命令，查询错误同样保留诊断。正式 agent CLI 与桌面共用 Rust controller。Python controller 保留旧 raw request/submit 等兼容子集；不再承接新特性，两套本地提交记录不能混用。
+- 帮助：App 内提供开发者 GitHub、Lintel 源码说明、Infra Field Guide 的 VPS 101 与 SSH 排障入口。macOS native 仅打开固定 HTTPS 文档资源，并增加六个场景入口、人类操作与 agent 指南；新文档的公开链接随源码发布生效。远端准备文档区分 App 批准安装与独立 CLI 的手工 PATH 准备。
 - 浏览器：Chromium MV3 / Firefox 独立适配、Native Messaging host、实例冲突/配对/持久操作记录与固定路径安装器。Chromium 清理先隔离、关闭目标及 iframe 宿主、注销 worker，等待完整浏览器重启，再用新确认继续删除。
 - 网络：loopback CONNECT / 有限 HTTP 转发、精确域名/端口规则、上游与连接事件；仅证明经过通道的流量。native start/status 返回实际采用的规范化 active_config；界面分开呈现当前生效配置与按环境保存的下次启动草案，支持默认动作及允许／阻止规则和端口。
 
@@ -78,7 +88,7 @@ Ubuntu 独立 OpenSSH runtime 已通过[CI 验收](https://github.com/IndelibleV
 
 | 范围 | 当前证据 |
 | --- | --- |
-| Core | clean macOS／Ubuntu CI 当前各 52 项 Rust tests 通过（含 21 项有限服务生命周期回归）；此前 31 项（新增版本／变量／组织矩阵、静态版本来源、显式解除与外部旧值保护），其余包括，旧计划冲突、归档导入拒绝覆盖、退役、官方注销 fake CLI、共享认证范围变化拒绝、删除窗口内替换新凭据保留，以及本轮新增：二次重建保留 lintel-imports 原有工作、9 MiB 会话不阻断 inspect、损坏 settings 下独立保全计划可预览并执行且原字节不变 |
+| Core | 最近记录的 clean macOS／Ubuntu CI 各 52 项 Rust tests 通过；本轮 macOS 源码候选 62 项通过（含 21 项有限服务生命周期回归）；此前 31 项（新增版本／变量／组织矩阵、静态版本来源、显式解除与外部旧值保护），其余包括，旧计划冲突、归档导入拒绝覆盖、退役、官方注销 fake CLI、共享认证范围变化拒绝、删除窗口内替换新凭据保留，以及本轮新增：二次重建保留 lintel-imports 原有工作、9 MiB 会话不阻断 inspect、损坏 settings 下独立保全计划可预览并执行且原字节不变 |
 | CLI / submission | 实际 CLI 配置往返旅程通过；独立 worker 的 durable ACK、父进程退出后完成、原 ID 查询、去重、口令不落记录通过。PTY 中重建/批准/无回显口令/加密归档通过。新增 work_preservation journey 3/3（大文件概览、A→B→C 保留、损坏 settings 独立保全）；policy journey 覆盖版本变化拒绝、外部编辑、准确删除、恢复外部旧值、receipt 策略证据 |
 | Egress | 5 unit + 7 localhost socket tests 通过；新增 inet_aton 式／IPv4-mapped IP 写法不能绕过精确规则、wire 配置缺省 default_action 直接拒绝的回归。本轮 native network tests 3/3 新鲜通过，覆盖规范化生效配置读回、精确规则命中、环境隔离、无效配置与通道结束状态。没有真实 Claude 公网探针或进程强约束证据 |
 | Browser | 20 JS 与当前 12 native host Rust tests 通过；App 内置扩展安装器 12 项含包内资源测试、host 安装／更新与实际 executable 验证见上节。既有覆盖：通用 control 不能放行扩展（授权仅限安装路径）、配对码 12 hex／5 次失败作废／pending 上限、browser 由调用方身份派生、running 回执移到 durable 边界之后、DNR 读回数组序不敏感。活跃 SW 负例证实注销后仍可能回写；当前真实 Chromium 持久安装／完整退出与原生 onStartup／二次确认 smoke 已通过，详见上节。覆盖 active SW／iframe writer、五类目标存储与邻域保留、隔离／权限恢复、重复操作不重删及 Native Messaging 持久回执。正式三浏览器与 AdsPower／Firefox 容器／真实网站仍未验收 |

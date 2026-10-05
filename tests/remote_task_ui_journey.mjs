@@ -28,7 +28,7 @@ async function invoke(command,args){
       case 'aliases':return ok({aliases:[alias],coverage:'Synthetic SSH inventory; no real connection'});
       case 'connect':assert.equal(p.alias,alias);return ok({status:'connected'});
       case 'remove_host':removed=true;return ok({status:'removed'});
-      case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok({...receipts[0]});
+      case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok(await core({command:'job',job_id:p.plan_id},true));
       case 'request':assert.equal(p.alias,alias);return ok(await core(p.request,true));
       case 'execute':assert.equal(p.alias,alias);return ok(await core({...p,command:'execute'},true));
       default:throw new Error('unexpected remote operation: '+p.op);
@@ -95,10 +95,19 @@ try{
 
   // An outstanding original-job query must not reopen a receipt closed by the user.
   heldJob=hold();await dialog.getByRole('button',{name:'查询最新结果',exact:true}).click();
-  await assertWait(()=>jobRequested);await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await assertWait(()=>jobRequested);assert.equal(calls.some(c=>c.op==='request'&&c.request?.command==='job'),false,'Receipt refresh bypassed the durable pinned-runner reconnect path');await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   heldJob.release();heldJob=null;await page.getByRole('button',{name:alias,exact:true}).waitFor({state:'visible'});
   await assertWait(async()=>!await pageBusy());assert.equal(await dialog.count(),0);
-  report.checks.push('late original-job response cannot revive a closed result panel');
+  await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
+  await page.getByText('执行连接中断？用原任务 ID 找回结果',{exact:true}).click();
+  const taskCountBeforeManual=tasks.length;
+  await page.getByLabel('原任务 ID',{exact:true}).fill(` ${original} `);
+  await page.locator('.query-task').getByRole('button',{name:'查询原任务',exact:true}).click();
+  await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();
+  assert.deepEqual(calls.filter(c=>c.op==='request'&&c.request?.command==='job').at(-1)?.request,{command:'job',job_id:original},'Manual lookup must use the read-only job operation');
+  assert.equal(tasks.length,taskCountBeforeManual,'Manual lookup must not allocate a submission record');
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  report.checks.push('receipt refresh uses reconnect; manual original-ID lookup uses read-only job without allocating a submission record; late original-job response cannot revive a closed result panel');
 
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
   heldDiscover=hold();await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();

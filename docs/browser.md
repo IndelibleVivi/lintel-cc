@@ -111,6 +111,8 @@ host 只接受已授权的精确扩展 ID，授权**只**发生在上述用户�
 
 ## Native bridge 接口
 
+CLI 的静态 browser catalog/schema 与 host validator 共用 ID 长度和身份常量：instance/operation/challenge/receipt ID 为 8–80 个 ASCII 字母、数字、`-` 或 `_`；安装时 Chrome/Edge 只接受 32 个 `a`–`p` 的 extension ID，Firefox 只接受 `lintel@lintel.local`。纯 manifest helper 支持 `chromium` 名称，固定路径注册 installer 不支持该名称；不能从 helper 的支持推导一个安装入口。
+
 `extensions/browser/native-host` 有自己的 Cargo workspace。桌面可直接依赖 package `lintel-browser-host`，不需要 shell 或 subprocess：
 
 ```rust
@@ -234,3 +236,10 @@ python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/li
 - [Firefox DataTypeSet](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/browsingData/DataTypeSet)：没有独立 CacheStorage 类别；不把全缓存或 serviceWorkers 字段冒充可单独定向的 CacheStorage API。
 - [Firefox background](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background)：Firefox 使用 scripts/event page，Chrome 使用 service worker。
 - [Firefox Native Messaging](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging) 与 [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)：安装 manifest、native framing 与 caller identity。
+
+
+## 统一 CLI 的有限适配
+
+macOS `lintel browser operations` / `describe browser.OP` / `schema browser.OP` 静态描述 control 与 action，不初始化 browser state。`browser operations --instance ID` 检查实际 pairing/conflict/online，权限继续由扩展 confirmation 决定。`browser instances`、`pair create/pending/approve`、`submit/query/control` 复用现有 Native Messaging host；原 instance/operation ID 拥有 query-only recovery。
+
+Linux runner 不带这个组件，明确返回限制；可在 profile 所在主机使用独立 host CLI。统一 CLI 的 manual host_path 安装与 App bundled installer 的资源定位/批准仍是分别明确的入口，不假设 GUI 已安装。安装方法、stdin 和人工等待见 [agents.md](agents.md#browser-adapter)，人类配对与清理见 [operator-guide.md](operator-guide.md)。

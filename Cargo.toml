@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "apps/runner", "crates/egress"]
+members = ["crates/core", "apps/runner", "crates/egress", "crates/operations", "crates/remote"]
 exclude = ["apps/desktop/src-tauri", "extensions/browser/native-host"]
 resolver = "2"
 

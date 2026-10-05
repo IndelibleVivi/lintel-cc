@@ -57,6 +57,8 @@ try{
   await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'清理与重建',exact:true}).click();
   await page.getByRole('radio',{name:/修复本地登录/}).check();
+  const writersWarning=page.getByText(/仍有无法归属到此目录的 Claude 写入进程/);
+  await writersWarning.waitFor();
   const control=page.locator('.service-control');await control.locator('summary').click();
   await control.getByLabel('服务 unit').fill(held.unit);await control.getByRole('button',{name:'检查服务',exact:true}).click();
   await control.getByText('运行中',{exact:true}).waitFor();assert.equal(calls.some(c=>c.command==='execute'),false);
@@ -67,9 +69,29 @@ try{
   report.checks.push('inspect/preview/cancel never mutates; target and persistent hold visible');
   await control.getByRole('button',{name:'检查服务',exact:true}).click();await control.getByRole('button',{name:'预览暂停服务',exact:true}).click();
   await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).waitFor();
+  // Receipt rendering precedes the async inventory refresh and cleanup effect.
+  // Observe the actual updated writer UI rather than racing the invoke queue.
+  await writersWarning.waitFor({state:'hidden'});
   assert.equal(calls.filter(c=>c.command==='execute').length,1);assert.ok(calls.filter(c=>c.command==='cleanup_inspect').length>=2,'service receipt refreshes cleanup writers');assert.equal(await dialog.getByRole('button',{name:'打开 Claude',exact:true}).count(),0);
   resumeConflict=true;await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).click();await dialog.getByText(/目标 unit 在任务后被编辑/).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,1);
   report.checks.push('lost ACK queries original job; one approved mutation; external-edit conflict preserves hold');
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.getByRole('checkbox',{name:/^已关闭目标的终端、IDE 与自动重启来源/}).check();
+  const cleanupPreview=page.getByRole('button',{name:'预览这份计划',exact:true});
+  assert.equal(await cleanupPreview.isEnabled(),true,'repair login does not require work selection');
+  await page.getByRole('radio',{name:/^清理并重建/}).check();
+  for(const name of [/^个人指令/,/^记忆文本/,/^会话资料/])await page.getByRole('checkbox',{name}).uncheck();
+  assert.equal(await cleanupPreview.isDisabled(),true,'empty reset work selection must block preview');
+  await page.getByRole('radio',{name:/^退役此环境/}).check();
+  assert.equal(await cleanupPreview.isDisabled(),true,'empty retirement work selection must block preview');
+  assert.equal(calls.some(c=>c.command==='plan_cleanup'),false,'blocked preview reached core');
+  await page.getByRole('checkbox',{name:/^个人指令/}).check();
+  assert.equal(await cleanupPreview.isEnabled(),true,'one selected category enables preview');
+  await page.getByRole('radio',{name:/^修复本地登录/}).check();
+  report.checks.push('empty reset/retire selection blocks cleanup preview; selected work and repair login remain available');
+  await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
+  await page.locator('.job-row').filter({hasText:makePlan(false).title}).getByRole('button',{name:'查看结果',exact:true}).click();
+  await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).waitFor();
   resumeConflict=false;await dialog.getByRole('button',{name:'预览恢复服务',exact:true}).click();await dialog.getByRole('heading',{name:'恢复这一个服务',exact:true}).waitFor();
   assert.equal(calls.filter(c=>c.command==='execute').length,1);await dialog.getByRole('button',{name:'批准并执行',exact:true}).focus();await page.keyboard.press('Enter');
   await dialog.getByRole('button',{name:'返回清理与重建',exact:true}).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,2);assert.equal(quiesced,false);
@@ -77,6 +99,7 @@ try{
   const artifacts=process.env.LINTEL_SERVICE_UI_ARTIFACTS;if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'service-day-receipt.png')});}
   await dialog.getByRole('button',{name:'返回清理与重建',exact:true}).click();await page.getByRole('button',{name:'深色 Night',exact:true}).click();await page.setViewportSize({width:900,height:640});
   await page.getByRole('radio',{name:/修复本地登录/}).check();if(!await control.evaluate(el=>el.open))await control.locator('summary').click();
+  await control.getByLabel('服务 unit').fill(held.unit);
   await control.getByRole('button',{name:'检查服务',exact:true}).click();await control.getByText('运行中',{exact:true}).waitFor();
   await control.getByRole('button',{name:'预览暂停服务',exact:true}).click({trial:true});assert.equal(await control.evaluate(el=>el.scrollWidth>el.clientWidth),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(artifacts)await page.screenshot({path:path.join(artifacts,'service-night-control.png')});

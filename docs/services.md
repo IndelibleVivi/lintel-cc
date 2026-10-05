@@ -6,6 +6,8 @@ Lintel 的 Linux runner 可以预览并暂停明确绑定到一个登记配置 r
 
 请求必须明确提供环境 ID、`manager: "user" | "system"` 与完整 service unit 名称，例如 `example.service`。`user` 只操作当前 UID 的 user manager；`system` 变更要求 runner 当前已以 root 身份执行。Lintel 不执行 sudo，不调整 linger、PAM、login policy，也不停止 manager、全局 supervisor 或 SSH。
 
+名称 schema 与 named CLI/core 共用 `crates/operations` 的有限规则：允许完整实例名如 `example@synthetic.service`，拒绝未实例化的 `example@.service`、路径、glob、换行与命令。通过名称检查仍需满足下列实际 unit 条件。
+
 支持直接 loaded 的持久 simple、exec 或 notify service，统一 cgroup v2、`KillMode=control-group`、无 cgroup delegation。unit 必须直接且唯一配置 `CLAUDE_CONFIG_DIR=<登记 root>`，不使用 EnvironmentFile、PassEnvironment 或 UnsetEnvironment 提供未知覆盖。active service 的 MainPID 和 cgroup 内每个进程必须属于当前 runner 用户，且 `/proc` 环境证据与该 root 一致。root 也必须属于当前用户。服务配置文件需是 root 或当前用户拥有、非共享可写且无路径 symlink 的普通文件。
 
 alias、glob、裸 service 前缀、未实例化 template、transient/generated/masked unit、自定义 unit 搜索目录、转换中或 failed 状态不受支持。带停止传播、其他 unit 对它的 Requires/BindsTo/PartOf 关系、自定义 stop/success/failure 动作、host action，以及可能启动或停止相邻 unit 的依赖关系会被明确拒绝。标准的 system/user slice 与基础 target 依赖可以保留。带 `Restart=always` 或精确 timer/socket 触发来源的独立 service 可以暂停；这些触发 unit 自身不会被停止。
@@ -76,6 +78,8 @@ python3 tests/service_systemd_journey.py --runner /absolute/test-runner/lintel -
 ```
 
 完整模式核验普通 `/etc/systemd/system` 本地 unit、Restart=always、实际 timer 与 manual activation、精确 root 与 alias 拒绝、邻居持续写入且 InvocationID 不变、durable query/replay、unit 外部编辑冲突、独立恢复与原 inactive 状态。已完成的检查立即保存在报告中。timer/manual 阻止验证通过后，脚本停止唯一自有的 200ms trigger timer，保持其 enablement 与源文件，等待目标 inactive/dead、MainPID 为零且 Job 为空，随后独立核验外部编辑冲突；恢复阶段也在 held manual activation 观察后停止同一自有 timer，核验稳定状态再请求产品 inspect/resume。报告保留 activation、timer phase 和外部编辑请求前后的有限状态及准确错误。脚本不会把 pending/failed 拒绝改判为外部编辑冲突，也不 reset-failed 或重发 Lintel mutation。结束后只清理脚本自有 fixtures。
+
+首次暂停后的稳定 `service_inspect` 同样安排在 live timer/manual activation 证明和自有 timer 结算之后，避免 fixture 连续排队的 skipped start 与稳定读取竞争。暂停回执先保存在报告中，即使随后 inspect 失败也保留原完成事实和失败；生产 pending/failed 状态仍明确拒绝，不据此重发 mutation。
 
 为真实 reboot 保留 fixtures：
 

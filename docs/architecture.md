@@ -1,23 +1,28 @@
 # 执行权威与状态
 
-本图是 SPEC 的目标架构。具体已接通与未验收部分见 [当前状态](current-state.md)，图中组件存在不代表整条旅程已通过。
+本图说明当前源码的调用与执行归属；它不代表所有平台或完整旅程已验收。运行证据与候选状态见 [当前状态](current-state.md)，完整目标仍由 [SPEC](SPEC.md) 保留。
 
 ```mermaid
-flowchart LR
-    UI[Mac 桌面界面] -->|计划请求| Core[Rust core · 唯一计划权威]
-    CLI[Linux CLI / TUI] -->|同一协议| Core
-    Core -->|持久记录后执行| Journal[目标主机的计划与任务 journal]
-    Core -->|批准的精确字段| FS[配置与工作文件]
-    Core -->|实例与任务 ID| Native[Native Messaging host]
-    Native -->|浏览器发起连接| Ext[已配对 profile 扩展]
-    Ext -->|原生 API| Storage[该 profile 站点数据与权限]
-    Ext -->|执行前后状态| BJ[扩展持久 journal]
-    UI -->|OpenSSH / JSON stdin| Remote[远端 runner · 独立 core 与 journal]
-    Launch[明确启动上下文] -->|仅选择的网络路径| Proxy[Loopback CONNECT 通道]
-    Core --> Launch
-    Proxy -->|不解密 TLS| Destination[批准的目的地 / 上游代理]
+flowchart TB
+    UI[macOS App] -->|本机 JSON| Core[crates/core · 计划与文件操作]
+    CLI[lintel agent CLI / TUI] -->|同一 core| Core
+    UI --> SSH[crates/remote · 有限 SSH controller]
+    CLI --> SSH
+    SSH -->|OpenSSH / JSON stdin| Runner[目标主机 runner · submit / 原 ID query]
+    Runner --> RemoteCore[目标 core 与持久 journal]
+    Core --> Journal[本机冻结计划 / 持久回执]
+    Core -->|批准后精确变更| Files[配置 / 工作文件 / 加密包]
+    UI --> Host[Native Messaging host · 配对与任务协调]
+    CLI -->|macOS 有限 control| Host
+    Host <-->|浏览器连接 / 原 operation ID| Ext[已配对 profile 扩展 · 原生 API / journal]
+    UI --> Proxy[crates/egress · loopback CONNECT]
+    CLI -->|前台进程持有| Proxy
+    Proxy -->|仅代理路径 / 不解密 TLS| Destination[规则允许的目的地或上游]
 ```
 
-界面持有草案与展示状态，目标 core 拥有计划与文件操作授权；浏览器扩展拥有原生浏览器操作结果。SSH 连接状态与业务任务状态分别保存。网络通道只证明经过它的连接；进程直接出站约束是独立的平台能力。
+`crates/operations` 提供静态 core operation/schema 与 named/finite transport 的严格字段合同；它不执行副作用。App 与 CLI 的本机文件操作、冻结计划和恢复都由 core 拥有。SSH controller 只运输有限请求并保存原任务映射；目标 runner/core 持久接受后才 ACK，重连只查原 ID。清理按状态备份／工作归档 → 新根迁入 → 批准的注销／文件处理推进。
 
+浏览器 host 负责配对和任务协调，扩展负责 profile 的权限、原生操作与执行 journal；真正 browser startup 和另行批准才允许完成 clear。macOS CLI 包含 host control，Linux runner 明确返回组件不可用。App 与 CLI 分别持有自己的网络通道，代理只证明经过它的连接，不能证明进程直接出站被强制阻止。
+
+portable work 的密文文件可通过用户明确选定的系统传输工具交接；目标 core 可独立检查与迁入，不依赖源 inventory/job。文件传输本身不属于 SSH controller 的隐式任务。
 关键状态为 `planned → accepted → executing → verifying → completed / partially_completed / failed / needs_reconciliation`。`accepted` 只在 journal 可持久查询后成立。不确定的副作用查询原任务，不重放破坏性动作；恢复以字段归属与当前值为依据。

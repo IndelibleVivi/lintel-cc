@@ -1,15 +1,18 @@
+mod cli;
 mod submission;
 mod supervisor;
 use serde_json::json;
-use std::io::{self, IsTerminal, Read, Write};
+use std::io::{self, IsTerminal, Write};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "help" {
-        println!("Lintel 0.1.0 — Claude environment control\n\n  lintel request                One JSON request from stdin, one JSON response\n  lintel submit                 Durable execute acknowledgement; detached worker\n  lintel discover               List local registered environments\n  lintel inspect <id>           Inspect one environment\n  lintel jobs                   List durable receipts\n  lintel job <plan-id>           Query after a lost response\n  lintel launch <id>            Open Claude with this root (interactive terminal)\n  lintel tui                    Interactive terminal interface\n\nMutations use JSON plan + exact approval digest. Test roots: LINTEL_TEST_HOME and LINTEL_STATE_DIR. No blanket --yes.\nExample: printf '%s' '{{\"command\":\"discover\"}}' | lintel request");
+        print!("{}", cli::HELP);
         return;
     }
     if ["submit", "__worker"].contains(&args[0].as_str()) {
-        submission::run(&args[0], &args[1..]);
+        if !submission::run(&args[0], &args[1..]) {
+            std::process::exit(1);
+        }
         return;
     }
     if args[0] == "tui" {
@@ -32,34 +35,7 @@ fn main() {
         eprintln!("Launch failed: {}", command.exec());
         std::process::exit(1);
     }
-    let response = if args[0] == "request" {
-        let mut bytes = vec![];
-        if io::stdin()
-            .take(1024 * 1024 + 1)
-            .read_to_end(&mut bytes)
-            .is_err()
-            || bytes.len() > 1024 * 1024
-        {
-            json!({"ok":false,"error":{"code":"request_limit","message":"Request exceeds 1 MiB or stdin failed"}})
-        } else {
-            let mut response = lintel_core::parse_request(&bytes);
-            if serde_json::from_slice::<serde_json::Value>(&bytes)
-                .is_ok_and(|r| r["command"] == "discover")
-            {
-                submission::capability(&mut response);
-            }
-            response
-        }
-    } else {
-        let request = match args[0].as_str() {
-            "discover" => json!({"command":"discover"}),
-            "jobs" => json!({"command":"jobs"}),
-            "inspect" => json!({"command":"inspect","environment_id":args.get(1)}),
-            "job" => json!({"command":"job","plan_id":args.get(1)}),
-            _ => json!({"command":"unknown"}),
-        };
-        lintel_core::handle_request(request)
-    };
+    let response = cli::run(&args);
     println!("{}", response);
     if response["ok"] != true {
         std::process::exit(1)
@@ -72,9 +48,10 @@ fn launch_command(environment_id: &str) -> Result<std::process::Command, String>
                 .into(),
         );
     }
-    let response = lintel_core::handle_request(
-        json!({"command":"launch_context","environment_id":environment_id}),
-    );
+    let request = json!({"command":"launch_context","environment_id":environment_id});
+    lintel_operations::validate(&request)
+        .map_err(|e| cli::error("invalid_request", e).to_string())?;
+    let response = lintel_core::handle_request(request);
     if response["ok"] != true {
         return Err(response.to_string());
     }

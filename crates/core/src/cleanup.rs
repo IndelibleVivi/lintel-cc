@@ -239,7 +239,19 @@ impl Engine {
             json!({"id":"quiescence","label":"复查目标已停止写入；不关闭其他环境","reversible":false}),
         ];
         if recipe != "repair_login" {
-            actions.push(json!({"id":"archive","label":"先加密归档工作内容与混合客户端状态","reversible":false}));
+            actions.push(
+                json!({"id":"state_backup","label":"先加密备份混合客户端状态","reversible":false}),
+            );
+            actions.push(json!({"id":"archive","label":"加密归档所选工作内容","reversible":false}));
+        }
+        // Canonical reset order, preserved end to end: state backup + work
+        // archive first, then the fresh root + migration, then official logout
+        // (which may contact the server), then the approved local file removals,
+        // then retirement. No destructive action moves ahead of preservation.
+        if recipe == "reset_client" {
+            actions.push(
+                json!({"id":"rebuild","label":"建立新环境并迁入选中的工作内容（在任何删除之前）","reversible":false}),
+            );
         }
         if logout {
             actions.push(json!({"id":"logout","label":"调用官方 auth logout（可能联系服务端），再核验登录状态","reversible":false}));
@@ -248,11 +260,6 @@ impl Engine {
             if !f["snapshot"].is_null() {
                 actions.push(json!({"id":f["category"],"label":format!("移除已预览文件：{}",f["path"].as_str().unwrap()),"reversible":false}));
             }
-        }
-        if recipe == "reset_client" {
-            actions.push(
-                json!({"id":"rebuild","label":"建立新环境并迁入选中的工作内容","reversible":false}),
-            );
         }
         if recipe == "retire" {
             actions.push(json!({"id":"retire","label":"从可启动环境中退役；保留原工作目录","reversible":true}));
@@ -320,6 +327,10 @@ impl Engine {
     ) -> Result<()> {
         let recipe = string(&p["extra"], "recipe")?;
         let files = p["extra"]["files"].as_array().unwrap();
+        // Step 1: write the encrypted state backup for the mixed client-state
+        // files. This is a prerequisite for reset_client/retire and is always
+        // produced before logout or any removal. The work-content archive (with
+        // its own receipt field) is written later, still before any deletion.
         if recipe != "repair_login" {
             let mut state = vec![];
             for f in files
@@ -336,17 +347,30 @@ impl Engine {
                 .state
                 .join("archives")
                 .join(format!("{}-state.age", string(j, "id")?));
-            atomic(&backup, &bytes, 0o600)?;
+            j["steps"].as_array_mut().unwrap().push(json!({"id":"state_backup","label":"混合客户端状态备份","status":"executing","message":"正在写入加密状态备份；尚未注销或删除旧文件。"}));
+            j["state_archive_path"] = json!(backup);
+            save(journal, j)?;
+            atomic_new(&backup, &bytes, 0o600)?;
             if read(&backup, 64 * 1024 * 1024)? != bytes {
                 return Err(err("archive_readback_failed", "状态备份未能读回，未清理"));
             }
-            j["state_archive_path"] = json!(backup);
-            if recipe == "reset_client" {
-                self.rebuild(e, p, r, j, journal)?;
-            } else {
-                self.archive_work(e, p, r, j, journal)?;
-            }
+            *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"state_backup","label":"混合客户端状态备份","status":"completed","message":"加密状态备份已写入并读回；独立于可迁入的工作包。"});
+            save(journal, j)?;
         }
+        // Step 2: independently archive the selected work content. Never destructive.
+        if recipe != "repair_login" {
+            self.archive_work(e, p, r, j, journal)?;
+        }
+        // Step 3: for reset_client, create the new root and migrate the selected
+        // work that step 2 already archived. The canonical reset order keeps all
+        // preservation (state backup, work archive, fresh root + migration) ahead
+        // of every destructive action (logout and file removal).
+        if recipe == "reset_client" {
+            self.migrate_to_new_root(e, p, r, j, journal)?;
+        }
+        // Step 4: official logout (may contact the server), rechecked against the
+        // approved scope. A failure here stops the run with the archives and the
+        // prepared new root retained, and no approved local file deleted.
         if p["extra"]["official_logout"] == true {
             // Archiving can take time: repeat the approved scope immediately before logout.
             self.check_cleanup(e, p, r)?;
@@ -369,6 +393,7 @@ impl Engine {
             *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"logout","label":"官方注销与读回","status":"completed","message":"CLI 报告已退出登录；服务端 token 撤销未独立验证。"});
             save(journal, j)?;
         }
+        // Step 5: remove exactly the frozen local files, each rechecked.
         for f in files {
             let path = Path::new(string(f, "path")?);
             let current = snapshot(path)?;
@@ -400,6 +425,7 @@ impl Engine {
             j["steps"].as_array_mut().unwrap().last_mut().unwrap()["status"] = json!("completed");
             save(journal, j)?;
         }
+        // Step 6: retire the environment registration (retain recipe only).
         if recipe == "retire" {
             let mut all = self.inventory()?;
             for entry in &mut all {

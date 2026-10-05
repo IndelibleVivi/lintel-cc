@@ -1,12 +1,138 @@
-use crate::{err, now, storage::*, string, Engine, Result};
+use crate::{archive, err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    collections::HashSet,
+    fs::{self, OpenOptions},
+    os::unix::ffi::OsStrExt,
+    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
+    path::{Component, Path, PathBuf},
     time::{Duration, Instant},
 };
 const MAX_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_FILES: usize = 10000;
+
+/// Absolute-path guard for an explicit archive destination: parent must already
+/// exist (we never create directories outside the frozen path), the path must be
+/// absolute without parent-directory hops and contain no symlinks. Existing
+/// content is never a valid target. Freeze the parent's device/inode so the
+/// same pathname cannot select a replacement directory after approval.
+pub(crate) fn freeze_output_path(path: &Path) -> Result<(PathBuf, [u64; 2])> {
+    guard(path)?;
+    if path.file_name().is_none() {
+        return Err(err("invalid_output_path", "请给出一个完整的归档文件名"));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| err("invalid_output_path", "归档路径缺少父目录"))?;
+    if !parent.is_dir() {
+        return Err(err(
+            "invalid_output_path",
+            "归档目标目录不存在；Lintel 不会替你新建目录",
+        ));
+    }
+    guard(parent)?;
+    if path.exists() {
+        return Err(err(
+            "output_exists",
+            "归档目标已存在；请选择新文件名，不覆盖已有内容",
+        ));
+    }
+    if fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(err("symlink_target", "归档目标不能是符号链接"));
+    }
+    let metadata = fs::metadata(parent)?;
+    Ok((path.to_path_buf(), [metadata.dev(), metadata.ino()]))
+}
+
+pub(crate) fn check_output_path(plan: &Value) -> Result<()> {
+    if let Some(destination) = plan["extra"]["output_path"].as_str() {
+        let (_, identity) = freeze_output_path(Path::new(destination))?;
+        if json!(identity) != plan["extra"]["output_parent_identity"] {
+            return Err(err(
+                "stale_plan",
+                "归档输出目录的实际对象已变化或旧计划未冻结身份，请重新预览",
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Read back an encrypted archive package from an explicit frozen path and
+/// return it with the digest of the on-disk encrypted bytes. Lintel-sealed
+/// archives are always single-link regular files owned by the current user, so
+/// they travel between independent installs but never through a symlink.
+pub(crate) fn read_package(path: &Path, pass: &str) -> Result<(Value, String)> {
+    guard(path)?;
+    let meta =
+        fs::symlink_metadata(path).map_err(|_| err("archive_missing", "找不到该归档文件"))?;
+    use std::os::unix::fs::MetadataExt;
+    if !meta.is_file()
+        || meta.file_type().is_symlink()
+        || meta.uid() != unsafe { libc::geteuid() }
+        || meta.nlink() != 1
+    {
+        return Err(err("archive_missing", "归档不是安全的常规文件"));
+    }
+    // The ciphertext envelope is slightly larger than the plaintext bound used
+    // by `unseal`; allow headroom while still bounded.
+    let bytes = read(path, crate::archive::MAX_PLAIN + 16 * 1024 * 1024)?;
+    let package = archive::unseal(&bytes, pass)?;
+    Ok((package, digest(&bytes)))
+}
+
+/// Validate a work package's file list. It is completely self-contained: every
+/// entry is judged on its own path/category/digest, so an external package that
+/// arrives without the original inventory or job still passes or fails on its
+/// own merits. Unsupported/unapproved categories and unsafe paths are refused.
+pub(crate) fn validate_package_files(package: &Value) -> Result<Vec<Value>> {
+    if package["schema"] != "lintel.work/1" {
+        return Err(err(
+            "archive_schema",
+            "只支持 Lintel 工作内容包；状态备份不能自动迁入",
+        ));
+    }
+    let files = package["files"]
+        .as_array()
+        .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?;
+    if files.len() > MAX_FILES {
+        return Err(err("archive_limit", "归档文件数量超过上限"));
+    }
+    let mut seen = HashSet::new();
+    let mut total = 0usize;
+    for f in files {
+        let name = string(f, "path")?;
+        let path = Path::new(name);
+        if path.is_absolute()
+            || name.contains('\\')
+            || name.contains('\0')
+            || path
+                .components()
+                .any(|c| !matches!(c, Component::Normal(_)))
+            || !seen.insert(path.components().collect::<PathBuf>())
+        {
+            return Err(err("archive_path", "归档包含重复路径或不安全路径"));
+        }
+        let category = string(f, "category")?;
+        if !["instructions", "memory", "sessions"].contains(&category) {
+            return Err(err(
+                "archive_category",
+                "归档含不受支持的类别；不能声明已覆盖全部所选内容",
+            ));
+        }
+        if classify(path) != Some(category) {
+            return Err(err("archive_category", "归档文件与批准的工作类别不符"));
+        }
+        let data: Vec<u8> = serde_json::from_value(f["data"].clone())?;
+        total += data.len();
+        if data.len() > 8 * 1024 * 1024 || total > MAX_BYTES as usize {
+            return Err(err("archive_limit", "工作内容超过容量上限"));
+        }
+        if digest(&data) != f["digest"] {
+            return Err(err("archive_integrity", "归档文件完整性校验失败"));
+        }
+    }
+    Ok(files.clone())
+}
 
 pub fn categories(r: &Value) -> Result<Vec<String>> {
     let values = r["categories"]
@@ -47,6 +173,222 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     }
     None
 }
+
+/// Map one selected batch into the inactive work area. Reserve every original
+/// name first, then disambiguate colliding file/ancestor names without changing suffixes
+/// or wrapping already imported paths. Preserve and portable import share this.
+pub(crate) fn migration_paths(files: &[Value]) -> Result<Vec<PathBuf>> {
+    let preferred: Vec<PathBuf> = files
+        .iter()
+        .map(|file| {
+            let relative = Path::new(string(file, "path")?);
+            Ok(
+                if file["category"] == "instructions" || relative.starts_with("lintel-imports") {
+                    relative.to_path_buf()
+                } else {
+                    Path::new("lintel-imports").join(relative)
+                },
+            )
+        })
+        .collect::<Result<_>>()?;
+    let reserved: HashSet<_> = preferred.iter().cloned().collect();
+    let directories: HashSet<_> = preferred
+        .iter()
+        .flat_map(|path| path.ancestors().skip(1))
+        .map(Path::to_path_buf)
+        .collect();
+    let mut used = HashSet::new();
+    let mut targets = Vec::with_capacity(files.len());
+    for path in preferred {
+        let mut target = path.clone();
+        if used.contains(&target) || directories.contains(&target) {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| err("invalid_path", "迁入文件名无效"))?;
+            let mut index = 1;
+            loop {
+                target.set_file_name(format!("lintel-{index}-{name}"));
+                if !reserved.contains(&target)
+                    && !directories.contains(&target)
+                    && !used.contains(&target)
+                {
+                    break;
+                }
+                index += 1;
+            }
+        }
+        used.insert(target.clone());
+        targets.push(target);
+    }
+    Ok(targets)
+}
+
+/// Missing work directories are private at creation. Existing destination
+/// directories belong to the approved environment and keep their permissions.
+pub(crate) fn migration_parent(path: &Path) -> Result<()> {
+    guard(path)?;
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)?;
+    if fs::metadata(path)?.uid() != unsafe { libc::geteuid() } {
+        return Err(err("wrong_owner", "迁入目录不属于当前用户"));
+    }
+    Ok(())
+}
+
+fn migration_access(path: &Path, mode: libc::c_int) -> Result<()> {
+    let path = std::ffi::CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| err("invalid_path", "迁入目录路径含无效字符"))?;
+    if unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), mode, libc::AT_EACCESS) } != 0 {
+        return Err(err(
+            "migration_destination_unwritable",
+            "迁入目录不可写入或访问；请核对权限后重新预览，已有权限不会自动改变",
+        ));
+    }
+    Ok(())
+}
+
+/// Inspect actual ancestors inside the approved root before any content write.
+/// Missing parents require write access only to their nearest existing parent;
+/// existing ancestors keep their modes and need search access, not blanket chmod.
+pub(crate) fn preflight_import_parent(root: &Path, target: &Path) -> Result<()> {
+    guard(target)?;
+    let relative = target
+        .parent()
+        .unwrap()
+        .strip_prefix(root)
+        .map_err(|_| err("invalid_path", "迁入目标不在批准的配置目录内"))?;
+    let mut directory = root.to_path_buf();
+    let mut last_existing = root.to_path_buf();
+    for component in std::iter::once(None).chain(relative.components().map(Some)) {
+        if let Some(component) = component {
+            directory.push(component);
+        }
+        match fs::metadata(&directory) {
+            Ok(metadata) => {
+                if metadata.uid() != unsafe { libc::geteuid() } {
+                    return Err(err("wrong_owner", "迁入目录不属于当前用户"));
+                }
+                migration_access(&directory, libc::X_OK)?;
+                last_existing = directory.clone();
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(_) => return Err(err("path_unreadable", "无法检查迁入目录")),
+        }
+    }
+    migration_access(&last_existing, libc::W_OK | libc::X_OK)
+}
+
+/// Check this batch against the actual destination filesystem's name rules.
+/// Runs only inside approved execution. The private scratch tree contains zero
+/// byte placeholders, never archived content; cleanup removes only names we
+/// created, and leaves any unexpected extra entry intact.
+pub(crate) fn preflight_migration_paths(
+    root: &Path,
+    paths: &[PathBuf],
+    j: &mut Value,
+    journal: &Path,
+) -> Result<()> {
+    struct Probe {
+        files: Vec<PathBuf>,
+        directories: Vec<PathBuf>,
+    }
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            for file in self.files.iter().rev() {
+                let _ = fs::remove_file(file);
+            }
+            for directory in self.directories.iter().rev() {
+                let _ = fs::remove_dir(directory);
+            }
+        }
+    }
+    let scratch = record_migration_probe(root, j, journal)?;
+    let result = (|| {
+        fs::create_dir(&scratch)?;
+        let mut probe = Probe {
+            files: vec![],
+            directories: vec![scratch.clone()],
+        };
+        private_dir(&scratch)?;
+        let conflict = || {
+            err("migration_path_conflict", "目标文件系统将所选路径视为同名或文件／目录冲突；未新建环境或迁入正文，请整理源内容后重新归档，或使用能区分这些路径的文件系统目标")
+        };
+        for relative in paths {
+            let mut parent = scratch.clone();
+            for component in relative.parent().unwrap_or(Path::new("")).components() {
+                parent.push(component);
+                match fs::create_dir(&parent) {
+                    Ok(()) => {
+                        probe.directories.push(parent.clone());
+                        private_dir(&parent)?;
+                    }
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::AlreadyExists && parent.is_dir() => {
+                    }
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
+                        ) =>
+                    {
+                        return Err(conflict())
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            let target = scratch.join(relative);
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&target)
+            {
+                Ok(_) => probe.files.push(target),
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::AlreadyExists | std::io::ErrorKind::NotADirectory
+                    ) =>
+                {
+                    return Err(conflict())
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Ok(())
+    })();
+    let removed = match fs::symlink_metadata(&scratch) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+        _ => false,
+    };
+    j["migration_probe"]["status"] = json!(if removed { "removed" } else { "retained" });
+    if removed {
+        let status = if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        };
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migration_preflight","label":"检查目标文件系统路径","status":status,"message":"临时空文件检查目录已清理；此步骤没有迁入归档正文。"});
+    }
+    save(journal, j)?;
+    if !removed {
+        return Err(err("migration_probe_retained", "路径检查目录未确认清理；按原任务的 migration_probe.path 核对，未迁入正文，不自动重发或删除额外内容"));
+    }
+    result
+}
+
+fn record_migration_probe(root: &Path, j: &mut Value, journal: &Path) -> Result<PathBuf> {
+    let scratch = root.join(format!(".lintel-path-check-{}", uuid::Uuid::new_v4()));
+    guard(&scratch)?;
+    j["migration_probe"] = json!({"path":scratch,"status":"executing"});
+    j["steps"].as_array_mut().unwrap().push(json!({"id":"migration_preflight","label":"检查目标文件系统路径","status":"executing","message":"正在以临时空文件检查路径；中断后按本任务记录核对检查目录。"}));
+    save(journal, j)?;
+    Ok(scratch)
+}
+
 pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
     guard(root)?;
     let start = Instant::now();
@@ -194,14 +536,18 @@ pub fn check_passphrase(r: &Value) -> Result<&str> {
     Ok(s)
 }
 impl Engine {
-    pub(crate) fn archive_work(
+    /// Build the encrypted work package for a selection and write it to `dest`.
+    /// The caller has already frozen `dest` (an explicit output path or the
+    /// plan's private state path). Returns the on-disk archive path and digest.
+    pub(crate) fn write_archive(
         &self,
         e: &Value,
         p: &Value,
         r: &Value,
+        dest: &Path,
         j: &mut Value,
         journal: &Path,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<(PathBuf, Vec<Value>)> {
         let pass = check_passphrase(r)?;
         let root = PathBuf::from(string(e, "root")?);
         let categories = categories(&p["extra"])?;
@@ -213,10 +559,13 @@ impl Engine {
             .iter()
             .map(|v| v["bytes"].as_u64().unwrap_or(0))
             .sum();
-        if fs2::available_space(&self.state)? < size * 6 + 1024 * 1024 {
+        let destination_dir = dest
+            .parent()
+            .ok_or_else(|| err("invalid_output_path", "归档路径缺少父目录"))?;
+        if fs2::available_space(destination_dir)? < size * 6 + 1024 * 1024 {
             return Err(err(
                 "insufficient_space",
-                "恢复存储空间不足；原始内容尚未删除",
+                "归档目标所在存储空间不足；原始内容尚未删除",
             ));
         }
         let mut files = vec![];
@@ -227,21 +576,215 @@ impl Engine {
             }
             files.push(json!({"path":entry["path"],"category":entry["category"],"digest":entry["digest"],"data":data}));
         }
-        let package = json!({"schema":"lintel.work/1","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
-        let encrypted = crate::archive::seal(&package, pass)?;
-        let archive = self
+        let package = json!({"schema":"lintel.work/1","generator":"Lintel","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
+        let encrypted = archive::seal(&package, pass)?;
+        // Recheck the frozen destination, then atomically publish without replacement.
+        if dest.exists() {
+            return Err(err(
+                "output_exists",
+                "归档目标在执行前已出现；没有覆盖，原内容保持不变",
+            ));
+        }
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"archive","label":"加密工作归档","status":"executing","message":"正在发布并核验完整加密工作包；目标已有文件不会覆盖。"}));
+        j["archive_path"] = json!(dest);
+        let archive_digest = digest(&encrypted);
+        j["archive_intent_digest"] = json!(archive_digest);
+        save(journal, j)?;
+        check_output_path(p)?;
+        atomic_new(dest, &encrypted, 0o600)?;
+        if read(dest, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
+            return Err(err("archive_readback_failed", "归档写后校验未通过"));
+        }
+        j["archive_digest"] = json!(archive_digest);
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"});
+        save(journal, j)?;
+        Ok((dest.to_path_buf(), files))
+    }
+
+    /// Archive into the plan's private state path. Used by rebuild/cleanup,
+    /// where the archive stays inside Lintel's own state directory so a receipt
+    /// can point back to it without a caller-supplied destination.
+    pub(crate) fn archive_work(
+        &self,
+        e: &Value,
+        p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<Vec<Value>> {
+        let dest = self
             .state
             .join("archives")
             .join(format!("{}.age", string(p, "id")?));
-        atomic(&archive, &encrypted, 0o600)?;
-        if read(&archive, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
-            return Err(err("archive_readback_failed", "归档写后校验未通过"));
-        }
-        j["archive_path"] = json!(archive);
-        j["steps"] = json!([{"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"}]);
-        save(journal, j)?;
+        let (_, files) = self.write_archive(e, p, r, &dest, j, journal)?;
         Ok(files)
     }
+
+    /// Archive-only plan: encrypt the selected work into an explicit output path
+    /// (frozen at preview) or into Lintel's private state. Never creates a new
+    /// environment, never touches settings, credentials or the original files.
+    pub(crate) fn plan_archive(&self, r: &Value) -> Result<Value> {
+        let e = self.env(r)?;
+        let categories = categories(r)?;
+        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let (output, output_parent_identity) = match r.get("output_path") {
+            Some(Value::String(s)) if !s.is_empty() => {
+                let (path, identity) = freeze_output_path(Path::new(s))?;
+                (Some(stringify_path(path)), Some(identity))
+            }
+            _ => (None, None),
+        };
+        let actions = json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false}]);
+        self.plan(
+            &e,
+            "archive",
+            "仅加密归档所选工作内容",
+            json!([]),
+            vec!["原环境全部内容（不注销、不删除、不新建）", "settings、hooks、MCP 与插件文件"],
+            actions,
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"output_path":output,"output_parent_identity":output_parent_identity,"outcome":"archive_only"}),
+        )
+    }
+
+    /// Preserve plan: encrypt the selected work and prepare a fresh root to
+    /// migrate into. Distinct from plan_reset/rebuild because its receipt
+    /// reports its own outcome and next steps instead of a partially-completed
+    /// cleanup.
+    pub(crate) fn plan_preserve(&self, r: &Value) -> Result<Value> {
+        let e = self.env(r)?;
+        let categories = categories(r)?;
+        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let name = r
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("保全");
+        let actions = json!([
+            {"id":"archive","label":"加密归档选中的工作内容","reversible":false},
+            {"id":"create","label":"创建新的配置目录","reversible":false},
+            {"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false}
+        ]);
+        self.plan(
+            &e,
+            "preserve",
+            "保全工作内容并准备新环境",
+            json!([]),
+            vec!["原环境全部内容（不注销、不删除、不停止进程）", "settings、hooks、MCP 与插件文件"],
+            actions,
+            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"preserve_name":name,"outcome":"preserve"}),
+        )
+    }
+
+    /// Preserve execution: archive the selection, then create a fresh owned root
+    /// and migrate the selected categories read-back-verified. The original
+    /// root, its login and its process state are left untouched.
+    pub(crate) fn preserve(
+        &self,
+        e: &Value,
+        p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let files = self.archive_work(e, p, r, j, journal)?;
+        self.migrate_files(
+            e,
+            p["extra"]["preserve_name"].as_str().unwrap_or("保全"),
+            &files,
+            j,
+            journal,
+        )?;
+        // Preservation keeps the source install untouched; that is the desired
+        // outcome, not an outstanding task. Report it as retained with explicit
+        // coverage instead of a misleading "not completed" step.
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"status","label":"旧环境、登录与运行进程","status":"preserved","message":"原 root、旧登录与运行进程全部保留；本次不注销、不删除、不停止。"}));
+        j["coverage"] = json!({
+            "categories": p["extra"]["categories"],
+            "file_count": p["extra"]["manifest"].as_array().map_or(0, Vec::len),
+            "old_login": "retained",
+            "old_root": "retained",
+            "service_binding": "unchanged"
+        });
+        j["next_steps"] = json!([
+            "在新环境采用自己的保护方案并完成一次真实启动，再核对运行效果；迁移内容不会自动启用。",
+            "在新环境按官方流程正常登录；旧登录仍在原 root。",
+            "原 root 的后台服务/进程绑定保持不变，Lintel 不会把新 root 改绑到已有 service。"
+        ]);
+        j["status"] = json!("completed");
+        j["outcome"] = json!("preserved");
+        Ok(())
+    }
+
+    /// Create a fresh owned root and copy the given archived entries into it,
+    /// read-back verified. Does not archive or delete anything.
+    fn migrate_files(
+        &self,
+        e: &Value,
+        label: &str,
+        files: &[Value],
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let targets = migration_paths(files)?;
+        preflight_migration_paths(&self.state.join("environments"), &targets, j, journal)?;
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
+        save(journal, j)?;
+        let new = self.create(
+            &format!("{} · {}", string(e, "name")?, label),
+            Some((j, journal)),
+        )?;
+        j["new_environment_id"] = new["id"].clone();
+        j["new_root"] = new["root"].clone();
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"});
+        save(journal, j)?;
+        let destination = PathBuf::from(string(&new, "root")?);
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"executing","message":"正在迁入并核验工作内容；失败时新 root 可能已有部分文件，请核对原任务。"}));
+        save(journal, j)?;
+        for (f, relative) in files.iter().zip(targets) {
+            let target = destination.join(relative);
+            migration_parent(
+                target
+                    .parent()
+                    .ok_or_else(|| err("invalid_path", "缺少迁入目标"))?,
+            )?;
+            let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
+            atomic_new(&target, &bytes, 0o600)?;
+            if digest(&read(&target, 8 * 1024 * 1024)?) != f["digest"] {
+                return Err(err("migration_failed", "迁入文件校验失败"));
+            }
+        }
+        *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"});
+        save(journal, j)?;
+        Ok(())
+    }
+
+    /// reset_client path: the work archive was already written earlier in the
+    /// receipt (so nothing is deleted before it is preserved). Re-open that
+    /// frozen archive and migrate it into a new root.
+    pub(crate) fn migrate_to_new_root(
+        &self,
+        e: &Value,
+        _p: &Value,
+        r: &Value,
+        j: &mut Value,
+        journal: &Path,
+    ) -> Result<()> {
+        let path = j["archive_path"]
+            .as_str()
+            .ok_or_else(|| err("archive_missing", "此任务没有工作归档"))?
+            .to_owned();
+        let (package, archive_digest) = read_package(Path::new(&path), check_passphrase(r)?)?;
+        if j["archive_digest"].as_str() != Some(archive_digest.as_str()) {
+            return Err(err(
+                "stale_archive",
+                "工作归档与本任务写入时的记录不一致；未新建环境、迁入或继续清理",
+            ));
+        }
+        let files = validate_package_files(&package)?;
+        self.migrate_files(e, "重建", &files, j, journal)
+    }
+
     pub(crate) fn rebuild(
         &self,
         e: &Value,
@@ -251,35 +794,7 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let files = self.archive_work(e, p, r, j, journal)?;
-        let new = self.create(&format!("{} · 重建", string(e, "name")?))?;
-        j["new_environment_id"] = new["id"].clone();
-        j["new_root"] = new["root"].clone();
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"completed","message":"新建目录，没有复制登录或执行配置。目录外凭据仍可能共享。"}));
-        save(journal, j)?;
-        let destination = PathBuf::from(string(&new, "root")?);
-        for f in &files {
-            let relative = Path::new(string(f, "path")?);
-            // Only the one supported text instruction location is active. Session/memory formats are preserved for inspection, not falsely claimed resumable.
-            // Content already held in lintel-imports keeps its logical path; it
-            // must not be wrapped into lintel-imports/lintel-imports.
-            let target =
-                if f["category"] == "instructions" || relative.starts_with("lintel-imports") {
-                    destination.join(relative)
-                } else {
-                    destination.join("lintel-imports").join(relative)
-                };
-            private_dir(
-                target
-                    .parent()
-                    .ok_or_else(|| err("invalid_path", "缺少迁入目标"))?,
-            )?;
-            let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
-            atomic(&target, &bytes, 0o600)?;
-            if digest(&read(&target, 8 * 1024 * 1024)?) != f["digest"] {
-                return Err(err("migration_failed", "迁入文件校验失败"));
-            }
-        }
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"completed","message":"CLAUDE.md 放入新 root；会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。"}));
+        self.migrate_files(e, "重建", &files, j, journal)?;
         if p["kind"] == "rebuild" {
             j["steps"].as_array_mut().unwrap().push(json!({"id":"credentials","label":"旧登录与客户端状态","status":"not_completed","message":"旧环境没有注销、删除或停进程；完整处理请使用清理配方。"}));
             j["status"] = json!("partially_completed");
@@ -288,5 +803,405 @@ impl Engine {
             ));
         }
         Ok(())
+    }
+}
+
+fn stringify_path(path: PathBuf) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_root_intent_survives_registration_failure() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home.clone(), base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let job_id = crate::id();
+        let journal = engine.path("jobs", &job_id);
+        let mut receipt = json!({"id":job_id,"status":"executing","warnings":[],"steps":[]});
+        // Registration will fail after the fresh directory has been created.
+        // Only this synthetic inventory is changed.
+        save(&engine.state.join("inventory.json"), &json!({})).unwrap();
+        let failure = engine
+            .migrate_files(&environment, "synthetic", &[], &mut receipt, &journal)
+            .unwrap_err();
+        assert_eq!(failure.code, "invalid_inventory");
+        let stored = load(&journal).unwrap();
+        assert!(
+            stored["new_root"].is_string(),
+            "Orphaned root is absent from original job: {stored}"
+        );
+        let destination = Path::new(stored["new_root"].as_str().unwrap());
+        assert!(destination.is_dir());
+        assert_eq!(
+            destination.parent().unwrap(),
+            engine.state.join("environments")
+        );
+        uuid::Uuid::parse_str(stored["new_environment_id"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            stored["steps"].as_array().unwrap().last().unwrap()["status"],
+            "executing"
+        );
+        let reopened = Engine::new(home, engine.state.clone()).unwrap();
+        let query = reopened.request(json!({"command":"job","job_id":job_id}));
+        assert_eq!(query["ok"], true, "{query}");
+        assert_eq!(query["data"]["status"], "needs_reconciliation");
+        assert_eq!(query["data"]["new_root"], stored["new_root"]);
+        assert_eq!(
+            query["data"]["new_environment_id"],
+            stored["new_environment_id"]
+        );
+        assert_eq!(
+            fs::read_dir(engine.state.join("environments"))
+                .unwrap()
+                .count(),
+            1
+        );
+        assert_eq!(
+            query,
+            reopened.request(json!({"command":"job","job_id":job_id}))
+        );
+    }
+
+    #[test]
+    fn new_root_journal_failure_prevents_creation_and_success_registers_intended_id() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let blocked_journal = engine.path("jobs", &crate::id());
+        fs::create_dir(&blocked_journal).unwrap();
+        let mut failed = json!({"steps":[]});
+        assert!(engine
+            .create("synthetic", Some((&mut failed, &blocked_journal)))
+            .is_err());
+        assert!(!Path::new(failed["new_root"].as_str().unwrap()).exists());
+        assert_eq!(
+            fs::read_dir(engine.state.join("environments"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert!(engine.inventory().unwrap().is_empty());
+        let journal = engine.path("jobs", &crate::id());
+        let mut receipt = json!({"steps":[]});
+        let created = engine
+            .create("synthetic", Some((&mut receipt, &journal)))
+            .unwrap();
+        let stored = load(&journal).unwrap();
+        assert_eq!(stored["new_root"], created["root"]);
+        assert_eq!(stored["new_environment_id"], created["id"]);
+        assert_eq!(engine.inventory().unwrap(), vec![created]);
+    }
+
+    #[test]
+    fn archive_space_check_uses_destination_before_publication() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let root = home.join("source");
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let parent = base.join("export-volume");
+        fs::create_dir(&parent).unwrap();
+        let destination = parent.join("work.age");
+        let preview = engine
+            .plan_archive(&json!({"environment_id":environment["id"],"categories":["instructions"],"output_path":destination}))
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        // Isolate the shared writer's volume check. The state volume stays
+        // usable; an unavailable destination must fail before encryption or
+        // publishing an archive step/journal, rather than querying state.
+        fs::remove_dir(&parent).unwrap();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let result = engine.write_archive(
+            &environment,
+            &plan,
+            &json!({"archive_passphrase":"synthetic passphrase only"}),
+            &destination,
+            &mut receipt,
+            &journal,
+        );
+        assert!(result.is_err());
+        assert_eq!(receipt["steps"], json!([]), "{receipt}");
+        assert!(!journal.exists());
+        assert_eq!(
+            fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+            "synthetic instruction"
+        );
+    }
+
+    #[test]
+    fn partial_migration_keeps_active_step_and_created_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let first = b"synthetic instruction";
+        let second = b"synthetic session";
+        let files = vec![
+            json!({"path":"CLAUDE.md","category":"instructions","data":first,"digest":digest(first)}),
+            // Model a failed readback after the second file was published.
+            json!({"path":"projects/example/session.jsonl","category":"sessions","data":second,"digest":digest(b"different readback")}),
+        ];
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let failure = engine
+            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .unwrap_err();
+        assert_eq!(failure.code, "migration_failed");
+        let stored = load(&journal).unwrap();
+        let active = stored["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|step| step["status"] == "executing")
+            .unwrap();
+        assert_eq!(active["id"], "migrate");
+        let destination = Path::new(stored["new_root"].as_str().unwrap());
+        assert_eq!(fs::read(destination.join("CLAUDE.md")).unwrap(), first);
+        assert_eq!(
+            fs::read(destination.join("lintel-imports/projects/example/session.jsonl")).unwrap(),
+            second
+        );
+        assert!(stored["new_environment_id"].is_string());
+    }
+
+    #[test]
+    fn migration_preserves_active_and_previously_imported_names() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let entries = [
+            (
+                "lintel-imports/projects/example/session.jsonl",
+                "sessions",
+                b"older session".as_slice(),
+            ),
+            (
+                "projects/example/session.jsonl",
+                "sessions",
+                b"active session".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/example/lintel-1-session.jsonl",
+                "sessions",
+                b"reserved name".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/example/memory/notes.md",
+                "memory",
+                b"older memory".as_slice(),
+            ),
+            (
+                "projects/example/memory/notes.md",
+                "memory",
+                b"active memory".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/foo.jsonl",
+                "sessions",
+                b"ancestor file".as_slice(),
+            ),
+            (
+                "projects/foo.jsonl/session.jsonl",
+                "sessions",
+                b"child session".as_slice(),
+            ),
+            (
+                "lintel-imports/projects/lintel-1-foo.jsonl/session.jsonl",
+                "sessions",
+                b"reserved directory".as_slice(),
+            ),
+        ];
+        let files: Vec<Value> = entries.iter().map(|(path, category, bytes)|
+            json!({"path":path,"category":category,"data":bytes,"digest":digest(bytes)})).collect();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        engine
+            .migrate_files(&environment, "synthetic", &files, &mut receipt, &journal)
+            .unwrap();
+        let destination = Path::new(receipt["new_root"].as_str().unwrap());
+        for (relative, bytes) in [
+            ("session.jsonl", b"older session".as_slice()),
+            ("lintel-2-session.jsonl", b"active session".as_slice()),
+            ("lintel-1-session.jsonl", b"reserved name".as_slice()),
+            ("memory/notes.md", b"older memory".as_slice()),
+            ("memory/lintel-1-notes.md", b"active memory".as_slice()),
+        ] {
+            assert_eq!(
+                fs::read(
+                    destination
+                        .join("lintel-imports/projects/example")
+                        .join(relative)
+                )
+                .unwrap(),
+                bytes
+            );
+        }
+        for (relative, bytes) in [
+            ("lintel-2-foo.jsonl", b"ancestor file".as_slice()),
+            ("foo.jsonl/session.jsonl", b"child session".as_slice()),
+            (
+                "lintel-1-foo.jsonl/session.jsonl",
+                b"reserved directory".as_slice(),
+            ),
+        ] {
+            assert_eq!(
+                fs::read(destination.join("lintel-imports/projects").join(relative)).unwrap(),
+                bytes
+            );
+        }
+        let again = manifest(destination, &["sessions".to_string(), "memory".to_string()]).unwrap();
+        assert_eq!(again.len(), entries.len());
+        assert!(again.iter().all(|file| !file["path"]
+            .as_str()
+            .unwrap()
+            .contains("lintel-imports/lintel-imports")));
+        assert_eq!(
+            migration_paths(&again).unwrap(),
+            again
+                .iter()
+                .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn archive_publication_intent_keeps_its_destination_on_failure() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let preview = engine
+            .plan_archive(
+                &json!({"environment_id":environment["id"],"categories":["instructions"]}),
+            )
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        // A destination whose leaf cannot be published isolates the durable
+        // boundary immediately before atomic_new, without a process race.
+        let destination = engine.state.join("archives").join("x".repeat(300));
+        let journal = engine.path("jobs", string(&preview, "id").unwrap());
+        let mut receipt = json!({"id":preview["id"],"plan_id":preview["id"],"steps":[]});
+        assert!(engine
+            .write_archive(
+                &environment,
+                &plan,
+                &json!({"archive_passphrase":"synthetic passphrase only"}),
+                &destination,
+                &mut receipt,
+                &journal
+            )
+            .is_err());
+        let stored = load(&journal).unwrap();
+        assert_eq!(stored["archive_path"].as_str(), destination.to_str());
+        assert_eq!(stored["steps"][0]["status"], "executing");
+        assert!(stored["archive_digest"].is_null());
+        assert!(stored["archive_intent_digest"].is_string());
+        assert!(!destination.exists());
+        assert_eq!(
+            fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+            "synthetic instruction"
+        );
+    }
+
+    #[test]
+    fn migration_case_equivalence_is_checked_before_creating_a_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        fs::write(base.join("filesystem-case-check"), b"synthetic").unwrap();
+        let folds_case = base.join("FILESYSTEM-CASE-CHECK").exists();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let files: Vec<_> = [("projects/foo.jsonl", b"lower".as_slice()), ("projects/Foo.jsonl", b"upper".as_slice())]
+            .into_iter().map(|(path, bytes)| json!({"path":path,"category":"sessions","digest":digest(bytes),"data":bytes})).collect();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        let result =
+            engine.migrate_files(&environment, "synthetic", &files, &mut receipt, &journal);
+        if folds_case {
+            assert_eq!(result.unwrap_err().code, "migration_path_conflict");
+            assert!(receipt["new_root"].is_null());
+            assert_eq!(engine.inventory().unwrap().len(), 1);
+            assert_eq!(
+                fs::read_dir(engine.state.join("environments"))
+                    .unwrap()
+                    .count(),
+                0
+            );
+        } else {
+            result.unwrap();
+            let new_root = Path::new(receipt["new_root"].as_str().unwrap());
+            assert_eq!(
+                fs::read(new_root.join("lintel-imports/projects/foo.jsonl")).unwrap(),
+                b"lower"
+            );
+            assert_eq!(
+                fs::read(new_root.join("lintel-imports/projects/Foo.jsonl")).unwrap(),
+                b"upper"
+            );
+        }
+    }
+
+    #[test]
+    fn interrupted_probe_is_discoverable_from_the_original_job() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        fs::create_dir(&home).unwrap();
+        let state = base.join("state");
+        let engine = Engine::new(home.clone(), state.clone()).unwrap();
+        let job_id = uuid::Uuid::new_v4().to_string();
+        let journal = engine.path("jobs", &job_id);
+        let mut receipt = json!({"id":job_id,"status":"executing","steps":[],"warnings":[]});
+        let scratch =
+            record_migration_probe(&state.join("environments"), &mut receipt, &journal).unwrap();
+        assert!(!scratch.exists(), "intent must precede directory creation");
+        let before = load(&journal).unwrap();
+        assert_eq!(before["migration_probe"]["path"].as_str(), scratch.to_str());
+        assert_eq!(before["steps"][0]["status"], "executing");
+        // Model a killed worker after the durable boundary: cleanup cannot run.
+        private_dir(&scratch).unwrap();
+        fs::write(scratch.join("placeholder"), b"").unwrap();
+        drop(engine);
+        let next = Engine::new(home, state).unwrap();
+        for _ in 0..2 {
+            let response = next.request(json!({"command":"job","job_id":job_id}));
+            assert_eq!(response["ok"], true);
+            assert_eq!(response["data"]["id"], job_id);
+            assert_eq!(response["data"]["status"], "needs_reconciliation");
+            assert_eq!(
+                response["data"]["migration_probe"],
+                before["migration_probe"]
+            );
+            assert_eq!(fs::read(scratch.join("placeholder")).unwrap(), b"");
+        }
     }
 }

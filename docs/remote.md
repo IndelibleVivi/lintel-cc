@@ -14,6 +14,8 @@
 
 “移除主机”只移除 Lintel 的主机列表登记，不修改系统 SSH config、known_hosts 或远端文件，也不取消已提交的任务。持久任务及去重记录保留；已移除主机的任务仍出现在 `hosts.tasks`，可通过原 `plan_id` 查询。重新添加同一 alias 后，旧计划仍只查询原 job，不能借移除/添加来重新执行。
 
+远端回执的“查询最新结果”和持久记录的“查询原任务”使用 reconnect；记录页手填 ID 与 CLI `remote job` 使用只读 job lookup。共同 controller 对已有任务记录都读取冻结的 runner，alias 升级不会切换这些任务的查询。手填未知 ID 只通过当前 alias runner 查询，不创建提交／去重记录，查询未提交的计划不会占用它的提交位置。显式 reconnect 在本地没有记录时先冻结当前 runner digest 和 query-only 意图，再查询，更新 alias 不切换该恢复记录。已有但无 digest 的旧记录保留 PATH 查询兼容路径；已提交或不确定任务仍只查询，不删除记录后重发。
+
 已有 SSH host key 必须先通过用户正常的可信流程核对。控制端固定设置 `StrictHostKeyChecking=yes` 与 `UpdateHostKeys=no`，不会自动接受首次 key、忽略变化或更新 known_hosts。连接失败后应在用户自己的 SSH 工具中核对主机身份，再从 Lintel 连接；不能改成自动忽略模式。
 
 ## 在 App 中准备 Linux 运行器
@@ -128,7 +130,7 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 | `execute` | `alias`, `plan_id`, `approval`，可选 `archive_passphrase` | 一次 `lintel submit`，返回 durable Receipt；重复调用只查原 job |
 | `reconnect` | `alias`, `plan_id` | 通过保存的 lookup ID 查询原 Receipt；已移除主机的已有任务也可查询，从不提交执行 |
 
-连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / query_install 对已移除 alias 仅开放本地仍有持久记录的原任务或安装。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
+连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install 对已移除 alias 仅开放本地仍有持久记录的原任务或安装，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
 
 - `discover`、`inspect`、`register`、`create_environment`；
 - `plan_policy`、`plan_reset`、`plan_cleanup`、`plan_restore`、`plan_import`；
@@ -235,7 +237,7 @@ CLI 的可导入 API 是 `list_aliases(Path)`、`Controller(state_dir).request(a
 ## 合成验证
 
 ```sh
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml remote::
+cargo test -p lintel-remote::
 python3 -m unittest discover -s platform/ssh/tests -v
 ```
 
@@ -246,3 +248,11 @@ python3 -m unittest discover -s platform/ssh/tests -v
 `linux-vm-runtime` 是另行明确选择的真实 Linux QEMU guest 检查，使用 inert services 和临时 SSH 用户，实际运行 systemd、PAM logout、cgroup 和 reboot；完整 service suite 后执行 hold 的 prepare/recover。历史 clean `8c9d85c` 的旧 setsid 路径在 `KillUserProcesses=no` 和 `yes` 下都被 logout 终止，原任务查询得到 `needs_reconciliation`，没有重新 execute。
 
 最新 clean `7a05291` 的 [CI37216354079](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37216354079) 已完成新的严格 `KillUserProcesses=yes` 对照：already-root system manager 与已有 linger/user bus 的 user manager 都在原 PAM logout 后继续运行，释放合成 barrier 后完成同一 policy job；准确 unit cgroup 与持久回执一致。不符合条件的 setsid 被终止并核对原任务。真实 reboot 后，system-managed 与 setsid 的 accepted job 都重复查询为同一 `needs_reconciliation`，不重发。共享认证 fixture 也确认原环境被保留，范围变化在 accept 前拒绝，没有注销、删除合成凭据或将环境值写入持久记录。精确服务暂停、邻居保留、外部编辑冲突、独立恢复与真实 reboot 后 loaded hold 继续通过。运行条件、镜像与销毁边界见 [统一验证入口](verification.md)，证据汇总见 [当前状态](current-state.md)；生产 VPS 与完整 G03 仍未验收。
+
+## GUI 与独立 CLI 的共同 owner
+
+`crates/remote` 保存唯一有限 controller（SSH、intent、alias registry、runner 绑定、安装与 query-only）。桌面 remote.rs 只定位 App 的同源资源并适配 Tauri async command；正式 `lintel remote` 使用同一公共 control。静态 `remote operations`、`describe remote.OP`、`schema remote.OP` 不读 HOME/state 或连接 SSH。core request 子集复用 `crates/operations` schema，并保留 transport 自己的 allowed-set 与单位/文本限制。
+
+`remote aliases/hosts/inspect`、`request ALIAS`、`submit ALIAS`、`job ALIAS PLAN_ID` 的 stdin、批准与资源目录见 [agents.md](agents.md#ssh-controller)。旧 `platform/ssh/lintel_ssh.py` 为已有 caller/subset 保留，新功能以共享 Rust 路径为 canonical；两者不共享 submission 去重 state，不能跨 controller 重发未核对任务。
+
+工作包 `archive_path/output_path` 始终是**远端主机**的路径，不是本机文件选择。跨主机先显式传输密文，再在目标主机读取/预览/批准 import，详见 [迁移步骤](operator-guide.md#work)。这个 controller 不增加任意文件上传/下载 endpoint；runner install 仍只上传冻结的 canonical static resource。

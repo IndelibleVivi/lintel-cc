@@ -166,9 +166,11 @@ class Guest:
         if submit:
             session_command = shlex.join(prefix + ["python3", PROBE, "session"]) + ' "$XDG_SESSION_ID" ' + shlex.join(["--json", case["session"]])
             command = session_command + " && exec " + command
-        result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=timeout)
+        result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=timeout,
+                            check=not bool(expected_error))
         response = json.loads(result.stdout)
         if expected_error:
+            require(result.returncode != 0, "Expected rejection must exit nonzero")
             require(response.get("ok") is False and response.get("error", {}).get("code") == expected_error,
                     f"Expected {expected_error}, got {response}")
             return response

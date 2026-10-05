@@ -195,7 +195,10 @@ fn normalize_host(host: &str) -> Result<String, &'static str> {
             if label.is_empty() {
                 return false;
             }
-            match label.strip_prefix("0x").or_else(|| label.strip_prefix("0X")) {
+            match label
+                .strip_prefix("0x")
+                .or_else(|| label.strip_prefix("0X"))
+            {
                 Some(hex) => !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()),
                 None => label.bytes().all(|b| b.is_ascii_digit()),
             }
@@ -769,8 +772,13 @@ mod unit_tests {
     }
     #[test]
     fn wire_config_requires_an_explicit_default_action() {
-        assert!(serde_json::from_value::<Config>(serde_json::json!({"default_action":"deny"})).is_ok());
-        assert!(serde_json::from_value::<Config>(serde_json::json!({"blocked":[{"host":"example.com","ports":[]}]})).is_err());
+        assert!(
+            serde_json::from_value::<Config>(serde_json::json!({"default_action":"deny"})).is_ok()
+        );
+        assert!(serde_json::from_value::<Config>(
+            serde_json::json!({"blocked":[{"host":"example.com","ports":[]}]})
+        )
+        .is_err());
     }
     #[test]
     fn rejects_unsupported_route_and_ambiguous_framing() {
@@ -784,4 +792,26 @@ mod unit_tests {
             assert!(parse_request(req.as_bytes()).is_err());
         }
     }
+}
+
+/// One foreground channel owner for both CLI executables. Stdout is NDJSON.
+pub async fn serve_config(path: &std::path::Path) -> Result<(), String> {
+    let bytes = std::fs::read(path).map_err(|_| "config_read_failed".to_string())?;
+    let config: Config =
+        serde_json::from_slice(&bytes).map_err(|_| "invalid_config_json".to_string())?;
+    let proxy = Proxy::bind(
+        config,
+        Arc::new(|event| println!("{}", serde_json::to_string(&event).unwrap())),
+    )
+    .await?;
+    println!(
+        "{}",
+        serde_json::json!({"event":"listening","owner":"foreground_process","pid":std::process::id(),"address":proxy.local_addr().map_err(|_|"listen_failed".to_string())?,"active_config":*proxy.config,"coverage":"proxy_connections_only","direct_connections_enforced":false})
+    );
+    proxy
+        .serve_until(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await
+        .map_err(|_| "accept_failed".to_string())
 }

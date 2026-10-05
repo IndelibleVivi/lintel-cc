@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, realpathSync } from 'node:fs';
 
 const fixturePort = Number(process.env.LINTEL_FIXTURE_PORT ?? '1420');
 function fixtureBridge(): Plugin {
@@ -12,7 +12,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {
@@ -33,7 +33,12 @@ function fixtureBridge(): Plugin {
           if (payload.command === 'register' && (typeof payload.root !== 'string' || !path.resolve(payload.root).startsWith(home + path.sep))) {
             res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '合成预览只能登记此临时测试目录中的环境。真实路径请使用桌面应用。' } })); return;
           }
-          const child = spawn(runner, ['request'], { env: { ...process.env, LINTEL_TEST_HOME: home, LINTEL_STATE_DIR: path.join(fixture, 'state') }, stdio: ['pipe', 'pipe', 'pipe'] });
+          for (const key of ['output_path', 'archive_path']) {
+            if (payload[key] !== undefined && (typeof payload[key] !== 'string' || ![home, realpathSync(home)].some(base => path.resolve(String(payload[key])).startsWith(base + path.sep)))) {
+              res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '测试空间只允许读取或另存此合成 home 内的工作包。' } })); return;
+            }
+          }
+          const child = spawn(runner, ['request'], { env: { ...process.env, HOME: home, LINTEL_TEST_HOME: home, LINTEL_STATE_DIR: path.join(fixture, 'state') }, stdio: ['pipe', 'pipe', 'pipe'] });
           let output = '';
           let errors = '';
           child.stdout.on('data', value => output += value);

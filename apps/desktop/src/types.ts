@@ -34,10 +34,13 @@ export interface Receipt {
   service?: ServicePlan & { observed?: { active_state: string; main_pid: number; quiesced: boolean } };
   service_restorable?: boolean;
   execution?: { mode: 'setsid' | 'system_manager' | 'user_manager'; manager: 'system' | 'user' | null; unit: string | null; continuation: string; limitation: string | null; reboot_survival: false };
-  local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string;
+  migration_probe?: { path: string; status: 'executing' | 'removed' | 'retained' };
+  error?: { code: string; message: string; phase: string; step_id?: string | null; recovery?: string; next_action?: string; uncertain_side_effects?: boolean };
+  coverage?: Record<string, unknown>; next_steps?: string[]; task_outcome?: string; outcome?: string;
+  local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string; archive_digest?: string;
 }
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }
-export interface ArchiveManifest { job_id: string; created_at: string; files: {path: string; category: string; bytes: number; digest: string}[]; notes: string }
+export interface ArchiveManifest { job_id?: string | null; archive_path?: string; created_at: string; files: {path: string; category: string; bytes: number; digest: string}[]; notes: string }
 export interface Drift { changes: Setting[]; status: string }
 export type ServiceManager = 'user' | 'system';
 export interface ServicePlan {
@@ -59,6 +62,9 @@ export interface Api {
   create_environment: { request: { name: string }; response: Environment };
   inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
   plan_policy: { request: { environment_id: string; preset: PolicyPreset; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[]; custom_settings?: CustomSettings }; response: Plan };
+  plan_archive: { request: { environment_id: string; categories: string[]; output_path?: string }; response: Plan };
+  plan_preserve: { request: { environment_id: string; categories: string[]; name?: string }; response: Plan };
+  plan_show: { request: { plan_id: string }; response: Plan };
   plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[] }; response: Plan };
   plan_restore: { request: { job_id: string }; response: Plan };
   execute: { request: { plan_id: string; approval: string; archive_passphrase?: string }; response: Receipt };
@@ -69,9 +75,9 @@ export interface Api {
   auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; remote_revocation: string } };
   plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[] }; response: Plan };
   reactivate_environment: { request: { environment_id: string }; response: { status: string } };
-  archive_inspect: { request: { job_id: string; archive_passphrase: string }; response: ArchiveManifest };
-  archive_read: { request: { job_id: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };
-  plan_import: { request: { environment_id: string; job_id: string; categories: string[]; archive_passphrase: string }; response: Plan };
+  archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };
+  archive_read: { request: { job_id?: string; archive_path?: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };
+  plan_import: { request: { environment_id: string; job_id?: string; archive_path?: string; categories: string[]; archive_passphrase: string }; response: Plan };
   jobs: { request: {}; response: { jobs: Receipt[] } };
   job: { request: { job_id: string }; response: Receipt };
   drift: { request: { environment_id: string }; response: Drift };

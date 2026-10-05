@@ -29,7 +29,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 | id | category | what it runs |
 | --- | --- | --- |
-| `cargo-workspace-test` | rust | `cargo test --workspace` (crates/core, crates/egress, apps/runner) |
+| `cargo-workspace-test` | rust | `cargo test --workspace` (crates/core, crates/operations, crates/remote, crates/egress, apps/runner) |
 | `desktop-rust-test` | rust | `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` (standalone Tauri crate, excluded from the workspace) |
 | `native-host-rust-test` | rust | `cargo test --manifest-path extensions/browser/native-host/Cargo.toml` (standalone crate) |
 | `runner-build` | rust | `cargo build -p lintel-runner` |
@@ -38,6 +38,10 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |
 | `desktop-build` | desktop | `npm run build` in `apps/desktop` (tsc + Vite) |
+| `shared-remote-journey` | python | shared Rust finite controller public API and schemas, synthetic transport |
+| `journey-agent-cli` | journey | static catalog, named CLI, durable original-ID wait, portable archive/import and restore |
+| `journey-agent-adapters` | journey | synthetic SSH registry, browser absent-profile handling and foreground network stream/stop |
+| `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
@@ -133,10 +137,11 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 
 | id | what it needs |
 | --- | --- |
-| `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and desktop build prerequisites; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
+| `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and shared Rust controller; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
 | `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, original-task query, full receipt, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
+| `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, wrong password, task help, keyboard and Day/Night; synthetic invoke, not native WebKit. |
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `linux-vm-runtime` | Linux x86_64, static musl runner, QEMU, cloud-image-utils, OpenSSH client, gpgv and Ubuntu cloud-image public keyring. Creates a disposable Ubuntu guest with real systemd/PAM, synthetic services and users; host policy and production VPS remain outside the test. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
@@ -159,6 +164,10 @@ helper restores its disposable manifest byte for byte, closes the old browser
 process, then relaunches without extension-loading flags. It requires a different
 native `runtime.onStartup` generation before the second, separately approved
 deletion. No profile preferences or startup markers are written by the harness.
+After explicit isolation release, the harness waits for the completed UI update,
+checks the durable release receipt and absence of its DNR rules before navigating.
+Permission previews are visible before confirmation; clicking an asynchronous
+button alone is not completion evidence.
 The detailed `browser-smoke.json` records process IDs, loading flags, generation
 and native-host receipts. These are real-runtime observations with synthetic
 data, not claude.ai or logged-in Claude acceptance. Formal Chrome, Edge, Firefox
@@ -282,8 +291,11 @@ transport. Current candidate and remaining limits are recorded in
 The built service UI can be checked separately with
 `python3 tests/verify.py --checks service-ui`. Set `LINTEL_SERVICE_UI_REPORT` for
 its JSON and `LINTEL_SERVICE_UI_ARTIFACTS` for optional Git-external screenshots.
+`work-ui` uses real core processes in two independent synthetic homes to verify
+archive-only, preservation and portable selective import through the built App.
+Set `LINTEL_WORK_UI_REPORT` for its JSON; fixture screenshots stay outside Git.
 It uses real headless Chromium with synthetic service state, not real systemd
-or native WebKit. Independent browser, pairing, service and remote-task UI checks are explicitly selected in CI;
+or native WebKit. Independent browser, pairing, service, remote-task and work UI checks are explicitly selected in CI;
 their actual current results are recorded in [current-state](current-state.md).
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)
@@ -317,3 +329,5 @@ and `passed`/`failed`/`skipped`/`deferred` reporting against throwaway commands.
 Earlier custom-policy source acceptance: clean `1fb9ab6` [CI run 37125403657](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37125403657) passed 12/12 defaults on both macOS and Ubuntu. The separately selected Linux OpenSSH runtime check passed 1/1 with 0 ignored; it exercised the seven-field custom contract on a real x86_64 static-musl runner, including exact subset changes, frozen receipt, lost ACK recovery and interactive PTY launch. It uses temporary synthetic roots and inert Claude, and does not establish real Claude effects, production VPS state or aarch64 runtime.
 
 Earlier browser source acceptance: clean `93c3f74` [CI run 37163091952](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37163091952) passed 12/12 defaults and 2/2 explicitly selected browser checks on both macOS arm64 and Ubuntu x86_64. Detailed Chromium 151.0.7922.34 reports retain all 11 smoke assertions, actual process exit/replacement, a new production `runtime.onStartup` generation, no relaunch extension-loading flags, retained identity and completed native receipt. The App copy-to-real-host pairing report passes with synthetic invoke/clipboard. Ubuntu OpenSSH runtime also passes 1/1 with 0 ignored. All five entrypoint reports record the same clean HEAD; packaged-App opt-ins and local Chromium 155 evidence remain separate. Formal browser distributions, AdsPower, real Claude/auth, native WebKit/OS clipboard and non-developer installation remain unverified.
+
+`work-ui` is an independent selection: built frontend + real core processes with isolated synthetic homes, invoke fixture and headless Playwright Chromium. It verifies task help, archive-only, preservation and portable selective import; it does not prove native WebKit or production transfer.

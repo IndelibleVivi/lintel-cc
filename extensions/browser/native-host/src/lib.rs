@@ -17,6 +17,10 @@ const PAIR_CODE_LEN: usize = 12;
 const PAIR_MAX_FAILURES: u64 = 5;
 /// Bound outstanding pairing challenges so a local process cannot grow the map without limit.
 const PAIR_MAX_PENDING: usize = 8;
+const ID_MIN_LENGTH: usize = 8;
+const ID_MAX_LENGTH: usize = 80;
+const CHROMIUM_EXTENSION_LENGTH: usize = 32;
+const FIREFOX_EXTENSION_ID: &str = "lintel@lintel.local";
 type Result<T> = std::result::Result<T, String>;
 fn now() -> u64 {
     SystemTime::now()
@@ -62,8 +66,8 @@ fn string<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
 }
 fn id(v: &Value, k: &str) -> Result<String> {
     let s = string(v, k)?;
-    if s.len() < 8
-        || s.len() > 80
+    if s.len() < ID_MIN_LENGTH
+        || s.len() > ID_MAX_LENGTH
         || !s
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
@@ -71,6 +75,14 @@ fn id(v: &Value, k: &str) -> Result<String> {
         return Err(format!("invalid_id:{k}"));
     }
     Ok(s.to_owned())
+}
+fn identifier_schema() -> Value {
+    json!({"type":"string","minLength":ID_MIN_LENGTH,"maxLength":ID_MAX_LENGTH,
+        "pattern":format!(r"^[A-Za-z0-9_-]{{{ID_MIN_LENGTH},{ID_MAX_LENGTH}}}(?![\s\S])")})
+}
+fn chromium_extension_schema() -> Value {
+    json!({"type":"string","minLength":CHROMIUM_EXTENSION_LENGTH,"maxLength":CHROMIUM_EXTENSION_LENGTH,
+        "pattern":format!(r"^[a-p]{{{CHROMIUM_EXTENSION_LENGTH}}}(?![\s\S])")})
 }
 fn transaction<F>(path: &Path, f: F) -> Result<Value>
 where
@@ -134,9 +146,8 @@ where
     FileExt::unlock(&lock).map_err(|e| e.to_string())?;
     result
 }
-fn action(a: &Value) -> Result<()> {
-    let kind = string(a, "kind")?;
-    let extra: &[&str] = match kind {
+fn action_fields(kind: &str) -> Result<&'static [&'static str]> {
+    Ok(match kind {
         "clear" => &["origins", "types", "cookieStoreId"],
         "clearProfileCache" => &[],
         "webrtc" => &["setting"],
@@ -146,7 +157,11 @@ fn action(a: &Value) -> Result<()> {
         "pauseRules" => &["minutes"],
         "restore" | "finishClear" => &["receiptId"],
         _ => return Err("unknown_action".into()),
-    };
+    })
+}
+fn action(a: &Value) -> Result<()> {
+    let kind = string(a, "kind")?;
+    let extra = action_fields(kind)?;
     let mut all = vec!["kind"];
     all.extend(extra);
     fields(a, &all)?;
@@ -231,6 +246,61 @@ fn action(a: &Value) -> Result<()> {
         _ => {}
     }
     Ok(())
+}
+/// Static finite control catalog; unlike control(), this never opens a journal.
+pub fn operation_catalog() -> Value {
+    let action_kinds = [
+        "clear",
+        "clearProfileCache",
+        "webrtc",
+        "sitePermission",
+        "proxy",
+        "blockSites",
+        "pauseRules",
+        "restore",
+        "finishClear",
+    ];
+    let actions: Vec<Value> = action_kinds.iter().map(|kind| {
+        let mut properties = serde_json::Map::new();
+        properties.insert("kind".into(), json!({"type":"string","const":kind}));
+        let mut required = vec!["kind"];
+        for field in action_fields(kind).unwrap() {
+            let schema = match *field {
+                "origins" => json!({"type":"array","minItems":1,"maxItems":2,"items":{"enum":["https://claude.ai","https://console.anthropic.com"]}}),
+                "types" => json!({"type":"array","minItems":1,"maxItems":6,"items":{"enum":["cookies","localStorage","indexedDB","serviceWorkers","cacheStorage","cache"]}}),
+                "setting" if *kind=="webrtc" => json!({"enum":["default","default_public_interface_only","disable_non_proxied_udp"]}),
+                "setting" => json!({"enum":["location","camera","microphone","notifications"]}),
+                "port" => json!({"type":"integer","minimum":1024,"maximum":65535}),
+                "minutes" => json!({"type":"integer","minimum":1,"maximum":60}),
+                "cookieStoreId" => json!({"type":"string","pattern":r"^firefox-(default|container-[0-9]+)(?![\s\S])"}),
+                "receiptId" => identifier_schema(),
+                _ => json!({"type":"string","minLength":1}),
+            };
+            properties.insert(field.to_string(), schema);
+            if *field!="cookieStoreId" {required.push(field);}
+        }
+        json!({"type":"object","properties":properties,"required":required,"additionalProperties":false})
+    }).collect();
+    let operations: Vec<Value> = ["instances","pair_create","pair_pending","pair_approve","submit","query","installation_plan","install_native_host"].iter().map(|op| {
+        let fields: &[&str] = match *op {
+            "pair_approve" => &["challenge"], "submit" => &["instance_id","operation_id","action"],
+            "query" => &["instance_id","operation_id"], "installation_plan"|"install_native_host" => &["browser","extension_id","host_path"], _=>&[],
+        };
+        let mut properties=serde_json::Map::new(); properties.insert("op".into(),json!({"const":op}));
+        let mut required=vec!["op"];
+        for field in fields {required.push(field); properties.insert(field.to_string(),match *field {
+            "action"=>json!({"oneOf":actions}), "browser"=>json!({"enum":["chrome","edge","firefox"]}),
+            "instance_id"|"operation_id"|"challenge"=>identifier_schema(),
+            "extension_id"=>json!({"oneOf":[chromium_extension_schema(),{"const":FIREFOX_EXTENSION_ID}]}),
+            "host_path"=>json!({"type":"string","pattern":"^/"}), _=>json!({"type":"string","minLength":1}),
+        });}
+        let mut request_schema=json!({"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":properties,"required":required,"additionalProperties":false});
+        if matches!(*op,"installation_plan"|"install_native_host") {
+            request_schema["allOf"]=json!([{"if":{"properties":{"browser":{"const":"firefox"}}},"then":{"properties":{"extension_id":{"const":FIREFOX_EXTENSION_ID}}},"else":{"properties":{"extension_id":chromium_extension_schema()}}}]);
+        }
+        json!({"id":format!("browser.{op}"),"request_schema":request_schema,"effects":{"profile":if *op=="submit"{"native_browser_api_after_extension_approval"}else{"none"},"lintel_state":if *op=="installation_plan"{"read_registration_and_resources"}else if *op=="install_native_host"{"manual_current_user_host_and_registration"}else{"host_journal_transaction"}},"approval":if *op=="submit" {"extension_confirmation_and_native_permission"}else{"explicit_operation_request"},"result":{"phases":["awaiting-browser-confirmation","running","awaiting-browser-restart","completed","uncertain","rejected","failed"],"recovery":"query_original_instance_and_operation_id"},"limitations":["profile pairing and current online evidence are separate","Firefox proxy/sitePermission/cache behavior remains limited","clear requires actual runtime.onStartup then separately approved finishClear"]})
+    }).collect();
+    json!({"operations":operations,"execution_owner":"paired_extension_native_browser_api","installation":"manual_host_path_cli_only"})
 }
 fn public_instance(key: &str, v: &Value) -> Value {
     json!({"instance_id":key,"label":v["label"],"browser":v["browser"],"extension_id":v["extension_id"],"paired":v["paired"],"conflict":v["conflict"],"last_seen":v["last_seen"],"online":v["last_seen"].as_u64().is_some_and(|t|now().saturating_sub(t)<20)})
@@ -334,14 +404,17 @@ fn control_inner(db: &mut Value, r: &Value) -> Result<Value> {
     }
 }
 fn valid_extension(s: &str) -> bool {
-    (s.len() == 32 && s.chars().all(|c| ('a'..='p').contains(&c))) || s == "lintel@lintel.local"
+    valid_chromium_extension(s) || s == FIREFOX_EXTENSION_ID
+}
+fn valid_chromium_extension(s: &str) -> bool {
+    s.len() == CHROMIUM_EXTENSION_LENGTH && s.chars().all(|c| ('a'..='p').contains(&c))
 }
 /// Map the argv-validated caller identity to its browser family. A Firefox
 /// add-on ID can never be recorded as chromium, and vice versa.
 fn browser_for_identity(extension: &str) -> Result<&'static str> {
     match extension {
-        "lintel@lintel.local" => Ok("firefox"),
-        e if e.len() == 32 && e.chars().all(|c| ('a'..='p').contains(&c)) => Ok("chromium"),
+        FIREFOX_EXTENSION_ID => Ok("firefox"),
+        e if valid_chromium_extension(e) => Ok("chromium"),
         _ => Err("invalid_caller_identity".into()),
     }
 }
@@ -369,12 +442,10 @@ pub fn manifest(browser: &str, extension: &str, host: &Path) -> Result<Value> {
     }
     let mut result = json!({"name":"app.lintel.browser","description":"Lintel paired browser bridge","path":host,"type":"stdio"});
     match browser {
-        "chrome" | "edge" | "chromium"
-            if extension.len() == 32 && extension.chars().all(|c| ('a'..='p').contains(&c)) =>
-        {
+        "chrome" | "edge" | "chromium" if valid_chromium_extension(extension) => {
             result["allowed_origins"] = json!([format!("chrome-extension://{extension}/")])
         }
-        "firefox" if extension == "lintel@lintel.local" => {
+        "firefox" if extension == FIREFOX_EXTENSION_ID => {
             result["allowed_extensions"] = json!([extension])
         }
         "chrome" | "edge" | "chromium" | "firefox" => return Err("invalid_extension_id".into()),
@@ -635,6 +706,51 @@ pub fn write_frame<W: Write>(w: &mut W, v: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn catalog_identifiers_and_installation_match_runtime_contracts() {
+        let catalog = operation_catalog();
+        let operations = catalog["operations"].as_array().unwrap();
+        let query = operations
+            .iter()
+            .find(|op| op["id"] == "browser.query")
+            .unwrap();
+        for field in ["instance_id", "operation_id"] {
+            assert_eq!(query["request_schema"]["properties"][field]["minLength"], 8);
+            assert_eq!(
+                query["request_schema"]["properties"][field]["maxLength"],
+                80
+            );
+            assert!(query["request_schema"]["properties"][field]["pattern"].is_string());
+        }
+        let install = operations
+            .iter()
+            .find(|op| op["id"] == "browser.installation_plan")
+            .unwrap();
+        assert_eq!(
+            install["request_schema"]["properties"]["browser"]["enum"],
+            json!(["chrome", "edge", "firefox"])
+        );
+        assert!(install["request_schema"]["properties"]["extension_id"]["oneOf"].is_array());
+        assert!(install["request_schema"]["allOf"].is_array());
+        let host = Path::new("/synthetic-host");
+        let home = Path::new("/synthetic-home");
+        let chrome_id = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        for browser in ["chrome", "edge"] {
+            assert!(installation::plan(browser, chrome_id, host, home, "macos").is_ok());
+            assert!(
+                installation::plan(browser, "lintel@lintel.local", host, home, "macos").is_err()
+            );
+        }
+        assert!(installation::plan("firefox", "lintel@lintel.local", host, home, "macos").is_ok());
+        assert!(installation::plan("firefox", chrome_id, host, home, "macos").is_err());
+        // The pure manifest helper supports this alias; the registration
+        // installer does not own a Chromium path and must not advertise it.
+        assert!(manifest("chromium", chrome_id, host).is_ok());
+        assert_eq!(
+            installation::plan("chromium", chrome_id, host, home, "macos").unwrap_err(),
+            "unsupported_browser_platform"
+        );
+    }
     fn path() -> PathBuf {
         std::env::temp_dir().join(format!("lintel-host-test-{}", random()))
     }

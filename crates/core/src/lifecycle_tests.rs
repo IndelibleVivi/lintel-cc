@@ -66,6 +66,42 @@ fn cleanup_preserves_work_archives_state_and_never_replays_new_login() {
 }
 
 #[test]
+fn failed_state_backup_keeps_its_publication_path_before_cleanup() {
+    let (_tmp, engine, e, root) = fixture();
+    fs::write(root.join(".credentials.json"), "synthetic-login").unwrap();
+    fs::write(root.join(".claude.json"), r#"{"synthetic":true}"#).unwrap();
+    fs::write(root.join("CLAUDE.md"), "Keep this work").unwrap();
+    let p = clean_plan(&engine, &e, "reset_client", false);
+    let backup = engine
+        .state
+        .join("archives")
+        .join(format!("{}-state.age", p["id"].as_str().unwrap()));
+    // An existing directory makes atomic publication fail after its intent is
+    // journaled, without racing a worker or changing a real client root.
+    fs::create_dir(&backup).unwrap();
+    let j = run(&engine, &p);
+    assert_eq!(j["status"], "needs_reconciliation", "{j}");
+    assert_eq!(j["state_archive_path"].as_str(), backup.to_str());
+    assert_eq!(j["error"]["step_id"], "state_backup");
+    assert_eq!(j["steps"][0]["status"], "executing");
+    assert!(j["archive_path"].is_null() && j["new_root"].is_null());
+    assert!(root.join(".credentials.json").exists());
+    assert!(root.join(".claude.json").exists());
+    assert_eq!(
+        fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+        "Keep this work"
+    );
+    let stored = load(&engine.path("jobs", p["id"].as_str().unwrap())).unwrap();
+    assert_eq!(stored["state_archive_path"], j["state_archive_path"]);
+    let queried = data(&engine, json!({"command":"job","job_id":j["id"]}));
+    assert_eq!(queried["state_archive_path"], j["state_archive_path"]);
+    assert!(
+        backup.is_dir(),
+        "query must not overwrite or remove the uncertain target"
+    );
+}
+
+#[test]
 fn changed_credentials_block_cleanup_before_acceptance() {
     let (_tmp, engine, e, root) = fixture();
     fs::write(root.join(".credentials.json"), "old").unwrap();
@@ -170,7 +206,7 @@ fn archive_reopens_imports_and_refuses_existing_or_escaping_targets() {
     assert_eq!(content["text"], "Synthetic instructions");
     let wrong=engine.request(json!({"command":"archive_inspect","job_id":j["id"],"archive_passphrase":"incorrect synthetic password"}));
     assert_eq!(wrong["error"]["code"], "archive_locked");
-    let dest = engine.create("destination").unwrap();
+    let dest = engine.create("destination", None).unwrap();
     let import = data(
         &engine,
         json!({"command":"plan_import","environment_id":dest["id"],"job_id":j["id"],"categories":["instructions"],"archive_passphrase":PASS}),

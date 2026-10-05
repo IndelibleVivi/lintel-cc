@@ -1,4 +1,9 @@
 import { useEffect, useRef, useId, type ReactNode } from 'react';
+import type { Receipt } from './types';
+
+export function hasConfirmedWorkArchive(receipt: Receipt): boolean {
+  return !!receipt.archive_path && (!!receipt.archive_digest || receipt.steps.some(step => step.id === 'archive' && step.status === 'completed'));
+}
 
 export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download';
 const paths: Record<IconName, ReactNode> = {

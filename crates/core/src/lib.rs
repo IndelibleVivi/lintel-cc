@@ -7,6 +7,8 @@ mod policy;
 mod service;
 mod storage;
 mod work;
+#[cfg(test)]
+mod work_tests;
 use fs2::FileExt;
 use policy::RULE;
 use serde_json::{json, Value};
@@ -186,6 +188,15 @@ impl Engine {
             .ok_or_else(|| err("environment_missing", "没有找到此环境"))
     }
     fn register(&self, name: &str, root: &Path, owned: bool) -> Result<Value> {
+        self.register_with_id(name, root, owned, &id())
+    }
+    fn register_with_id(
+        &self,
+        name: &str,
+        root: &Path,
+        owned: bool,
+        environment_id: &str,
+    ) -> Result<Value> {
         let root = physical(root)?;
         guard(&root)?;
         if !root.is_dir() || root == Path::new("/") || root == self.home {
@@ -199,17 +210,25 @@ impl Engine {
             return Ok(e.clone());
         }
         let env = policy::environment(
-            json!({"id":id(),"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
+            json!({"id":environment_id,"name":name,"host":"local","surface":"claude-code","root":root,"ownership":if owned{"lintel"}else{"registered"},"status":"discovered","credential_scope":"unverified"}),
             self.executable(),
         );
         all.push(env.clone());
         save(&self.state.join("inventory.json"), &json!(all))?;
         Ok(env)
     }
-    fn create(&self, name: &str) -> Result<Value> {
+    fn create(&self, name: &str, journal: Option<(&mut Value, &Path)>) -> Result<Value> {
         let root = self.state.join("environments").join(id());
+        let environment_id = id();
+        if let Some((receipt, path)) = journal {
+            receipt["new_environment_id"] = json!(environment_id);
+            receipt["new_root"] = json!(root);
+            // These are intent until registration succeeds. A failed journal
+            // prevents creation; a failed registration retains the exact path.
+            save(path, receipt)?;
+        }
         private_dir(&root)?;
-        self.register(name, &root, true)
+        self.register_with_id(name, &root, true, &environment_id)
     }
     fn settings(&self, e: &Value) -> Result<(PathBuf, Value, Value)> {
         let root = PathBuf::from(string(e, "root")?);
@@ -259,6 +278,27 @@ impl Engine {
             ));
         }
         Ok(())
+    }
+    /// Read back a deeply frozen plan for CLI display. The private raw snapshot,
+    /// root identity and internal `extra` are stripped exactly as a preview
+    /// would strip them; no passphrase or other secret is ever stored in a plan,
+    /// so none can leak here. A missing or damaged plan is a specific error.
+    fn plan_show(&self, r: &Value) -> Result<Value> {
+        let pid = safe_id(r, "plan_id")?;
+        let path = self.path("plans", &pid);
+        if !path.exists() {
+            return Err(err("plan_not_found", "没有找到这份计划"));
+        }
+        let p = load(&path)?;
+        if !p.is_object() || !p["hash"].is_string() {
+            return Err(err("invalid_plan", "保存的计划损坏，无法读取"));
+        }
+        let mut unhashed = p.clone();
+        unhashed.as_object_mut().unwrap().remove("hash");
+        if p["hash"] != digest(&serde_json::to_vec(&unhashed)?) {
+            return Err(err("plan_changed", "保存的计划已变化，无法据此读取"));
+        }
+        Ok(public_plan(p))
     }
     fn plan(
         &self,
@@ -321,7 +361,7 @@ impl Engine {
                 )
             }
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
-            "create_environment" => self.create(string(r, "name")?),
+            "create_environment" => self.create(string(r, "name")?, None),
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
@@ -407,6 +447,9 @@ impl Engine {
                 let manifest = work::manifest(Path::new(string(&e, "root")?), &categories)?;
                 self.plan(&e,"rebuild","保留内容，准备新环境",json!([]),vec!["原环境全部内容（尚未注销或删除）","未选中的实例与项目文件"],json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false},{"id":"create","label":"创建新的配置目录","reversible":false},{"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false},{"id":"credentials","label":"旧登录及客户端状态尚需独立处理","reversible":false}]),json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true}))
             }
+            "plan_archive" => self.plan_archive(r),
+            "plan_preserve" => self.plan_preserve(r),
+            "plan_show" => self.plan_show(r),
             "service_inspect" => self.service_inspect(r),
             "plan_service_quiesce" => self.plan_service_quiesce(r),
             "plan_service_resume" => self.plan_service_resume(r),
@@ -551,7 +594,10 @@ impl Engine {
         // settings bytes; an unparseable settings file must not block them.
         // Settings-writing plans still require a fully parsed document.
         let (path, mut doc, snap) = match p["kind"].as_str() {
-            Some("rebuild" | "cleanup" | "import" | "service_quiesce" | "service_resume") => {
+            Some(
+                "rebuild" | "preserve" | "archive" | "cleanup" | "import" | "service_quiesce"
+                | "service_resume",
+            ) => {
                 let path = root.join("settings.json");
                 let snap = snapshot(&path)?;
                 (path, Value::Null, snap)
@@ -577,6 +623,17 @@ impl Engine {
             let manifest = work::manifest(&root, &work::categories(&p["extra"])?)?;
             if json!(manifest) != p["extra"]["manifest"] {
                 return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
+            }
+        } else if p["kind"] == "archive" || p["kind"] == "preserve" {
+            work::check_passphrase(r)?;
+            let manifest = work::manifest(&root, &work::categories(&p["extra"])?)?;
+            if json!(manifest) != p["extra"]["manifest"] {
+                return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
+            }
+            if p["kind"] == "archive" {
+                // Explicit output must remain free in the same approved directory.
+                // The private state path is chosen fresh per plan.
+                work::check_output_path(&p)?;
             }
         } else if p["kind"] == "cleanup" {
             self.block_managed(&e)?;
@@ -610,6 +667,27 @@ impl Engine {
             }
             if p["kind"] == "rebuild" {
                 self.rebuild(&e, &p, r, &mut j, &jp)?;
+                return Ok(());
+            }
+            if p["kind"] == "archive" {
+                let dest = match p["extra"]["output_path"].as_str() {
+                    Some(raw) => PathBuf::from(raw),
+                    None => self.state.join("archives").join(format!("{pid}.age")),
+                };
+                let (_, files) = crate::Engine::write_archive(self, &e, &p, r, &dest, &mut j, &jp)?;
+                j["outcome"] = json!("archive_only");
+                j["coverage"] =
+                    json!({"categories": p["extra"]["categories"], "file_count": files.len()});
+                j["next_steps"] = json!([
+                    "妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。",
+                    "原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。"
+                ]);
+                j["status"] = json!("completed");
+                return Ok(());
+            }
+            if p["kind"] == "preserve" {
+                self.preserve(&e, &p, r, &mut j, &jp)?;
+                j["status"] = json!("completed");
                 return Ok(());
             }
             if p["kind"] == "cleanup" {
@@ -667,7 +745,34 @@ impl Engine {
             Ok(())
         })();
         if let Err(failure) = result {
+            // Record the real receipt status the failure happened in (for a
+            // settings write this is `verifying`), before overwriting it with the
+            // reconciliation state. A caller must not have to infer the phase.
+            let phase = j["status"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .unwrap_or("executing")
+                .to_string();
             j["status"] = json!("needs_reconciliation");
+            // A structured machine-readable failure in addition to the human
+            // warning, so a caller never has to parse Chinese free text to learn
+            // the code/phase or what to do next. Recovery always points at the
+            // original job query; completed steps and their artifacts are kept.
+            let uncertain = phase == "verifying"
+                || j["steps"].as_array().is_some_and(|steps| {
+                    steps.iter().any(|step| {
+                        matches!(step["status"].as_str(), Some("running" | "executing"))
+                    })
+                });
+            let step_id = j["steps"]
+                .as_array()
+                .and_then(|steps| {
+                    steps.iter().rev().find(|step| {
+                        matches!(step["status"].as_str(), Some("running" | "executing"))
+                    })
+                })
+                .map(|step| step["id"].clone());
+            j["error"] = json!({"code":failure.code,"message":failure.message,"phase":phase,"step_id":step_id,"uncertain_side_effects":uncertain,"recovery":"查询此任务的原始记录（同一 ID），查看已完成步骤与产物；不要重复提交，已完成步骤不会自动重做。"});
             j["warnings"]
                 .as_array_mut()
                 .unwrap()
@@ -767,6 +872,12 @@ fn public_plan(mut p: Value) -> Value {
     if p["extra"]["archive_passphrase_required"] == true {
         p["archive_passphrase_required"] = json!(true);
         p["file_count"] = json!(p["extra"]["manifest"].as_array().map_or(0, Vec::len));
+    }
+    if p["extra"]["outcome"].is_string() {
+        p["outcome"] = p["extra"]["outcome"].clone();
+    }
+    if p["extra"]["output_path"].is_string() {
+        p["output_path"] = p["extra"]["output_path"].clone();
     }
     p.as_object_mut().unwrap().remove("extra");
     p
@@ -991,7 +1102,7 @@ mod tests {
             engine.request(json!({"command":"drift","environment_id":e["id"]}))["data"]["status"],
             "changed"
         );
-        let absent = engine.create("absent settings").unwrap();
+        let absent = engine.create("absent settings", None).unwrap();
         let response = engine.request(
             json!({"command":"plan_policy","environment_id":absent["id"],"preset":"custom"}),
         );

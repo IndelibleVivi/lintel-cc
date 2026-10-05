@@ -1,4 +1,4 @@
-//! User-approved installation of the App's own static Linux runner.
+//! User-approved installation of caller-supplied static Linux runner resources.
 use super::*;
 use sha2::{Digest, Sha256};
 const MAX_BUNDLE: usize = 32 * 1024 * 1024;
@@ -33,7 +33,7 @@ fn shell_script(script: &str) -> Vec<String> {
 // No Claude paths are opened. All variable text is encoded before JSON output.
 const PROBE_BODY: &str = r#"
 os=$(uname -s); arch=$(uname -m); uid=$(id -u)
-[ "$os" = Linux ] || { printf '{"ok":false,"error":{"code":"platform_unsupported","message":"App 内置安装仅支持 Linux"}}\n'; exit 1; }
+[ "$os" = Linux ] || { printf '{"ok":false,"error":{"code":"platform_unsupported","message":"内置 runner 安装仅支持 Linux"}}\n'; exit 1; }
 mid=''; if [ -r /etc/machine-id ]; then mid=$(cat /etc/machine-id); fi
 for tool in base64 sha256sum stat mktemp chmod ln rm mkdir cat tr cut; do
   command -v "$tool" >/dev/null 2>&1 || { printf '{"ok":false,"error":{"code":"install_tools_missing","message":"Linux 用户级安装所需基础工具不可用"}}\n'; exit 1; }
@@ -94,7 +94,7 @@ impl Controller {
             return Err(match response["error"]["code"].as_str() {
                 Some("platform_unsupported") => failure(
                     "platform_unsupported",
-                    "App 内置安装只支持 Linux x86_64 / arm64",
+                    "内置 runner 安装只支持 Linux x86_64 / arm64",
                 ),
                 Some("install_tools_missing") => failure(
                     "install_tools_missing",
@@ -140,13 +140,13 @@ impl Controller {
         let manifest = load(&self.bundles.join("manifest.json")).map_err(|_| {
             failure(
                 "bundle_unavailable",
-                "此 App 未包含 Linux runner；请使用包含远端资源的桌面构建",
+                "本次调用未提供 Linux runner 资源；请指定完整的静态 runner 资源目录",
             )
         })?;
         let meta = manifest["runners"]
             .as_array()
             .and_then(|all| all.iter().find(|r| r["target"] == target))
-            .ok_or_else(|| failure("bundle_unavailable", "此 App 缺少目标架构的 runner"))?
+            .ok_or_else(|| failure("bundle_unavailable", "提供的资源目录缺少目标架构的 runner"))?
             .clone();
         let sha = checked_digest(&meta["sha256"])?;
         if meta["protocol"] != 1 || meta["version"].as_str().is_none() {
@@ -216,7 +216,7 @@ impl Controller {
     }
     pub(super) fn install_dispatch(&self, alias: &str, payload: &Value) -> Result<Value> {
         if payload["op"] == "prepare_runner" {
-            exact_fields(payload, &["op", "alias"], &[])?;
+            exact_operation_fields(payload)?;
             let root = self.install_root(alias)?;
             let _held = lock(&root.join("install.lock"))?;
             if self
@@ -240,20 +240,12 @@ impl Controller {
                 "install-{}",
                 &hash(&json!([alias, probe, bundle.meta, stamp]))[..24]
             );
-            let mut plan = json!({"install_id":id,"alias":alias,"probe":probe,"bundle":bundle.meta,"destination":format!("$HOME/.local/share/lintel/runners/{}/lintel",bundle.meta["sha256"].as_str().unwrap()),"effects":["上传 App 内置静态 runner 到当前 SSH 用户的专用版本目录","核验 SHA-256 与执行权限，再用 discover 核验 durable submit 能力","成功后 Lintel 绑定此版本；已有任务继续使用原 runner"],"status":"previewed","created_at":stamp});
+            let mut plan = json!({"install_id":id,"alias":alias,"probe":probe,"bundle":bundle.meta,"destination":format!("$HOME/.local/share/lintel/runners/{}/lintel",bundle.meta["sha256"].as_str().unwrap()),"effects":["上传本次调用提供的静态 runner 到当前 SSH 用户的专用版本目录","核验 SHA-256 与执行权限，再用 discover 核验 durable submit 能力","成功后 Lintel 绑定此版本；已有任务继续使用原 runner"],"status":"previewed","created_at":stamp});
             plan["approval"] = json!(hash(&plan));
             save(&root.join(format!("{id}.json")), &plan)?;
             return Ok(json!({"ok":true,"data":plan}));
         }
-        exact_fields(
-            payload,
-            if payload["op"] == "install_runner" {
-                &["op", "alias", "install_id", "approval"]
-            } else {
-                &["op", "alias", "install_id"]
-            },
-            &[],
-        )?;
+        exact_operation_fields(payload)?;
         let id = valid_id(field(payload, "install_id")?)?;
         let root = self.install_root(alias)?;
         let _held = lock(&root.join("install.lock"))?;
@@ -638,37 +630,47 @@ eval "$last"
     }
     #[test]
     fn finite_policy_schema_accepts_version_conditions_but_rejects_unmodeled_fields() {
-        assert!(validate_request(&json!({"command":"inspect","environment_id":"synthetic","trusted_devices":"not_required"})).is_ok());
-        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":true,"trusted_devices":"unknown","release_settings":["DISABLE_TELEMETRY"]})).is_ok());
+        assert!(validate_request(&json!({"command":"inspect","environment_id":"00000000-0000-4000-8000-000000000001","trusted_devices":"not_required"})).is_ok());
+        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":true,"trusted_devices":"unknown","release_settings":["DISABLE_TELEMETRY"]})).is_ok());
         assert!(validate_request(
-            &json!({"command":"inspect","environment_id":"synthetic","trusted_devices":"maybe"})
+            &json!({"command":"inspect","environment_id":"00000000-0000-4000-8000-000000000001","trusted_devices":"maybe"})
         )
         .is_err());
-        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"synthetic","preset":"reduce","keep_remote_control":true,"release_settings":["UNMODELED_ENV"]})).is_err());
+        assert!(validate_request(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":true,"release_settings":["UNMODELED_ENV"]})).is_err());
     }
     #[test]
     fn task_queries_use_original_digest_after_update() {
         let (_t, c) = fixture();
         let p = prepare(&c);
         install(&c, &p).unwrap();
-        let (path, held) = c.record("synthetic-host", "old-plan").unwrap();
-        save(&path,&json!({"plan_id":"old-plan","lookup_id":"old-plan","status":"submission_unknown","runner_digest":p["bundle"]["sha256"]})).unwrap();
+        let (path, held) = c
+            .record("synthetic-host", "00000000-0000-4000-8000-000000000007")
+            .unwrap();
+        save(&path,&json!({"plan_id":"00000000-0000-4000-8000-000000000007","lookup_id":"00000000-0000-4000-8000-000000000007","status":"submission_unknown","runner_digest":p["bundle"]["sha256"]})).unwrap();
         save(
             &c.state.join("bindings/synthetic-host.json"),
             &json!({"digest":"b".repeat(64)}),
         )
         .unwrap();
         drop(held);
-        let result =
-            c.dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"old-plan"}));
-        assert!(result.is_err()); // inert fixture's discover is not a matching receipt
-        let commands =
-            fs::read_to_string(c.transport.ssh.parent().unwrap().join("commands")).unwrap();
-        assert!(commands
-            .lines()
-            .last()
-            .unwrap()
-            .contains(p["bundle"]["sha256"].as_str().unwrap()));
-        assert!(!commands.lines().last().unwrap().contains(&"b".repeat(64)));
+        for request in [
+            json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000007"}),
+            json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"00000000-0000-4000-8000-000000000007"}}),
+            json!({"op":"request","alias":"synthetic-host","request":{"command":"job","plan_id":"00000000-0000-4000-8000-000000000007"}}),
+        ] {
+            let result = c.dispatch(request);
+            assert!(result.is_err()); // inert fixture's discover is not a matching receipt
+            let commands =
+                fs::read_to_string(c.transport.ssh.parent().unwrap().join("commands")).unwrap();
+            assert!(
+                commands
+                    .lines()
+                    .last()
+                    .unwrap()
+                    .contains(p["bundle"]["sha256"].as_str().unwrap()),
+                "Original task query switched to upgraded alias runner"
+            );
+            assert!(!commands.lines().last().unwrap().contains(&"b".repeat(64)));
+        }
     }
 }
