@@ -69,9 +69,12 @@ def elf(machine: int, interp: bool = False, *, file_type: int = 2,
 
 def macho_arm64(file_type: int = 2, *, entry: bool = True,
                 entryoff: int | None = None, executable: bool = True,
-                legacy: bool = False) -> bytes:
+                legacy: bool = False, platform_id: int | None = 1,
+                legacy_platform: bool = False) -> bytes:
     # Synthetic format fixture, never counted as native runtime acceptance.
-    command_size = 72 + ((288 if legacy else 24) if entry else 0) + (0 if legacy else 32)
+    platform_command = (struct.pack("<IIII", 0x24, 16, 0, 0) if legacy_platform else
+                        struct.pack("<IIIIII", 0x32, 24, platform_id, 0, 0, 0)) if platform_id is not None else b""
+    command_size = 72 + ((288 if legacy else 24) if entry else 0) + (0 if legacy else 32) + len(platform_command)
     payload_offset = 32 + command_size
     file_size = payload_offset + 256
     segment = struct.pack("<II16sQQQQIIII", 0x19, 72, b"__TEXT", 0x100000000,
@@ -84,8 +87,8 @@ def macho_arm64(file_type: int = 2, *, entry: bool = True,
         main = struct.pack("<IIII", 5, 288, 6, 68) + state
     dyld = struct.pack("<III", 0xe, 32, 12) + b"/usr/lib/dyld\0" + b"\0" * 6
     header = struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, file_type,
-                         1 + int(entry) + int(not legacy), command_size, 0, 0)
-    return header + segment + main + (b"" if legacy else dyld) + b"\x20\x00\x80\x52\xc0\x03\x5f\xd6" + b"\0" * 248
+                         1 + int(entry) + int(not legacy) + int(bool(platform_command)), command_size, 0, 0)
+    return header + segment + main + (b"" if legacy else dyld) + platform_command + b"\x20\x00\x80\x52\xc0\x03\x5f\xd6" + b"\0" * 248
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -301,6 +304,10 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
                                 ("macho-no-entry", macho_arm64(entry=False), "not_executable"),
                                 ("macho-unmapped-entry", macho_arm64(entryoff=99999), "not_executable"),
                                 ("macho-nonexec", macho_arm64(executable=False), "not_executable"),
+                                ("macho-no-platform", macho_arm64(platform_id=None), "wrong_platform"),
+                                ("macho-ios", macho_arm64(platform_id=2), "wrong_platform"),
+                                ("macho-tvos", macho_arm64(platform_id=3), "wrong_platform"),
+                                ("macho-watchos", macho_arm64(platform_id=4), "wrong_platform"),
                                 ("macho-broken-command", broken_command, "wrong_format")):
         binary = journey.base / name
         binary.write_bytes(payload)
@@ -369,7 +376,7 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
     result = journey.package(journey.base / "static-pie-out", supplied, version=version)
     assert result.returncode == 0, result.stderr
     legacy = journey.base / "arm64-thread-macho"
-    legacy.write_bytes(macho_arm64(legacy=True))
+    legacy.write_bytes(macho_arm64(legacy=True, legacy_platform=True))
     result = journey.package(journey.base / "thread-macho-out", dict(inputs, macos=legacy), version=version)
     assert result.returncode == 0, result.stderr
 
@@ -391,6 +398,8 @@ def publication_failure(journey: PackageJourney, inputs: dict, version: str) -> 
         wrapper = tools / "tar"
         wrapper.write_text(f'''#!{sys.executable}
 import pathlib,subprocess,sys
+if '-czf' not in sys.argv:
+    sys.exit(subprocess.call([{real_tar!r},*sys.argv[1:]]))
 count=pathlib.Path({str(count)!r})
 n=int(count.read_text())+1 if count.exists() else 1
 count.write_text(str(n))
@@ -425,6 +434,41 @@ sys.exit(subprocess.call([{real_tar!r},*sys.argv[1:]]))
         assert retry.returncode == 0 and index.is_file(), retry.stderr
         assert keep.read_text() == "unrelated output\n"
     assert not failures, failures
+
+
+def archive_environment(journey: PackageJourney, inputs: dict, version: str) -> None:
+    real_tar = shutil.which("tar")
+    for mode in ("options", "drop-member"):
+        tools = journey.base / (mode + "-tar-tools")
+        tools.mkdir()
+        wrapper = tools / "tar"
+        # GNU tar honors TAR_OPTIONS; emulate that documented behavior on BSD
+        # tar too so the environment regression is exercised on both hosts.
+        wrapper.write_text(f'''#!{sys.executable}
+import os,shlex,subprocess,sys
+options=shlex.split(os.environ.get('TAR_OPTIONS',''))
+if {mode!r}=='drop-member' and '-czf' in sys.argv:
+    options=['--exclude=bin/lintel']
+sys.exit(subprocess.call([{real_tar!r},*options,*sys.argv[1:]]))
+''')
+        wrapper.chmod(0o755)
+        output = journey.base / (mode + "-tar-out")
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"],
+                   TAR_OPTIONS="--exclude=bin/lintel")
+        result = journey.package(output, inputs, version=version, env=env)
+        if mode == "drop-member":
+            assert result.returncode != 0 and "invalid_archive" in result.stderr, result.stderr
+            assert not list(output.glob("*.tar.gz")) and not list(output.glob("candidates-*.json"))
+        else:
+            assert result.returncode == 0, result.stderr
+            for archive in output.glob("*.tar.gz"):
+                with tarfile.open(archive) as tar:
+                    names = tar.getnames()
+                assert set(names) == {"bin/lintel", "candidate.json", "SHA256SUMS", "README.txt",
+                                      "bin/remote-runners/manifest.json",
+                                      "bin/remote-runners/x86_64-unknown-linux-musl/lintel",
+                                      "bin/remote-runners/aarch64-unknown-linux-musl/lintel"}, names
+                assert len(names) == len(set(names))
 
 
 def manifest_snapshot(journey: PackageJourney, inputs: dict, version: str) -> None:
@@ -479,7 +523,7 @@ def main() -> int:
     journey = PackageJourney()
     base = journey.base
     if journey.host is None:
-        raise SystemExit(f"unsupported host {platform.system()}/{platform.machine()}; this check runs on macOS arm64 or Linux x86_64")
+        raise SystemExit(f"unsupported host {platform.system()}/{platform.machine()}; this check runs on macOS arm64 or Linux x86_64/aarch64")
     # The supplied native input must match this host's packaged target.
     with open(journey.native, "rb") as handle:
         native_bytes = handle.read()
@@ -617,6 +661,7 @@ def main() -> int:
         assert not rejected.exists(), "a rejected run still wrote output"
         executable_inputs(journey, inputs, version)
         publication_failure(journey, inputs, version)
+        archive_environment(journey, inputs, version)
 
         for key, triple in (("x86", "x86_64-unknown-linux-musl"),
                             ("arm", "aarch64-unknown-linux-musl")):

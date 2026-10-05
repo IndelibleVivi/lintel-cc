@@ -74,6 +74,8 @@ try {
   check('reduced motion disables automatic cursor animation');
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth), false);
+  // The viewport protocol reply can precede the real media-query notification.
+  await page.waitForFunction(()=>document.querySelector('[role=tablist]').getAttribute('aria-orientation') === 'horizontal', null, {timeout:2000});
   assert.equal(await page.getByRole('tablist').getAttribute('aria-orientation'), 'horizontal');
   await page.locator('.cg-jump').click();
   assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'running');

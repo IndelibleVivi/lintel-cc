@@ -81,8 +81,16 @@ def _check(
 
 
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
-_CLI_PACKAGE_BINARY = ROOT / ("target/x86_64-unknown-linux-musl/release/lintel"
-                             if platform.system() == "Linux" else "target/debug/lintel")
+
+
+def _cli_package_binary(system: str, machine: str) -> Path:
+    if system == "Linux":
+        arch = "aarch64" if machine in ("aarch64", "arm64") else "x86_64"
+        return ROOT / f"target/{arch}-unknown-linux-musl/release/lintel"
+    return ROOT / "target/debug/lintel"
+
+
+_CLI_PACKAGE_BINARY = _cli_package_binary(platform.system(), platform.machine())
 _CLI_PACKAGE_TOOLS = (("node", "tar", "cc", "shasum") if platform.system() == "Darwin"
                       else ("node", "tar", "sha256sum"))
 
@@ -123,7 +131,7 @@ CHECKS: List[Check] = [
     _check("cli-candidate", "portable CLI package/extract/native execution and retained-state upgrade", "independent",
            PYTHON, "tests/cli_package_journey.py", str(_CLI_PACKAGE_BINARY),
            tools=_CLI_PACKAGE_TOOLS, paths=(_CLI_PACKAGE_BINARY,),
-           independent=True, requires="macOS arm64 native CLI or Linux x86_64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum for test fixtures/checksums",
+           independent=True, requires="macOS arm64 native CLI or Linux x86_64/aarch64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum for test fixtures/checksums",
            reason="executes the native extracted package; other architectures use visibly synthetic format fixtures"),
     _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
            PYTHON, "tests/remote_linux_ssh_journey.py", "target/x86_64-unknown-linux-musl/release/lintel",
@@ -425,6 +433,11 @@ def run_self_test() -> int:
                "opted-in independent check skips (not passes) when prerequisites are missing")
 
         from unittest.mock import patch
+        for machine, arch in (("x86_64", "x86_64"), ("aarch64", "aarch64"), ("arm64", "aarch64")):
+            expect(_cli_package_binary("Linux", machine) == ROOT / f"target/{arch}-unknown-linux-musl/release/lintel",
+                   f"candidate selects native Linux {machine} binary")
+        expect(_cli_package_binary("Darwin", "arm64") == ROOT / "target/debug/lintel",
+               "candidate retains native Mac input")
         candidate = next(c for c in CHECKS if c.id == "cli-candidate")
         prebuilt = Path(temp) / "native-cli"
         prebuilt.touch()

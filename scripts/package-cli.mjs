@@ -112,6 +112,7 @@ function verifyMachOArm64(bytes, label) {
   const segments = [];
   let entryOffset = null;
   let entryAddress = null;
+  let macOSPlatform = false;
   let cursor = 32;
   for (let i = 0; i < count; i += 1) {
     if (cursor + 8 > end) fail('wrong_format', `${label}: Mach-O command header is truncated`);
@@ -132,6 +133,17 @@ function verifyMachOArm64(bytes, label) {
         fail('wrong_format', `${label}: Mach-O segment is not file-backed`);
       }
       if ((bytes.readUInt32LE(cursor + 60) & 4) !== 0) segments.push({ address, offset, fileSize });
+    } else if (command === 0x32) { // LC_BUILD_VERSION
+      if (size < 24 || 24 + bytes.readUInt32LE(cursor + 20) * 8 !== size) {
+        fail('wrong_format', `${label}: invalid platform build command`);
+      }
+      if (bytes.readUInt32LE(cursor + 8) !== 1) fail('wrong_platform', `${label}: not built for macOS`);
+      macOSPlatform = true;
+    } else if (command === 0x24) { // LC_VERSION_MIN_MACOSX
+      if (size !== 16) fail('wrong_format', `${label}: invalid macOS version command`);
+      macOSPlatform = true;
+    } else if ([0x25, 0x2f, 0x30].includes(command)) { // Other legacy Apple platforms
+      fail('wrong_platform', `${label}: not built for macOS`);
     } else if (command === 0x80000028) { // LC_MAIN
       if (size !== 24 || entryOffset !== null) fail('wrong_format', `${label}: invalid LC_MAIN`);
       entryOffset = bytes.readBigUInt64LE(cursor + 8);
@@ -145,6 +157,7 @@ function verifyMachOArm64(bytes, label) {
     cursor += size;
   }
   if (cursor !== end) fail('wrong_format', `${label}: Mach-O command count/size disagree`);
+  if (!macOSPlatform) fail('wrong_platform', `${label}: Mach-O lacks a macOS platform command`);
   const loadedEntry = segments.some(({ address, offset, fileSize }) =>
     (entryOffset !== null && entryOffset > 0n && entryOffset >= offset && entryOffset < offset + fileSize)
     || (entryAddress !== null && entryAddress > 0n && entryAddress >= address && entryAddress < address + fileSize));
@@ -567,16 +580,26 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
     // archive can appear.
     const tempArchive = path.join(publishDir, `.tmp-${archiveName}-${process.pid}`);
     await rm(tempArchive, { force: true });
+    const tarEnv = { ...process.env, COPYFILE_DISABLE: '1' };
+    delete tarEnv.TAR_OPTIONS;
+    const expectedMembers = entries.map((e) => e.archive).sort();
     execFileSync('tar', [
       '-czf', tempArchive,
       '-C', stage,
-      ...entries.map((e) => e.archive).sort(),
+      ...expectedMembers,
     ], {
       // COPYFILE_DISABLE suppresses macOS AppleDouble `._*` members so the
       // archive contains exactly the payload the manifest lists.
-      env: { ...process.env, COPYFILE_DISABLE: '1' },
+      // GNU TAR_OPTIONS must not exclude/transform explicit payload members.
+      env: tarEnv,
       stdio: ['ignore', 'inherit', 'inherit'],
     });
+    const members = execFileSync('tar', ['-tzf', tempArchive], {
+      env: tarEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'],
+    }).trim().split('\n').sort();
+    if (members.length !== expectedMembers.length || members.some((name, i) => name !== expectedMembers[i])) {
+      fail('invalid_archive', 'tar output does not contain exactly the declared candidate files');
+    }
     const archiveBytes = await readFile(tempArchive);
     try {
       await publishNoReplace(archivePath, archiveBytes, 0o644, publishDir, published);

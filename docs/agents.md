@@ -28,6 +28,8 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 Mach-O 逐条核对 load-command 数量、边界与 segment／section 结构，并要求 `LC_MAIN` 或 ARM64 `LC_UNIXTHREAD` 入口位于文件支持的 executable segment。只有 header、没有入口、未映射入口或不可执行 segment 的输入均拒绝。打包／最终索引发布报错时，回收本次已发布且 identity／大小／mtime 仍未变化的 links，保留既有文件与可检测到的外部替换或编辑，然后可重试；不承诺进程突然终止后的自动 transaction 恢复。
 
+macOS 输入必须带 `LC_BUILD_VERSION` 的 macOS 平台标记，或 legacy `LC_VERSION_MIN_MACOSX`；其它 Apple 平台和缺少平台标记的输入拒绝。打包器移除子进程的 `TAR_OPTIONS`，并在发布前核对归档成员恰好等于声明清单，避免继承的 tar 配置漏掉或改名 executable。
+
 先在 macOS 上用 `target/release/lintel` 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：
 
 ```sh

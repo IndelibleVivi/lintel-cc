@@ -140,7 +140,7 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 
 | id | what it needs |
 | --- | --- |
-| `cli-candidate` | macOS arm64 native CLI or Linux x86_64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum. Mac cc builds only a synthetic malformed-probe fixture; the installed CLI does not need a compiler. Packages/extracts/runs the native CLI in synthetic homes, rejects wrong/dynamic/missing inputs and overwrites, and preserves original state/job across two selected version directories. Other-architecture inputs are visibly synthetic format fixtures; these do not prove their runtime. The optional full-real smoke requires all three correctly formatted binaries and both canonical runner files plus manifest; incomplete or wrong-platform local outputs cannot trigger it. |
+| `cli-candidate` | macOS arm64 native CLI or Linux x86_64/aarch64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum. Mac cc builds only a synthetic malformed-probe fixture; the installed CLI does not need a compiler. Packages/extracts/runs the native CLI in synthetic homes, rejects wrong/dynamic/missing inputs and overwrites, and preserves original state/job across two selected version directories. Other-architecture inputs are visibly synthetic format fixtures; these do not prove their runtime. The optional full-real smoke requires all three correctly formatted binaries and both canonical runner files plus manifest; incomplete or wrong-platform local outputs cannot trigger it. |
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and shared Rust controller; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | A real Chromium restart that emits `runtime.onStartup`, plus the Playwright dependency. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
@@ -159,7 +159,10 @@ python3 tests/verify.py --checks cli-candidate --json /tmp/lintel-cli-candidate.
 ```
 
 On Linux x86_64, first build `target/x86_64-unknown-linux-musl/release/lintel`
-with the static musl command below; the same selection uses that executable.
+with the static musl command below. Linux aarch64/arm64 selects
+`target/aarch64-unknown-linux-musl/release/lintel`; build the corresponding
+static musl target on that host. The selection uses the native architecture.
+Architecture-selection control tests do not establish aarch64 runtime acceptance.
 CI selects this check on both platforms after the applicable build. Installation
 verification uses the packaged checksum list with macOS `shasum` or Linux
 `sha256sum`; Node is a packaging-host prerequisite, not a CLI runtime dependency.
