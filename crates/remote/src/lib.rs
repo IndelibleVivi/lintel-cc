@@ -1163,18 +1163,24 @@ impl Controller {
             .any(|host| host["alias"] == alias);
         if !registered {
             // Removing a display entry cannot erase or strand a durable task.
+            let task_id = match op {
+                "reconnect" => payload["plan_id"].as_str(),
+                "request" if payload["request"]["command"] == "job" => payload["request"]["job_id"]
+                    .as_str()
+                    .or_else(|| payload["request"]["plan_id"].as_str()),
+                _ => None,
+            };
             let existing_query = (op == "query_install"
                 && self.install_record_exists(alias, &payload))
-                || op == "reconnect"
-                    && payload["plan_id"].as_str().is_some_and(|id| {
-                        valid_id(id).is_ok()
-                            && self
-                                .state
-                                .join("tasks")
-                                .join(alias)
-                                .join(format!("{id}.json"))
-                                .exists()
-                    });
+                || task_id.is_some_and(|id| {
+                    valid_id(id).is_ok()
+                        && self
+                            .state
+                            .join("tasks")
+                            .join(alias)
+                            .join(format!("{id}.json"))
+                            .exists()
+                });
             if !existing_query {
                 return Err(failure(
                     "host_not_registered",
@@ -1252,6 +1258,9 @@ impl Controller {
                 }
                 let mut record =
                     json!({"plan_id":plan_id,"lookup_id":plan_id,"status":"submission_unknown"});
+                if let Some(digest) = self.binding(alias)? {
+                    record["runner_digest"] = digest;
+                }
                 if op == "reconnect" {
                     record["status"] = json!("query_only");
                     save(&path, &record)?;
@@ -1267,9 +1276,6 @@ impl Controller {
                         ));
                     }
                     request["archive_passphrase"] = passphrase.clone();
-                }
-                if let Some(digest) = self.binding(alias)? {
-                    record["runner_digest"] = digest;
                 }
                 save(&path, &record)?; // Durable local intent precedes the one possible submission.
                 let response =
@@ -1564,6 +1570,38 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn new_reconnect_pins_current_runner_before_query_and_keeps_it_after_upgrade() {
+        let (temp, controller) = fixture(RECEIPT);
+        let original = json!("a".repeat(64));
+        let binding = controller.state.join("bindings/synthetic-host.json");
+        private_dir(binding.parent().unwrap()).unwrap();
+        save(&binding, &json!({"digest":original})).unwrap();
+        let id = "00000000-0000-4000-8000-000000000002";
+        let request = json!({"op":"reconnect","alias":"synthetic-host","plan_id":id});
+        assert_eq!(
+            controller.dispatch(request.clone()).unwrap()["data"]["id"],
+            id
+        );
+        let task = controller
+            .state
+            .join("tasks/synthetic-host")
+            .join(format!("{id}.json"));
+        assert_eq!(load(&task).unwrap()["runner_digest"], original);
+        save(&binding, &json!({"digest":"b".repeat(64)})).unwrap();
+        controller.dispatch(request).unwrap();
+        controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":id}})).unwrap();
+        let args = fs::read_to_string(temp.path().join("args")).unwrap();
+        assert_eq!(
+            args.lines()
+                .filter(|arg| arg.contains(original.as_str().unwrap()))
+                .count(),
+            3
+        );
+        assert!(!args.contains(&"b".repeat(64)));
+        assert!(!args.lines().any(|arg| arg == "submit"));
     }
 
     #[test]
@@ -2037,6 +2075,9 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             .dispatch(json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000002"}))
             .unwrap();
         assert_eq!(queried["data"]["status"], "completed");
+        let queried = controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"00000000-0000-4000-8000-000000000002"}})).unwrap();
+        assert_eq!(queried["data"]["status"], "completed");
+        assert_eq!(envelope(controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job","job_id":"00000000-0000-4000-8000-000000000006"}})))["error"]["code"], "host_not_registered");
         assert_eq!(
             envelope(controller.dispatch(
                 json!({"op":"reconnect","alias":"synthetic-host","plan_id":"00000000-0000-4000-8000-000000000006"})
@@ -2052,7 +2093,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         );
         let args = fs::read_to_string(temp.path().join("args")).unwrap();
         assert_eq!(args.lines().filter(|line| *line == "submit").count(), 1);
-        assert_eq!(args.lines().filter(|line| *line == "request").count(), 2);
+        assert_eq!(args.lines().filter(|line| *line == "request").count(), 3);
         assert_eq!(
             fs::read_to_string(&controller.config).unwrap(),
             "Host synthetic-host\n  HostName synthetic.invalid\n"

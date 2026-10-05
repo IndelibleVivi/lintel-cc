@@ -502,7 +502,7 @@ fn remote(args: &[String]) -> Value {
             request.as_object_mut().unwrap().remove("command");
             request["op"]=json!("execute");request["alias"]=json!(word(2));request
         }
-        "job" if !word(2).is_empty()&&!word(3).is_empty()=>json!({"op":"reconnect","alias":word(2),"plan_id":word(3)}),
+        "job" if !word(2).is_empty()&&!word(3).is_empty()=>json!({"op":"request","alias":word(2),"request":{"command":"job","job_id":word(3)}}),
         "launch" => json!({"op":"launch","alias":word(2),"environment_id":word(3)}),
         _=>return error("invalid_argument","remote control | hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID"),
     };

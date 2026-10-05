@@ -44,6 +44,18 @@ def run():
                                                   'request': {'command': 'execute'}}, good=False)
         assert error['code'] == 'host_not_registered'
         assert call('remote', 'submit', 'synthetic-alias', payload={'command': 'discover'}, good=False)['code'] == 'invalid_submission'
+        call('remote', 'control', payload={'op': 'add_host', 'alias': 'synthetic-alias'})
+        remote_state = base / 'state/remote'
+        # A lookup has no use for writable submission storage. Block that path
+        # and use an invalid binding so both routes stop before any real SSH.
+        tasks = remote_state / 'tasks'
+        tasks.write_text('synthetic retained submission-storage obstacle')
+        bindings = remote_state / 'bindings'
+        bindings.mkdir(mode=0o700)
+        (bindings / 'synthetic-alias.json').write_text(json.dumps({'digest': 'invalid'}))
+        error = call('remote', 'job', 'synthetic-alias', '00000000-0000-4000-8000-000000000002', good=False)
+        assert error['code'] == 'invalid_bundle', ('Manual CLI lookup tried to allocate a task', error)
+        assert tasks.read_text() == 'synthetic retained submission-storage obstacle'
         # No connect/SSH operation is issued in this test.
         if sys.platform == 'darwin':
             catalog = call('browser', 'operations')

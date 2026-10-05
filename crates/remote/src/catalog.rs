@@ -139,7 +139,7 @@ fn describe(op: &str) -> Value {
             "fixed_openssh_submit_or_original_job_query",
         ),
         "reconnect" => (
-            "read_or_persist_query_only_original_plan_record_and_record_receipt",
+            "read_or_persist_query_only_original_plan_record_with_current_runner_binding_and_record_receipt",
             "query_original_job_only",
             "fixed_openssh_request",
         ),
@@ -170,6 +170,7 @@ fn describe(op: &str) -> Value {
     let registry_condition = match op {
         "query_install" => "registered_literal_alias_or_retained_original_install_query",
         "reconnect" => "registered_literal_alias_or_retained_original_job_reconnect",
+        "request" => "registered_literal_alias_or_retained_original_job_lookup_only",
         _ => "registered_literal_alias",
     };
     let conditions = if local_only {
@@ -213,7 +214,7 @@ fn describe(op: &str) -> Value {
             json!({"id_field":"install_id","operation":"remote.query_install","mode":"query_original_install_only_after_upload_intent","sole_upload":true,"preserve_frozen_digest_and_target":true,"retained_after_remove_host":true,"do_not_create_second_install_after_uncertainty":true})
         }
         "remove_host" => {
-            json!({"mode":"registry_only","retained_queries":["remote.reconnect","remote.query_install"],"retains":["tasks","installations","runner_bindings","deduplication"]})
+            json!({"mode":"registry_only","retained_queries":["remote.reconnect","remote.request.job","remote.query_install"],"retains":["tasks","installations","runner_bindings","deduplication"]})
         }
         "launch" => {
             json!({"mode":"terminal_session_observation","detached_job":false,"session_ends_with_SSH":true,"reboot_survival":false})
