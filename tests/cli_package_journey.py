@@ -40,7 +40,8 @@ SECOND_REVISION = "b0001234567890abcdef1234567890abcdef1234"
 
 def elf(machine: int, interp: bool = False, *, file_type: int = 2,
         entry: int = 0x401000, needed: bool = False, dynamic: bool = False,
-        memory_size: int = 256) -> bytes:
+        memory_size: int = 256, phentsize: int = 56,
+        program_count: int = 1) -> bytes:
     header = bytearray(64)
     header[0:4] = b"\x7fELF"
     header[4] = 2
@@ -51,14 +52,15 @@ def elf(machine: int, interp: bool = False, *, file_type: int = 2,
     struct.pack_into("<I", header, 20, 1)
     struct.pack_into("<Q", header, 24, entry)
     struct.pack_into("<H", header, 52, 64)
-    phoff, phentsize, phnum = 64, 56, 2 if needed or dynamic else 1
+    phoff, phnum = 64, 2 if needed or dynamic else program_count
     struct.pack_into("<Q", header, 32, phoff)
     struct.pack_into("<H", header, 54, phentsize)
     struct.pack_into("<H", header, 56, phnum)
-    program = bytearray(56)
+    program = bytearray(max(56, phentsize))
     payload_offset = phoff + phentsize * phnum
     struct.pack_into("<IIQQQQQQ", program, 0, 3 if interp else 1, 5,
                      payload_offset, 0x401000, 0x401000, 256, memory_size, 1)
+    program *= program_count
     payload = bytearray(b"\x90" * 256)
     if needed or dynamic:
         dynamic_program = struct.pack("<IIQQQQQQ", 2, 4, payload_offset, 0x401000, 0x401000, 32, 32, 8)
@@ -320,6 +322,8 @@ def executable_inputs(journey: PackageJourney, inputs: dict, version: str) -> No
         for kind, payload, code in (("object", elf(machine, file_type=1), "not_executable"),
                                     ("shared", elf(machine, file_type=3, entry=0), "not_executable"),
                                     ("needed", elf(machine, file_type=3, needed=True), "dynamic_dependency"),
+                                    ("large-phentry", elf(machine, phentsize=64), "wrong_format"),
+                                    ("oversized-phtable", elf(machine, program_count=1171), "wrong_format"),
                                     ("small-mapping", elf(machine, memory_size=255), "wrong_format"),
                                     ("empty-mapping", elf(machine, memory_size=0), "wrong_format")):
             name = f"{key}-{kind}"

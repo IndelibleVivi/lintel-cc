@@ -83,11 +83,13 @@ def _check(
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
 
 
-def _cli_package_binary(system: str, machine: str) -> Path:
-    if system == "Linux":
+def _cli_package_binary(system: str, machine: str) -> Optional[Path]:
+    if system == "Linux" and machine in ("x86_64", "aarch64", "arm64"):
         arch = "aarch64" if machine in ("aarch64", "arm64") else "x86_64"
         return ROOT / f"target/{arch}-unknown-linux-musl/release/lintel"
-    return ROOT / "target/debug/lintel"
+    if system == "Darwin" and machine == "arm64":
+        return ROOT / "target/debug/lintel"
+    return None
 
 
 _CLI_PACKAGE_BINARY = _cli_package_binary(platform.system(), platform.machine())
@@ -129,8 +131,8 @@ CHECKS: List[Check] = [
            paths=(ROOT / "apps/desktop/node_modules",), requires="apps/desktop/node_modules"),
     # Independent / real-runtime evidence: never in the implicit default group.
     _check("cli-candidate", "portable CLI package/extract/native execution and retained-state upgrade", "independent",
-           PYTHON, "tests/cli_package_journey.py", str(_CLI_PACKAGE_BINARY),
-           tools=_CLI_PACKAGE_TOOLS, paths=(_CLI_PACKAGE_BINARY,),
+           PYTHON, "tests/cli_package_journey.py", *((str(_CLI_PACKAGE_BINARY),) if _CLI_PACKAGE_BINARY else ()),
+           tools=_CLI_PACKAGE_TOOLS, paths=(_CLI_PACKAGE_BINARY,) if _CLI_PACKAGE_BINARY else (),
            independent=True, requires="macOS arm64 native CLI or Linux x86_64/aarch64 static musl CLI; Node/tar; macOS cc/shasum or Linux sha256sum for test fixtures/checksums",
            reason="executes the native extracted package; other architectures use visibly synthetic format fixtures"),
     _check("linux-ssh-runtime", "real Linux OpenSSH native install/submit/query/TTY journey", "independent",
@@ -281,6 +283,8 @@ def run_check(check: Check, args: argparse.Namespace) -> Dict[str, object]:
     explicit = bool(args.all or getattr(args, "checks", None) or getattr(args, "category", None))
     if check.independent and not explicit:
         return finish(DEFER, check.reason)
+    if check.id == "cli-candidate" and _cli_package_binary(platform.system(), platform.machine()) is None:
+        return finish(SKIP, f"unsupported host {platform.system()}/{platform.machine()}; requires macOS arm64 or Linux x86_64/aarch64")
     if not check.cwd.is_dir():
         return finish(SKIP, f"working directory missing: {check.cwd}")
     missing_tool = next((tool for tool in check.tools if shutil.which(tool) is None), None)
@@ -438,6 +442,16 @@ def run_self_test() -> int:
                    f"candidate selects native Linux {machine} binary")
         expect(_cli_package_binary("Darwin", "arm64") == ROOT / "target/debug/lintel",
                "candidate retains native Mac input")
+        for system, machine in (("Darwin", "x86_64"), ("Linux", "riscv64"), ("Windows", "AMD64")):
+            expect(_cli_package_binary(system, machine) is None,
+                   f"candidate has no native input on unsupported {system}/{machine}")
+            with patch.object(platform, "system", return_value=system), \
+                    patch.object(platform, "machine", return_value=machine), \
+                    patch(__name__ + ".run", side_effect=AssertionError("unsupported journey launched")):
+                candidate_check = next(c for c in CHECKS if c.id == "cli-candidate")
+                result = run_check(candidate_check, opted_in)
+                expect(result["status"] == SKIP and "unsupported host" in str(result.get("reason")),
+                       f"candidate skips unsupported {system}/{machine} before launching")
         candidate = next(c for c in CHECKS if c.id == "cli-candidate")
         prebuilt = Path(temp) / "native-cli"
         prebuilt.touch()

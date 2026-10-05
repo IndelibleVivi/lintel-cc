@@ -188,7 +188,9 @@ function verifyStaticElf(bytes, machine, label) {
   const phoff = Number(bytes.readBigUInt64LE(32));
   const phentsize = bytes.readUInt16LE(54);
   const phnum = bytes.readUInt16LE(56);
-  if (phentsize < 56 || phnum === 0 || phoff + phentsize * phnum > bytes.length) {
+  // Linux load_elf_phdrs requires the exact Elf64_Phdr size and <= 64 KiB.
+  if (phentsize !== 56 || phnum === 0 || phentsize * phnum > 65536
+    || phoff + phentsize * phnum > bytes.length) {
     fail('wrong_format', `${label}: ELF program headers are unreadable`);
   }
   let loadedEntry = false;
