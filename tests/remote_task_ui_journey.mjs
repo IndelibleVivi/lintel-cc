@@ -98,7 +98,14 @@ try{
   await assertWait(()=>jobRequested);assert.equal(calls.some(c=>c.op==='request'&&c.request?.command==='job'),false,'Receipt refresh bypassed the durable pinned-runner reconnect path');await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   heldJob.release();heldJob=null;await page.getByRole('button',{name:alias,exact:true}).waitFor({state:'visible'});
   await assertWait(async()=>!await pageBusy());assert.equal(await dialog.count(),0);
-  report.checks.push('receipt refresh uses durable pinned-runner reconnect; late original-job response cannot revive a closed result panel');
+  await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
+  await page.getByText('执行连接中断？用原任务 ID 找回结果',{exact:true}).click();
+  await page.getByLabel('原任务 ID',{exact:true}).fill(` ${original} `);
+  await page.locator('.query-task').getByRole('button',{name:'查询原任务',exact:true}).click();
+  await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();
+  assert.equal(calls.some(c=>c.op==='request'&&c.request?.command==='job'),false,'Manual original-ID lookup bypassed pinned reconnect');
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  report.checks.push('receipt refresh and manual original-ID lookup use durable pinned-runner reconnect; late original-job response cannot revive a closed result panel');
 
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
   heldDiscover=hold();await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();
