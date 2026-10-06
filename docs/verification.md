@@ -35,6 +35,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `runner-build` | rust | `cargo build -p lintel-runner` |
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared runner gait/jump/stars/collision/pause physics, no dependencies) |
+| `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |
@@ -47,6 +48,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
 | `journey-components` | journey | named CLI finite metadata/config sources, original-ID scope, no auth/body disclosure or journal reconciliation |
+| `journey-large-work` | journey | `python3 tests/large_work_journey.py`; >8 MiB files / >32 MiB total archive, independent state import and preserve, full hashes, metadata blockers and isolated per-process RSS |
 | `journey-work-capacity` | journey | metadata-only byte/file bounds, incomplete scans, strict schema and unchanged full archive admission |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
 | `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY launch plus custom policy approval and restoration, synthetic roots) |
@@ -122,6 +124,10 @@ themselves (`LINTEL_TEST_HOME` / `LINTEL_STATE_DIR` pointing at throwaway
 directories). They do not read the operator's real Claude credentials,
 personal browser profiles, SSH remotes, or network policy. The Python SSH suite
 uses a fake SSH transport, and the JS suite uses an in-memory browser API stub.
+Startup observations in unit tests and matching `LINTEL_TEST_HOME` CLI runs
+redirect managed candidates under the synthetic home and stop ancestor walks at
+the independent temporary fixture, including fixtures with sibling home/project
+directories. Invalid synthetic scope is refused before observation.
 
 Two loopback-only checks (`cargo-workspace-test` via `crates/egress/tests/proxy.rs`
 and `desktop-rust-test` via the desktop network module) bind `127.0.0.1` sockets.
@@ -148,8 +154,8 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `browser-smoke` | Built desktop frontend, Rust and Playwright Chromium, with a real restart that emits `runtime.onStartup`. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
 | `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, local→A/B→A full receipt routing through refresh, Agent packet/query command and startup preview, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
-| `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, clipboard failure, original request recovery and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
-| `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, metadata paging, exact project/session/file selection excluding 9 MiB, frozen approval/bytes, old-runner refusal, wrong password, keyboard and Day/Night; synthetic invoke, not native WebKit. |
+| `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, finite startup sources with sanitized declarations/auth unknown, old-runner approval refusal, clipboard failure, original request query followed by a fresh preview only for confirmed unattempted plans, and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
+| `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, metadata paging, exact project/session/file selection excluding the actual runner file limit + 1 sparse bytes, frozen approval/bytes, old-runner refusal, wrong password, keyboard and Day/Night; synthetic invoke, not native WebKit. |
 | `components-ui` | Built frontend, runner and Playwright Chromium; real synthetic cores, component/cwd facts, malformed settings, exact original alias/ID, late-response isolation and capacity correction. Invoke/SSH are modeled; not native WebKit or production. Set `LINTEL_COMPONENTS_UI_REPORT` for external evidence. |
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `site-ui` | Static website, Playwright Chromium and an ephemeral loopback server; no native/core transport or external requests. |
@@ -336,6 +342,40 @@ These are the same gaps recorded in [current-state](current-state.md#完整目�
 and the [acceptance status](acceptance-status.json). Passing the default checks
 does not close them.
 
+## Large work resource evidence
+
+`journey-large-work` remains synthetic and uses the canonical debug runner. Its
+fixture has a 24 MiB non-UTF-8 session and a >12 MiB JSONL session, plus instruction
+and memory files, exceeding the former per-file and aggregate limits. Archive,
+independent-state inspection, head/middle/tail pages, import and preserve verify
+complete digests. Sparse 256 MiB + 1 and 1 GiB + 1 selections exercise metadata
+blockers without reading those oversized bodies; exact selection excludes them.
+Wrong passphrase, truncated/tag/tail failures clean current-operation staging;
+legacy v1 without optional bytes, original CRLF/non-UTF-8 offsets, and selected
+identity changes are explicit cases.
+
+Set `LINTEL_LARGE_WORK_REPORT` to an external JSON path. Each measured CLI runs in
+its own Python wrapper, so `RUSAGE_CHILDREN.ru_maxrss` covers one runner process;
+the report records raw units (bytes on macOS, KiB on Linux), elapsed time,
+platform/build conditions, semantic success and the actual age header's log N.
+This includes the device-selected default age KDF, not a reduced-cost test key.
+The JSON codec uses bounded buffers and private disk staging; KDF memory, metadata,
+page projections and disk/time costs remain separate. A measured peak on one
+host/fixture is not a universal memory guarantee or runtime evidence at 1 GiB.
+
+2026-10-07 local observation: macOS 26.5.2 arm64 debug runner, 36 MiB across
+four original files, actual default log N 14. Archive peak was 24.5 MiB / 67.5s,
+inspect 25.8 MiB / 35.4s, three page requests 24.9–26.3 MiB / 36.6–53.7s,
+and preserve 25.0 MiB / 131.3s. Eight journey cases passed with no optional age
+CLI dependency or legacy-fixture skip. Default 23/23 passed with
+`RUST_TEST_THREADS=4`; final focused checks cover migration-probe protection,
+the workspace, product-baseline CLI, built work-ui and strict schema rejection.
+Final desktop build and baseline-ui also passed after the unattempted-plan
+re-preview recovery change; uncertain requests must query the original ID first,
+and no second launch is sent by re-preview. These
+are dirty-source checks plus focused final evidence, not a packaged release or
+another architecture's runtime result.
+
 ## Evidence JSON
 
 Pass `--json PATH` to write a machine-readable record outside Git (default
@@ -473,6 +513,6 @@ App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
 The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
-The default group includes 22 checks; the CI independent browser/UI group includes
+The default group includes 23 checks; the CI independent browser/UI group includes
 browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, remote-task-ui, site-ui and
 clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.

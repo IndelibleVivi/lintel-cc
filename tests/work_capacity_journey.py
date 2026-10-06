@@ -32,8 +32,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else ROOT / 'target/debug/lintel'
 PASSPHRASE = "synthetic-capacity-preflight-passphrase"
-FILE_LIMIT = 8 * 1024 * 1024
-TOTAL_LIMIT = 32 * 1024 * 1024
+FILE_LIMIT = 256 * 1024 * 1024
+TOTAL_LIMIT = 1024 * 1024 * 1024
 ENTRY_LIMIT = 50000
 
 
@@ -215,7 +215,7 @@ class WorkCapacityJourney(unittest.TestCase):
     def test_oversized_sparse_file_is_reported_without_reading_body(self) -> None:
         self.write("settings.json", b"{}")
         self.write("CLAUDE.md", b"Ok instruction.\n")
-        big = self.sparse("projects/demo/session.jsonl", 9 * 1024 * 1024)
+        big = self.sparse("projects/demo/session.jsonl", FILE_LIMIT + 1)
         environment_id = self.register()
         report = self.preflight(environment_id, ["instructions", "sessions"])
         self.assertEqual(report["complete"], True)
@@ -226,16 +226,13 @@ class WorkCapacityJourney(unittest.TestCase):
             None,
         )
         self.assertIsNotNone(oversized, report["blockers"])
-        # The message must not imply per-file selection exists this round.
-        self.assertIn("类别", oversized["message"])
-        self.assertNotIn("按有限文件集合单独处理", oversized["message"])
-        self.assertEqual(big.stat().st_size, 9 * 1024 * 1024)
-        self.assertEqual(report["totals"]["bytes"], len(b"Ok instruction.\n") + 9 * 1024 * 1024)
+        self.assertEqual(big.stat().st_size, FILE_LIMIT + 1)
+        self.assertEqual(report["totals"]["bytes"], len(b"Ok instruction.\n") + FILE_LIMIT + 1)
 
     def test_oversized_total_is_a_blocker(self) -> None:
         self.write("settings.json", b"{}")
         for index in range(5):
-            self.sparse(f"projects/demo/session-{index}.jsonl", 7 * 1024 * 1024)
+            self.sparse(f"projects/demo/session-{index}.jsonl", FILE_LIMIT)
         environment_id = self.register()
         report = self.preflight(environment_id, ["sessions"])
         self.assertEqual(report["complete"], True)
@@ -374,7 +371,7 @@ class WorkCapacityJourney(unittest.TestCase):
         self.assertEqual((self.root / "CLAUDE.md").read_bytes(), instruction)
         self.assertEqual((self.root / "projects/demo/session.jsonl").read_bytes(), session)
 
-        self.sparse("projects/demo/big.jsonl", 9 * 1024 * 1024)
+        self.sparse("projects/demo/big.jsonl", FILE_LIMIT + 1)
         error = self.request({
             "command": "plan_archive", "environment_id": environment_id,
             "categories": ["sessions"],

@@ -164,6 +164,9 @@ def run():
                                                      "project_cwd": str(project), "mode": "interactive"})
         assert launch["launch_request"]["id"] == launch["id"], launch
         assert launch["launch_request"]["project_cwd"] == str(project), launch
+        startup = launch["launch_request"]["startup"]
+        assert startup["observation_context"] == "synthetic", startup
+        assert all(Path(source["path"]).is_relative_to(base) for source in startup["sources"]), startup
 
         # launch_query is readonly and finds the frozen plan before any attempt.
         planned = cli("launch", "query", launch["id"])

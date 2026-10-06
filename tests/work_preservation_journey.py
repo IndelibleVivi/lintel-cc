@@ -155,7 +155,7 @@ class WorkPreservationJourney(unittest.TestCase):
             self.write(path, data)
         huge = self.root / "projects/demo/huge.jsonl"
         with huge.open("wb") as file:
-            file.truncate(9 * 1024 * 1024)
+            file.truncate(256 * 1024 * 1024 + 1)
         environment_id = self.register()
         whole = self.envelope("plan_archive", environment_id=environment_id, categories=["sessions"])
         self.assertFalse(whole["ok"])
@@ -183,7 +183,7 @@ class WorkPreservationJourney(unittest.TestCase):
                 self.assertEqual({item["source"] for item in plan["planned_target"]["files"]}, set(originals))
                 for item in plan["planned_target"]["files"]:
                     self.assertEqual(Path(item["destination"]).read_bytes(), originals[item["source"]])
-        self.assertGreater(huge.stat().st_size, 9 * 1024 * 1024)
+        self.assertGreater(huge.stat().st_size, 256 * 1024 * 1024)
 
     def test_exact_selected_changes_are_rejected_before_acceptance(self) -> None:
         path = "projects/demo/session.jsonl"

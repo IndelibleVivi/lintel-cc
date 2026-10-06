@@ -1,7 +1,7 @@
 // Built App + real core in disposable homes; invoke fixture, not native WebKit.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {copyFile,mkdir,mkdtemp,readFile,realpath,writeFile} from 'node:fs/promises';
+import {copyFile,mkdir,mkdtemp,open,stat,readFile,realpath,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -64,10 +64,11 @@ try{
   await dialog.locator('.plan-steps .action-description').first().waitFor();assert.equal(await dialog.locator('.plan-steps .action-description').count(),3);await approve();await dialog.getByText(/工作保全已完成/).waitFor();
   await dialog.getByRole('button',{name:'为新环境选择保护方案',exact:true}).click();await page.getByRole('heading',{name:'保护方案',exact:true}).waitFor();assert.notEqual(await page.getByLabel('当前环境',{exact:true}).inputValue(),source.id);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
   report.checks.push('Preserve → completed outcome → new environment policy; old root/login untouched');
-  // Metadata pages and real exact selection, with a 9 MiB excluded transcript.
+  // Metadata pages and real exact selection, with an excluded transcript over this runner's actual limit.
   // Existing category-only journeys above retain their original coverage.
   const oversized=path.join(root,'projects/synthetic/oversized.jsonl');
-  await writeFile(oversized,'x'.repeat(9*1024*1024));
+  const oversizedBytes=(await data({command:'work_preflight',environment_id:source.id,categories:['sessions']})).limits.file_bytes+1;
+  const oversizedHandle=await open(oversized,'w');await oversizedHandle.truncate(oversizedBytes);await oversizedHandle.write('x');await oversizedHandle.close();
   await writeFile(path.join(root,'projects/direct.jsonl'),'SYNTHETIC DIRECT SESSION\n');
   await mkdir(path.join(root,'projects/other/memory'),{recursive:true});
   for(let i=0;i<101;i++)await writeFile(path.join(root,`projects/other/memory/item${String(i).padStart(3,'0')}.md`),`Synthetic other ${i}\n`);
@@ -115,11 +116,11 @@ try{
   assert.deepEqual((await range.locator('li code').allTextContents()).sort(),selected);
   assert.deepEqual(payloads.filter(p=>p.command==='plan_archive'&&p.selected_paths).at(-1).selected_paths.sort(),selected);
   // An unselected external write/new file cannot expand or invalidate this plan.
-  await writeFile(oversized,'y'.repeat(9*1024*1024));await writeFile(path.join(root,'projects/synthetic/new-unselected.jsonl'),'SYNTHETIC UNSELECTED\n');
+  const changedHandle=await open(oversized,'r+');await changedHandle.write('y');await changedHandle.close();await writeFile(path.join(root,'projects/synthetic/new-unselected.jsonl'),'SYNTHETIC UNSELECTED\n');
   await approve();
   const selectedReceipt=(await data({command:'jobs'})).jobs.find(job=>job.archive_path===selectedArchive);assert.ok(selectedReceipt);
   const archived=await data({command:'archive_inspect',job_id:selectedReceipt.id,archive_passphrase:password});assert.deepEqual(archived.files.map(file=>file.path).sort(),selected);
-  assert.equal((await readFile(oversized)).length,9*1024*1024);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
+  assert.equal((await stat(oversized)).size,oversizedBytes);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
   await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   await page.getByLabel(/保全并准备新环境/).check();await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
   const selectedMap=dialog.getByRole('region',{name:'最终迁入清单'});await selectedMap.waitFor();

@@ -1,5 +1,8 @@
 //! Readonly, finite component coverage for one exact registered environment.
 //! Presence and historical receipt evidence never attest runtime isolation.
+#[path = "startup.rs"]
+pub(crate) mod startup;
+
 use crate::{err, now, policy, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, fs, path::Path};
@@ -16,23 +19,6 @@ fn presence(path: &Path) -> Value {
         Err(_) => "access_limited",
     };
     json!({"path":path,"state":status})
-}
-
-fn source(path: &Path, scope: &str, parse_settings: bool) -> Value {
-    let mut fact = presence(path);
-    fact["scope"] = json!(scope);
-    if parse_settings && fact["state"] == "observed" {
-        // Only presence of execution-bearing fields leaves this function.
-        // No env values, hook commands, MCP arguments or file body are returned.
-        match read(path, 1024 * 1024).and_then(|bytes| parse(&bytes)) {
-            Ok(doc) if doc.is_object() => {
-                fact["hooks_declared"] = json!(doc.get("hooks").is_some());
-                fact["mcp_declared"] = json!(doc.get("mcpServers").is_some());
-            }
-            _ => fact["content_state"] = json!("unknown"),
-        }
-    }
-    fact
 }
 
 fn item(
@@ -74,61 +60,20 @@ impl Engine {
         let checked_at = now();
         let executable = self.executable();
         let cli = policy::product(executable.as_deref());
-        let mut sources = vec![
-            source(&root.join("settings.json"), "user", true),
-            source(&root.join("CLAUDE.md"), "user_instructions", false),
-            source(
-                &root.join("managed-settings.json"),
-                "managed_candidate",
-                true,
-            ),
-        ];
-        if root != self.home.join(".claude") {
-            sources.push(source(
-                &self.home.join(".claude/managed-settings.json"),
-                "managed_candidate",
-                true,
-            ));
-        }
-        // These are the same finite platform locations recognized by the core
-        // managed-settings boundary. Other policy delivery remains unknown.
-        #[cfg(not(test))]
-        if cfg!(target_os = "macos") {
-            sources.push(source(
-                Path::new("/Library/Application Support/ClaudeCode/managed-settings.json"),
-                "managed_candidate",
-                true,
-            ));
-        } else if cfg!(target_os = "linux") {
-            sources.push(source(
-                Path::new("/etc/claude-code/managed-settings.json"),
-                "managed_candidate",
-                true,
-            ));
-        }
-        if let Some(cwd) = project {
-            sources.extend([
-                source(&cwd.join(".claude/settings.json"), "project", true),
-                source(
-                    &cwd.join(".claude/settings.local.json"),
-                    "project_local",
-                    true,
-                ),
-                source(&cwd.join(".mcp.json"), "project_mcp", true),
-                source(&cwd.join("CLAUDE.md"), "project_instructions", false),
-            ]);
-        }
-        let restricted = sources.iter().any(|s| s["state"] == "access_limited");
-        let contents_unknown = sources.iter().any(|s| {
-            s["content_state"] == "unknown"
-                || s["state"] == "unsupported_type"
-                || s["state"] == "observed_directory"
-        });
+        let observed = startup::snapshot(&self.home, root, project, "readonly-components")?;
+        let sources = observed.view["sources"].clone();
+        let restricted = sources
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["state"] == "access_limited");
+        let contents_unknown = observed.view["content_limited"] == true
+            || observed.view["candidate_scan_complete"] != true;
         let credentials = presence(&root.join(".credentials.json"));
         let profile = presence(&self.home.join(".config/anthropic"));
         let mut items = vec![
             item("cli", "Claude Code CLI", if executable.is_some(){"observed"}else{"not_found"}, "static_discovery", "当前 runner 的 PATH 优先发现及当前用户 native fallback", "仅静态识别，不执行 Claude；其他安装来源、登录与实际加载未核验。", json!({"selected_executable":executable,"registered_executable":environment["executable"],"product":cli}), "launch"),
-            item("configuration", "配置与项目来源", if restricted{"access_limited"}else if contents_unknown{"unknown"}else{"observed"}, "finite_config_files", "当前 root；可选项目 cwd；有限 managed 文件位置", "文件存在和声明只表示可能参与。上级项目、系统或组织下发的其他来源未完整扫描；不证明实际加载或 OS 隔离。", json!({"sources":sources,"project_selected":project.is_some()}), "policy"),
+            item("configuration", "配置与项目来源", if restricted{"access_limited"}else if contents_unknown{"unknown"}else{"observed"}, "finite_config_files", "当前 root；可选项目 cwd 与有限上级候选；managed 文件及 drop-ins", "文件存在和声明只表示可能参与；组织下发、worktree 主 checkout、目录内容与实际加载仍未核验。", json!({"sources":sources,"project_selected":project.is_some(),"startup":observed.view}), "policy"),
             item("authentication", "认证位置", "unknown", "metadata_only", "已识别文件及目录外共享 profile", "未读取凭据、未调用认证命令。文件存在不代表已登录，Keychain 与服务端状态未知；认证来源需另行显式检查。", json!({"credential_file":credentials,"shared_profile":profile,"keychain":"not_checked","account":"not_checked"}), "cleanup"),
             item("desktop_ide", "Desktop／IDE", "unsupported", "adapter_support", "独立客户端与编辑器入口", "尚无存储与生命周期 adapter；暂不支持不能解释为未发现。", json!({}), "none"),
             item("browser", "浏览器 profiles", "separate_module", "native_browser_host", "本机浏览器独立配对的具体 profile", "配置 root 不证明浏览器 profile 归属；从浏览器工作空间按原 clear ID 完成重启后的步骤。远端环境不改绑本机 profile。", json!({"environment_binding":"unverified"}), "browser"),

@@ -8,6 +8,7 @@ mod context;
 mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
+mod package;
 mod policy;
 mod service;
 mod session;
@@ -824,10 +825,12 @@ impl Engine {
                     Some(raw) => PathBuf::from(raw),
                     None => self.state.join("archives").join(format!("{pid}.age")),
                 };
-                let (_, files) = crate::Engine::write_archive(self, &e, &p, r, &dest, &mut j, &jp)?;
+                crate::Engine::write_archive(self, &e, &p, r, &dest, &mut j, &jp)?;
                 j["outcome"] = json!("archive_only");
-                j["coverage"] =
-                    json!({"categories": p["extra"]["categories"], "file_count": files.len()});
+                j["coverage"] = json!({
+                    "categories": p["extra"]["categories"],
+                    "file_count": p["extra"]["manifest"].as_array().map_or(0, Vec::len),
+                });
                 j["next_steps"] = json!([
                     "妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。",
                     "原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。"
@@ -1837,11 +1840,11 @@ mod tests {
         )
         .unwrap();
         fs::create_dir_all(root.join("projects/demo")).unwrap();
-        fs::write(
-            root.join("projects/demo/session.jsonl"),
-            vec![b'x'; 9 * 1024 * 1024],
-        )
-        .unwrap();
+        // One sparse file just over the 256 MiB single-file limit: inspection
+        // reads metadata only, while a destructive plan must still refuse it.
+        let big = fs::File::create(root.join("projects/demo/session.jsonl")).unwrap();
+        big.set_len(256 * 1024 * 1024 + 1).unwrap();
+        drop(big);
         let r = engine.request(json!({"command":"inspect","environment_id":e["id"]}));
         assert_eq!(r["ok"], true, "{r}");
         let assets = r["data"]["assets"].as_array().unwrap();

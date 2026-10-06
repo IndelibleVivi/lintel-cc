@@ -197,6 +197,8 @@ for _id, _desc, _file in (
     ("journey-work-preservation", "work-preservation journey (large session, A->B->C, damaged settings)",
      "work_preservation_journey.py"),
     ("journey-components", "finite readonly component sources, original records and strict CLI scope", "components_journey.py"),
+    ("journey-large-work", "streaming large work archive/carry/import/preserve, bounded pages and isolated RSS",
+     "large_work_journey.py"),
     ("journey-work-capacity", "read-only work-capacity preflight (metadata-only admission, blockers, strict schema)",
      "work_capacity_journey.py"),
     ("journey-launch", "interactive CLI/TUI launch and custom policy (real PTY, synthetic roots)", "launch_journey.py"),

@@ -37,6 +37,17 @@ export interface WorkPreflight {
   blockers:{code:string;path?:string|null;message:string}[];blockers_truncated:boolean;
 }
 export interface WorkFile {path:string;category:string;bytes:number}
+export interface StartupSource {
+  path:string;scope:string;state:string;content_state?:string;
+  hooks_declared?:boolean;mcp_declared?:boolean;api_key_helper_declared?:boolean;
+  policy_helper_declared?:boolean;plugins_declared?:boolean;auth_selectors_declared?:string[];
+}
+export interface StartupInspection {
+  schema:'lintel.startup/1';config_root:string;project_cwd:string|null;
+  sources:StartupSource[];candidate_scan_complete:boolean;content_limited:boolean;
+  actual_loaded:'unverified';note:string;unknown_sources:string[];next_steps:string[];
+  authentication:{state:'unverified';observation:'metadata_only';runner_environment:{name:string;present:boolean}[];terminal_environment:'unverified';keychain:'not_checked';account:'not_checked'};
+}
 export interface WorkInventory {
   environment_id:string;root:string;complete:boolean;digest:string;
   files:WorkFile[];total_files:number;next_offset:number|null;
@@ -52,8 +63,8 @@ export interface Plan {
   service?: ServicePlan;
   plan_revision?: string;
   planned_target?: { new_environment_id: string|null; new_root: string; create: boolean; files: {source:string;destination:string;category:string;size:number;sha256:string}[]; purposes: Record<string,string>; activation: Record<string,boolean> };
-  launch_request?: { id:string;environment_id:string;project_cwd:string;config_root:string;executable:string;client_version:string|null;mode:string;input_reference?:unknown;created_at:string };
-  resume?: { supported:boolean;reason:string|null;mode:string;source:unknown;transcript_path:string;private_copy_path:string;config_root:string;project_cwd:string;client_version:string|null;client_support:unknown;archive_unmodified:boolean;auth_unverified:boolean;attach_risk:string;write_scope?:{config_root:string;project_cwd?:string;note:string} };
+  launch_request?: { id:string;environment_id:string;project_cwd:string;config_root:string;executable:string;client_version:string|null;mode:string;input_reference?:unknown;created_at:string;startup?:StartupInspection };
+  resume?: { supported:boolean;reason:string|null;mode:string;source:unknown;transcript_path:string;private_copy_path:string;config_root:string;project_cwd:string;executable?:string;client_version:string|null;client_support:unknown;archive_unmodified:boolean;auth_unverified:boolean;attach_risk:string;startup?:StartupInspection;write_scope?:{config_root:string;project_cwd?:string;note:string} };
   import_manifest?: {
     package: { format: string; generator: string | null; sha256: string };
     files: { source: string; destination: string; category: string; size: number; sha256: string }[];

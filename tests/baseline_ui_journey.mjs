@@ -19,7 +19,7 @@ const inert=path.join(versions,'2.1.283');await writeFile(inert,'#!/bin/sh\nexit
 const {symlink}=await import('node:fs/promises');await symlink(inert,path.join(home,'.local/bin/claude'));const {chmod}=await import('node:fs/promises');await chmod(inert,0o700);
 const actor={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:path.join(home,'.local/bin')};
 const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],copied=[],resources=[];
-let queue=Promise.resolve(),clipboardFail=false,launchFailure=false;
+let queue=Promise.resolve(),clipboardFail=false,launchFailure=false,legacyStartup=false;
 function processCall(args,payload,env=actor){return new Promise((resolve,reject)=>{const child=spawn(runner,args,{env,stdio:['pipe','pipe','pipe']});let out='',err='';const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout'))},55000);child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);child.once('error',reject);child.once('close',()=>{clearTimeout(timeout);assert.ok(!out.includes(password)&&!err.includes(password));try{resolve(JSON.parse(out))}catch{reject(new Error('invalid envelope: '+err))}});child.stdin.end(payload?JSON.stringify(payload):'')})}
 function core(payload){calls.push(payload);const result=queue.then(()=>processCall(['request'],payload));queue=result.catch(()=>{});return result}
 async function data(payload){const result=await core(payload);assert.ok(result.ok,result.error?.message);return result.data}
@@ -39,7 +39,9 @@ try{
   }
   if(command==='remote_request')return {ok:true,data:{hosts:[],tasks:[],installations:[]}};
   assert.equal(command,'request');if(args.payload.command==='launch_request'&&launchFailure){calls.push(args.payload);return {ok:false,error:{code:'synthetic_connection_lost',message:'合成启动回复丢失；这里没有执行 Terminal launcher'}}}
-  return core(args.payload);
+  const response=await core(args.payload);
+  if(legacyStartup && args.payload.command==='plan_launch' && response.ok)delete response.data.launch_request.startup;
+  return response;
  });
  await page.addInitScript(()=>{if(!localStorage.getItem('lintel.selected'))localStorage.setItem('lintel.selected','stale-removed-environment');window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:text=>window.syntheticClipboard(text)}})});
  await page.clock.setFixedTime(new Date(2026,9,13,9,0));
@@ -127,13 +129,36 @@ try{
  const draft=await reader.getByLabel('工作交接稿',{exact:true}).inputValue();assert.ok(draft.includes(secret));assert.ok(!draft.includes('opaque content')&&!draft.includes('SYNTHETIC_SIGNATURE_BYTES'));
  await reader.getByLabel('工作交接稿',{exact:true}).fill(draft+'\n下一步：在正确的项目里接着做。');
  await reader.getByRole('button',{name:'审阅稿件与继续目标',exact:true}).click();const launch=reader.locator('.session-continuation');
+ await mkdir(path.join(project,'.claude'),{recursive:true});
+ await writeFile(path.join(project,'.claude/settings.json'),JSON.stringify({hooks:{x:'SYNTHETIC_HOOK_COMMAND_MUST_STAY_PRIVATE'},env:{ANTHROPIC_API_KEY:'SYNTHETIC_AUTH_VALUE_MUST_STAY_PRIVATE'}}));
+ await writeFile(path.join(project,'.mcp.json'),JSON.stringify({mcpServers:{synthetic:{command:'SYNTHETIC_MCP_COMMAND_MUST_STAY_PRIVATE'}}}));
  await launch.getByLabel('项目工作目录',{exact:true}).fill(project);await launch.getByRole('button',{name:'核对启动目标',exact:true}).click();
- await launch.locator('.launch-review').getByText(project,{exact:true}).waitFor();await launch.getByLabel(/已审阅当前稿件/).check();
+ await launch.locator('.launch-review').getByText(project,{exact:true}).waitFor();
+ const sources=launch.getByRole('region',{name:'启动来源核对',exact:true});await sources.getByRole('heading',{name:'启动前，再看一眼来源',exact:true}).waitFor();
+ assert.ok((await sources.innerText()).includes('有声明：hooks') && (await sources.innerText()).includes('有声明：MCP'));
+ for(const privateValue of ['SYNTHETIC_HOOK_COMMAND_MUST_STAY_PRIVATE','SYNTHETIC_AUTH_VALUE_MUST_STAY_PRIVATE','SYNTHETIC_MCP_COMMAND_MUST_STAY_PRIVATE'])assert.ok(!(await sources.innerText()).includes(privateValue));
+ await sources.getByText('尚未核验的来源',{exact:true}).click();await sources.getByText(/Git worktree 主 checkout/).waitFor();
+ for(const [width,height,theme]of[[1120,760,'light'],[900,640,'dark']]){await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);assert.ok(await reader.evaluate(el=>el.scrollWidth<=el.clientWidth));await sources.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(fixture,'startup-sources-'+width+'-'+theme+'.png')});}
+ legacyStartup=true;await launch.getByRole('button',{name:'核对启动目标',exact:true}).click();await launch.getByText(/当前 runner 未提供启动来源核对/).waitFor();await launch.getByLabel(/已审阅当前稿件/).check();assert.equal(await launch.getByRole('button',{name:'复制上下文并打开新会话',exact:true}).isDisabled(),true);
+ legacyStartup=false;await launch.getByRole('button',{name:'核对启动目标',exact:true}).click();await sources.getByRole('heading',{name:'启动前，再看一眼来源',exact:true}).waitFor();await launch.getByLabel(/已审阅当前稿件/).check();
+ report.checks.push('startup: real finite candidate sources, sanitized declarations and auth unknown, old runner omission blocks approval, readable Day/Night source list at 1120/900');
  clipboardFail=true;const launchesBefore=calls.filter(c=>c.command==='launch_request').length;
  await launch.getByRole('button',{name:'复制上下文并打开新会话',exact:true}).click();await launch.getByRole('alert').getByText(/复制失败/).waitFor();
  assert.equal(calls.filter(c=>c.command==='launch_request').length,launchesBefore);
  clipboardFail=false;launchFailure=true;await launch.getByRole('button',{name:'复制上下文并打开新会话',exact:true}).click();await launch.getByText('复制：已复制这份审阅稿',{exact:true}).waitFor();await launch.getByText(/结果待核对；保留原启动请求/).waitFor();
+ assert.equal(await launch.getByRole('button',{name:'重新核对启动目标',exact:true}).count(),0,'uncertain requests must query their original ID first');
  const requested=calls.findLast(c=>c.command==='launch_request');await launch.getByRole('button',{name:'核对原启动请求',exact:true}).click();await launch.getByText(/尚未请求启动；可批准原计划或继续核对。/).waitFor();assert.deepEqual(calls.findLast(c=>c.command==='launch_query'),{command:'launch_query',request_id:requested.request_id});assert.equal(calls.filter(c=>c.command==='launch_request').length,launchesBefore+1);assert.equal(copied.filter(text=>text.includes(secret)).length,1);
+ const retainedText=await launch.getByLabel('最终工作交接稿',{exact:true}).inputValue();
+ await writeFile(path.join(project,'.mcp.json'),JSON.stringify({mcpServers:{}}));
+ await launch.getByRole('button',{name:'重新核对启动目标',exact:true}).click();await launch.getByLabel(/已审阅当前稿件/).waitFor();
+ const freshPlan=calls.findLast(c=>c.command==='plan_launch');assert.equal(freshPlan.project_cwd,project);
+ const newId=await launch.locator('.launch-original-id code').innerText();assert.notEqual(newId,requested.request_id,'confirmed unattempted plan gets a new preview ID');
+ assert.equal(await launch.getByLabel(/已审阅当前稿件/).isChecked(),false);assert.equal(await launch.getByRole('button',{name:'复制上下文并打开新会话',exact:true}).isDisabled(),true);
+ assert.equal(await launch.getByLabel('最终工作交接稿',{exact:true}).inputValue(),retainedText);assert.equal(await launch.getByLabel('项目工作目录',{exact:true}).inputValue(),project);
+ assert.equal(calls.filter(c=>c.command==='launch_request').length,launchesBefore+1,'re-preview never replays a launch');
+ assert.equal((await data({command:'launch_query',request_id:requested.request_id})).status,'planned');
+ assert.equal((await data({command:'launch_query',request_id:newId})).status,'planned');
+ report.checks.push('launch recovery: modeled lost response queries real original planned metadata before new preview; preserves draft/cwd, resets approval, freezes changed sources under new ID, zero second launch');
  report.checks.push('A02/A05/A09: same-name draft isolation, frozen root/file purpose preview, responsive reachable approval; A07/A08/A10: real package, bounded structured reader/unknown/thinking exclusion, reviewed text, clipboard refusal and original-request-only launch error');
  await page.getByRole('button',{name:'终端与 Agent',exact:true}).click();assert.ok(!(await page.evaluate(()=>JSON.stringify(localStorage))).includes(password));assert.ok(!(await page.evaluate(()=>JSON.stringify(localStorage))).includes(secret));
  await page.getByLabel('Lintel CLI 完整路径').fill(runner);await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();await page.getByLabel('Agent 操作交接包').waitFor();

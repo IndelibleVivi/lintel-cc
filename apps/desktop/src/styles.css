@@ -836,3 +836,16 @@ h1[tabindex="-1"]:focus{outline:none}
 .work-selection-review p { font-size:12px; line-height:1.8; }
 .work-selection-review ul { max-height:220px; overflow:auto; padding-left:20px; }
 .work-selection-review li { margin:8px 0; }
+
+.startup-sources{margin:24px 0;padding:20px 0;border-block:1px solid var(--line);font-size:13px;line-height:1.8}
+.startup-sources>p{color:var(--muted);margin:0 0 14px}
+.startup-source-list{list-style:none;margin:12px 0;padding:0}
+.startup-source-list>li{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.startup-source-list>li>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.startup-source-list small{color:var(--muted);font-size:11px}
+.startup-source-list code{display:block;font-size:11px;line-height:1.8;overflow-wrap:anywhere}
+.startup-source-list p{margin:4px 0 0;font-size:12px}
+.startup-auth{margin-top:18px}.startup-auth p{margin:6px 0;font-size:12px}
+.startup-auth code{overflow-wrap:anywhere}.startup-next-steps{padding-left:20px;margin:18px 0 0}
+.startup-next-steps li+li{margin-top:8px}
+@media(max-width:760px){.startup-source-list>li>div{display:block}.startup-source-list small{display:block}}

@@ -1,4 +1,4 @@
-use crate::{archive, err, now, storage::*, string, Engine, Result};
+use crate::{err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -9,8 +9,21 @@ use std::{
     path::{Component, Path, PathBuf},
     time::{Duration, Instant},
 };
-const MAX_BYTES: u64 = 32 * 1024 * 1024;
-const MAX_FILES: usize = 10000;
+/// Finite package capacity. The archive writer/reader streams one file at a
+/// time, so these bound the total work set rather than any in-memory buffer.
+pub(crate) const FILE_LIMIT_BYTES: u64 = 256 * 1024 * 1024;
+pub(crate) const MAX_BYTES: u64 = 1024 * 1024 * 1024;
+pub(crate) const MAX_FILES: usize = 10000;
+
+/// The single source of truth for package capacity, shared by the metadata
+/// scans, the archive admission check and the streaming codec.
+pub(crate) fn limits() -> crate::package::Limits {
+    crate::package::Limits {
+        file_bytes: FILE_LIMIT_BYTES,
+        total_bytes: MAX_BYTES,
+        files: MAX_FILES,
+    }
+}
 /// Upper bound for one serialized inventory page. A page that cannot fit within
 /// this budget is reported as explicitly incomplete rather than silently
 /// truncated (dropping rows). The page size is also capped at 100 rows.
@@ -67,50 +80,35 @@ pub(crate) fn check_output_path(plan: &Value) -> Result<()> {
     Ok(())
 }
 
-/// Read back an encrypted archive package from an explicit frozen path and
-/// return it with the digest of the on-disk encrypted bytes. Lintel-sealed
-/// archives are always single-link regular files owned by the current user, so
-/// they travel between independent installs but never through a symlink.
+/// Read back a *small* encrypted archive package from an explicit frozen path
+/// (warm path for state backups and test fixtures). Large work packages go
+/// through the streaming `Engine::open_archive`.
+#[cfg(test)]
 pub(crate) fn read_package(path: &Path, pass: &str) -> Result<(Value, String)> {
-    guard(path)?;
-    let meta =
-        fs::symlink_metadata(path).map_err(|_| err("archive_missing", "找不到该归档文件"))?;
-    use std::os::unix::fs::MetadataExt;
-    if !meta.is_file()
-        || meta.file_type().is_symlink()
-        || meta.uid() != unsafe { libc::geteuid() }
-        || meta.nlink() != 1
-    {
-        return Err(err("archive_missing", "归档不是安全的常规文件"));
-    }
-    // The ciphertext envelope is slightly larger than the plaintext bound used
-    // by `unseal`; allow headroom while still bounded.
-    let bytes = read(path, crate::archive::MAX_PLAIN + 16 * 1024 * 1024)?;
-    let package = archive::unseal(&bytes, pass)?;
-    Ok((package, digest(&bytes)))
+    let digest = crate::package::ciphertext_digest(path)?;
+    let value = crate::package::read_value(path, pass, crate::package::LEGACY_PLAIN_LIMIT)?;
+    Ok((value, digest))
 }
 
-/// Validate a work package's file list. It is completely self-contained: every
-/// entry is judged on its own path/category/digest, so an external package that
-/// arrives without the original inventory or job still passes or fails on its
-/// own merits. Unsupported/unapproved categories and unsafe paths are refused.
-pub(crate) fn validate_package_files(package: &Value) -> Result<Vec<Value>> {
-    if package["schema"] != "lintel.work/1" {
+/// Validate a decoded work package's file list. It is completely self
+/// contained: every entry is judged on its own path/category/digest, so an
+/// external package that arrives without the original inventory or job still
+/// passes or fails on its own merits. The codec has already verified each
+/// file's byte count and digest against its declared values.
+pub(crate) fn validate_package(package: &crate::package::Package) -> Result<()> {
+    if package.schema != crate::package::SCHEMA {
         return Err(err(
             "archive_schema",
             "只支持 Lintel 工作内容包；状态备份不能自动迁入",
         ));
     }
-    let files = package["files"]
-        .as_array()
-        .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?;
-    if files.len() > MAX_FILES {
+    if package.files.len() > MAX_FILES {
         return Err(err("archive_limit", "归档文件数量超过上限"));
     }
     let mut seen = HashSet::new();
-    let mut total = 0usize;
-    for f in files {
-        let name = string(f, "path")?;
+    let mut total: u64 = 0;
+    for entry in &package.files {
+        let name = entry.path.as_str();
         let path = Path::new(name);
         if path.is_absolute()
             || name.contains('\\')
@@ -122,7 +120,7 @@ pub(crate) fn validate_package_files(package: &Value) -> Result<Vec<Value>> {
         {
             return Err(err("archive_path", "归档包含重复路径或不安全路径"));
         }
-        let category = string(f, "category")?;
+        let category = entry.category.as_str();
         if !["instructions", "memory", "sessions"].contains(&category) {
             return Err(err(
                 "archive_category",
@@ -132,16 +130,15 @@ pub(crate) fn validate_package_files(package: &Value) -> Result<Vec<Value>> {
         if classify(path) != Some(category) {
             return Err(err("archive_category", "归档文件与批准的工作类别不符"));
         }
-        let data: Vec<u8> = serde_json::from_value(f["data"].clone())?;
-        total += data.len();
-        if data.len() > 8 * 1024 * 1024 || total > MAX_BYTES as usize {
-            return Err(err("archive_limit", "工作内容超过容量上限"));
+        if entry.bytes > FILE_LIMIT_BYTES {
+            return Err(err("archive_limit", "工作内容超过单文件容量上限"));
         }
-        if digest(&data) != f["digest"] {
-            return Err(err("archive_integrity", "归档文件完整性校验失败"));
+        total = total.saturating_add(entry.bytes);
+        if total > MAX_BYTES {
+            return Err(err("archive_limit", "工作内容超过合计容量上限"));
         }
     }
-    Ok(files.clone())
+    Ok(())
 }
 
 pub fn categories(r: &Value) -> Result<Vec<String>> {
@@ -407,21 +404,52 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
 /// drives the frozen plan, the published manifest and the actual execution, so a
 /// plan and its receipt can never disagree about where CLAUDE.md goes.
 pub(crate) fn migration_paths(files: &[Value], instructions_active: bool) -> Result<Vec<PathBuf>> {
-    let preferred: Vec<PathBuf> = files
+    let pairs: Vec<(PathBuf, &str)> = files
         .iter()
         .map(|file| {
-            let relative = Path::new(string(file, "path")?);
-            Ok(
-                if (file["category"] == "instructions" && instructions_active)
-                    || relative.starts_with("lintel-imports")
-                {
-                    relative.to_path_buf()
-                } else {
-                    Path::new("lintel-imports").join(relative)
-                },
-            )
+            Ok((
+                PathBuf::from(string(file, "path")?),
+                string(file, "category")?,
+            ))
         })
         .collect::<Result<_>>()?;
+    migration_paths_pairs(&pairs, instructions_active)
+}
+
+/// Map a decoded package selection (path + category) into the inactive work
+/// area. Shares the exact collision/disambiguation rule with `migration_paths`.
+pub(crate) fn migration_paths_for(
+    files: &[String],
+    instructions_active: bool,
+) -> Result<Vec<PathBuf>> {
+    let pairs: Vec<(PathBuf, &str)> = files
+        .iter()
+        .map(|path| {
+            let relative = Path::new(path);
+            classify(relative)
+                .map(|category| (relative.to_path_buf(), category))
+                .ok_or_else(|| err("archive_category", "归档文件与批准的工作类别不符"))
+        })
+        .collect::<Result<_>>()?;
+    migration_paths_pairs(&pairs, instructions_active)
+}
+
+fn migration_paths_pairs(
+    files: &[(PathBuf, &str)],
+    instructions_active: bool,
+) -> Result<Vec<PathBuf>> {
+    let preferred: Vec<PathBuf> = files
+        .iter()
+        .map(|(relative, category)| {
+            if (*category == "instructions" && instructions_active)
+                || relative.starts_with("lintel-imports")
+            {
+                relative.clone()
+            } else {
+                Path::new("lintel-imports").join(relative)
+            }
+        })
+        .collect();
     let reserved: HashSet<_> = preferred.iter().cloned().collect();
     let directories: HashSet<_> = preferred
         .iter()
@@ -522,6 +550,14 @@ pub(crate) fn preflight_migration_paths(
     j: &mut Value,
     journal: &Path,
 ) -> Result<()> {
+    if paths.iter().any(|path| {
+        path.is_absolute()
+            || path
+                .components()
+                .any(|component| !matches!(component, Component::Normal(_)))
+    }) {
+        return Err(err("invalid_mapping", "碰撞预检需要受批准的相对迁入路径"));
+    }
     struct Probe {
         files: Vec<PathBuf>,
         directories: Vec<PathBuf>,
@@ -622,7 +658,6 @@ fn record_migration_probe(root: &Path, j: &mut Value, journal: &Path) -> Result<
 
 const SCAN_ENTRIES: usize = 50000;
 const SCAN_TIME: Duration = Duration::from_secs(30);
-const FILE_LIMIT_BYTES: u64 = 8 * 1024 * 1024;
 const BLOCKER_LIMIT: usize = 200;
 
 /// One metadata-only walk of the selected work scope. It shares the exact
@@ -1095,15 +1130,19 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
             }
             if let Some(category) = classify(rel) {
                 if categories.iter().any(|c| c == category) {
-                    let data = read(&p, 8 * 1024 * 1024)?;
-                    bytes += data.len() as u64;
+                    // Bind every whole-category source to its path/handle
+                    // identity too, so a same-bytes replacement (inode reuse)
+                    // is refused before publication just like an exact
+                    // selection, not only content changes.
+                    let (len, file_digest, identity) = digest_selected_original(&p, None)?;
+                    bytes += len;
                     if bytes > MAX_BYTES || out.len() >= MAX_FILES {
                         return Err(err(
                             "archive_limit",
-                            "选定工作内容超过本候选的 32 MiB / 10000 文件上限；未截断或删除",
+                            "选定工作内容超过容量上限（256 MiB/文件、1 GiB 合计或 10000 文件）；未截断或删除",
                         ));
                     }
-                    out.push(json!({"path":rel,"category":category,"bytes":data.len(),"digest":digest(&data)}));
+                    out.push(json!({"path":rel,"category":category,"bytes":len,"digest":file_digest,"source_identity":identity}));
                 }
             }
         }
@@ -1119,7 +1158,7 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
 /// the path (never trusting a caller-supplied category), verifies the entry is
 /// a regular file inside the frozen root, reads and digests only the selected
 /// bytes, and refuses absolute escapes, symlinks, non-regular files and
-/// unselected oversized neighbours. It applies the same 8 MiB/32 MiB/10000-file
+/// unselected oversized neighbours. It applies the same 256 MiB/1 GiB/10000-file
 /// limits but excludes every unselected oversized session, exactly as intended.
 ///
 /// A missing/changed selected path is an explicit failure (`selected_missing`/
@@ -1128,14 +1167,18 @@ fn source_identity(metadata: &fs::Metadata) -> Value {
     json!({"device":metadata.dev(),"inode":metadata.ino(),"owner":metadata.uid(),"ctime":metadata.ctime(),"ctime_nsec":metadata.ctime_nsec()})
 }
 
-/// Read the chosen original through one non-following, nonblocking handle and
-/// bind its path and handle identity before/after reading. ctime distinguishes
-/// immediate inode reuse. This is observation, not OS CAS against external writers.
-fn read_selected_original(path: &Path) -> Result<(Vec<u8>, Value)> {
+/// Stream one source file through a single non-following, nonblocking handle
+/// while binding its path and handle identity before/after, hashing the bytes
+/// with a bounded buffer (so a large file never lands in memory) and, when
+/// `stage` is supplied, copying the exact bytes into a private staging file.
+/// ctime distinguishes immediate inode reuse. This is observation, not an OS
+/// CAS against external writers.
+fn digest_selected_original(path: &Path, stage: Option<&Path>) -> Result<(u64, String, Value)> {
+    use sha2::Digest as _;
     guard(path)?;
     let before = fs::symlink_metadata(path)?;
     if !before.is_file() || before.len() > FILE_LIMIT_BYTES {
-        return Err(err("selected_changed", "所选原件不是普通文件或已超限"));
+        return Err(err("file_limit", "所选原件超过单文件容量上限（256 MiB）"));
     }
     let identity = source_identity(&before);
     let mut file = OpenOptions::new()
@@ -1145,18 +1188,47 @@ fn read_selected_original(path: &Path) -> Result<(Vec<u8>, Value)> {
     if !file.metadata()?.is_file() || source_identity(&file.metadata()?) != identity {
         return Err(err("selected_changed", "所选原件在读取前被替换"));
     }
-    let mut data = Vec::new();
-    (&mut file)
-        .take(FILE_LIMIT_BYTES + 1)
-        .read_to_end(&mut data)?;
+    let mut sink = match stage {
+        Some(dest) => Some(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(dest)?,
+        ),
+        None => None,
+    };
+    let mut hasher = sha2::Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    let mut len: u64 = 0;
+    loop {
+        let n = match file.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(err("selected_changed", "读取所选原件失败")),
+        };
+        len += n as u64;
+        if len > FILE_LIMIT_BYTES {
+            return Err(err("selected_changed", "所选原件在读取期间超过容量上限"));
+        }
+        hasher.update(&buf[..n]);
+        if let Some(sink) = sink.as_mut() {
+            use std::io::Write as _;
+            sink.write_all(&buf[..n])?;
+        }
+    }
+    if let Some(sink) = sink {
+        sink.sync_all()?;
+    }
     guard(path)?;
-    if data.len() as u64 > FILE_LIMIT_BYTES
-        || source_identity(&file.metadata()?) != identity
+    if source_identity(&file.metadata()?) != identity
         || source_identity(&fs::symlink_metadata(path)?) != identity
     {
         return Err(err("selected_changed", "所选原件在读取期间被替换或修改"));
     }
-    Ok((data, identity))
+    Ok((len, format!("{:x}", hasher.finalize()), identity))
 }
 
 pub fn selected_manifest(
@@ -1207,19 +1279,19 @@ pub fn selected_manifest(
                 &format!("所选路径不是常规文件（符号链接/特殊文件）: {relative}"),
             ));
         }
-        let (data, identity) = read_selected_original(&path)?;
-        bytes += data.len() as u64;
+        let (len, file_digest, identity) = digest_selected_original(&path, None)?;
+        bytes += len;
         if bytes > MAX_BYTES || out.len() >= MAX_FILES {
             return Err(err(
                 "archive_limit",
-                "精确选择的内容超过本候选的 32 MiB / 10000 文件上限；未截断或删除",
+                "精确选择的内容超过容量上限（256 MiB/文件、1 GiB 合计或 10000 文件）；未截断或删除",
             ));
         }
         out.push(json!({
             "path": relative,
             "category": category,
-            "bytes": data.len(),
-            "digest": digest(&data),
+            "bytes": len,
+            "digest": file_digest,
             "source_identity":identity,
         }));
     }
@@ -1411,7 +1483,7 @@ impl Engine {
         dest: &Path,
         j: &mut Value,
         journal: &Path,
-    ) -> Result<(PathBuf, Vec<Value>)> {
+    ) -> Result<PathBuf> {
         let pass = check_passphrase(r)?;
         let root = PathBuf::from(string(e, "root")?);
         let entries = frozen_manifest(&root, &p["extra"])?;
@@ -1428,52 +1500,121 @@ impl Engine {
         let destination_dir = dest
             .parent()
             .ok_or_else(|| err("invalid_output_path", "归档路径缺少父目录"))?;
-        if fs2::available_space(destination_dir)? < size * 6 + 1024 * 1024 {
+        // The age envelope plus the worst-case JSON byte-array encoding (each
+        // byte can serialize to four characters) needs generous headroom.
+        if fs2::available_space(destination_dir)? < size * 6 + 64 * 1024 * 1024 {
             return Err(err(
                 "insufficient_space",
                 "归档目标所在存储空间不足；原始内容尚未删除",
             ));
         }
-        let mut files = vec![];
-        for entry in &entries {
-            let path = root.join(string(entry, "path")?);
-            let data = if entry.get("source_identity").is_some() {
-                let (data, identity) = read_selected_original(&path)?;
-                if identity != entry["source_identity"] {
-                    return Err(err("stale_plan", "归档期间所选原件身份改变"));
-                }
-                data
-            } else {
-                read(&path, 8 * 1024 * 1024)?
-            };
-            if digest(&data) != entry["digest"] {
-                return Err(err("stale_plan", "归档期间工作内容变化；原环境保持不变"));
-            }
-            files.push(json!({"path":entry["path"],"category":entry["category"],"digest":entry["digest"],"data":data}));
-        }
-        let package = json!({"schema":"lintel.work/1","generator":"Lintel","created_at":now(),"files":files,"notes":"Selected working content only; runtime credentials and executable config excluded."});
-        let encrypted = archive::seal(&package, pass)?;
-        // Recheck the frozen destination, then atomically publish without replacement.
         if dest.exists() {
             return Err(err(
                 "output_exists",
                 "归档目标在执行前已出现；没有覆盖，原内容保持不变",
             ));
         }
+        check_output_path(p)?;
+        // Stage every frozen source into one private directory so the exact
+        // bytes consumed by the writer are bound to the frozen digest/identity
+        // and nothing is re-read from the live source after this point.
+        let staging = crate::package::Staging::new(&self.state)?;
+        let package = json!({
+            "schema": crate::package::SCHEMA,
+            "generator": crate::package::GENERATOR,
+            "created_at": now(),
+            "files": entries,
+            "notes": "Selected working content only; runtime credentials and executable config excluded.",
+        });
+        let mut staged: Vec<(String, String, String, PathBuf)> = vec![];
+        for (index, entry) in entries.iter().enumerate() {
+            let path = root.join(string(entry, "path")?);
+            let stage_path = staging.dir.join(format!("source-{index:08}.bin"));
+            let (_len, file_digest, identity) = digest_selected_original(&path, Some(&stage_path))?;
+            if entry.get("source_identity").is_some() && identity != entry["source_identity"] {
+                return Err(err("stale_plan", "归档期间所选原件身份改变"));
+            }
+            if file_digest != entry["digest"] {
+                return Err(err("stale_plan", "归档期间工作内容变化；原环境保持不变"));
+            }
+            staged.push((
+                string(entry, "path")?.to_string(),
+                string(entry, "category")?.to_string(),
+                string(entry, "digest")?.to_string(),
+                stage_path,
+            ));
+        }
+        let sources: Vec<crate::package::Source<'_>> = staged
+            .iter()
+            .map(
+                |(path, category, digest, stage_path)| crate::package::Source {
+                    path,
+                    category,
+                    expected_digest: digest,
+                    plain: stage_path,
+                },
+            )
+            .collect();
+        // Encrypt into a private temp file in the destination directory so the
+        // published name is only ever the completed ciphertext.
+        let tmp = destination_dir.join(format!(".lintel-{}.tmp", uuid::Uuid::new_v4()));
+        let mut tmp_file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(&tmp)?;
+        let write_result = crate::package::write(&mut tmp_file, &package, &sources, pass);
+        let (archive_digest, _total) = match write_result {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = fs::remove_file(&tmp);
+                return Err(error);
+            }
+        };
+        tmp_file.sync_all()?;
+        drop(tmp_file);
+        drop(staging);
+        if let Err(failure) = check_output_path(p) {
+            let _ = fs::remove_file(&tmp);
+            return Err(failure);
+        }
+        // Durable intent: record the exact destination and the unsigned
+        // ciphertext digest before the rename. A later reader can only verify
+        // this path; it never re-publishes or picks a new path.
         j["steps"].as_array_mut().unwrap().push(json!({"id":"archive","label":"加密工作归档","status":"executing","message":"正在发布并核验完整加密工作包；目标已有文件不会覆盖。"}));
         j["archive_path"] = json!(dest);
-        let archive_digest = digest(&encrypted);
         j["archive_intent_digest"] = json!(archive_digest);
         save(journal, j)?;
-        check_output_path(p)?;
-        atomic_new(dest, &encrypted, 0o600)?;
-        if read(dest, (MAX_BYTES * 6) + 1024 * 1024)? != encrypted {
+        match crate::storage::publish_staged_new(&tmp, dest) {
+            Ok(()) => {}
+            Err(error) => {
+                let _ = fs::remove_file(&tmp);
+                return Err(error);
+            }
+        }
+        // Streaming readback: decrypt the published archive and verify the
+        // ciphertext digest, refusing a truncated or replaced package.
+        let readback_digest = self.verify_archive(dest, pass)?;
+        if readback_digest != archive_digest {
             return Err(err("archive_readback_failed", "归档写后校验未通过"));
         }
         j["archive_digest"] = json!(archive_digest);
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"archive","label":"加密工作归档","status":"completed","message":"age 口令加密；口令未保存。原始工作内容保持不变。"});
         save(journal, j)?;
-        Ok((dest.to_path_buf(), files))
+        Ok(dest.to_path_buf())
+    }
+
+    /// Stream-decrypt a published archive purely to verify its ciphertext digest
+    /// and that it decrypts to a complete JSON document. Bounded: one file's
+    /// bytes at a time through a private staging directory.
+    fn verify_archive(&self, path: &Path, pass: &str) -> Result<String> {
+        let staging = crate::package::Staging::new(&self.state)?;
+        let (package, digest) = crate::package::read_to_temp(path, pass, &staging, limits())?;
+        // Verify the same package semantics a real read enforces (paths,
+        // categories, duplicates) in addition to the codec's byte/digest check.
+        validate_package(&package)?;
+        Ok(digest)
     }
 
     /// Archive into the plan's private state path. Used by rebuild/cleanup,
@@ -1486,13 +1627,13 @@ impl Engine {
         r: &Value,
         j: &mut Value,
         journal: &Path,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<()> {
         let dest = self
             .state
             .join("archives")
             .join(format!("{}.age", string(p, "id")?));
-        let (_, files) = self.write_archive(e, p, r, &dest, j, journal)?;
-        Ok(files)
+        self.write_archive(e, p, r, &dest, j, journal)?;
+        Ok(())
     }
 
     /// Archive-only plan: encrypt the selected work into an explicit output path
@@ -1624,19 +1765,29 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
-        let files = self.archive_work(e, p, r, j, journal)?;
+        self.archive_work(e, p, r, j, journal)?;
+        // Re-open the just-published archive so migration streams the exact
+        // verified plaintext (the same readback that proves publication).
+        let path = PathBuf::from(string(j, "archive_path")?);
+        let opened = self.open_archive(&json!({
+            "archive_path": path,
+            "archive_passphrase": r["archive_passphrase"],
+        }))?;
+        if j["archive_digest"].as_str() != Some(opened.cipher_digest.as_str()) {
+            return Err(err(
+                "stale_archive",
+                "工作归档写入与读回不一致；未新建环境或迁入",
+            ));
+        }
         self.migrate_files(
             e,
             p["extra"]["preserve_name"].as_str().unwrap_or("保全"),
-            &files,
+            &opened,
             j,
             journal,
             Some(&p["extra"]["frozen_target"]),
             &p["extra"]["activate"],
         )?;
-        // Preservation keeps the source install untouched; that is the desired
-        // outcome, not an outstanding task. Report it as retained with explicit
-        // coverage instead of a misleading "not completed" step.
         j["steps"].as_array_mut().unwrap().push(json!({"id":"status","label":"旧环境、登录与运行进程","status":"preserved","message":"原 root、旧登录与运行进程全部保留；本次不注销、不删除、不停止。"}));
         j["coverage"] = json!({
             "categories": p["extra"]["categories"],
@@ -1664,20 +1815,26 @@ impl Engine {
         Ok(())
     }
 
-    /// Create a fresh owned root and copy the given archived entries into it,
-    /// read-back verified. Does not archive or delete anything.
+    /// Create a fresh owned root and stream-copy the given package's entries
+    /// into it, read-back verified. Does not archive or delete anything.
     fn migrate_files(
         &self,
         e: &Value,
         label: &str,
-        files: &[Value],
+        opened: &crate::archive::OpenedArchive,
         j: &mut Value,
         journal: &Path,
         frozen_target: Option<&Value>,
         activate: &Value,
     ) -> Result<()> {
         let instructions_active = activate["instructions"].as_bool().unwrap_or(true);
-        let targets = migration_paths(files, instructions_active)?;
+        let paths: Vec<String> = opened
+            .package
+            .files
+            .iter()
+            .map(|f| f.path.clone())
+            .collect();
+        let targets = migration_paths_for(&paths, instructions_active)?;
         preflight_migration_paths(&self.state.join("environments"), &targets, j, journal)?;
         j["steps"].as_array_mut().unwrap().push(json!({"id":"create","label":"新配置目录","status":"executing","message":"正在创建新环境；失败后需核对原任务与已生成目录。"}));
         save(journal, j)?;
@@ -1704,18 +1861,14 @@ impl Engine {
         };
         j["steps"].as_array_mut().unwrap().push(json!({"id":"migrate","label":"选择性迁入","status":"executing","message":"正在迁入并核验工作内容；失败时新 root 可能已有部分文件，请核对原任务。"}));
         save(journal, j)?;
-        for (f, relative) in files.iter().zip(targets) {
+        for (entry, relative) in opened.package.files.iter().zip(&targets) {
             let target = destination.join(relative);
             migration_parent(
                 target
                     .parent()
                     .ok_or_else(|| err("invalid_path", "缺少迁入目标"))?,
             )?;
-            let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
-            atomic_new(&target, &bytes, 0o600)?;
-            if digest(&read(&target, 8 * 1024 * 1024)?) != f["digest"] {
-                return Err(err("migration_failed", "迁入文件校验失败"));
-            }
+            crate::archive::copy_staged_verified(&entry.plain, &target, &entry.digest)?;
         }
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"migrate","label":"选择性迁入","status":"completed","message":format!("{instruction_note}会话与记忆保存在 lintel-imports，未宣称可直接续聊。hooks、MCP、插件配置没有启用。")});
         save(journal, j)?;
@@ -1737,18 +1890,20 @@ impl Engine {
             .as_str()
             .ok_or_else(|| err("archive_missing", "此任务没有工作归档"))?
             .to_owned();
-        let (package, archive_digest) = read_package(Path::new(&path), check_passphrase(r)?)?;
-        if j["archive_digest"].as_str() != Some(archive_digest.as_str()) {
+        let opened = self.open_archive(&json!({
+            "archive_path": path,
+            "archive_passphrase": r["archive_passphrase"],
+        }))?;
+        if j["archive_digest"].as_str() != Some(opened.cipher_digest.as_str()) {
             return Err(err(
                 "stale_archive",
                 "工作归档与本任务写入时的记录不一致；未新建环境、迁入或继续清理",
             ));
         }
-        let files = validate_package_files(&package)?;
         self.migrate_files(
             e,
             "重建",
-            &files,
+            &opened,
             j,
             journal,
             Some(&p["extra"]["frozen_target"]),
@@ -1764,11 +1919,22 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
-        let files = self.archive_work(e, p, r, j, journal)?;
+        self.archive_work(e, p, r, j, journal)?;
+        let path = PathBuf::from(string(j, "archive_path")?);
+        let opened = self.open_archive(&json!({
+            "archive_path": path,
+            "archive_passphrase": r["archive_passphrase"],
+        }))?;
+        if j["archive_digest"].as_str() != Some(opened.cipher_digest.as_str()) {
+            return Err(err(
+                "stale_archive",
+                "工作归档写入与读回不一致；未新建环境或迁入",
+            ));
+        }
         self.migrate_files(
             e,
             "重建",
-            &files,
+            &opened,
             j,
             journal,
             Some(&p["extra"]["frozen_target"]),
@@ -1792,6 +1958,59 @@ fn stringify_path(path: PathBuf) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::OpenedArchive;
+    use crate::package::{Entry, Package, Staging};
+
+    #[test]
+    fn migration_probe_refuses_absolute_mapping_without_final_path_writes() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let final_path = base.join("final.jsonl");
+        let journal = base.join("job.json");
+        let mut job = json!({"id":crate::id(),"steps":[]});
+        assert_eq!(
+            preflight_migration_paths(&base, &[final_path.clone()], &mut job, &journal)
+                .unwrap_err()
+                .code,
+            "invalid_mapping"
+        );
+        assert!(!final_path.exists());
+        assert!(!journal.exists());
+        assert_eq!(fs::read_dir(&base).unwrap().count(), 0);
+    }
+
+    /// Build a synthetic in-memory `OpenedArchive` from `(path, category,
+    /// bytes)` triples: bytes are staged into a private dir, exactly as a real
+    /// archive read would leave them.
+    fn opened(files: &[(&str, &str, &[u8])], temp: &tempfile::TempDir) -> OpenedArchive {
+        let staging = Staging::new(&temp.path().canonicalize().unwrap()).unwrap();
+        let entries = files
+            .iter()
+            .enumerate()
+            .map(|(index, (path, category, bytes))| {
+                let plain = staging.dir.join(format!("entry-{index:08}.bin"));
+                fs::write(&plain, bytes).unwrap();
+                Entry {
+                    path: (*path).to_string(),
+                    category: (*category).to_string(),
+                    digest: digest(bytes),
+                    bytes: bytes.len() as u64,
+                    plain,
+                }
+            })
+            .collect();
+        OpenedArchive {
+            package: Package {
+                schema: crate::package::SCHEMA.to_string(),
+                generator: json!(crate::package::GENERATOR),
+                created_at: json!("2026-01-01T00:00:00Z"),
+                files: entries,
+            },
+            cipher_digest: digest(b"synthetic"),
+            path: temp.path().join("synthetic.age"),
+            _staging: staging,
+        }
+    }
 
     #[test]
     fn new_root_intent_survives_registration_failure() {
@@ -1808,11 +2027,12 @@ mod tests {
         // Registration will fail after the fresh directory has been created.
         // Only this synthetic inventory is changed.
         save(&engine.state.join("inventory.json"), &json!({})).unwrap();
+        let empty = opened(&[], &temp);
         let failure = engine
             .migrate_files(
                 &environment,
                 "synthetic",
-                &[],
+                &empty,
                 &mut receipt,
                 &journal,
                 None,
@@ -1939,29 +2159,33 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let engine = Engine::new(home, base.join("state")).unwrap();
         let environment = engine.register("synthetic", &root, false).unwrap();
-        let first = b"synthetic instruction";
-        let second = b"synthetic session";
-        let files = vec![
-            json!({"path":"CLAUDE.md","category":"instructions","data":first,"digest":digest(first)}),
-            // Model a failed readback after the second file was published.
-            json!({"path":"projects/example/session.jsonl","category":"sessions","data":second,"digest":digest(b"different readback")}),
-        ];
+        let first: &[u8] = b"synthetic instruction";
+        let second: &[u8] = b"synthetic session";
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
+        // The second file's staged bytes deliberately do not match the declared
+        // digest, so the streaming copy refuses publication of that file after
+        // the first file lands. The original job still records partial work.
+        let tampered = vec![
+            ("CLAUDE.md", "instructions", first),
+            ("projects/example/session.jsonl", "sessions", second),
+        ];
+        let mut opened_archive = opened(&tampered, &temp);
+        opened_archive.package.files[1].digest = digest(b"different readback");
         // Legacy raw callers omit `activate`; the mapping keeps its historical
         // default where instructions land at the root position.
         let failure = engine
             .migrate_files(
                 &environment,
                 "synthetic",
-                &files,
+                &opened_archive,
                 &mut receipt,
                 &journal,
                 None,
                 &json!({"instructions": true}),
             )
             .unwrap_err();
-        assert_eq!(failure.code, "migration_failed");
+        assert_eq!(failure.code, "readback_failed");
         let stored = load(&journal).unwrap();
         let active = stored["steps"]
             .as_array()
@@ -1972,10 +2196,9 @@ mod tests {
         assert_eq!(active["id"], "migrate");
         let destination = Path::new(stored["new_root"].as_str().unwrap());
         assert_eq!(fs::read(destination.join("CLAUDE.md")).unwrap(), first);
-        assert_eq!(
-            fs::read(destination.join("lintel-imports/projects/example/session.jsonl")).unwrap(),
-            second
-        );
+        assert!(!destination
+            .join("lintel-imports/projects/example/session.jsonl")
+            .exists());
         assert!(stored["new_environment_id"].is_string());
     }
 
@@ -2030,15 +2253,14 @@ mod tests {
                 b"reserved directory".as_slice(),
             ),
         ];
-        let files: Vec<Value> = entries.iter().map(|(path, category, bytes)|
-            json!({"path":path,"category":category,"data":bytes,"digest":digest(bytes)})).collect();
+        let archive = opened(&entries, &temp);
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
         engine
             .migrate_files(
                 &environment,
                 "synthetic",
-                &files,
+                &archive,
                 &mut receipt,
                 &journal,
                 None,
@@ -2138,7 +2360,7 @@ mod tests {
         ]);
         // Model what the manifest would classify from that tree, then freeze the
         // reference mapping (instructions inactive) and assert it is unchanged.
-        let mut files = vec![];
+        let mut triples = vec![];
         for (entry, bytes) in
             groups
                 .as_array()
@@ -2147,18 +2369,15 @@ mod tests {
                 .zip([instruction, collision, memory])
         {
             let path = entry["path"].as_str().unwrap();
+            let category = entry["category"].as_str().unwrap();
             assert_eq!(
                 classify(Path::new(path)),
-                Some(entry["category"].as_str().unwrap()),
+                Some(category),
                 "classification of retained path {path}"
             );
-            files.push(json!({
-                "path": path,
-                "category": entry["category"],
-                "data": bytes,
-                "digest": digest(bytes),
-            }));
+            triples.push((path, category, bytes));
         }
+        let archive = opened(&triples, &temp);
         let engine = Engine::new(home, base.join("state")).unwrap();
         let environment = engine.register("synthetic", &root, false).unwrap();
         let journal = engine.state.join("jobs/synthetic.json");
@@ -2167,7 +2386,7 @@ mod tests {
             .migrate_files(
                 &environment,
                 "synthetic",
-                &files,
+                &archive,
                 &mut receipt,
                 &journal,
                 None,
@@ -2227,11 +2446,18 @@ mod tests {
         let active = b"active instruction".as_slice();
         let reference = b"reference instruction".as_slice();
         let collided = b"already collided reference".as_slice();
-        let files = vec![
-            json!({"path":"CLAUDE.md","category":"instructions","data":active,"digest":digest(active)}),
-            json!({"path":"lintel-imports/CLAUDE.md","category":"instructions","data":reference,"digest":digest(reference)}),
-            json!({"path":"lintel-imports/lintel-1-CLAUDE.md","category":"instructions","data":collided,"digest":digest(collided)}),
-        ];
+        let archive = opened(
+            &[
+                ("CLAUDE.md", "instructions", active),
+                ("lintel-imports/CLAUDE.md", "instructions", reference),
+                (
+                    "lintel-imports/lintel-1-CLAUDE.md",
+                    "instructions",
+                    collided,
+                ),
+            ],
+            &temp,
+        );
         let engine = Engine::new(home, base.join("state")).unwrap();
         let environment = engine.register("synthetic", &root, false).unwrap();
         let journal = engine.state.join("jobs/synthetic.json");
@@ -2242,7 +2468,7 @@ mod tests {
             .migrate_files(
                 &environment,
                 "synthetic",
-                &files,
+                &archive,
                 &mut receipt,
                 &journal,
                 None,
@@ -2326,14 +2552,19 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let engine = Engine::new(home, base.join("state")).unwrap();
         let environment = engine.register("synthetic", &root, false).unwrap();
-        let files: Vec<_> = [("projects/foo.jsonl", b"lower".as_slice()), ("projects/Foo.jsonl", b"upper".as_slice())]
-            .into_iter().map(|(path, bytes)| json!({"path":path,"category":"sessions","digest":digest(bytes),"data":bytes})).collect();
+        let archive = opened(
+            &[
+                ("projects/foo.jsonl", "sessions", b"lower"),
+                ("projects/Foo.jsonl", "sessions", b"upper"),
+            ],
+            &temp,
+        );
         let journal = engine.state.join("jobs/synthetic.json");
         let mut receipt = json!({"steps":[]});
         let result = engine.migrate_files(
             &environment,
             "synthetic",
-            &files,
+            &archive,
             &mut receipt,
             &journal,
             None,
@@ -2440,9 +2671,12 @@ mod tests {
         let good = b"kept session bytes\n";
         fs::write(root.join("projects/demo/keep.jsonl"), good).unwrap();
         fs::write(root.join("projects/demo/other.jsonl"), b"unrelated\n").unwrap();
-        // An unselected 9 MiB session exceeds the 8 MiB per-file limit.
+        // An unselected session just over the 256 MiB per-file limit (sparse,
+        // never materialized) must not block an exact selection of other files.
         let big = root.join("projects/demo/huge.jsonl");
-        fs::write(&big, vec![b'x'; 9 * 1024 * 1024]).unwrap();
+        let big_file = fs::File::create(&big).unwrap();
+        big_file.set_len(FILE_LIMIT_BYTES + 1).unwrap();
+        drop(big_file);
         let memory = b"# memory\n";
         fs::write(root.join("projects/demo/memory/MEMORY.md"), memory).unwrap();
 
@@ -2465,7 +2699,7 @@ mod tests {
         assert_eq!(entries[0]["digest"], digest(good));
         assert_eq!(entries[0]["category"], "sessions");
         assert_eq!(entries[1]["category"], "memory");
-        assert_eq!(fs::read(&big).unwrap().len(), 9 * 1024 * 1024);
+        assert_eq!(fs::metadata(&big).unwrap().len(), FILE_LIMIT_BYTES + 1);
         assert_eq!(
             fs::read(root.join("projects/demo/other.jsonl")).unwrap(),
             b"unrelated\n"

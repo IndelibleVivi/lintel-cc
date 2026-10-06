@@ -158,6 +158,8 @@ lintel work archive list
 
 output_path 可省略以保存在 Lintel state；填写路径时父目录须存在且目的地尚未使用。计划冻结父目录的 device/inode，在接受和发布前复查；目录被替换返回 `stale_plan`，没有这份身份的旧显式输出计划也须重新预览。原任务回执继续只查询、不重跑。archive-only 不建立环境、不处理登录、不改变源文件。`work preserve plan --environment ID --categories ... [--name NAME]` 另行表示归档并准备新环境，成功为完成，outcome=preserved；旧登录保留，接着选新环境保护方案、正常登录与启动。归档仍为 `lintel.work/1`，包含类别、相对路径、原字节和文件 digest，不复制 credentials/settings/hooks/MCP。
 
+当前源码准入为单文件 256 MiB、所选合计 1 GiB、10,000 文件；先用 `work preflight` 读取实际 runner 的 limits，旧候选可能更低。work codec 流式编码、完整解密并核验所有原件，再按冻结 mapping 迁入；每页 reader 至多取 256 KiB，正文不常驻整个包。每次读取仍核验全包，state 磁盘须容纳展开原件，目的地另需密文／逐文件临时空间。正常返回清除私有暂存；强制终止可能留下 `.lintel-work-stage-*`，不会自动扫除。reader 限制 scrypt log N ≤ 20；高成本包明确返回 `archive_limit`，不会降级解密。旧 reader 仍有自己的容量限制，不能据包格式相同推断大包可在旧版本读入。 有限 SSH 的 60 秒／2 MiB 响应边界不因 core 容量增加而改变，慢包预览或阅读可能 `transport_unknown`；在目标机独立运行 CLI 核对，已接受 job 保留原 ID 查询。
+
 把**密文**复制到新机器/独立安装后，不需要源 inventory 或源 job：
 
 ```sh
@@ -185,6 +187,8 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 `CLAUDE_CONFIG_DIR` 指向已登记配置 root；`project_cwd` 是目标主机上已存在、当前用户可用的项目目录。它们可以不同，Lintel 不代为创建或改变项目权限。新启动先预览实际目录、程序和静态版本，再批准这一份不可变请求：
 
+新 launch／resume 计划的 `startup` 投影列出有限配置候选来源、声明和只查看元数据的认证位置；不返回命令、token 或指令正文，actual_loaded 与认证仍是未核验。候选变化需要重新预览；未尝试的旧计划缺少 private startup binding 也需要新预览，已记录原 ID 仍优先查询。新 Terminal 的 shell 环境、Keychain、组织策略和工作目录外指令 imports 另行核对；`/status` 与 `/mcp` 是用户在目标终端确认的步骤。
+
 新 launch／resume 计划同时冻结目录的 device、inode、owner 与创建时间，以识别 Linux 立即复用 inode 的目录替换；普通新增／删除项目文件不改变目录创建时间。文件系统不能提供创建时间时返回 `directory_identity_unsupported`，不打开客户端。缺少这份身份的旧未启动计划须重新预览；已有原启动记录仍先只读查询，不重放。
 
 ```sh
@@ -209,7 +213,7 @@ python3 -c 'import getpass,json; print(json.dumps({"archive_passphrase":getpass.
 
 需要继续时，从上一页的 `next_offset` 传入 `--offset`，可用 `--expected-digest` 核对原文件。未知记录、非 ASCII 与特殊换行保留原字节；原始文本显示与结构化解析都是阅读视图，不改写 transcript。thinking／signature 按不透明块处理，不进入自动生成的交接稿。
 
-原生续聊是独立、有限任务。通过 `call plan_resume` 的一次性 JSON stdin 提交准确的 archive source、path、环境与项目，口令用 `getpass` 获取。先 `describe plan_resume`／`schema plan_resume` 核对当前版本合同；批准后使用真正终端的 `resume_request REQUEST_ID HASH`。支持范围、私有运行副本、认证／原会话未核对状态都在预览中显示。入口使用绝对 transcript 副本与固定 `--resume`／`--fork-session`；不改写 session ID、signature 或索引。读回运行副本与 inert 参数验证不能证明真实 Claude 已恢复成功。
+原生续聊是独立、有限任务，目前只完整评估不超过 8 MiB 的 transcript；大文件仍可完整保全和分页阅读，超过这个 resume 范围明确标为不支持。通过 `call plan_resume` 的一次性 JSON stdin 提交准确的 archive source、path、环境与项目，口令用 `getpass` 获取。先 `describe plan_resume`／`schema plan_resume` 核对当前版本合同；批准后使用真正终端的 `resume_request REQUEST_ID HASH`。支持范围、私有运行副本、认证／原会话未核对状态都在预览中显示。入口使用绝对 transcript 副本与固定 `--resume`／`--fork-session`；不改写 session ID、signature 或索引。读回运行副本与 inert 参数验证不能证明真实 Claude 已恢复成功。
 
 原启动查询不需要 approval 或口令，不执行 Terminal，也不重新准备运行副本。对于 SSH 使用 `lintel remote launch query ALIAS REQUEST_ID`；原启动 runner binding 保留，普通重连和 alias 升级不能重发或换绑它。
 

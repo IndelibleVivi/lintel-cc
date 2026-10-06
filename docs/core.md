@@ -79,19 +79,41 @@
 
 `plan_reset` 仍只接受 `recipe: "rebuild"`，语义不变：仅归档后建立新根并迁入，旧 root/登录保留，receipt 维持 `partially_completed`（旧登录/客户端清理步骤未完成）；历史 receipt 不复绿。
 
-当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。枚举预算为单文件 8 MiB、总量 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
+当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。内容准入为单文件 256 MiB、总量 1 GiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
 工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
+
+`package.rs` 是工作包唯一生产 codec，复用 serde `DeserializeSeed`／`Visitor`、已有重复键检查及 age 流；旧完整 `Value` reader 只用于小包测试，`lintel.state/1` 的有限备份 writer 保留现有调用。正文逐块摘要并从冻结来源写入私有 0700／0600 暂存；读入将 byte arrays 逐 u8 写入暂存，不物化整包。元数据单字段最多 1 MiB、合计 16 MiB；单个 data token 在交给 serde 前限 128 字节，完整 JSON／密文另有按总内容计算的有限编码预算。缓冲位于预算 gate 下方，不能让上一字段预取的字节绕过当前预算。密文摘要、完整认证与尾部来自同一 non-following handle，读取前后核对 handle／path 身份；只返回有限 metadata 和请求窗口。age header 读取最多 64 KiB，scrypt reader 拒绝 `log N > 20`，不改变包原有强度；正常 writer 沿用 age 的设备成本选择，实际 KDF 内存与构建条件单独测量。
+
+发布前记录准确目的地与密文摘要，重新核对冻结输出父目录，原子不覆盖发布，再完整解密读回；完成事实不由 intent 推断。迁入／resume 副本逐块复制到同目录临时文件，摘要匹配与 fsync 后再原子不覆盖发布，目标读回之后才完成；失败保留原 job／已发布产物，不改名重发。暂存只由本操作 RAII 清理；kill 后可能保留私有随机目录，不自动扫历史暂存。state 与输出磁盘分别需要展开／密文／临时发布空间，流式内存路线不消除磁盘和核验时间成本。
+
+下面是当前 core 源码的数据流；原始工作文件只读，只有批准后的 core 可以发布包或迁入目标。图中“核验成功”不是实际客户端加载／认证证据。
+
+```mermaid
+flowchart TD
+    F["冻结选择／完整摘要"] --> S["work.rs：私有原件暂存"]
+    S --> E["package.rs：流式 age 编码"]
+    E --> J["持久 archive intent"]
+    J --> P["原子不覆盖发布密文"]
+    P --> V["package.rs：完整认证／摘要／EOF"]
+    C["已有 job 包或独立包"] --> V
+    V --> D["本操作私有解密暂存"]
+    D --> R["session.rs：≤256 KiB 页面"]
+    D --> A["已批准 mapping／完整摘要"]
+    A --> I["archive.rs：临时复制后不覆盖发布／读回"]
+```
+
+每次打开或翻页都会走完整核验路径；RAII 只清理本操作的私有解密暂存，强制终止后的残留需按原任务核对。
 
 工作包与状态备份仅在归档完成后才创建新根。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
 ## 有限关联组件与容量预检
 
-`inspect_components` 由 `components.rs` 投影 `lintel.components/1`：准确 environment/root、可选 target-host project cwd、观察时间、有限来源／范围／下一入口、原任务记录。CLI 只读取现有静态安装元数据；配置来源只返回路径、存在情况及 hooks/MCP 声明布尔值，不返回命令、参数、env 任意字段或正文。只检查已选择 cwd 的有限文件及 core 已认识的 managed 文件位置；父级、其他组织下发、实际加载与 OS 强约束仍未覆盖。认证只检查已知文件／共享 profile 的元数据，不读取 credentials，也不执行 auth probe。
+`inspect_components` 由 `components.rs` 投影 `lintel.components/1`：准确 environment/root、可选 target-host project cwd、观察时间、有限来源／范围／下一入口、原任务记录。CLI 只读取现有静态安装元数据；配置来源只返回路径、存在情况，以及 hooks/MCP、credential/policy helper、plugins 声明布尔值和有限认证变量名称；不返回命令、参数、env 值或正文。同一 `startup.rs` owner 列出 root、明确 cwd 及最多 32 层上级候选、系统 managed 文件与最多 64 个 drop-in 目录项；上级项是候选，不推断具体版本加载优先级。组织下发、worktree 主 checkout、目录内容、实际加载与 OS 强约束仍未覆盖。认证只检查已知文件／共享 profile 的元数据，不读取 credentials，也不执行 auth probe。
 
 原记录扫描最多读取 10,000 个目录项，不调用 `job` 的 reconciliation；仅投影同一 environment、文件名与合法原 ID 一致的记录，最多 50 份，读取不完整与展示截断分开。最多刷新 8 个原记录所指的确切 systemd unit，当前 probe 失败标未知并保留原 ID。原 task_result.coverage 是历史证据。Browser、IDE／Desktop 与未支持 supervisor 保持各自范围，不以 root 已处理推断都已处理。
 
-`work_preflight` 与工作统计共用 metadata scanner，选择类别、单文件／合计／文件数、目录预算与 symlink 规则沿用实际归档范围；阻塞对象最多列 200 项，截断不改变拒绝结论；扫描预算保持 50,000 目录项／30 秒，首个未覆盖来源保留相对路径。它没有摘要、冻结计划或副作用批准；内容准入仍由 manifest 和执行复查拥有。既有包格式与 8 MiB／32 MiB／10,000 文件 limits 未改变。
+`work_preflight` 与工作统计共用 metadata scanner，选择类别、单文件／合计／文件数、目录预算与 symlink 规则沿用实际归档范围；阻塞对象最多列 200 项，截断不改变拒绝结论；扫描预算保持 50,000 目录项／30 秒，首个未覆盖来源保留相对路径。它没有摘要、冻结计划或副作用批准；内容准入仍由 manifest 和执行复查拥有。包格式仍为 `lintel.work/1`；当前内容 limits 为 256 MiB／1 GiB／10,000 文件，扫描与精确选择预算不变。
 
 `work_inventory` 按原始路径排序并有界分页，只读取元数据；`complete` 表示整次扫描是否完整，与 `next_offset` 独立。分页摘要绑定完整观察，后续页必须核对 `expected_digest`，变化拒绝 `stale_inventory`。它不授予执行。`work_preflight`／`plan_archive`／`plan_preserve` 的 additive `selected_paths` 是有限精确原件集合；省略保持旧整类调用。静态类别由 operations 与 core 共用，路径、数量／实际 JSON 编码大小及祖先 guard 分别验证。精确模式只核对选中原件，未选 oversized／非普通项不会被读取；正式 plan 冻结 exact paths、source device/inode/owner/ctime 与完整正文 manifest，同字节替换也必须重新预览，读取前后及接受前复查。它不提供对外部 writer 的 OS CAS。public `work_selection` 只投影 mode／paths；保全新根仍使用原冻结 target／mapping。内部身份不写入 lintel.work/1；旧类别计划、cleanup/reset/import 和包原件格式保持兼容。
 
@@ -115,9 +137,11 @@ TUI 通过 `lintel tui` 提供上述配方、认证检查、归档阅读/迁入�
 
 ## 启动与支持资料
 
-`crates/core/src/session.rs` 拥有有界 `session_read`：按工作包 source＋文件摘要读取一页，返回字节继续位置、结构化记录及 raw text。未知／损坏记录不从原件删除；thinking／signature 是不透明块。正文与口令不进普通 journal。旧 `archive_read` 保留其既有兼容行为。
+`crates/core/src/session.rs` 拥有有界 `session_read`：按工作包 source＋文件摘要读取一页，返回字节继续位置、结构化记录及 raw text。未知／损坏记录不从原件删除；thinking／signature 是不透明块。正文与口令不进普通 journal。每次先完整认证／核验包，再从暂存 seek 读取至多 256 KiB；记录 offset 按原字节计量，含 CRLF 与非 UTF-8 原件。旧 `archive_read` 保留其最多 1 MiB 的预览兼容行为。
 
-`crates/core/src/launch.rs` 拥有 `plan_launch`／`launch_request`、独立 `plan_resume`／`resume_request` 以及只读 `launch_query`／`launches`。配置 root 决定状态，项目 cwd 决定工作目录。预览冻结 target／程序／静态版本；首次执行复查，Terminal／PTY 前持久 intent。重复与中断按原 ID 核对，不能重放启动。resume 准备私有字节副本，不把 archive 原件交给客户端写；有限支持政策、真实认证／实际恢复限制与写入范围见原计划和 [操作指南](operator-guide.md)。
+`crates/core/src/launch.rs` 拥有 `plan_launch`／`launch_request`、独立 `plan_resume`／`resume_request` 以及只读 `launch_query`／`launches`。配置 root 决定状态，项目 cwd 决定工作目录。预览冻结 target／程序／静态版本；首次执行复查，Terminal／PTY 前持久 intent。重复与中断按原 ID 核对，不能重放启动。resume 准备私有字节副本，不把 archive 原件交给客户端写；native resume 格式核对最多 8 MiB，更大文件明确 unsupported 而仍可阅读；有限支持政策、真实认证／实际恢复限制与写入范围见原计划和 [操作指南](operator-guide.md)。
+
+`startup.rs` 是 components 与启动预览共用的有限静态来源 owner。`lintel.startup/1` 公开候选路径、状态与有限声明，不公开命令、env 值、凭据或指令正文；settings／MCP 每文件最多读 1 MiB，合计 16 MiB，符号链接、特殊类型、访问受限与解析失败分别标注。启动与 resume 在私有 `extra.startup_binding` 冻结文件身份和每计划加盐的 settings 内容摘要，首次 intent／私有副本／Terminal 前复查，变化返回 `stale_plan`。未经尝试的旧计划没有此绑定须新预览；既有原记录仍优先查询。新 root 不消除项目或系统配置；实际加载、认证与 Terminal 环境仍未核验。目录只观察自身元数据，不声称冻结其后代或阻止外部 writer。
 
 启动目录身份使用 device／inode／owner 加创建时间，避免 Linux 删除重建时立即复用 inode 漏过复查；普通项目内容变化不冻结。创建时间不可用时明确拒绝新预览；旧未启动计划缺少该证据须重新预览，原记录优先查询语义不变。这是写前身份检查，不是对外部 writer 的 OS 级 CAS。
 

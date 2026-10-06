@@ -104,6 +104,10 @@ const SUPPORTED_RESUME_VERSIONS: &[&str] = &["2.1.283", "2.1.285"];
 /// must be re-previewed before its first launch (a code/policy change invalidates
 /// the approved adapter behavior).
 const RESUME_POLICY_VERSION: u32 = 1;
+/// Largest head of a transcript scanned for resume-format assessment. A file
+/// larger than this is explicitly unsupported for native resume rather than
+/// loaded in full.
+const RESUME_SCAN_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, PartialEq)]
 enum ResumeSupport {
@@ -416,6 +420,7 @@ impl Engine {
         let executable_identity = exec_identity(Path::new(&executable))?;
         let project_identity = project_identity(&project)?;
         let product = policy::product(Some(&executable));
+        let startup = crate::components::startup::freeze(&self.home, &root, &project)?;
         let request_id = id();
         let launch_request = json!({
             "id": request_id,
@@ -432,6 +437,7 @@ impl Engine {
             "input_reference": input_reference,
             "proxy_url": proxy,
             "created_at": now(),
+            "startup": startup.view,
         });
         let mut plan = self.plan(
             &e,
@@ -440,7 +446,7 @@ impl Engine {
             json!([]),
             vec!["配置文件与项目目录本身", "用户未选择的历史内容"],
             json!([{"id":"launch","label":"在准确的项目目录与配置环境中启动交互会话","reversible":false}]),
-            json!({"launch_request":launch_request,"mode":mode}),
+            json!({"launch_request":launch_request,"mode":mode,"startup_binding":startup.binding}),
         )?;
         // Make the frozen request ID identical to the plan ID, then re-hash so
         // approval still binds the exact frozen target.
@@ -553,6 +559,12 @@ impl Engine {
             ));
         }
         let proxy = request["proxy_url"].as_str();
+        crate::components::startup::recheck(
+            &self.home,
+            &root,
+            &project,
+            &plan["extra"]["startup_binding"],
+        )?;
         // Durable intent BEFORE the Terminal attempt.
         let mut record = json!({
             "status": "launch_intent",
@@ -595,27 +607,26 @@ impl Engine {
     pub(crate) fn plan_resume(&self, r: &Value) -> Result<Value> {
         let (e, root, executable) = self.launch_environment(r)?;
         let project = check_project_cwd(string(r, "project_cwd")?)?;
-        let (package, archive_digest, source_path) = self.archive_package(r)?;
+        let opened = self.open_archive(r)?;
         let name = string(r, "path")?;
-        let entry = package["files"]
-            .as_array()
-            .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?
-            .iter()
-            .find(|f| f["path"] == name)
-            .ok_or_else(|| err("archive_file_missing", "归档没有该会话文件"))?
-            .clone();
-        let transcript_digest = string(&entry, "digest")?.to_string();
-        let bytes: Vec<u8> = serde_json::from_value(entry["data"].clone())?;
+        let entry = opened.entry(name)?;
+        let transcript_digest = entry.digest.clone();
+        let format = assess_resume_format(
+            name,
+            &entry.plain,
+            entry.bytes,
+            policy::product(Some(&executable))
+                .get("version")
+                .and_then(Value::as_str),
+        );
+        let archive_digest = opened.cipher_digest.clone();
+        let source_path = opened.path.clone();
         let product = policy::product(Some(&executable));
-        let client_version = product
-            .get("version")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        let format = assess_resume_format(name, &bytes, client_version.as_deref());
         let root_identity = dir_identity(&root)?;
         let executable_identity = exec_identity(Path::new(&executable))?;
         let project_identity = project_identity(&project)?;
         let private_copy = self.state.join("resume").join(format!("{}.jsonl", id()));
+        let startup = crate::components::startup::freeze(&self.home, &root, &project)?;
         let resume = json!({
             "supported": format.support.supported(),
             "reason": format.support.reason(),
@@ -657,6 +668,7 @@ impl Engine {
                 "note": "客户端可能按自身规则更新所选配置环境中的运行状态，并可能按内部索引读取原项目/subagent 会话；私有副本不构成隔离保证，归档原件不交给客户端写入。",
             },
             "format": format.format,
+            "startup": startup.view,
         });
         self.plan(
             &e,
@@ -665,7 +677,7 @@ impl Engine {
             json!([]),
             vec!["归档原件字节", "本机认证与登录状态"],
             json!([{"id":"resume","label":"用私有运行副本进行有限原生续聊；不修改归档原件","reversible":false}]),
-            json!({"resume":resume,"archive_passphrase_required":true,"archive_path":source_path,"transcript_path":name}),
+            json!({"resume":resume,"archive_passphrase_required":true,"archive_path":source_path,"transcript_path":name,"startup_binding":startup.binding}),
         )
     }
 
@@ -763,26 +775,26 @@ impl Engine {
                 "该组合暂不支持原生续聊；可改用阅读或提取上下文入口",
             ));
         }
+        crate::components::startup::recheck(
+            &self.home,
+            &root,
+            &project,
+            &plan["extra"]["startup_binding"],
+        )?;
         // Re-read and re-verify the exact transcript bytes from the frozen source.
         let source = json!({
             "archive_path": resume["source"]["archive_path"],
             "archive_passphrase": r["archive_passphrase"],
         });
-        let (package, digest_now, _) = self.archive_package(&source)?;
+        let opened = self.open_archive(&source)?;
+        let digest_now = opened.cipher_digest.clone();
         if resume["source"]["archive_digest"].as_str() != Some(digest_now.as_str()) {
             return Err(err("stale_archive", "工作包在预览后改变，请重新预览"));
         }
-        let entry = package["files"]
-            .as_array()
-            .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?
-            .iter()
-            .find(|f| f["path"] == name.as_str())
-            .ok_or_else(|| err("archive_file_missing", "归档没有该会话文件"))?
-            .clone();
-        if string(&entry, "digest")? != string(resume, "transcript_digest")? {
+        let entry = opened.entry(&name)?;
+        if entry.digest != string(resume, "transcript_digest")? {
             return Err(err("stale_archive", "会话文件在预览后改变，请重新预览"));
         }
-        let bytes: Vec<u8> = serde_json::from_value(entry["data"].clone())?;
         let copy = Path::new(string(resume, "private_copy_path")?);
         guard(copy)?;
         if !copy.is_absolute() {
@@ -808,11 +820,10 @@ impl Engine {
         });
         save(&result_path, &record)?;
         let prepared = (|| -> Result<()> {
-            atomic_new(copy, &bytes, 0o600)?;
-            if read(copy, 8 * 1024 * 1024)? != bytes {
-                return Err(err("readback_failed", "私有运行副本读回不一致，未启动续聊"));
-            }
-            Ok(())
+            // Stream-copy the verified plaintext into the private running copy
+            // and read it back, hashing both, so a large transcript is never
+            // loaded whole.
+            crate::archive::copy_staged_verified(&entry.plain, copy, &entry.digest)
         })();
         if let Err(failure) = prepared {
             record["status"] = json!("launch_failed");
@@ -870,7 +881,31 @@ struct ResumeFormat {
 /// declared client version. This is a *format + policy* check on the archived
 /// bytes and static version metadata, not a claim of authentication or actual
 /// client support.
-fn assess_resume_format(name: &str, bytes: &[u8], client_version: Option<&str>) -> ResumeFormat {
+/// Read at most `limit` bytes from the head of a file (bounded; fewer only at
+/// EOF). Used for the resume-format prefix scan.
+fn read_prefix(path: &Path, limit: u64) -> Result<Vec<u8>> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = vec![0u8; limit.min(usize::MAX as u64) as usize];
+    let mut filled = 0;
+    while filled < buf.len() {
+        match file.read(&mut buf[filled..]) {
+            Ok(0) => break,
+            Ok(n) => filled += n,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(err("archive_read_failed", "无法读取会话文件")),
+        }
+    }
+    buf.truncate(filled);
+    Ok(buf)
+}
+
+fn assess_resume_format(
+    name: &str,
+    plain: &Path,
+    size: u64,
+    client_version: Option<&str>,
+) -> ResumeFormat {
     if !name.ends_with(".jsonl") {
         return ResumeFormat {
             support: ResumeSupport::Unsupported(
@@ -881,7 +916,22 @@ fn assess_resume_format(name: &str, bytes: &[u8], client_version: Option<&str>) 
             observed: json!({}),
         };
     }
-    let text = String::from_utf8_lossy(bytes);
+    // Read at most `RESUME_SCAN_BYTES` from the head of the transcript: a huge
+    // session is assessed from a bounded prefix, and the scan is marked
+    // truncated rather than loading the whole file.
+    let prefix = match read_prefix(plain, RESUME_SCAN_BYTES) {
+        Ok(prefix) => prefix,
+        Err(_) => {
+            return ResumeFormat {
+                support: ResumeSupport::Unsupported("无法读取会话文件内容"),
+                format: "unknown",
+                inference: json!("读取归档会话文件失败"),
+                observed: json!({}),
+            }
+        }
+    };
+    let truncated_scan = size > prefix.len() as u64;
+    let text = String::from_utf8_lossy(&prefix);
     let mut recognized = 0usize;
     let mut total = 0usize;
     let mut has_session_id = false;
@@ -910,7 +960,23 @@ fn assess_resume_format(name: &str, bytes: &[u8], client_version: Option<&str>) 
         "sessionId": has_session_id,
         "cwd": has_cwd,
         "uuid": has_uuid,
+        "truncated_scan": truncated_scan,
+        "scanned_bytes": prefix.len(),
+        "total_bytes": size,
     });
+    // A transcript larger than the bounded scan cannot be verified in full for
+    // the fields resume relies on, so it is explicitly unsupported rather than
+    // approved from a partial observation.
+    if truncated_scan {
+        return ResumeFormat {
+            support: ResumeSupport::Unsupported(
+                "会话文件超过可核对的原生续聊容量；本候选不从部分内容推断可恢复，请改用阅读入口",
+            ),
+            format: "claude-session-jsonl",
+            inference: json!("超出有界核对范围；拒绝从截断内容推断原生续聊支持"),
+            observed,
+        };
+    }
     if total == 0 {
         return ResumeFormat {
             support: ResumeSupport::Unsupported("会话文件为空，没有可恢复的记录"),
@@ -1051,43 +1117,76 @@ mod tests {
     fn resume_format_rejects_unknown_and_accepts_known_declared_version() {
         // A recognized transcript with the fields the resume path relies on and a
         // declared version is a supported candidate.
+        let temp = tempfile::tempdir().unwrap();
+        let write = |name: &str, bytes: &[u8]| {
+            let path = temp.path().join(name);
+            std::fs::write(&path, bytes).unwrap();
+            (path, bytes.len() as u64)
+        };
         let known = br#"{"type":"user","sessionId":"s","cwd":"/p","uuid":"u","message":{"content":[{"type":"text","text":"hi"}]}}"#;
+        let (known_path, known_len) = write("s.jsonl", known);
+        assert!(assess_resume_format(
+            "projects/x/s.jsonl",
+            &known_path,
+            known_len,
+            Some("2.1.285")
+        )
+        .support
+        .supported());
+        // A recognized shape but an unknown/absent version is never assumed.
         assert!(
-            assess_resume_format("projects/x/s.jsonl", known, Some("2.1.285"))
+            !assess_resume_format("projects/x/s.jsonl", &known_path, known_len, None)
                 .support
                 .supported()
         );
-        // A recognized shape but an unknown/absent version is never assumed.
-        assert!(!assess_resume_format("projects/x/s.jsonl", known, None)
-            .support
-            .supported());
         assert!(
-            !assess_resume_format("projects/x/s.jsonl", known, Some("2.0.0"))
+            !assess_resume_format("projects/x/s.jsonl", &known_path, known_len, Some("2.0.0"))
                 .support
                 .supported()
         );
         // Missing required fields (sessionId/cwd) is unsupported even for a
         // declared version.
         let no_fields = br#"{"type":"user","message":{"content":[{"type":"text","text":"hi"}]}}"#;
-        assert!(
-            !assess_resume_format("projects/x/s.jsonl", no_fields, Some("2.1.285"))
-                .support
-                .supported()
-        );
+        let (no_fields_path, no_fields_len) = write("no-fields.jsonl", no_fields);
+        assert!(!assess_resume_format(
+            "projects/x/s.jsonl",
+            &no_fields_path,
+            no_fields_len,
+            Some("2.1.285")
+        )
+        .support
+        .supported());
         // Non-.jsonl, unknown record types and empty content are unsupported.
         let unknown = b"{\"type\":\"weird\"}\n";
+        let (unknown_path, unknown_len) = write("unknown.jsonl", unknown);
+        assert!(!assess_resume_format(
+            "projects/x/s.jsonl",
+            &unknown_path,
+            unknown_len,
+            Some("2.1.285")
+        )
+        .support
+        .supported());
         assert!(
-            !assess_resume_format("projects/x/s.jsonl", unknown, Some("2.1.285"))
+            !assess_resume_format("notes.txt", &known_path, known_len, Some("2.1.285"))
                 .support
                 .supported()
         );
-        assert!(!assess_resume_format("notes.txt", known, Some("2.1.285"))
-            .support
-            .supported());
+        let (empty_path, _) = write("empty.jsonl", b"");
         assert!(
-            !assess_resume_format("projects/x/s.jsonl", b"", Some("2.1.285"))
+            !assess_resume_format("projects/x/s.jsonl", &empty_path, 0, Some("2.1.285"))
                 .support
                 .supported()
         );
+        // A transcript larger than the bounded scan is explicitly unsupported.
+        let (big_path, big_len) = write("big.jsonl", known);
+        assert!(!assess_resume_format(
+            "projects/x/s.jsonl",
+            &big_path,
+            big_len + RESUME_SCAN_BYTES,
+            Some("2.1.285"),
+        )
+        .support
+        .supported());
     }
 }

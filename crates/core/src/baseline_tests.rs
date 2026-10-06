@@ -8,6 +8,141 @@ use tempfile::TempDir;
 
 const PASS: &str = "synthetic-baseline-passphrase";
 
+#[test]
+fn startup_sources_are_frozen_before_intent_and_original_records_stay_query_only() {
+    let (_t, mut engine, e, root) = setup();
+    engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());
+    let e = with_inert_claude(&engine, &e, &root);
+    let project = engine.home.join("old-project");
+    fs::create_dir_all(project.join(".claude")).unwrap();
+    let settings = project.join(".claude/settings.json");
+    fs::write(&settings, r#"{"hooks":{"x":"PRIVATE_HOOK_COMMAND"},"env":{"ANTHROPIC_API_KEY":"PRIVATE_AUTH_VALUE"}}"#).unwrap();
+    let plan = data(
+        &engine,
+        json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
+    );
+    assert_eq!(
+        plan["launch_request"]["startup"]["schema"],
+        "lintel.startup/1"
+    );
+    assert_eq!(
+        plan["launch_request"]["startup"]["actual_loaded"],
+        "unverified"
+    );
+    let public = plan.to_string();
+    for private in [
+        "PRIVATE_HOOK_COMMAND",
+        "PRIVATE_AUTH_VALUE",
+        "content_digest",
+        "startup_binding",
+    ] {
+        assert!(
+            !public.contains(private),
+            "private startup binding leaked: {private}"
+        );
+    }
+    fs::write(project.join(".mcp.json"), "{}").unwrap();
+    let rejected = engine.request(
+        json!({"command":"launch_request","request_id":plan["id"],"approval":plan["hash"]}),
+    );
+    assert_eq!(rejected["error"]["code"], "stale_plan", "{rejected}");
+    let record = engine
+        .state
+        .join("launches")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()));
+    assert!(!record.exists(), "stale source acquired a launch intent");
+
+    let plan = data(
+        &engine,
+        json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
+    );
+    fs::write(project.join("ordinary.txt"), "ordinary work").unwrap();
+    let result = engine.request(
+        json!({"command":"launch_request","request_id":plan["id"],"approval":plan["hash"]}),
+    );
+    // Non-macOS gets the existing no-TTY limitation after durable intent; the
+    // macOS test opener is synthetic and cannot start real Claude.
+    assert!(
+        result["ok"] == true || result["error"]["code"] == "terminal_required",
+        "{result}"
+    );
+    fs::write(&settings, "{}").unwrap();
+    let replay = data(
+        &engine,
+        json!({"command":"launch_request","request_id":plan["id"],"approval":"wrong-original-query-only"}),
+    );
+    assert_eq!(replay["replayed_query"], true);
+}
+
+#[test]
+fn an_unattempted_launch_without_the_new_source_binding_requires_preview() {
+    let (_t, mut engine, e, root) = setup();
+    engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());
+    let e = with_inert_claude(&engine, &e, &root);
+    let project = engine.home.join("project");
+    fs::create_dir(&project).unwrap();
+    let plan = data(
+        &engine,
+        json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
+    );
+    let path = engine.path("plans", plan["id"].as_str().unwrap());
+    let mut legacy = storage::load(&path).unwrap();
+    legacy["extra"]
+        .as_object_mut()
+        .unwrap()
+        .remove("startup_binding");
+    legacy.as_object_mut().unwrap().remove("hash");
+    legacy["hash"] = json!(storage::digest(&serde_json::to_vec(&legacy).unwrap()));
+    storage::save(&path, &legacy).unwrap();
+    let rejected = engine.request(
+        json!({"command":"launch_request","request_id":plan["id"],"approval":legacy["hash"]}),
+    );
+    assert_eq!(rejected["error"]["code"], "stale_plan", "{rejected}");
+    assert!(!engine
+        .state
+        .join("launches")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()))
+        .exists());
+}
+
+#[test]
+fn resume_checks_the_same_startup_sources_before_copy_or_intent() {
+    let (_t, mut engine, e, root) = setup();
+    engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());
+    let e = with_versioned_claude(&engine, &e, &root, "2.1.283");
+    let project = engine.home.join("old-project");
+    fs::create_dir_all(&project).unwrap();
+    fs::create_dir_all(root.join("projects/p")).unwrap();
+    fs::write(root.join("projects/p/session.jsonl"), r#"{"type":"user","sessionId":"synthetic","cwd":"/synthetic-project","message":{"content":"synthetic work"}}"#).unwrap();
+    let archive = data(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["sessions"]}),
+    );
+    let receipt = data(
+        &engine,
+        json!({"command":"execute","plan_id":archive["id"],"approval":archive["hash"],"archive_passphrase":PASS}),
+    );
+    let plan = data(
+        &engine,
+        json!({"command":"plan_resume","environment_id":e["id"],"project_cwd":project,"job_id":receipt["id"],"archive_passphrase":PASS,"path":"projects/p/session.jsonl"}),
+    );
+    assert_eq!(plan["resume"]["supported"], true);
+    assert_eq!(plan["resume"]["startup"]["schema"], "lintel.startup/1");
+    fs::write(
+        project.join(".mcp.json"),
+        r#"{"mcpServers":{"x":{"command":"PRIVATE_MCP_COMMAND"}}}"#,
+    )
+    .unwrap();
+    let rejected = engine.request(json!({"command":"resume_request","request_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}));
+    assert_eq!(rejected["error"]["code"], "stale_plan", "{rejected}");
+    assert!(!std::path::Path::new(plan["resume"]["private_copy_path"].as_str().unwrap()).exists());
+    assert!(!engine
+        .state
+        .join("launches")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()))
+        .exists());
+}
+
 fn setup() -> (TempDir, Engine, Value, std::path::PathBuf) {
     let temp = tempfile::tempdir().unwrap();
     let base = temp.path().canonicalize().unwrap();

@@ -6,7 +6,6 @@ import RequestFailure,{asError} from './RequestFailure';
 
 const categoriesAll=['instructions','memory','sessions'];
 const pageSize=50;
-const fileLimit=8*1024*1024;
 type Group={key:string;label:string;files:WorkFile[]};
 
 // These are path groups, never inferred project cwd or parsed conversation titles.
@@ -40,28 +39,28 @@ function PageControls({page,total,onPage}:{page:number;total:number;onPage:(page
   if(total<=pageSize)return null;
   return <div className="work-list-pages"><button disabled={!page} onClick={()=>onPage(page-1)}>上一页</button><span>{page+1} / {Math.ceil(total/pageSize)}</span><button disabled={(page+1)*pageSize>=total} onClick={()=>onPage(page+1)}>下一页</button></div>;
 }
-function FileFamily({group,selected,disabled,onToggle}:{group:Group;selected:Set<string>;disabled:boolean;onToggle:(files:WorkFile[],checked:boolean)=>void}) {
+function FileFamily({group,selected,disabled,onToggle,fileLimit}:{fileLimit?:number;group:Group;selected:Set<string>;disabled:boolean;onToggle:(files:WorkFile[],checked:boolean)=>void}) {
   const [page,setPage]=useState(0),count=group.files.filter(file=>selected.has(file.path)).length;
   const currentPage=Math.min(page,Math.max(0,Math.ceil(group.files.length/pageSize)-1));
   return <details className="work-file-family" open={group.files.length<=3}>
     <summary><span>{group.label}</span><small>{count} / {group.files.length} 已选</small></summary>
     {group.files.length>1&&<label className="work-group-choice"><SelectionCheck label={`选择${group.label}全部文件`} files={group.files} selected={selected} disabled={disabled} onToggle={onToggle}/><span>选择这一组原件（包括本组子会话文件）</span></label>}
-    <ul className="work-file-list">{group.files.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(file=><li key={file.path}><label><input type="checkbox" aria-label={`保留 ${file.path}`} checked={selected.has(file.path)} disabled={disabled} onChange={e=>onToggle([file],e.target.checked)}/><span><code>{file.path}</code><small>{formatBytes(file.bytes)}{file.bytes>fileLimit&&<em> · 超过单文件 8 MiB 上限</em>}</small></span></label></li>)}</ul>
+    <ul className="work-file-list">{group.files.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(file=><li key={file.path}><label><input type="checkbox" aria-label={`保留 ${file.path}`} checked={selected.has(file.path)} disabled={disabled} onChange={e=>onToggle([file],e.target.checked)}/><span><code>{file.path}</code><small>{formatBytes(file.bytes)}{fileLimit!==undefined&&file.bytes>fileLimit&&<em> · 超过单文件 {formatBytes(fileLimit)} 上限</em>}</small></span></label></li>)}</ul>
     <PageControls page={currentPage} total={group.files.length} onPage={setPage}/>
   </details>;
 }
-function ProjectGroup({group,selected,disabled,onToggle}:{group:Group;selected:Set<string>;disabled:boolean;onToggle:(files:WorkFile[],checked:boolean)=>void}) {
+function ProjectGroup({group,selected,disabled,onToggle,fileLimit}:{fileLimit?:number;group:Group;selected:Set<string>;disabled:boolean;onToggle:(files:WorkFile[],checked:boolean)=>void}) {
   const [page,setPage]=useState(0),families=useMemo(()=>groups(group.files,family),[group.files]);
   const count=group.files.filter(file=>selected.has(file.path)).length,currentPage=Math.min(page,Math.max(0,Math.ceil(families.length/pageSize)-1));
   return <details className="work-project-group" open>
     <summary><span>{group.label}</span><small>{count} / {group.files.length} 已选 · {formatBytes(group.files.reduce((sum,file)=>sum+file.bytes,0))}</small></summary>
     <label className="work-group-choice"><SelectionCheck label={`选择${group.label}全部文件`} files={group.files} selected={selected} disabled={disabled} onToggle={onToggle}/><span>选择本组全部原件</span></label>
-    {families.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(group=><FileFamily key={group.key} group={group} selected={selected} disabled={disabled} onToggle={onToggle}/>)}
+    {families.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(group=><FileFamily fileLimit={fileLimit} key={group.key} group={group} selected={selected} disabled={disabled} onToggle={onToggle}/>)}
     <PageControls page={currentPage} total={families.length} onPage={setPage}/>
   </details>;
 }
 
-export default function WorkFileSelection({send=request,environment,categories,paths,disabled,onChange,onReady}:{send?:typeof request;environment:Environment;categories:string[];paths:string[]|null;disabled:boolean;onChange:(paths:string[]|null)=>void;onReady:(ready:boolean)=>void}) {
+export default function WorkFileSelection({send=request,environment,categories,paths,disabled,onChange,onReady,fileLimit}:{fileLimit?:number;send?:typeof request;environment:Environment;categories:string[];paths:string[]|null;disabled:boolean;onChange:(paths:string[]|null)=>void;onReady:(ready:boolean)=>void}) {
   const [files,setFiles]=useState<WorkFile[]|null>(null),[error,setError]=useState<Error|null>(null),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[query,setQuery]=useState(''),[page,setPage]=useState(0);
   const [incomplete,setIncomplete]=useState<string|null>(null);
   const initialize=useRef(false),pathMode=paths!==null,pathsRef=useRef(paths),categoriesRef=useRef(categories);
@@ -114,11 +113,11 @@ export default function WorkFileSelection({send=request,environment,categories,p
         {incomplete&&<Notice tone="warning">{incomplete}</Notice>}
         {!!missing.length&&<Notice tone="warning">已选原件从清单中消失；请核对后移除失效选择再预览。{missing.map(path=><code className="missing-work-path" key={path}>{path}</code>)}<button disabled={disabled||busy} onClick={()=>onChange((paths??[]).filter(path=>known.has(path)))}>移除失效选择</button></Notice>}
         {files&&!error&&<>
-          <div className="work-selection-tools"><button disabled={disabled||busy||!!incomplete} onClick={()=>toggle(visible,true)}>选择当前类别全部原件</button><button disabled={disabled||busy} onClick={()=>onChange([])}>清空文件选择</button><button disabled={disabled||busy||!visible.some(file=>selected.has(file.path)&&file.bytes>fileLimit)} onClick={()=>toggle(visible.filter(file=>file.bytes>fileLimit),false)}>排除超限文件</button></div>
+          <div className="work-selection-tools"><button disabled={disabled||busy||!!incomplete} onClick={()=>toggle(visible,true)}>选择当前类别全部原件</button><button disabled={disabled||busy} onClick={()=>onChange([])}>清空文件选择</button><button disabled={disabled||busy||fileLimit===undefined||!visible.some(file=>selected.has(file.path)&&file.bytes>fileLimit)} onClick={()=>toggle(visible.filter(file=>fileLimit!==undefined&&file.bytes>fileLimit),false)}>排除超限文件</button></div>
           <label className="field">筛选原件路径<input type="search" value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder="项目、会话或文件路径"/></label>
           {query&&<p className="small-print">筛选只改变显示；下面的分组选框只作用于匹配的原件。</p>}
           {!shown.length&&<p className="muted">{visible.length?'没有匹配路径。':'当前类别没有可列出的原件。'}</p>}
-          {projectGroups.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(group=><ProjectGroup key={group.key+query} group={group} selected={selected} disabled={disabled||busy||!!incomplete} onToggle={toggle}/>)}
+          {projectGroups.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(group=><ProjectGroup fileLimit={fileLimit} key={group.key+query} group={group} selected={selected} disabled={disabled||busy||!!incomplete} onToggle={toggle}/>)}
           <PageControls page={currentPage} total={projectGroups.length} onPage={setPage}/>
         </>}
       </>}

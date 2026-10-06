@@ -18,7 +18,7 @@ for(const [index,alias] of [null,...aliases].entries()){
  await mkdir(root,{recursive:true});await mkdir(path.join(project,'.claude'),{recursive:true});
  await writeFile(path.join(root,'settings.json'),alias===aliases[1]?'malformed':'{"hooks":{"anything":"SYNTHETIC_EXECUTION_SECRET"}}');
  await writeFile(path.join(root,'CLAUDE.md'),'Synthetic instructions');await mkdir(path.join(root,'projects/demo/memory'),{recursive:true});await writeFile(path.join(root,'projects/demo/memory/MEMORY.md'),'Synthetic memory');
- const large=path.join(root,'projects/demo/large-session.jsonl'),file=await open(large,'w');await file.truncate(9*1024*1024);await file.close();
+ const large=path.join(root,'projects/demo/large-session.jsonl'),file=await open(large,'w');await file.truncate(256*1024*1024+1);await file.close();
  await writeFile(path.join(project,'.claude/settings.local.json'),'{"mcpServers":{"private":"SYNTHETIC_MCP_SECRET"}}');
  const executable=path.join(home,'.local/bin/claude');await mkdir(path.dirname(executable),{recursive:true});await writeFile(executable,'#!/bin/sh\nexit 9\n');await chmod(executable,0o700);
  const actor={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:path.join(home,'.local/bin')};

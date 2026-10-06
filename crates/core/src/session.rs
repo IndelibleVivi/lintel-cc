@@ -32,10 +32,7 @@ fn is_opaque_block(block: &Value) -> bool {
 /// into derived text; it is reported as an opaque marker instead.
 fn message_records(record: &Value, index: usize) -> Vec<Value> {
     let kind = classify_record(record);
-    let timestamp = record
-        .get("timestamp")
-        .cloned()
-        .unwrap_or(Value::Null);
+    let timestamp = record.get("timestamp").cloned().unwrap_or(Value::Null);
     // `content` may be a rich array (text/tool blocks), a plain string (common
     // in user transcripts) or a single object. Normalize all three.
     let content = record["message"]
@@ -54,59 +51,84 @@ fn message_records(record: &Value, index: usize) -> Vec<Value> {
         Some(blocks) => {
             for block in blocks {
                 match block.get("type").and_then(Value::as_str) {
-                    Some("text") => push(&mut out, json!({
-                        "index": index,
-                        "kind": kind,
-                        "text": block["text"],
-                    })),
-                    Some("tool_use") => push(&mut out, json!({
-                        "index": index,
-                        "kind": "tool_call",
-                        "name": block["name"],
-                        "tool": block["input"],
-                    })),
-                    Some("tool_result") => push(&mut out, json!({
-                        "index": index,
-                        "kind": "tool_result",
-                        "text": block["content"],
-                    })),
-                    _ if is_opaque_block(block) => push(&mut out, json!({
-                        "index": index,
-                        "kind": kind,
-                        "opaque": true,
-                        "text": Value::Null,
-                    })),
-                    _ => push(&mut out, json!({
-                        "index": index,
-                        "kind": "unknown",
-                        "unknown": true,
-                        "block": block,
-                    })),
+                    Some("text") => push(
+                        &mut out,
+                        json!({
+                            "index": index,
+                            "kind": kind,
+                            "text": block["text"],
+                        }),
+                    ),
+                    Some("tool_use") => push(
+                        &mut out,
+                        json!({
+                            "index": index,
+                            "kind": "tool_call",
+                            "name": block["name"],
+                            "tool": block["input"],
+                        }),
+                    ),
+                    Some("tool_result") => push(
+                        &mut out,
+                        json!({
+                            "index": index,
+                            "kind": "tool_result",
+                            "text": block["content"],
+                        }),
+                    ),
+                    _ if is_opaque_block(block) => push(
+                        &mut out,
+                        json!({
+                            "index": index,
+                            "kind": kind,
+                            "opaque": true,
+                            "text": Value::Null,
+                        }),
+                    ),
+                    _ => push(
+                        &mut out,
+                        json!({
+                            "index": index,
+                            "kind": "unknown",
+                            "unknown": true,
+                            "block": block,
+                        }),
+                    ),
                 }
             }
         }
         None => {
             match content {
-                Some(Value::String(text)) => push(&mut out, json!({
-                    "index": index,
-                    "kind": kind,
-                    "text": text,
-                })),
-                Some(Value::Object(block)) => {
-                    out.extend(message_records(&json!({"type": record["type"], "content": [block]}), index))
-                }
-                Some(other) => push(&mut out, json!({
-                    "index": index,
-                    "kind": kind,
-                    "text": other.to_string(),
-                })),
+                Some(Value::String(text)) => push(
+                    &mut out,
+                    json!({
+                        "index": index,
+                        "kind": kind,
+                        "text": text,
+                    }),
+                ),
+                Some(Value::Object(block)) => out.extend(message_records(
+                    &json!({"type": record["type"], "content": [block]}),
+                    index,
+                )),
+                Some(other) => push(
+                    &mut out,
+                    json!({
+                        "index": index,
+                        "kind": kind,
+                        "text": other.to_string(),
+                    }),
+                ),
                 // No content at all: keep the record visible rather than dropping.
-                None => push(&mut out, json!({
-                    "index": index,
-                    "kind": "unknown",
-                    "unknown": true,
-                    "record": record,
-                })),
+                None => push(
+                    &mut out,
+                    json!({
+                        "index": index,
+                        "kind": "unknown",
+                        "unknown": true,
+                        "record": record,
+                    }),
+                ),
             }
         }
     }
@@ -114,89 +136,100 @@ fn message_records(record: &Value, index: usize) -> Vec<Value> {
 }
 
 impl Engine {
-    /// Resolve a member file out of the frozen archive source, honoring an
-    /// optional caller-supplied `expected_digest` binding. Returns the decoded
-    /// bytes, file digest and resolved archive path.
-    pub(crate) fn session_source(&self, r: &Value) -> Result<(PathBuf, Vec<u8>, String, String)> {
-        let (package, package_digest, path) = self.archive_package(r)?;
+    /// Read a bounded byte window of one archived member file, honoring an
+    /// optional caller-supplied `expected_digest` binding. Only the requested
+    /// window (at most `PAGE_BYTES`) is ever held in memory, so a
+    /// large transcript can be paged without loading the whole file.
+    pub(crate) fn session_source(
+        &self,
+        r: &Value,
+        offset: usize,
+    ) -> Result<(PathBuf, Vec<u8>, u64, String, String)> {
+        let opened = self.open_archive(r)?;
         let name = string(r, "path")?;
-        let entry = package["files"]
-            .as_array()
-            .ok_or_else(|| err("invalid_archive", "归档缺少文件清单"))?
-            .iter()
-            .find(|f| f["path"] == name)
-            .ok_or_else(|| err("archive_file_missing", "归档没有该文件"))?
-            .clone();
-        let digest = string(&entry, "digest")?.to_string();
+        let entry = opened.entry(name)?;
         if let Some(expected) = r.get("expected_digest").and_then(Value::as_str) {
-            if expected != digest {
+            if expected != entry.digest {
                 return Err(err(
                     "stale_archive",
                     "来源文件摘要与选择时不同；旧阅读位置不能映射到改变后的内容",
                 ));
             }
         }
-        // `data` is a JSON byte array (serde serializes `Vec<u8>` that way), so
-        // decoding it back gives the exact archived bytes.
-        let bytes: Vec<u8> = serde_json::from_value(entry["data"].clone())?;
-        Ok((path, bytes, digest, package_digest))
+        let total = entry.bytes;
+        if offset as u64 > total {
+            return Err(err("invalid_offset", "偏移超出文件长度"));
+        }
+        // Read one bounded page directly from the verified staging file.
+        let want = (PAGE_BYTES as u64).min(total.saturating_sub(offset as u64)) as usize;
+        let mut window = vec![0u8; want];
+        read_window(&entry.plain, offset as u64, &mut window)?;
+        Ok((
+            opened.path.clone(),
+            window,
+            total,
+            entry.digest.clone(),
+            opened.cipher_digest.clone(),
+        ))
     }
 
     pub(crate) fn session_read(&self, r: &Value) -> Result<Value> {
-        let (path, bytes, digest, package_digest) = self.session_source(r)?;
         let offset = r.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
-        if offset > bytes.len() {
-            return Err(err("invalid_offset", "偏移超出文件长度"));
-        }
-        let window_end = (offset + PAGE_BYTES).min(bytes.len());
+        let (path, window, total_bytes, digest, package_digest) = self.session_source(r, offset)?;
         let name = string(r, "path")?.to_string();
-        let content_kind = if name.ends_with(".jsonl") { "messages" } else { "text" };
-        // For a JSONL transcript we advance only past complete lines so the tail
-        // of an incomplete record is re-read next page instead of being lost; for
-        // plain text we bound purely by bytes. Both ensure forward progress and a
-        // stable byte position, even for one oversized line or many multibyte
-        // characters, and never loop forever.
-        let (end, complete) = if content_kind == "messages" {
-            match bytes[offset..window_end].iter().rposition(|b| *b == b'\n') {
-                Some(last_newline) => (offset + last_newline + 1, true),
-                None if window_end == bytes.len() => (bytes.len(), true),
+        let content_kind = if name.ends_with(".jsonl") {
+            "messages"
+        } else {
+            "text"
+        };
+        // The window is a bounded slice; the number of bytes we actually keep
+        // is `page_end` within it. For a JSONL transcript we advance only past
+        // complete lines so the tail of an incomplete record is re-read next
+        // page instead of being lost; for plain text we bound purely by bytes.
+        let kept = window.len().min(PAGE_BYTES);
+        let (end_in_window, complete) = if content_kind == "messages" {
+            match window[..kept].iter().rposition(|b| *b == b'\n') {
+                Some(last_newline) => (last_newline + 1, true),
+                None if offset as u64 + kept as u64 >= total_bytes => (kept, true),
                 None => {
-                    // A single logical line longer than a page: bound by bytes so
-                    // the caller can still make progress; the record is only
-                    // parsed when its line is complete.
-                    (window_end, false)
+                    // A single logical line longer than the read window; bound
+                    // by bytes so the caller still makes progress.
+                    if window.len() >= PAGE_BYTES {
+                        (kept, false)
+                    } else {
+                        // Window is short only at EOF; the remainder is complete.
+                        (kept, true)
+                    }
                 }
             }
         } else {
-            (window_end, true)
+            (kept, true)
         };
-        let done = end >= bytes.len();
-        let page = &bytes[offset..end];
+        let end = offset + end_in_window;
+        let done = end as u64 >= total_bytes;
+        let page = &window[..end_in_window];
         let raw_text = String::from_utf8_lossy(page).into_owned();
         let mut records = vec![];
         if content_kind == "messages" && complete {
-            for (i, line) in raw_text.lines().enumerate() {
+            let mut line_offset = offset;
+            for (i, bytes) in page.split_inclusive(|b| *b == b'\n').enumerate() {
+                let current_offset = line_offset;
+                line_offset += bytes.len();
+                let line = String::from_utf8_lossy(bytes);
                 if line.trim().is_empty() {
                     continue;
                 }
-                // Stable record identity: the byte offset where the line begins.
-                let line_offset = offset
-                    + raw_text
-                        .lines()
-                        .take(i)
-                        .map(|previous| previous.len() + 1)
-                        .sum::<usize>();
-                match serde_json::from_str::<Value>(line) {
+                match serde_json::from_str::<Value>(&line) {
                     Ok(record) => {
                         for record in message_records(&record, i) {
                             let mut record = record;
-                            record["offset"] = json!(line_offset);
+                            record["offset"] = json!(current_offset);
                             records.push(record);
                         }
                     }
                     Err(_) => records.push(json!({
                         "index": i,
-                        "offset": line_offset,
+                        "offset": current_offset,
                         "kind": "unknown",
                         "unknown": true,
                         "raw": line,
@@ -210,7 +243,7 @@ impl Engine {
             "offset": offset,
             "next_offset": if done { Value::Null } else { json!(end) },
             "done": done,
-            "total_bytes": bytes.len(),
+            "total_bytes": total_bytes,
             "page_bytes": page.len(),
             "digest": digest,
             "source": {
@@ -225,6 +258,24 @@ impl Engine {
         }
         Ok(data)
     }
+}
+
+/// Read up to `buf.len()` bytes starting at `offset` from a staged plaintext
+/// file, seeking directly so a large file is never fully read.
+fn read_window(path: &std::path::Path, offset: u64, buf: &mut [u8]) -> Result<()> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(path)?;
+    file.seek(SeekFrom::Start(offset))?;
+    let mut filled = 0;
+    while filled < buf.len() {
+        match file.read(&mut buf[filled..]) {
+            Ok(0) => break,
+            Ok(n) => filled += n,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(err("archive_read_failed", "无法读取归档文件")),
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

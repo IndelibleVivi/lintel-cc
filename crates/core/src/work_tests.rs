@@ -641,6 +641,7 @@ fn job_archive_rejects_replacement_but_explicit_path_remains_independent() {
     let bytes: &[u8] = b"synthetic replacement instruction";
     replacement["files"][0]["data"] = json!(bytes);
     replacement["files"][0]["digest"] = json!(digest(bytes));
+    replacement["files"][0]["bytes"] = json!(bytes.len());
     atomic(&out, &archive::seal(&replacement, PASS).unwrap(), 0o600).unwrap();
     let destination = root.parent().unwrap().join("destination");
     fs::create_dir(&destination).unwrap();
@@ -706,6 +707,7 @@ fn cleanup_reopen_rejects_replacement_before_new_root_or_migration() {
     let bytes: &[u8] = b"synthetic replacement instruction";
     replacement["files"][0]["data"] = json!(bytes);
     replacement["files"][0]["digest"] = json!(digest(bytes));
+    replacement["files"][0]["bytes"] = json!(bytes.len());
     atomic(&path, &archive::seal(&replacement, PASS).unwrap(), 0o600).unwrap();
     let failure = engine
         .migrate_to_new_root(&environment, &plan, &request, &mut receipt, &journal)
@@ -940,7 +942,10 @@ fn preflight_reports_metadata_only_selection_totals() {
     seed_work(&root);
     // A preflight never reads contents: a large sparse file must be reported by
     // its metadata length without materializing it.
-    sparse(&root.join("projects/example/memory/BIG.md"), 9 * 1024 * 1024);
+    sparse(
+        &root.join("projects/example/memory/BIG.md"),
+        crate::work::FILE_LIMIT_BYTES + 1,
+    );
     let report = ok(
         &engine,
         json!({"command":"work_preflight","environment_id":e["id"],

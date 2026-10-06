@@ -94,6 +94,11 @@ pub fn atomic_recorded(
 pub fn atomic_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
     write_atomic(path, bytes, mode, false, |_| Ok(()))
 }
+/// Publish an already-complete staged file to `path` without replacing a
+/// concurrently created target. The caller owns `tmp` cleanup on failure.
+pub(crate) fn publish_staged_new(tmp: &Path, path: &Path) -> Result<()> {
+    publish_new(tmp, path)
+}
 fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     return Err(err(
@@ -245,7 +250,7 @@ pub fn parse(bytes: &[u8]) -> Result<Value> {
         .map_err(|_| err("invalid_json", "JSON 文档包含多余内容"))?;
     Ok(value)
 }
-struct Unique(Value);
+pub(crate) struct Unique(pub(crate) Value);
 impl<'de> Deserialize<'de> for Unique {
     fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
         d.deserialize_any(UniqueVisitor)

@@ -1,26 +1,28 @@
-use crate::{err, now, safe_id, storage::*, string, work, Engine, Result};
+use crate::{
+    err,
+    package::{self, Package, Staging},
+    storage::*,
+    string, work, Engine, Result,
+};
 use serde_json::{json, Value};
 use std::{
-    io::{Read, Write},
+    fs,
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
 
+#[cfg(test)]
 pub(crate) const MAX_PLAIN: u64 = 200 * 1024 * 1024;
 
+/// Legacy warm-path seal: encrypt a small in-memory `Value` (used for the
+/// state-backup package and test fixtures, never for large work content).
 pub(crate) fn seal(value: &Value, pass: &str) -> Result<Vec<u8>> {
-    let encryptor =
-        age::Encryptor::with_user_passphrase(age::secrecy::SecretString::from(pass.to_owned()));
-    let mut bytes = vec![];
-    let mut output = encryptor
-        .wrap_output(&mut bytes)
-        .map_err(|_| err("archive_failed", "无法初始化归档加密"))?;
-    output.write_all(&serde_json::to_vec(value)?)?;
-    output
-        .finish()
-        .map_err(|_| err("archive_failed", "归档加密未完整完成"))?;
-    Ok(bytes)
+    package::write_value(value, pass)
 }
 
+/// Legacy warm-path unseal: decrypt a small in-memory `Value`. Bounded by
+/// `MAX_PLAIN`; large work packages must go through [`Engine::open_archive`].
+#[cfg(test)]
 pub(crate) fn unseal(bytes: &[u8], pass: &str) -> Result<Value> {
     let decryptor =
         age::Decryptor::new(bytes).map_err(|_| err("invalid_archive", "不是有效的 age 归档"))?;
@@ -29,6 +31,7 @@ pub(crate) fn unseal(bytes: &[u8], pass: &str) -> Result<Value> {
         .decrypt(std::iter::once(&identity as &dyn age::Identity))
         .map_err(|_| err("archive_locked", "口令不正确，或归档无法解密"))?;
     let mut plain = vec![];
+    use std::io::Read;
     reader
         .take(MAX_PLAIN + 1)
         .read_to_end(&mut plain)
@@ -39,22 +42,32 @@ pub(crate) fn unseal(bytes: &[u8], pass: &str) -> Result<Value> {
     parse(&plain)
 }
 
-fn validated_files(package: &Value) -> Result<Vec<Value>> {
-    work::validate_package_files(package)
+/// A decoded work package plus the private staging that owns its plaintext.
+pub(crate) struct OpenedArchive {
+    pub package: Package,
+    pub cipher_digest: String,
+    pub path: PathBuf,
+    pub _staging: Staging,
+}
+
+impl OpenedArchive {
+    /// Find one entry by its frozen relative path.
+    pub(crate) fn entry(&self, name: &str) -> Result<&package::Entry> {
+        self.package
+            .files
+            .iter()
+            .find(|file| file.path == name)
+            .ok_or_else(|| err("archive_file_missing", "归档没有该文件"))
+    }
 }
 
 impl Engine {
     /// Resolve the frozen archive source for a read/inspect/import request.
     ///
-    /// Accepts exactly one of:
-    ///   - `job_id`: the archive inside this install's own state, matched against
-    ///     the original receipt's frozen `archive_path`;
-    ///   - `archive_path`: an explicit absolute path, so a package can be carried
-    ///     to a different Lintel install that has no access to the original
-    ///     job/state.
-    /// The package is self-describing; read/inspect/import never consult the
-    /// original inventory. A job-scoped archive additionally verifies the job
-    /// path is the recorded one.
+    /// Accepts exactly one of a `job_id` (this install's recorded archive) or an
+    /// explicit absolute `archive_path` (a package carried to an independent
+    /// install). The package is self-describing; readers never consult the
+    /// original inventory.
     fn archive_source(&self, r: &Value) -> Result<PathBuf> {
         let job = r.get("job_id").and_then(Value::as_str).is_some();
         let path = r.get("archive_path").and_then(Value::as_str).is_some();
@@ -65,7 +78,7 @@ impl Engine {
             ));
         }
         if job {
-            let jid = safe_id(r, "job_id")?;
+            let jid = crate::safe_id(r, "job_id")?;
             let record = load(&self.path("jobs", &jid))?;
             let path = record["archive_path"]
                 .as_str()
@@ -83,74 +96,106 @@ impl Engine {
         }
     }
 
-    /// Read a package, resolving either a job_id or an explicit absolute path.
-    /// Job-scoped reads also confirm the recorded path matches the frozen one.
-    pub(crate) fn archive_package(&self, r: &Value) -> Result<(Value, String, PathBuf)> {
-        let path = self.archive_source(r)?;
-        let recorded_digest = if let Some(jid) = r.get("job_id").and_then(Value::as_str) {
-            let record = load(&self.path("jobs", jid))?;
-            if record["archive_path"].as_str() != path.to_str() {
-                return Err(err("archive_missing", "此任务的归档来源已经变化"));
+    /// The recorded ciphertext digest for a job-scoped read, when the original
+    /// receipt froze one. A job-scoped read also confirms the recorded path.
+    fn recorded_digest(&self, r: &Value, path: &Path) -> Result<Option<String>> {
+        match r.get("job_id").and_then(Value::as_str) {
+            None => Ok(None),
+            Some(jid) => {
+                let record = load(&self.path("jobs", jid))?;
+                if record["archive_path"].as_str() != path.to_str() {
+                    return Err(err("archive_missing", "此任务的归档来源已经变化"));
+                }
+                Ok(record["archive_digest"]
+                    .as_str()
+                    .or_else(|| record["archive_intent_digest"].as_str())
+                    .map(str::to_owned))
             }
-            record["archive_digest"]
-                .as_str()
-                .or_else(|| record["archive_intent_digest"].as_str())
-                .map(str::to_owned)
-        } else {
-            None
-        };
+        }
+    }
+
+    /// Stream-decode a work package into metadata plus a private staging
+    /// directory of per-file plaintext. Validates paths, categories,
+    /// duplicates, per-file digests and the full ciphertext digest.
+    pub(crate) fn open_archive(&self, r: &Value) -> Result<OpenedArchive> {
+        let path = self.archive_source(r)?;
+        let recorded = self.recorded_digest(r, &path)?;
         let pass = work::check_passphrase(r)?;
-        let (package, archive_digest) = work::read_package(&path, pass)?;
-        validated_files(&package)?;
-        if recorded_digest.is_some_and(|expected| expected != archive_digest) {
+        // Staging lives in Lintel's own private state so a carried package does
+        // not scatter decoded plaintext next to the archive.
+        let staging = Staging::new(&self.state)?;
+        let (package, cipher_digest) =
+            package::read_to_temp(&path, pass, &staging, work::limits())?;
+        // Path/category/duplicate validation runs on the decoded package first,
+        // so a hostile external package is reported by its own defect; the
+        // recorded-digest binding then refuses any replaced job archive.
+        work::validate_package(&package)?;
+        if recorded.is_some_and(|expected| expected != cipher_digest) {
             return Err(err(
                 "stale_archive",
                 "归档字节与原任务记录不一致；请核对原任务和归档来源",
             ));
         }
-        Ok((package, archive_digest, path))
+        Ok(OpenedArchive {
+            package,
+            cipher_digest,
+            path,
+            _staging: staging,
+        })
     }
 
     pub(crate) fn archive_inspect(&self, r: &Value) -> Result<Value> {
-        let (package, _, path) = self.archive_package(r)?;
-        let files: Vec<Value> = validated_files(&package)?.iter().map(|f| json!({"path":f["path"],"category":f["category"],"bytes":f["data"].as_array().map_or(0,Vec::len),"digest":f["digest"]})).collect();
+        let opened = self.open_archive(r)?;
+        let files: Vec<Value> = opened
+            .package
+            .files
+            .iter()
+            .map(|file| {
+                json!({"path":file.path,"category":file.category,"bytes":file.bytes,"digest":file.digest})
+            })
+            .collect();
         Ok(
-            json!({"job_id":r["job_id"],"archive_path":path,"created_at":package["created_at"],"generator":package["generator"].as_str(),"schema":package["schema"],"categories":category_summary(&files),"files":files,"notes":"指令可迁入原位置；会话与记忆保留在 lintel-imports，不自动激活 hooks/MCP，也不保证原会话可以续聊。generator 是包内自声明元数据，缺失时为 null，不是来源认证。此清单只描述包本身，不代表来源安装或来源 job 仍存在。"}),
+            json!({"job_id":r["job_id"],"archive_path":opened.path,"created_at":opened.package.created_at,"generator":opened.package.generator.as_str(),"schema":opened.package.schema,"categories":category_summary(&files),"files":files,"notes":"指令可迁入原位置；会话与记忆保留在 lintel-imports，不自动激活 hooks/MCP，也不保证原会话可以续聊。generator 是包内自声明元数据，缺失时为 null，不是来源认证。此清单只描述包本身，不代表来源安装或来源 job 仍存在。"}),
         )
     }
 
     pub(crate) fn archive_read(&self, r: &Value) -> Result<Value> {
-        let (package, _, _) = self.archive_package(r)?;
+        let opened = self.open_archive(r)?;
         let name = string(r, "path")?;
-        let f = package["files"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|f| f["path"] == name)
-            .ok_or_else(|| err("archive_file_missing", "归档没有该文件"))?;
-        let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
-        let end = bytes.len().min(1024 * 1024);
-        Ok(
-            json!({"path":name,"text":String::from_utf8_lossy(&bytes[..end]),"bytes":bytes.len(),"truncated":end<bytes.len()}),
-        )
+        let entry = opened.entry(name)?;
+        let file = std::fs::File::open(&entry.plain)?;
+        // Only the first bounded window is read for the preview.
+        let mut window = vec![0u8; entry.bytes.min(1024 * 1024) as usize];
+        read_exact_window(file, &mut window)?;
+        Ok(json!({
+            "path": name,
+            "text": String::from_utf8_lossy(&window),
+            "bytes": entry.bytes,
+            "truncated": entry.bytes > window.len() as u64,
+        }))
     }
 
     pub(crate) fn plan_import(&self, r: &Value) -> Result<Value> {
         let e = self.env(r)?;
-        let (package, archive_digest, path) = self.archive_package(r)?;
+        let opened = self.open_archive(r)?;
         let cats = work::categories(r)?;
         let root = Path::new(string(&e, "root")?);
-        let mut files = vec![];
-        let selected: Vec<_> = validated_files(&package)?
-            .into_iter()
-            .filter(|file| cats.iter().any(|category| file["category"] == *category))
+        let selected: Vec<&package::Entry> = opened
+            .package
+            .files
+            .iter()
+            .filter(|file| cats.iter().any(|category| *category == file.category))
             .collect();
+        if selected.is_empty() {
+            return Err(err("empty_import", "归档中没有选中类别的文件"));
+        }
         let activation = work::activation(r, &cats);
         let instructions_active = activation["instructions"] == true;
-        for (f, relative) in selected
-            .iter()
-            .zip(work::migration_paths(&selected, instructions_active)?)
-        {
+        let selection_paths: Vec<String> =
+            selected.iter().map(|entry| entry.path.clone()).collect();
+        let targets = work::migration_paths_for(&selection_paths, instructions_active)?;
+        let mut files = vec![];
+        for (entry, relative) in selected.iter().zip(&targets) {
             let p = root.join(relative);
             work::preflight_import_parent(root, &p)?;
             if p.exists() {
@@ -159,13 +204,30 @@ impl Engine {
                     "目标已有同名内容；请选择新的环境，已有文件未覆盖",
                 ));
             }
-            files.push(json!({"path":f["path"],"category":f["category"],"digest":f["digest"],"destination":p,"bytes":f["data"].as_array().unwrap().len()}));
-        }
-        if files.is_empty() {
-            return Err(err("empty_import", "归档中没有选中类别的文件"));
+            files.push(json!({"path":entry.path,"category":entry.category,"digest":entry.digest,"destination":p,"bytes":entry.bytes}));
         }
         let frozen_target = work::freeze_existing_target(root, &files, instructions_active)?;
-        self.plan(&e,"import","迁入选定工作内容",json!([]),vec!["目标环境现有文件","登录、hooks、MCP 与插件配置"],json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),json!({"original_job":r.get("job_id").cloned().unwrap_or(Value::Null),"archive_path":path,"archive_digest":archive_digest,"package_format":package["schema"],"package_generator":package["generator"].as_str(),"manifest":files,"categories":cats,"archive_passphrase_required":true,"frozen_target":frozen_target,"work_purpose":work::purposes(&cats),"activate":activation}))
+        self.plan(
+            &e,
+            "import",
+            "迁入选定工作内容",
+            json!([]),
+            vec!["目标环境现有文件", "登录、hooks、MCP 与插件配置"],
+            json!([{"id":"import","label":"解密并迁入所选类别，逐文件读回","reversible":false}]),
+            json!({
+                "original_job": r.get("job_id").cloned().unwrap_or(Value::Null),
+                "archive_path": opened.path,
+                "archive_digest": opened.cipher_digest,
+                "package_format": opened.package.schema,
+                "package_generator": opened.package.generator.as_str(),
+                "manifest": files,
+                "categories": cats,
+                "archive_passphrase_required": true,
+                "frozen_target": frozen_target,
+                "work_purpose": work::purposes(&cats),
+                "activate": activation,
+            }),
+        )
     }
 
     pub(crate) fn import_work(
@@ -176,22 +238,16 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
-        // The plan froze the exact archive source (job_id or explicit path) and
-        // the encrypted digest. Re-read it at execution and re-verify.
         let source = if p["extra"]["original_job"].is_string() {
             json!({"job_id":p["extra"]["original_job"],"archive_passphrase":r["archive_passphrase"]})
         } else {
             json!({"archive_path":p["extra"]["archive_path"],"archive_passphrase":r["archive_passphrase"]})
         };
-        let (package, archive_digest, _) = self.archive_package(&source)?;
-        if archive_digest != p["extra"]["archive_digest"] {
+        let opened = self.open_archive(&source)?;
+        if opened.cipher_digest != p["extra"]["archive_digest"] {
             return Err(err("stale_archive", "预览后归档发生变化"));
         }
-        let files = validated_files(&package)?;
         let root = Path::new(string(e, "root")?);
-        // Recheck the frozen existing-target identity: the config root must be
-        // the same object approved at preview (plan_import uses an existing,
-        // registered root and does not require it to be absent).
         let frozen = &p["extra"]["frozen_target"];
         if frozen["plan_revision"] == "lintel.plan/2" {
             let metadata = std::fs::metadata(root)?;
@@ -206,21 +262,26 @@ impl Engine {
         let planned = p["extra"]["manifest"]
             .as_array()
             .ok_or_else(|| err("invalid_plan", "缺少迁入清单"))?;
-        let selected: Vec<Value> = planned
+        let selected: Vec<&package::Entry> = planned
             .iter()
             .map(|entry| {
-                files
+                let path = entry["path"].as_str().unwrap_or_default();
+                let digest = entry["digest"].as_str().unwrap_or_default();
+                opened
+                    .package
+                    .files
                     .iter()
-                    .find(|file| file["path"] == entry["path"] && file["digest"] == entry["digest"])
-                    .cloned()
+                    .find(|file| file.path == path && file.digest == digest)
                     .ok_or_else(|| err("stale_archive", "归档与计划不匹配"))
             })
             .collect::<Result<_>>()?;
         let instructions_active = p["extra"]["activate"]["instructions"]
             .as_bool()
             .unwrap_or(true);
-        let targets: Vec<_> = work::migration_paths(&selected, instructions_active)?
-            .into_iter()
+        let selected_paths: Vec<String> = selected.iter().map(|e| e.path.clone()).collect();
+        let relative_targets = work::migration_paths_for(&selected_paths, instructions_active)?;
+        let targets: Vec<PathBuf> = relative_targets
+            .iter()
             .map(|relative| root.join(relative))
             .collect();
         let total: u64 = planned
@@ -239,38 +300,142 @@ impl Engine {
                 return Err(err("import_conflict", "预览后出现同名内容；没有覆盖"));
             }
         }
-        work::preflight_migration_paths(
-            root,
-            &work::migration_paths(&selected, instructions_active)?,
-            j,
-            journal,
-        )?;
-        for ((entry, f), pth) in planned.iter().zip(&selected).zip(&targets) {
-            work::migration_parent(pth.parent().unwrap())?;
-            let bytes: Vec<u8> = serde_json::from_value(f["data"].clone())?;
+        work::preflight_migration_paths(root, &relative_targets, j, journal)?;
+        for ((entry, source), target) in planned.iter().zip(&selected).zip(&targets) {
+            work::migration_parent(target.parent().unwrap())?;
             j["steps"].as_array_mut().unwrap().push(json!({"id":entry["path"],"label":entry["path"],"status":"executing","message":"正在发布并核验迁入文件；不替换已有内容。"}));
             save(journal, j)?;
-            atomic_new(&pth, &bytes, 0o600).map_err(|error| {
-                if error.code == "target_exists" {
-                    err("import_conflict", "目标文件已出现；已有内容保持不变")
-                } else {
-                    error
-                }
-            })?;
-            if digest(&read(&pth, 8 * 1024 * 1024)?) != f["digest"] {
-                return Err(err("readback_failed", "迁入后读回不匹配"));
-            }
+            // Stream-copy the staged plaintext into the target and read it back,
+            // hashing both, so a large file never lands fully in memory.
+            copy_staged_verified(&source.plain, target, source.digest.as_str())?;
             *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":entry["path"],"label":entry["path"],"status":"completed","message":"文件已迁入并校验；可执行配置未激活。"});
             save(journal, j)?;
         }
         j["status"] = json!("completed");
-        j["completed_at"] = json!(now());
+        j["completed_at"] = json!(crate::now());
         Ok(())
     }
 }
 
-/// Per-category file count and byte total for an archive manifest. Derived only
-/// from the package contents, so an external package reports its own coverage.
+/// Read up to `buf.len()` bytes from the front of `file` (fewer only at EOF).
+fn read_exact_window(mut file: std::fs::File, buf: &mut Vec<u8>) -> Result<()> {
+    use std::io::Read;
+    let capacity = buf.len();
+    let mut filled = 0;
+    while filled < capacity {
+        match file.read(&mut buf[filled..]) {
+            Ok(0) => break,
+            Ok(n) => filled += n,
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(err("archive_read_failed", "无法读取归档文件")),
+        }
+    }
+    buf.truncate(filled);
+    Ok(())
+}
+
+/// Publish `source` at `target` with `atomic_new` semantics and verify the
+/// readback digest matches `expected`. Streams in bounded chunks.
+pub(crate) fn copy_staged_verified(source: &Path, target: &Path, expected: &str) -> Result<()> {
+    atomic_new_from_file(target, source, expected)?;
+    let digest = digest_file(target)?;
+    if digest != expected {
+        return Err(err("readback_failed", "迁入后读回不匹配"));
+    }
+    Ok(())
+}
+
+/// Copy `source` into a brand-new file at `target` without replacement,
+/// streaming in bounded chunks. Refuses a concurrent target.
+fn atomic_new_from_file(target: &Path, source: &Path, expected: &str) -> Result<()> {
+    use sha2::Digest as _;
+    use std::io::{Read, Write};
+    guard(target)?;
+    guard(source)?;
+    let mut input = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(source)?;
+    if !input.metadata()?.is_file() || input.metadata()?.len() > work::FILE_LIMIT_BYTES {
+        return Err(err("archive_limit", "暂存来源不是有限普通文件"));
+    }
+    let parent = target
+        .parent()
+        .ok_or_else(|| err("invalid_path", "迁入目标缺少父目录"))?;
+    let tmp = parent.join(format!(".lintel-import-{}.tmp", uuid::Uuid::new_v4()));
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&tmp)?;
+    let result = (|| -> Result<()> {
+        let mut hash = sha2::Sha256::new();
+        let mut count = 0u64;
+        let mut buf = [0u8; 64 * 1024];
+        loop {
+            let n = match input.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => return Err(err("io_error", "读取来源失败")),
+            };
+            count += n as u64;
+            if count > work::FILE_LIMIT_BYTES {
+                return Err(err("archive_limit", "暂存来源在读取期间超过容量上限"));
+            }
+            output.write_all(&buf[..n])?;
+            hash.update(&buf[..n]);
+        }
+        if format!("{:x}", hash.finalize()) != expected {
+            return Err(err(
+                "readback_failed",
+                "暂存来源与冻结摘要不一致；未发布迁入文件",
+            ));
+        }
+        output.sync_all()?;
+        // Publish the completed file with the same no-replace primitive as all
+        // other new-file mutations. An interrupted copy leaves no partial file
+        // at its approved final name.
+        publish_staged_new(&tmp, target)
+    })();
+    drop(output);
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result
+}
+
+/// Streaming SHA-256 of a file.
+pub(crate) fn digest_file(path: &Path) -> Result<String> {
+    use sha2::Digest as _;
+    use std::io::Read;
+    guard(path)?;
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(err("readback_failed", "读回目标不是普通文件"));
+    }
+    let mut count = 0u64;
+    let mut hasher = sha2::Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        count += n as u64;
+        if count > work::FILE_LIMIT_BYTES {
+            return Err(err("archive_limit", "读回目标超过容量上限"));
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Per-category file count and byte total for an archive manifest.
 fn category_summary(files: &[Value]) -> Value {
     let mut out: std::collections::BTreeMap<&str, (u64, u64)> = Default::default();
     for f in files {
@@ -287,4 +452,40 @@ fn category_summary(files: &[Value]) -> Value {
             json!({"category": c, "count": count, "bytes": bytes})
         })
         .collect::<Vec<_>>())
+}
+
+#[cfg(test)]
+mod streaming_publication_tests {
+    use super::*;
+    #[test]
+    fn verified_copy_publishes_complete_bytes_and_preserves_concurrent_targets() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path().canonicalize().unwrap();
+        let source = base.join("source.bin");
+        let target = base.join("target.bin");
+        fs::write(&source, b"synthetic exact original").unwrap();
+        let expected = digest(b"synthetic exact original");
+        assert_eq!(
+            copy_staged_verified(&source, &target, &digest(b"wrong"))
+                .unwrap_err()
+                .code,
+            "readback_failed"
+        );
+        assert!(!target.exists());
+        assert_eq!(
+            fs::read_dir(&base).unwrap().count(),
+            1,
+            "failed copy left a plaintext temp file"
+        );
+        fs::write(&target, b"neighbor owns this name").unwrap();
+        assert!(copy_staged_verified(&source, &target, &expected).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"neighbor owns this name");
+        assert_eq!(fs::read_dir(&base).unwrap().count(), 2);
+        let fresh = base.join("fresh.bin");
+        copy_staged_verified(&source, &fresh, &expected).unwrap();
+        assert_eq!(fs::read(&fresh).unwrap(), b"synthetic exact original");
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(fs::metadata(&fresh).unwrap().nlink(), 1);
+        assert_eq!(fs::metadata(&fresh).unwrap().mode() & 0o777, 0o600);
+    }
 }
