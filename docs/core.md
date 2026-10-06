@@ -85,6 +85,14 @@
 
 工作包与状态备份仅在归档完成后才创建新根。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
+## 有限关联组件与容量预检
+
+`inspect_components` 由 `components.rs` 投影 `lintel.components/1`：准确 environment/root、可选 target-host project cwd、观察时间、有限来源／范围／下一入口、原任务记录。CLI 只读取现有静态安装元数据；配置来源只返回路径、存在情况及 hooks/MCP 声明布尔值，不返回命令、参数、env 任意字段或正文。只检查已选择 cwd 的有限文件及 core 已认识的 managed 文件位置；父级、其他组织下发、实际加载与 OS 强约束仍未覆盖。认证只检查已知文件／共享 profile 的元数据，不读取 credentials，也不执行 auth probe。
+
+原记录扫描最多读取 10,000 个目录项，不调用 `job` 的 reconciliation；仅投影同一 environment、文件名与合法原 ID 一致的记录，最多 50 份，读取不完整与展示截断分开。最多刷新 8 个原记录所指的确切 systemd unit，当前 probe 失败标未知并保留原 ID。原 task_result.coverage 是历史证据。Browser、IDE／Desktop 与未支持 supervisor 保持各自范围，不以 root 已处理推断都已处理。
+
+`work_preflight` 与工作统计共用 metadata scanner，选择类别、单文件／合计／文件数、目录预算与 symlink 规则沿用实际归档范围；阻塞对象最多列 200 项，截断不改变拒绝结论；扫描预算保持 50,000 目录项／30 秒，首个未覆盖来源保留相对路径。它没有摘要、冻结计划或副作用批准；内容准入仍由 manifest 和执行复查拥有。既有包格式与 8 MiB／32 MiB／10,000 文件 limits 未改变。
+
 ## 有限清理与认证
 
 `cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；只新增 `identity_observed` 布尔值，不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。

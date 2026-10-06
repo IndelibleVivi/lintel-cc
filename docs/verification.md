@@ -46,6 +46,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
+| `journey-components` | journey | named CLI finite metadata/config sources, original-ID scope, no auth/body disclosure or journal reconciliation |
+| `journey-work-capacity` | journey | metadata-only byte/file bounds, incomplete scans, strict schema and unchanged full archive admission |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
 | `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY launch plus custom policy approval and restoration, synthetic roots) |
 | `journey-policy` | journey | `python3 tests/policy_journey.py` (versioned policy, custom keep/disable/remove, no-op, restoration and external edits) |
@@ -148,6 +150,7 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, local→A/B→A full receipt routing through refresh, Agent packet/query command and startup preview, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
 | `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, clipboard failure, original request recovery and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
 | `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, wrong password, task help, keyboard and Day/Night; synthetic invoke, not native WebKit. |
+| `components-ui` | Built frontend, runner and Playwright Chromium; real synthetic cores, component/cwd facts, malformed settings, exact original alias/ID, late-response isolation and capacity correction. Invoke/SSH are modeled; not native WebKit or production. Set `LINTEL_COMPONENTS_UI_REPORT` for external evidence. |
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `site-ui` | Static website, Playwright Chromium and an ephemeral loopback server; no native/core transport or external requests. |
 | `clawd-app-ui` | Built desktop frontend and Playwright Chromium; shared game lifecycle through the App with an empty synthetic inventory. |
@@ -467,6 +470,6 @@ App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
 The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
-The default group includes 20 checks; the CI independent browser/UI group includes
-browser-smoke, browser-pairing-ui, service-ui, work-ui, baseline-ui, remote-task-ui, site-ui and
+The default group includes 22 checks; the CI independent browser/UI group includes
+browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, remote-task-ui, site-ui and
 clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.

@@ -571,6 +571,309 @@ fn record_migration_probe(root: &Path, j: &mut Value, journal: &Path) -> Result<
     Ok(scratch)
 }
 
+const SCAN_ENTRIES: usize = 50000;
+const SCAN_TIME: Duration = Duration::from_secs(30);
+const FILE_LIMIT_BYTES: u64 = 8 * 1024 * 1024;
+const BLOCKER_LIMIT: usize = 200;
+
+/// One metadata-only walk of the selected work scope. It shares the exact
+/// traversal scope, entry/time budget, non-regular-file refusal and symlink
+/// boundary that `manifest` (content admission) and `summaries` (inspector
+/// overview) already use, so the three follow the same rules about which files
+/// are content and which directory is walked:
+///   * only descendants of `projects` and `lintel-imports` are descended into,
+///   * a non-regular entry is never opened or admitted as content,
+///   * a symlink anywhere in the selected scope is never followed,
+///   * the entry/time budget bounds every walk.
+///
+/// The three are still independent snapshots: each is taken at its own time, so
+/// they can observe a different set of files if content changes in between. A
+/// preflight result is provisional metadata admission, never a substitute for
+/// the full `manifest` content + digest check that a real plan runs.
+///
+/// The walker never reads file contents, hashes, credentials or invokes Claude;
+/// it records only per-file metadata for paths `classify` accepts. It never
+/// opens an entry, so a FIFO/socket/device is observed by metadata only and is
+/// recorded as non-regular rather than counted, admitted or read.
+struct Scan {
+    /// Regular files whose relative path `classify` accepts: (category, rel, len).
+    files: Vec<(&'static str, PathBuf, u64)>,
+    /// `classify`-accepted entries that are not regular files (FIFO, socket,
+    /// device, ...). The real `manifest` refuses these through `read()`, so a
+    /// preflight must never admit them as countable content. Never opened.
+    nonregular: Vec<(&'static str, PathBuf)>,
+    complete: bool,
+    reason: Option<&'static str>,
+    /// Bounded relative path of the first entry/directory the walk could not
+    /// observe (unreadable dir/entry/metadata, budget cut, symlink in scope).
+    /// Root-level failures use `.`. Bounded by the walk's own path depth.
+    unobserved: Option<PathBuf>,
+}
+
+fn scan(root: &Path) -> Result<Scan> {
+    guard(root)?;
+    let start = Instant::now();
+    let mut stack = vec![root.to_path_buf()];
+    let mut files = vec![];
+    let mut nonregular = vec![];
+    let mut complete = true;
+    let mut reason: Option<&'static str> = None;
+    let mut unobserved: Option<PathBuf> = None;
+    let mut entries = 0usize;
+    // Record the first unobserved source once; later ones keep the first reason.
+    let note = |reason_code: &'static str,
+                path: Option<PathBuf>,
+                reason: &mut Option<&'static str>,
+                unobserved: &mut Option<PathBuf>| {
+        if reason.is_none() {
+            *reason = Some(reason_code);
+        }
+        if unobserved.is_none() {
+            *unobserved = Some(
+                path.filter(|p| !p.as_os_str().is_empty())
+                    .unwrap_or_else(|| PathBuf::from(".")),
+            );
+        }
+    };
+    'walk: while let Some(dir) = stack.pop() {
+        let items = match fs::read_dir(&dir) {
+            Ok(items) => items,
+            Err(_) => {
+                complete = false;
+                let rel = dir.strip_prefix(root).unwrap_or(Path::new(""));
+                let rel = if rel.as_os_str().is_empty() {
+                    PathBuf::from(".")
+                } else {
+                    rel.to_path_buf()
+                };
+                note(
+                    "unreadable_directory",
+                    Some(rel),
+                    &mut reason,
+                    &mut unobserved,
+                );
+                continue;
+            }
+        };
+        for item in items {
+            entries += 1;
+            if entries > SCAN_ENTRIES || start.elapsed() > SCAN_TIME {
+                complete = false;
+                note(
+                    "scan_budget_exceeded",
+                    dir.strip_prefix(root).ok().map(Path::to_path_buf),
+                    &mut reason,
+                    &mut unobserved,
+                );
+                break 'walk;
+            }
+            let item = match item {
+                Ok(item) => item,
+                Err(_) => {
+                    complete = false;
+                    note(
+                        "unreadable_entry",
+                        dir.strip_prefix(root).ok().map(Path::to_path_buf),
+                        &mut reason,
+                        &mut unobserved,
+                    );
+                    continue;
+                }
+            };
+            let p = item.path();
+            let rel = match p.strip_prefix(root) {
+                Ok(rel) => rel,
+                Err(_) => {
+                    complete = false;
+                    note("path_escape", None, &mut reason, &mut unobserved);
+                    continue;
+                }
+            };
+            let m = match fs::symlink_metadata(&p) {
+                Ok(m) => m,
+                Err(_) => {
+                    complete = false;
+                    note(
+                        "unreadable_metadata",
+                        Some(rel.to_path_buf()),
+                        &mut reason,
+                        &mut unobserved,
+                    );
+                    continue;
+                }
+            };
+            if m.file_type().is_symlink() {
+                // Never followed. A symlink inside the selected scope is
+                // explicitly uncovered, not silently skipped as empty.
+                if rel.starts_with("projects")
+                    || rel.starts_with("lintel-imports")
+                    || rel == Path::new("CLAUDE.md")
+                {
+                    complete = false;
+                    note(
+                        "symlink_in_scope",
+                        Some(rel.to_path_buf()),
+                        &mut reason,
+                        &mut unobserved,
+                    );
+                }
+                continue;
+            }
+            if m.is_dir() {
+                if rel.starts_with("projects") || rel.starts_with("lintel-imports") {
+                    stack.push(p)
+                }
+                continue;
+            }
+            if let Some(category) = classify(rel) {
+                if m.is_file() {
+                    files.push((category, rel.to_path_buf(), m.len()));
+                } else {
+                    // A FIFO/socket/device/etc.: never opened, never counted.
+                    // `manifest` refuses it, so preflight must not admit it.
+                    nonregular.push((category, rel.to_path_buf()));
+                    complete = false;
+                    note(
+                        "nonregular_entry",
+                        Some(rel.to_path_buf()),
+                        &mut reason,
+                        &mut unobserved,
+                    );
+                }
+            }
+        }
+    }
+    Ok(Scan {
+        files,
+        nonregular,
+        complete,
+        reason,
+        unobserved,
+    })
+}
+
+/// Read-only capacity preflight for one explicit selection. Metadata only: it
+/// reads no file contents, computes no digests, invokes no Claude and touches no
+/// credential. It never fails on an incomplete scan; instead it reports the
+/// first uncovered source and sets `complete:false` so a truncated result can never be
+/// read as an admitted one. A scan that cannot complete is *not* an empty
+/// directory: unreadable/over-budget coverage remains explicit.
+///
+/// `eligible` is a *provisional metadata-level* admission signal only. The scan
+/// and the real `manifest` are separate snapshots taken at different times, so
+/// this report cannot guarantee the archive will agree: a file can grow, appear
+/// or vanish in between. A real archive/preserve plan still runs the full
+/// `manifest` content + digest check before approval, and only that check
+/// admits or refuses the selection.
+pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Result<Value> {
+    let scan = scan(root)?;
+    let selected = |category: &str| categories.iter().any(|c| c == category);
+    let roots = ["instructions", "memory", "sessions"];
+    let mut per: std::collections::BTreeMap<&'static str, (u64, u64)> = Default::default();
+    let mut totals = (0u64, 0u64);
+    let mut blockers: Vec<Value> = vec![];
+    let mut blocker_count = 0usize;
+    let mut push_blocker = |code: &str, path: Option<&Path>, message: String| {
+        blocker_count += 1;
+        if blockers.len() < BLOCKER_LIMIT {
+            blockers.push(json!({
+                "code": code,
+                "path": path.map(|p| p.to_string_lossy().into_owned()),
+                "message": message,
+            }));
+        }
+    };
+    // Per-category counts are always reported for every category (selected or
+    // not) so callers can see the full picture; the running total is only the
+    // selected subset.
+    for entry in &scan.files {
+        let stat = per.entry(entry.0).or_default();
+        stat.0 += 1;
+        stat.1 += entry.2;
+        if selected(entry.0) {
+            totals.0 += 1;
+            totals.1 += entry.2;
+            if entry.2 > FILE_LIMIT_BYTES {
+                push_blocker(
+                    "file_too_large",
+                    Some(&entry.1),
+                    format!(
+                        "单个文件 {} 字节，超过 {} 字节上限。可取消整个类别后重新检查；按文件选择和大文件保全暂不支持。原件不受影响。",
+                        entry.2, FILE_LIMIT_BYTES
+                    ),
+                );
+            }
+        }
+    }
+    // A non-regular selected entry (FIFO/socket/device) can never be read as
+    // content: `manifest` refuses it. Never opened here either.
+    for (category, path) in &scan.nonregular {
+        if selected(category) {
+            push_blocker(
+                "nonregular_entry",
+                Some(path),
+                "所选范围包含非普通文件（如 FIFO、socket 或设备）；归档会拒绝读取它，预检没有打开或计入。请核对该入口后重新检查。".to_string(),
+            );
+        }
+    }
+    // Aggregate limits are only meaningful when the scan actually finished; an
+    // incomplete scan cannot prove the selection fits.
+    if scan.complete {
+        if totals.1 > MAX_BYTES {
+            push_blocker(
+                "total_bytes_exceeded",
+                None,
+                format!(
+                    "所选合计 {} 字节，超过 {} 字节上限；未截断，可取消整个类别后重新检查；按文件选择暂不支持",
+                    totals.1, MAX_BYTES
+                ),
+            );
+        }
+        if totals.0 > MAX_FILES as u64 {
+            push_blocker(
+                "file_count_exceeded",
+                None,
+                format!(
+                    "所选合计 {} 个文件，超过 {} 个上限；未截断，可取消整个类别后重新检查",
+                    totals.0, MAX_FILES
+                ),
+            );
+        }
+    } else {
+        push_blocker(
+            "scan_incomplete",
+            scan.unobserved.as_deref(),
+            format!(
+                "扫描未完成（{}）；已统计部分不代表完整目录，未覆盖范围必须重新检查后才能作为容量结论",
+                scan.reason.unwrap_or("unknown")
+            ),
+        );
+    }
+    // `entries` budget is shared across the whole scan; expose the same bound
+    // the walker enforces so callers can explain an incomplete result.
+    let eligible = scan.complete && blocker_count == 0;
+    Ok(json!({
+        "environment_id": environment_id,
+        "root": root.to_string_lossy(),
+        "checked_at": now(),
+        "complete": scan.complete,
+        "eligible": eligible,
+        "totals": {"files": totals.0, "bytes": totals.1},
+        "limits": {
+            "file_bytes": FILE_LIMIT_BYTES,
+            "total_bytes": MAX_BYTES,
+            "files": MAX_FILES,
+            "entries": SCAN_ENTRIES,
+        },
+        "categories": roots.iter().map(|c| {
+            let (count, bytes) = per.get(c).copied().unwrap_or((0, 0));
+            json!({"category": c, "count": count, "bytes": bytes})
+        }).collect::<Vec<_>>(),
+        "blockers": blockers,
+        "blockers_truncated": blocker_count > BLOCKER_LIMIT,
+    }))
+}
+
 pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
     guard(root)?;
     let start = Instant::now();
@@ -635,75 +938,18 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
 /// the scan budget runs out or entries cannot be read, the result is marked
 /// `complete: false` instead of failing the unrelated settings inspection.
 pub fn summaries(root: &Path) -> Result<Vec<Value>> {
-    guard(root)?;
-    let start = Instant::now();
-    let mut stack = vec![root.to_path_buf()];
+    let scan = scan(root)?;
     let mut stats: std::collections::BTreeMap<&'static str, (u64, u64)> = Default::default();
-    let mut complete = true;
-    let mut entries = 0;
-    'walk: while let Some(dir) = stack.pop() {
-        let items = match fs::read_dir(&dir) {
-            Ok(items) => items,
-            Err(_) => {
-                complete = false;
-                continue;
-            }
-        };
-        for item in items {
-            entries += 1;
-            if entries > 50000 || start.elapsed() > Duration::from_secs(30) {
-                complete = false;
-                break 'walk;
-            }
-            let item = match item {
-                Ok(item) => item,
-                Err(_) => {
-                    complete = false;
-                    continue;
-                }
-            };
-            let p = item.path();
-            let rel = match p.strip_prefix(root) {
-                Ok(rel) => rel,
-                Err(_) => {
-                    complete = false;
-                    continue;
-                }
-            };
-            let m = match fs::symlink_metadata(&p) {
-                Ok(m) => m,
-                Err(_) => {
-                    complete = false;
-                    continue;
-                }
-            };
-            if m.file_type().is_symlink() {
-                if rel.starts_with("projects")
-                    || rel.starts_with("lintel-imports")
-                    || rel == Path::new("CLAUDE.md")
-                {
-                    complete = false;
-                }
-                continue;
-            }
-            if m.is_dir() {
-                if rel.starts_with("projects") || rel.starts_with("lintel-imports") {
-                    stack.push(p)
-                }
-                continue;
-            }
-            if let Some(category) = classify(rel) {
-                let stat = stats.entry(category).or_default();
-                stat.0 += 1;
-                stat.1 += m.len();
-            }
-        }
+    for (category, _, bytes) in &scan.files {
+        let stat = stats.entry(category).or_default();
+        stat.0 += 1;
+        stat.1 += bytes;
     }
     Ok(["instructions", "memory", "sessions"]
         .iter()
         .map(|c| {
             let (count, bytes) = stats.get(c).copied().unwrap_or((0, 0));
-            json!({"category":c,"count":count,"bytes":bytes,"complete":complete})
+            json!({"category":c,"count":count,"bytes":bytes,"complete":scan.complete})
         })
         .collect())
 }

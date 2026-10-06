@@ -19,7 +19,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'work_preflight', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {

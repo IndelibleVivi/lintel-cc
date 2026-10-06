@@ -3,6 +3,7 @@ mod archive;
 #[cfg(test)]
 mod baseline_tests;
 mod cleanup;
+mod components;
 mod context;
 mod launch;
 #[cfg(test)]
@@ -454,6 +455,7 @@ impl Engine {
             }
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
             "create_environment" => self.create(string(r, "name")?, None),
+            "inspect_components" => self.inspect_components(r),
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
@@ -462,6 +464,22 @@ impl Engine {
                 Ok(
                     json!({"environment":e,"settings":settings,"assets":assets,"policy":policy::assessment(&doc,&e["product_evidence"],policy::trusted_devices(r)?),"warnings":self.warnings(&e)}),
                 )
+            }
+            // Read-only capacity preflight: metadata only, no content read, no
+            // digest, no Claude, no credential. It does not mutate the
+            // environment, its work, or Lintel state beyond the operation lock.
+            "work_preflight" => {
+                let e = self.env(r)?;
+                let categories = work::categories(r)?;
+                if categories.is_empty() {
+                    return Err(err(
+                        "invalid_categories",
+                        "容量预检需要至少选择一种工作类别；空选择不会被当作通过",
+                    ));
+                }
+                let root = PathBuf::from(string(&e, "root")?);
+                let report = work::preflight(string(&e, "id")?, &root, &categories)?;
+                Ok(report)
             }
             "plan_policy" => {
                 let e = policy::environment(self.env(r)?, self.executable());

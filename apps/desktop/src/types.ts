@@ -18,6 +18,24 @@ export interface PolicyAssessment {
 export interface Capability { name: string; status: string; reason: string }
 export interface Setting { key: string; label: string; value: string | null; source: string; effect_timing: string; status: string }
 export interface Inspection { environment: Environment; settings: Setting[]; assets: { category: string; count: number; bytes: number; complete?: boolean }[]; warnings: string[]; policy?: PolicyAssessment }
+export interface ComponentInspection {
+  environment_id:string;root:string;project_cwd:string|null;checked_at:string;note:string;
+  items:{id:string;title:string;state:string;source:string;scope:string;detail:string;facts:{
+    selected_executable?:string|null;
+    sources?:{scope:string;path:string;state:string;content_state?:string;hooks_declared?:boolean;mcp_declared?:boolean}[];
+    credential_file?:{state:string};shared_profile?:{state:string};
+    services?:{manager:string;unit:string;original_job_id:string;recorded_status:string;state:string;current?:{active_state:string;quiesced:boolean}}[];
+    services_truncated?:boolean;
+  };next_action:string}[];
+  records:{id:string;title:string;status:string;created_at:string;coverage?:{scope:string;state:string;detail:string}[]|null}[];
+  records_complete:boolean;records_truncated:boolean;
+}
+export interface WorkPreflight {
+  environment_id:string;root:string;checked_at:string;complete:boolean;eligible:boolean;
+  totals:{files:number;bytes:number};limits:{file_bytes:number;total_bytes:number;files:number;entries:number};
+  categories:{category:string;count:number;bytes:number}[];
+  blockers:{code:string;path?:string|null;message:string}[];blockers_truncated:boolean;
+}
 export interface Plan {
   id: string; hash: string; environment_id: string; title: string;
   changes: { key: string; label: string; before: string | null; after: string | null; path: string }[];
@@ -85,6 +103,8 @@ export interface Api {
   register: { request: { name: string; root: string }; response: Environment };
   create_environment: { request: { name: string }; response: Environment };
   inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
+  inspect_components:{request:{environment_id:string;project_cwd?:string};response:ComponentInspection};
+  work_preflight:{request:{environment_id:string;categories:string[]};response:WorkPreflight};
   plan_policy: { request: { environment_id: string; preset: PolicyPreset; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[]; custom_settings?: CustomSettings }; response: Plan };
   plan_archive: { request: { environment_id: string; categories: string[]; output_path?: string }; response: Plan };
   plan_preserve: { request: { environment_id: string; categories: string[]; activate?:{instructions:boolean}; name?: string }; response: Plan };

@@ -14,7 +14,7 @@ pub const HELP: &str = concat!(
   "  lintel context [--json]                      Readonly state/user/executable facts; no state made\n",
   "  lintel tasks [--json]                        The one finite six-task map; no state made\n",
   "  lintel help [GROUP]                         Static help; GROUP ∈ env/policy/work/job/restore/remote/launch/session\n",
-  "  lintel env list | inspect ID | create --name NAME | register --name NAME --root PATH\n",
+  "  lintel env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n",
   "  lintel policy plan --environment ID --preset reduce --keep-remote-control\n",
   "  lintel plan show ID                         Read original frozen plan\n",
   "  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n",
@@ -22,6 +22,7 @@ pub const HELP: &str = concat!(
   "  lintel restore plan --job ID                Prepare an independent restoration\n",
   "  lintel work archive plan --environment ID --categories instructions,memory,sessions\n",
   "  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n",
+  "  lintel work preflight --environment ID --categories instructions,memory,sessions\n",
   "  lintel work session read                    Bounded paged read; passphrase via JSON stdin\n",
   "  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n",
   "  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n",
@@ -305,9 +306,9 @@ const GROUP_HELP: &[(&str, &str)] = &[
     ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
     ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
     ("network", "network serve --config PATH\n  明确前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
-    ("env", "env list | inspect ID | create --name NAME | register --name NAME --root PATH\n  list/inspect 只读；create/register 只建立或登记明确的配置目标。"),
+    ("env", "env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n  list/inspect/components 只读；components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
-    ("work", "work archive plan|list|inspect|read | preserve plan | import plan | session read\n  session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}；不修改原件。"),
+    ("work", "work preflight --environment ID --categories instructions,memory,sessions\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  preflight 只读元数据容量预检，不读正文、不计算摘要、不修改原件；session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
     ("job", "job show ID | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
     ("restore", "restore plan --job ID\n  为仍属于本工具的字段准备独立恢复预览。"),
     ("remote", "remote hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID | control\n  remote launch request|resume ALIAS REQUEST_ID APPROVAL；remote launch query ALIAS REQUEST_ID | remote launch list ALIAS。有限 OpenSSH controller；execute 只走 submit，恢复只查询原任务。"),
@@ -443,11 +444,17 @@ pub fn run(args: &[String]) -> Value {
                 json!({"environment_id":word(2)}),
                 false,
             ),
+            "components" if !word(2).is_empty() => named(
+                "inspect_components",
+                &args[3..],
+                json!({"environment_id":word(2)}),
+                false,
+            ),
             "register" => named("register", &args[2..], json!({}), false),
             "create" => named("create_environment", &args[2..], json!({}), false),
             _ => error(
                 "invalid_argument",
-                "env list | inspect ID | register | create",
+                "env list | inspect ID | components ID [--project-cwd PATH] | register | create",
             ),
         },
         "policy" if word(1) == "plan" => named("plan_policy", &args[2..], json!({}), false),
@@ -479,13 +486,14 @@ pub fn run(args: &[String]) -> Value {
                 ("archive", "list", _) => ("jobs", 3, false),
                 ("archive", "inspect", _) => ("archive_inspect", 3, true),
                 ("archive", "read", _) => ("archive_read", 3, true),
+                ("preflight", _, _) => ("work_preflight", 2, false),
                 ("session", "read", _) => ("session_read", 3, true),
                 ("preserve", "plan", _) => ("plan_preserve", 3, false),
                 ("import", "plan", _) => ("plan_import", 3, true),
                 _ => {
                     return error(
                         "invalid_argument",
-                        "work archive plan/list/inspect/read | session read | preserve plan | import plan",
+                        "work preflight --environment ID --categories ... | archive plan/list/inspect/read | session read | preserve plan | import plan",
                     )
                 }
             };

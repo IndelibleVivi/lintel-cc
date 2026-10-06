@@ -793,3 +793,23 @@ button:disabled{opacity:.6}
 
 /* Routed headings receive focus for announcement, without a control ring. */
 h1[tabindex="-1"]:focus{outline:none}
+
+/* Finite component coverage and capacity facts stay in their working surfaces. */
+.component-inspection { display: grid; gap: 18px; min-width: 0; }
+.component-inspection .surface-heading { padding: 0; }
+.component-inspection p { margin: 8px 0; }
+.component-list { display: grid; }
+.component-row { min-width: 0; padding: 20px 0; border-top: 1px solid var(--line); }
+.component-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.component-heading h3 { margin: 0; }
+.component-state { flex-shrink: 0; font-size: 11px; color: var(--muted); }
+.component-row code, .component-records code, .component-inspection .small-print code { overflow-wrap: anywhere; }
+.component-sources { padding-left: 18px; font-size: 12px; }
+.component-sources li { margin: 12px 0; }
+.component-sources code, .component-sources li > span { display: block; margin-top: 4px; }
+.component-service, .component-records > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.component-records button { max-width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.capacity-blockers { max-height: 300px; overflow: auto; padding-left: 18px; }
+.capacity-blockers li { margin: 12px 0; }
+.capacity-blockers code, .capacity-blockers span, .capacity-blockers small { display: block; overflow-wrap: anywhere; }
+.capacity-blockers small { color: var(--muted); font-size: 10px; }

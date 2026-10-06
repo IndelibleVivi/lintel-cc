@@ -2,6 +2,7 @@
 //! semantics. Synthetic temporary roots only; no real Claude, account or
 //! operator path is ever touched.
 use super::*;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 const PASS: &str = "synthetic work-preservation passphrase";
@@ -924,4 +925,163 @@ fn portable_import_preserves_existing_directory_modes_and_creates_private_parent
             0o600
         );
     }
+}
+
+// --- capacity preflight (work_preflight) -------------------------------------
+
+fn sparse(path: &Path, bytes: u64) {
+    let file = fs::File::create(path).unwrap();
+    file.set_len(bytes).unwrap();
+}
+
+#[test]
+fn preflight_reports_metadata_only_selection_totals() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    // A preflight never reads contents: a large sparse file must be reported by
+    // its metadata length without materializing it.
+    sparse(&root.join("projects/example/memory/BIG.md"), 9 * 1024 * 1024);
+    let report = ok(
+        &engine,
+        json!({"command":"work_preflight","environment_id":e["id"],
+               "categories":["instructions","memory","sessions"]}),
+    );
+    assert_eq!(report["complete"], true);
+    // The oversized single file blocks *eligibility* but not scan completeness;
+    // the walk itself never fails on size.
+    assert_eq!(report["eligible"], false);
+    let sessions = report["categories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["category"] == "sessions")
+        .unwrap()
+        .clone();
+    // Totals cover the selected subset; per-category counts cover the whole scan.
+    assert_eq!(report["totals"]["files"], 4);
+    assert_eq!(sessions["count"], 1);
+    let memory = report["categories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["category"] == "memory")
+        .unwrap()
+        .clone();
+    // The per-category view covers the whole scan (MEMORY.md + BIG.md).
+    assert_eq!(memory["count"], 2);
+    let blockers = report["blockers"].as_array().unwrap();
+    assert!(
+        blockers
+            .iter()
+            .any(|b| b["code"] == "file_too_large"
+                && b["path"] == "projects/example/memory/BIG.md"),
+        "{blockers:?}"
+    );
+}
+
+#[test]
+fn preflight_symbolic_link_is_not_followed_and_marks_scan_incomplete() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    std::os::unix::fs::symlink("/etc/hosts", root.join("projects/example/link.jsonl")).unwrap();
+    let report = ok(
+        &engine,
+        json!({"command":"work_preflight","environment_id":e["id"],
+               "categories":["sessions"]}),
+    );
+    assert_eq!(report["complete"], false);
+    assert_eq!(report["eligible"], false);
+    let blockers = report["blockers"].as_array().unwrap();
+    let incomplete = blockers
+        .iter()
+        .find(|b| b["code"] == "scan_incomplete")
+        .unwrap_or_else(|| panic!("{blockers:?}"));
+    // The blocker retains a bounded meaningful relative path for the first
+    // unobserved entry, not just a reason.
+    assert_eq!(incomplete["path"], "projects/example/link.jsonl");
+    // The symlink must not be inventoried as a session file.
+    assert_eq!(report["totals"]["files"], 1);
+}
+
+/// A FIFO placed where a session file is expected must never be opened or
+/// admitted: metadata says it is not a regular file, so the preflight marks the
+/// scan incomplete and reports a specific blocker without blocking on a read.
+#[test]
+fn preflight_refuses_nonregular_entries_without_opening_them() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let fifo = root.join("projects/example/fifo.jsonl");
+    let c_path = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+    assert_eq!(rc, 0, "mkfifo failed: {}", std::io::Error::last_os_error());
+    let report = ok(
+        &engine,
+        json!({"command":"work_preflight","environment_id":e["id"],
+               "categories":["sessions"]}),
+    );
+    assert_eq!(report["complete"], false);
+    assert_eq!(report["eligible"], false);
+    let blockers = report["blockers"].as_array().unwrap();
+    assert!(
+        blockers
+            .iter()
+            .any(|b| b["code"] == "nonregular_entry" && b["path"] == "projects/example/fifo.jsonl"),
+        "{blockers:?}"
+    );
+    // The FIFO is not a countable file: only the regular session.jsonl remains.
+    assert_eq!(report["totals"]["files"], 1);
+    // The selected total counts only the regular session file's 19 bytes.
+    assert_eq!(report["totals"]["bytes"], 19);
+}
+
+#[test]
+fn preflight_missing_root_is_specific_error_not_empty_scan() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    fs::remove_dir_all(&root).unwrap();
+    // A root that vanished must not read as an empty directory: the scan is
+    // explicitly incomplete and the selection is not eligible.
+    let report = ok(
+        &engine,
+        json!({"command":"work_preflight","environment_id":e["id"],
+               "categories":["instructions","memory","sessions"]}),
+    );
+    assert_eq!(report["complete"], false);
+    assert_eq!(report["eligible"], false);
+    assert_eq!(report["totals"]["files"], 0);
+    let blockers = report["blockers"].as_array().unwrap();
+    let incomplete = blockers
+        .iter()
+        .find(|b| b["code"] == "scan_incomplete")
+        .unwrap_or_else(|| panic!("{blockers:?}"));
+    // Root-level failure uses `.` as the bounded relative path.
+    assert_eq!(incomplete["path"], ".");
+}
+
+#[test]
+fn preflight_does_not_change_original_bytes_or_create_state() {
+    let (_t, engine, e, root) = fixture();
+    seed_work(&root);
+    let before: Vec<_> = ["CLAUDE.md", "projects/example/session.jsonl"]
+        .iter()
+        .map(|rel| fs::read(root.join(rel)).unwrap())
+        .collect();
+    let plan_dir = engine.state.join("plans");
+    let plans_before = fs::read_dir(&plan_dir).map(|d| d.count()).unwrap_or(0);
+    ok(
+        &engine,
+        json!({"command":"work_preflight","environment_id":e["id"],
+               "categories":["instructions","memory","sessions"]}),
+    );
+    for (rel, bytes) in ["CLAUDE.md", "projects/example/session.jsonl"]
+        .iter()
+        .zip(before)
+    {
+        assert_eq!(fs::read(root.join(rel)).unwrap(), bytes);
+    }
+    assert_eq!(
+        fs::read_dir(&plan_dir).map(|d| d.count()).unwrap_or(0),
+        plans_before,
+        "preflight never persists a plan or receipt"
+    );
 }

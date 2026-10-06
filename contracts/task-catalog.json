@@ -38,6 +38,7 @@
       "route": "#/work",
       "help_anchor": "work",
       "operations": [
+        "work_preflight",
         "plan_archive",
         "plan_preserve",
         "plan_import",
@@ -46,6 +47,7 @@
         "job"
       ],
       "cli_examples": [
+        "lintel work preflight --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
         "lintel work archive plan --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
         "lintel work preserve plan --environment <ENVIRONMENT_ID> --categories instructions,memory",
         "lintel work session read --job <JOB_ID> --path CLAUDE.md"

@@ -112,6 +112,8 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
         "register" => (&["name", "root"], &[]),
         "create_environment" => (&["name"], &[]),
         "inspect" => (&["environment_id"], &["trusted_devices"]),
+        "inspect_components" => (&["environment_id"], &["project_cwd"]),
+        "work_preflight" => (&["environment_id", "categories"], &[]),
         "drift"
         | "accept_drift"
         | "cleanup_inspect"
@@ -168,6 +170,8 @@ pub const COMMANDS: &[&str] = &[
     "register",
     "create_environment",
     "inspect",
+    "inspect_components",
+    "work_preflight",
     "plan_policy",
     "plan_reset",
     "plan_archive",
@@ -399,6 +403,8 @@ pub fn describe(command: &str) -> Option<Value> {
         "execute" => "frozen_plan_scope",
         "launch_request" => "start_target_process",
         "launch_query" | "launches" => "readonly_launch_records",
+        "inspect_components" => "read_finite_component_sources_and_original_records",
+        "work_preflight" => "read_selected_work_metadata_only",
         "plan_archive" | "plan_preserve" | "plan_reset" | "plan_cleanup" => {
             "read_selected_work_for_frozen_plan"
         }
@@ -416,6 +422,8 @@ pub fn describe(command: &str) -> Option<Value> {
         }
         "job" | "jobs" => "read_journal_may_reconcile_interrupted_job",
         "launch_query" | "launches" => "read_launch_records_only",
+        "inspect_components" => "read_original_records_without_reconciliation",
+        "work_preflight" => "readonly_metadata_scan_no_state_written",
         "accept_drift" => "write_baseline",
         "execute" => "persist_receipt_and_recovery",
         _ if planning => "persist_frozen_plan",
@@ -553,6 +561,38 @@ mod tests {
             assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"]})).is_ok());
         }
         assert!(validate(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
+    }
+    #[test]
+    fn work_preflight_is_a_strict_readonly_operation() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        assert!(COMMANDS.contains(&"work_preflight"));
+        // Required fields: environment_id and a non-empty finite category set.
+        assert!(validate(
+            &json!({"command":"work_preflight","environment_id":id,"categories":["memory"]})
+        )
+        .is_ok());
+        for invalid in [
+            json!({"command":"work_preflight","categories":["memory"]}),
+            json!({"command":"work_preflight","environment_id":id}),
+            json!({"command":"work_preflight","environment_id":id,"categories":[]}),
+            json!({"command":"work_preflight","environment_id":id,"categories":["bogus"]}),
+            json!({"command":"work_preflight","environment_id":"synthetic","categories":["memory"]}),
+            json!({"command":"work_preflight","environment_id":id,"categories":["memory"],"extra":true}),
+            json!({"command":"work_preflight","environment_id":id,"categories":["memory"],"approval":"x"}),
+        ] {
+            assert!(validate(&invalid).is_err(), "{invalid}");
+        }
+        let describe = describe("work_preflight").unwrap();
+        assert_eq!(describe["requires_plan"], false);
+        assert_eq!(
+            describe["effects"]["target"],
+            "read_selected_work_metadata_only"
+        );
+        assert_eq!(
+            describe["effects"]["lintel_state"],
+            "readonly_metadata_scan_no_state_written"
+        );
+        assert!(describe["secret_fields"].as_array().unwrap().is_empty());
     }
     #[test]
     fn execute_approval_schema_matches_plan_hash_shape() {

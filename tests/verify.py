@@ -160,6 +160,7 @@ CHECKS: List[Check] = [
                ROOT / "apps/desktop/dist/index.html"), loopback=True,
            independent=True, reason="headless Chromium UI evidence; service manager and invoke are synthetic"),
     _check("work-ui", "built App task help, independent archive/preserve and portable import (real synthetic core)", "independent", *(NODE or "node", "tests/work_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="isolated headless Chromium and invoke fixture; not native WebKit"),
+    _check("components-ui", "built component/original task/metadata capacity journey (real synthetic core)", "independent", *(NODE or "node", "tests/components_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic cores; finite SSH/invoke modeled; not native WebKit/production"),
     _check("baseline-ui", "built product-baseline task/session/Agent/approval journey (real synthetic core)", "independent", *(NODE or "node", "tests/baseline_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic core; static CLI/clipboard/launch-error boundary modeled; not native WebKit/Claude"),
     _check("remote-task-ui", "built App original SSH task/reopen/conflict/separate restore (synthetic transport)",
            "independent", *(NODE or "node", "tests/remote_task_ui_journey.mjs"),
@@ -195,6 +196,9 @@ for _id, _desc, _file in (
      "submission_journey.py"),
     ("journey-work-preservation", "work-preservation journey (large session, A->B->C, damaged settings)",
      "work_preservation_journey.py"),
+    ("journey-components", "finite readonly component sources, original records and strict CLI scope", "components_journey.py"),
+    ("journey-work-capacity", "read-only work-capacity preflight (metadata-only admission, blockers, strict schema)",
+     "work_capacity_journey.py"),
     ("journey-launch", "interactive CLI/TUI launch and custom policy (real PTY, synthetic roots)", "launch_journey.py"),
     ("journey-policy", "versioned policy journey (version/value/ownership compatibility)", "policy_journey.py"),
 ):

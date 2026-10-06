@@ -66,12 +66,18 @@ lintel describe plan_policy --json
 lintel schema plan_policy
 lintel env list --json
 lintel env inspect <environment-id> --json
+lintel env components <environment-id> --project-cwd /synthetic/project --json
+lintel work preflight --environment <environment-id> --categories instructions,memory,sessions --json
 lintel capabilities --environment <environment-id>
 ```
 
 静态 help/version/capabilities/describe/schema/tasks/context 不运行 Claude、不发现个人目录、不初始化 state。`describe` 返回稳定 operation ID、有限 transports、JSON Schema、平台/目标条件、目标与 Lintel state 副作用、批准方式、秘密字段、结果和恢复语义。显式目标 capabilities 附带该环境的真实 inspection；service 的准确 unit/manager 继续用 `service_inspect`，browser 继续用 profile inspection。
 
 Service unit 只接受准确 `.service` 名称，例如 `claude.service` 或 `claude@synthetic.service`；模板 `claude@.service`、路径、glob 与命令不受支持。schema 与 named CLI/core 共用的名称规则保持一致；named 输入在初始化目标 state 前检查，实际 unit 身份、绑定与 manager 状态仍由 core 核对。
+
+`inspect_components` 对准确 environment 返回有限静态来源与原任务投影，`project_cwd` 可选且属于目标主机。它不调用 Claude、不读取凭据正文、不查询并改写 job；服务仅核对最多 8 个已有记录中的明确 unit，不能代替全局 supervisor 发现。`records` 最多 50 份，扫描／展示缺口分别标记；原任务的历史 coverage 不等于当前运行状态。浏览器 profile 属于独立本机模块，不由 root 推断归属。
+
+`work_preflight` 只读取元数据，返回所选类别数量／字节、限额、阻塞相对路径及扫描完整性；`eligible` 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 `plan_archive`／`plan_preserve` 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。暂未交付按文件排除或单个大 session 的完整归档路线。
 
 Named CLI 与有限 SSH 的 `environment_id`、`plan_id`、`job_id` 按 schema 的 UUID 格式检查，接受大小写十六进制的 `8-4-4-4-12` 连字符形式。错误格式返回 `invalid_request`，在本机 state 初始化或 SSH 调用前拒绝；始终使用执行器返回的原 ID。旧 raw protocol-1 仍由 core 按既有 ID 规则处理。
 
