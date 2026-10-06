@@ -42,7 +42,13 @@ try{
   return core(args.payload);
  });
  await page.addInitScript(()=>{if(!localStorage.getItem('lintel.selected'))localStorage.setItem('lintel.selected','stale-removed-environment');window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:text=>window.syntheticClipboard(text)}})});
+ await page.clock.setFixedTime(new Date(2026,9,13,9,0));
  await page.goto(url);await page.locator('.home-title').waitFor();
+ assert.equal(await page.locator('.home-title').innerText(),'一周年。门还开着。','StrictMode must not consume the opening date greeting');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('lintel.greeting.special-date')),'2026-10-13');
+ await page.reload();await page.locator('.home-title').waitFor();
+ const visitGreeting=await page.locator('.home-title').innerText();
+ assert.notEqual(visitGreeting,'一周年。门还开着。','next opening on the same date returns to ordinary greetings');
  assert.equal(await page.getByRole('alert').count(),0);assert.equal(calls.some(c=>c.command==='inspect'&&c.environment_id==='stale-removed-environment'),false);assert.equal(await page.locator('.task-home [data-task-id]').count(),0);assert.equal(await page.getByLabel('当前环境').inputValue(),'');
  assert.equal(await page.getByRole('button',{name:'本机',exact:true}).isEnabled(),true);
  await page.screenshot({path:path.join(fixture,'home-empty-day.png')});
@@ -70,6 +76,7 @@ try{
  }
  await page.getByRole('button',{name:'开始一项任务',exact:true}).click();assert.equal(await page.locator('.task-home [data-task-id]').count(),6);
  await page.keyboard.press('Escape');await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor({state:'visible'});
+ assert.equal(await page.locator('.home-title').innerText(),visitGreeting,'navigation keeps this visit greeting stable');
  assert.equal(await page.getByRole('button',{name:'开始一项任务',exact:true}).evaluate(el=>el===document.activeElement),true);
  await page.getByRole('button',{name:'开始一项任务',exact:true}).click();
  await page.locator('.task-home [data-task-id=browser_profile] button').click();const dialog=page.getByRole('dialog');
@@ -78,7 +85,7 @@ try{
  assert.equal(await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).isDisabled(),true);
  await page.getByLabel('Lintel CLI 完整路径').fill('relative');await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();await page.getByRole('alert').getByText(/cli_absolute_path_required/).waitFor();
  const beforeContext=await processCall(['context','--json']);assert.equal(beforeContext.data.state.exists,true); // App discovery created its own journal; static query itself is independently tested by CLI/Rust.
- report.checks.push('A01/A03: quiet greeting home, six actionable task choices, host selector, local browser scope and CLI entry/error');
+ report.checks.push('A01/A03: quiet greeting home with StrictMode-safe once-per-date egg and visit stability, six actionable task choices, host selector, local browser scope and CLI entry/error');
  await mkdir(path.join(root,'projects/synthetic/memory'),{recursive:true});
  const transcript=[
   {type:'user',timestamp:'2026-10-05T00:00:00Z',message:{role:'user',content:'继续实现上下文 · '+secret}},

@@ -113,6 +113,8 @@ CHECKS: List[Check] = [
            *(NODE or "node", "--test", "extensions/browser/tests/engine.test.mjs"), tools=("node",)),
     _check("site-game-test", "shared Clawd gait, jump, stars, collision and pause physics (node:test, no deps)", "js",
            *(NODE or "node", "--test", "tests/site_game.test.mjs"), tools=("node",)),
+    _check("home-greetings-test", "Clawd greeting pools, local date dedup and egg priorities", "js",
+           *(NODE or "node", "--experimental-strip-types", "--test", "tests/home_greetings.test.mjs"), tools=("node",)),
     _check("site-ui", "static website responsive, theme, demo and Clawd journey", "independent",
            *(NODE or "node", "tests/site_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),

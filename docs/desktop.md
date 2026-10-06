@@ -129,6 +129,6 @@ npm run desktop:build
 
 ## 本轮页面与组件索引
 
-六任务的用户名称、说明、操作与帮助锚点由 `contracts/task-catalog.json` 维护；App 首页／帮助与 CLI 直接消费。`ArchivePanel.tsx` 是唯一资料阅读器，索引、阅读和交接稿按窗口排列；`LaunchPanel.tsx` 承担独立 cwd、审阅快照、复制和启动结果；`AgentPanel.tsx` 只投影有限操作元数据；`PlanReview.tsx` 展示冻结落点；`TaskOutcome.tsx` 分开所选结果与覆盖，兼容原始回执。`taskDrafts.ts` 保存按主机／环境隔离的非秘密草案。`homeGreetings.ts` 维护 32 句原创时段问候。`ui.tsx` 的 `WorkspaceActions` 将保护、保全和清理操作挂载到正文之外的唯一底栏，随内容滚动位置不变；侧栏帮助和设置不参与环境列表滚动。
+六任务的用户名称、说明、操作与帮助锚点由 `contracts/task-catalog.json` 维护；App 首页／帮助与 CLI 直接消费。`ArchivePanel.tsx` 是唯一资料阅读器，索引、阅读和交接稿按窗口排列；`LaunchPanel.tsx` 承担独立 cwd、审阅快照、复制和启动结果；`AgentPanel.tsx` 只投影有限操作元数据；`PlanReview.tsx` 展示冻结落点；`TaskOutcome.tsx` 分开所选结果与覆盖，兼容原始回执。`taskDrafts.ts` 保存按主机／环境隔离的非秘密草案。`homeGreetings.ts` 维护 56 句原创时段问候和日期／整分钟／稀有彩蛋；`main.tsx` 在 React mount 前选择本次问候，特殊日期只在当天首次打开出现，localStorage 仅记最后显示的特殊日期。`ui.tsx` 的 `WorkspaceActions` 将保护、保全和清理操作挂载到正文之外的唯一底栏，随内容滚动位置不变；侧栏帮助和设置不参与环境列表滚动。
 
 图形／颜色／字型身份继续由[视觉语言](visual-language.md)管理。Selen 可继续精修光学间距、字型、细线、阴影与动效；按钮接线、完整状态、窗口适配和键盘语义是已经接入的产品合同，不能退回示意页。实际 Chromium、native WebKit、Terminal 与真实客户端各层证据见[本轮 18 项验收](specs/product-baseline-status.md)。

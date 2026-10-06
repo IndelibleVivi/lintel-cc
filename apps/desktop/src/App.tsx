@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { requester, RequestError, transport } from './api';
 import BrowserPanel from './BrowserPanel';
 import Clawd from './Clawd';
-import { homeGreeting } from './homeGreetings';
 import type { ClawdDestination } from './ClawdFlightMenu';
 import ClawdPlayroom from './ClawdPlayroom';
 import ArchivePanel from './ArchivePanel';
@@ -34,13 +33,12 @@ const defaultDraft: Draft = { preset: 'reduce', keepRemoteControl: false };
 function loadDrafts(): Record<string, Draft> { try { return JSON.parse(localStorage.getItem('lintel.drafts') ?? '{}'); } catch { return {}; } }
 function errorText(error: unknown) { return error instanceof RequestError ? `${error.message}（${error.code}）` : error instanceof Error ? error.message : '操作未完成，请重新检查本地执行器。'; }
 
-export default function App() {
+export default function App({ greeting }: { greeting: string }) {
   const [hostAlias, setHostAlias] = useState<string | null>(null);
   const request = useMemo(() => requester(hostAlias), [hostAlias]);
   const activeHost = useRef(hostAlias); activeHost.current = hostAlias;
   const mainRef = useRef<HTMLElement>(null);
   const [actionsMount, setActionsMount] = useState<HTMLElement | null>(null);
-  const [greeting] = useState(() => homeGreeting(new Date()));
   const [playroom, setPlayroom] = useState<'landscapes' | 'runner' | null>(null);
   const [page, setPage] = useState<Page>('environments');
   const [activeTask,setActiveTask]=useState<string|null>(()=>{const saved=localStorage.getItem('lintel.goal');return productTasks.some(t=>t.id===saved)?saved:null});
