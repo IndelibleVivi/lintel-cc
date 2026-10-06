@@ -11,12 +11,12 @@
 | A03 | B 本机浏览器范围 | UI／浏览器通过 | 本机 scope 明示；`browser-pairing-ui` 使用真实 core／host 与一次性 Chromium profile。Tauri invoke／clipboard 是合成 transport |
 | A04 | A/C cwd 与有限启动 | core／PTY 通过 | `journey-product-baseline`：inert Claude 读回独立 cwd 与配置 root，无 prompt；非 TTY JSON 请求不能打开客户端。2026-10-07 新增有限 startup source／私有变化复查，原记录只查询；built App 缺来源阻止新批准 |
 | A05 | A 冻结新 root／清单 | core／UI／native 通过 | 新 root、命名、用途与全部文件落点先冻结；碰撞／父目录更换拒绝旧计划。native preserve 的三份文件逐字节读回一致 |
-| A06 | A 原任务 intent／恢复 | core／UI 通过 | 部分迁入、私有副本失败、重复启动／丢回复保留原 intent、位置和阶段；原 ID 查询，不再建 root 或打开第二次 Terminal |
+| A06 | A 原任务 intent／恢复 | core／UI 通过 | 部分迁入、私有副本失败、重复启动／丢回复保留原 intent、位置和阶段；原 ID 查询，不再建 root 或打开第二次 Terminal；本批 publication 的目录／文件同步与 intent 保存失败回归覆盖准确产物路径、未完成状态及本次临时文件回收 |
 | A07 | C 原件与私有阅读 | core／资料旅程通过 | 非 ASCII、未知字段、signature、特殊换行包字节不变；提取排除 opaque thinking／signature；正文不入操作回执和 Agent 包 |
-| A08 | C 有界分页／来源身份 | core／UI 通过 | 6000 条记录完整有界分页，损坏／未知格式明确展示；path、package／entry digest 与记录索引绑定，源变化拒绝旧选择。当前源码每页 ≤256 KiB；36 MiB 工作集的 archive、独立 state inspect／pages／import／preserve 与原始 CRLF／非 UTF-8 offsets 合成旅程通过，先完整认证并私有暂存全包；资源条件见 current-state |
+| A08 | C 有界分页／来源身份 | core／UI 通过 | 6000 条记录完整有界分页，损坏／未知格式明确展示；path、package／entry digest 与记录索引绑定，源变化拒绝旧选择。当前源码每页 ≤256 KiB；36 MiB 工作集的 archive、独立 state inspect／pages／import／preserve 与原始 CRLF／非 UTF-8 offsets 合成旅程通过，先完整认证并私有暂存全包；资源条件见 current-state；`archive-wait-ui` 验首读／翻页等待、旧页标记、离开后的队列状态及迟到结果隔离 |
 | A09 | A/B 资料用途与启用 | core／UI／native 通过 | App 默认参考资料；启用指令另行选择，批准与落盘一致。旧 raw import 默认激活语义保留；新工作交接稿不自动写入指令位置 |
 | A10 | B/C 审阅／复制／启动 | core／UI 通过 | 编辑使审阅失效，复制失败不启动；启动失败／未知只查原请求，阶段不冒充模型接收；普通新上下文与原生 resume 各自明确选择 |
-| A11 | C 有限 resume／支持证据 | 静态／inert 通过；真实认证未验证 | 仅静态识别的 2.1.283／2.1.285 与 ≤8 MiB 的受支持 JSONL shape 开放；私有 byte-identical 副本、`--resume` 与 `--fork-session`、cwd／config、原件不变受测试覆盖。真实 Claude 接受和实际写入／原路径读取尚未验收 |
+| A11 | C 有限 resume／支持证据 | 静态／inert 通过；真实认证未验证 | 仅静态识别的 2.1.283／2.1.285 与 ≤8 MiB 的受支持 JSONL shape 开放；私有 byte-identical 副本、`--resume` 与 `--fork-session`、cwd／config、原件不变受测试覆盖；`journey-resume-staging` 的真正 PTY exec 验整包明文暂存清除，解包／复制窗口的来源变化测试分别拒绝首次 intent 或保留原 intent 只查询。真实 Claude 接受和实际写入／原路径读取尚未验收 |
 | A12 | D 静态 CLI／state 核对 | native checker／UI 通过 | 明确 executable；错误架构、协议、资源缺失／摘要和 state／UID 各自报告；固定 argv、有界输出／时限，静态检查不初始化 state。bytes 一致不等于源认证 |
 | A13 | D 原任务 Agent 交接 | core／remote／UI 通过 | accepted／uncertain job 和原启动 ID 均保留准确查询命令、runner binding／PATH 兼容事实；移除 alias 后保留核对，secret sentinel 不进包、argv 或普通日志 |
 | A14 | D 帮助／任务映射 | CLI 通过 | 顶层及深层 `--help` 提前只读返回；六任务／operations／schema 可解析；context、version、tasks 静态调用不建立 state |

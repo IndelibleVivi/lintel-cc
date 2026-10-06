@@ -1564,21 +1564,18 @@ impl Engine {
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW)
             .open(&tmp)?;
-        let write_result = crate::package::write(&mut tmp_file, &package, &sources, pass);
-        let (archive_digest, _total) = match write_result {
-            Ok(value) => value,
-            Err(error) => {
-                let _ = fs::remove_file(&tmp);
-                return Err(error);
-            }
-        };
-        tmp_file.sync_all()?;
+        // Arm the guard only after `create_new` proved this process created the
+        // name. It owns exactly this temp name: any normal error from the
+        // package write, sync_all, output-path recheck, journal save or the
+        // publish itself removes only that name, so no unpublished temp
+        // accumulates. It never sweeps unrelated or killed-process leftovers.
+        let mut staged = crate::storage::StagedTemp::new(tmp.clone());
+        let (archive_digest, _total) =
+            crate::package::write(&mut tmp_file, &package, &sources, pass)?;
+        crate::storage::sync_staged_file(&tmp_file)?;
         drop(tmp_file);
         drop(staging);
-        if let Err(failure) = check_output_path(p) {
-            let _ = fs::remove_file(&tmp);
-            return Err(failure);
-        }
+        check_output_path(p)?;
         // Durable intent: record the exact destination and the unsigned
         // ciphertext digest before the rename. A later reader can only verify
         // this path; it never re-publishes or picks a new path.
@@ -1586,13 +1583,11 @@ impl Engine {
         j["archive_path"] = json!(dest);
         j["archive_intent_digest"] = json!(archive_digest);
         save(journal, j)?;
-        match crate::storage::publish_staged_new(&tmp, dest) {
-            Ok(()) => {}
-            Err(error) => {
-                let _ = fs::remove_file(&tmp);
-                return Err(error);
-            }
-        }
+        // The publication primitive enforces the parent-directory durability
+        // barrier; a rename whose parent sync fails surfaces as an error here so
+        // the step never becomes "completed" without that barrier.
+        crate::storage::publish_staged_new(&tmp, dest)?;
+        staged.disarm();
         // Streaming readback: decrypt the published archive and verify the
         // ciphertext digest, refusing a truncated or replaced package.
         let readback_digest = self.verify_archive(dest, pass)?;
@@ -2518,7 +2513,11 @@ mod tests {
         // boundary immediately before atomic_new, without a process race.
         let destination = engine.state.join("archives").join("x".repeat(300));
         let journal = engine.path("jobs", string(&preview, "id").unwrap());
-        let mut receipt = json!({"id":preview["id"],"plan_id":preview["id"],"steps":[]});
+        // Model the durable state the real `execute` path persists before the
+        // archive step: status "executing" with the plan id, so a recovery query
+        // exercises the same reconciliation branch.
+        let mut receipt =
+            json!({"id":preview["id"],"plan_id":preview["id"],"status":"executing","steps":[]});
         assert!(engine
             .write_archive(
                 &environment,
@@ -2539,6 +2538,187 @@ mod tests {
             fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
             "synthetic instruction"
         );
+    }
+
+    #[test]
+    fn archive_parent_sync_failure_never_completes_or_republishes() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let preview = engine
+            .plan_archive(
+                &json!({"environment_id":environment["id"],"categories":["instructions"]}),
+            )
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        let destination = engine.state.join("archives").join("published.age");
+        let journal = engine.path("jobs", string(&preview, "id").unwrap());
+        // Model the durable state the real `execute` path persists before the
+        // archive step so a recovery query exercises the reconciliation branch.
+        let mut receipt = json!({"id":preview["id"],"plan_id":preview["id"],
+            "status":"executing","warnings":[],"steps":[]});
+        // The rename succeeds and the archive lands, but the parent-directory
+        // flush fails. The write must not report success, the durable step must
+        // not become "completed", and nothing re-publishes on its own.
+        crate::storage::sync_fault::arm_owner();
+        let result = engine.write_archive(
+            &environment,
+            &plan,
+            &json!({"archive_passphrase":"synthetic passphrase only"}),
+            &destination,
+            &mut receipt,
+            &journal,
+        );
+        crate::storage::sync_fault::disarm_owner();
+        assert!(result.is_err(), "parent sync failure reported as success");
+        let stored = load(&journal).unwrap();
+        assert_eq!(stored["archive_path"].as_str(), destination.to_str());
+        assert_eq!(stored["steps"][0]["status"], "executing");
+        assert!(stored["archive_digest"].is_null());
+        let intent = stored["archive_intent_digest"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(intent.len(), 64);
+        // The published ciphertext is intact at the exact frozen destination;
+        // no second publication or temp was created.
+        assert!(destination.exists());
+        let leftovers = fs::read_dir(engine.state.join("archives"))
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name() != "published.age")
+            .count();
+        assert_eq!(leftovers, 0, "a sibling temp/republish was left behind");
+        // Recovery is original-path query-only: the interrupted job reports
+        // needs_reconciliation (never completed), and the exact published bytes
+        // are readable only by binding them to the frozen intent digest. The
+        // bytes existing is not completion, because the directory barrier failed.
+        let query = engine.request(json!({"command":"job","job_id":preview["id"]}));
+        assert_eq!(query["ok"], true, "{query}");
+        assert_eq!(query["data"]["status"], "needs_reconciliation", "{query}");
+        assert_eq!(query["data"]["archive_path"], destination.to_str().unwrap());
+        assert!(
+            query["data"].get("archive_digest").is_none()
+                || query["data"]["archive_digest"].is_null(),
+            "recovery promoted the intent digest to a completed digest: {query}"
+        );
+        // A job-scoped read verifies the published bytes against the frozen
+        // intent digest instead of declaring a new publication.
+        let inspected = engine.request(json!({
+            "command":"archive_inspect","job_id":preview["id"],
+            "archive_passphrase":"synthetic passphrase only"
+        }));
+        assert_eq!(inspected["ok"], true, "{inspected}");
+        // A repeat query is stable and never re-publishes.
+        let again = engine.request(json!({"command":"job","job_id":preview["id"]}));
+        assert_eq!(again["data"]["status"], "needs_reconciliation");
+        assert_eq!(
+            fs::read_dir(engine.state.join("archives"))
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .count(),
+            1,
+            "recovery re-published the archive"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("CLAUDE.md")).unwrap(),
+            "synthetic instruction"
+        );
+    }
+
+    #[test]
+    fn archive_staged_sync_failure_cleans_its_own_temp_and_records_no_intent() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let preview = engine
+            .plan_archive(
+                &json!({"environment_id":environment["id"],"categories":["instructions"]}),
+            )
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        let destination = engine.state.join("archives").join("never.age");
+        let journal = engine.path("jobs", string(&preview, "id").unwrap());
+        let mut receipt = json!({"steps":[]});
+        // The staged ciphertext cannot be flushed before publication. This is
+        // the writer-flow failure the temp guard owns: no unpublished temp may
+        // accumulate, no destination may appear and no durable intent is written.
+        crate::storage::sync_fault::arm_staged();
+        let result = engine.write_archive(
+            &environment,
+            &plan,
+            &json!({"archive_passphrase":"synthetic passphrase only"}),
+            &destination,
+            &mut receipt,
+            &journal,
+        );
+        crate::storage::sync_fault::disarm_staged();
+        assert!(result.is_err(), "staged sync failure reported as success");
+        assert_eq!(
+            fs::read_dir(engine.state.join("archives")).unwrap().count(),
+            0,
+            "a staged-sync failure left an unpublished temp"
+        );
+        assert!(!destination.exists());
+        assert!(
+            !journal.exists(),
+            "a staged-sync failure still wrote a durable intent"
+        );
+    }
+
+    #[test]
+    fn archive_intent_save_failure_cleans_its_own_temp_before_publication() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("CLAUDE.md"), "synthetic instruction").unwrap();
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let preview = engine
+            .plan_archive(
+                &json!({"environment_id":environment["id"],"categories":["instructions"]}),
+            )
+            .unwrap();
+        let plan = load(&engine.path("plans", string(&preview, "id").unwrap())).unwrap();
+        let destination = engine.state.join("archives").join("never.age");
+        // Point the journal at a read-only directory so the durable intent `save`
+        // fails: the writer-flow must still remove its own staged temp and leave
+        // no destination behind.
+        let locked = base.join("locked-jobs");
+        fs::create_dir(&locked).unwrap();
+        let journal = locked.join("synthetic.json");
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o500)).unwrap();
+        let mut receipt = json!({"steps":[]});
+        let result = engine.write_archive(
+            &environment,
+            &plan,
+            &json!({"archive_passphrase":"synthetic passphrase only"}),
+            &destination,
+            &mut receipt,
+            &journal,
+        );
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(result.is_err(), "intent-save failure reported as success");
+        assert_eq!(
+            fs::read_dir(engine.state.join("archives")).unwrap().count(),
+            0,
+            "an intent-save failure left an unpublished temp"
+        );
+        assert!(!destination.exists());
+        assert!(!journal.exists());
     }
 
     #[test]

@@ -105,6 +105,154 @@ fn an_unattempted_launch_without_the_new_source_binding_requires_preview() {
         .exists());
 }
 
+// Fault injection for the resume window: the configured file is created when
+// the hook fires, modelling a real external writer that changes settings/MCP
+// during the decrypt ("pre_intent") or copy ("pre_launch") window. The hook is a
+// plain `fn(&str)` because `Engine::resume_window_hook` is a function pointer,
+// so the target path is passed through a thread-local.
+thread_local! {
+    static RESUME_WINDOW_FILE: std::cell::RefCell<Option<(std::path::PathBuf, String, &'static str)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn resume_window_hook(phase: &str) {
+    RESUME_WINDOW_FILE.with(|slot| {
+        if let Some((path, body, at)) = slot.borrow().as_ref() {
+            if *at == phase {
+                fs::write(path, body).unwrap();
+            }
+        }
+    });
+}
+
+/// Build one supported synthetic session archive and return (engine, plan) for a
+/// known-format resume, so a test can inject a window change.
+fn supported_resume_fixture() -> (
+    TempDir,
+    Engine,
+    Value,
+    std::path::PathBuf,
+    std::path::PathBuf,
+) {
+    let (temp, mut engine, registered, root) = setup();
+    engine.resume_window_hook = Some(resume_window_hook);
+    let e = with_versioned_claude(&engine, &registered, &root, "2.1.285");
+    let project = root.parent().unwrap().join("project");
+    fs::create_dir(&project).unwrap();
+    fs::create_dir_all(root.join("projects/p")).unwrap();
+    fs::write(
+        root.join("projects/p/s.jsonl"),
+        "{\"type\":\"user\",\"sessionId\":\"s\",\"cwd\":\"/p\",\"uuid\":\"u\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}}\n",
+    )
+    .unwrap();
+    let archive = data(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["sessions"]}),
+    );
+    let receipt = data(
+        &engine,
+        json!({"command":"execute","plan_id":archive["id"],"approval":archive["hash"],"archive_passphrase":PASS}),
+    );
+    let plan = data(
+        &engine,
+        json!({"command":"plan_resume","environment_id":e["id"],"project_cwd":project,"job_id":receipt["id"],"archive_passphrase":PASS,"path":"projects/p/s.jsonl"}),
+    );
+    assert_eq!(plan["resume"]["supported"], true, "{plan}");
+    (temp, engine, plan, project, root)
+}
+
+#[test]
+fn resume_rejects_change_in_decrypt_window_before_intent_or_copy() {
+    let (_t, engine, plan, project, root) = supported_resume_fixture();
+    let copy = std::path::PathBuf::from(plan["resume"]["private_copy_path"].as_str().unwrap());
+    assert!(!copy.exists());
+    // A settings/MCP source changes after the pre-decrypt recheck but within the
+    // decrypt window. The post-decrypt recheck must reject before the durable
+    // intent, so no launch record, no copy and an intact next-step path exist.
+    RESUME_WINDOW_FILE.with(|slot| {
+        *slot.borrow_mut() = Some((
+            project.join(".mcp.json"),
+            r#"{"mcpServers":{"x":{"command":"PRIVATE_MCP_COMMAND"}}}"#.to_string(),
+            "pre_intent",
+        ))
+    });
+    let rejected = engine.request(
+        json!({"command":"resume_request","request_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    RESUME_WINDOW_FILE.with(|slot| *slot.borrow_mut() = None);
+    assert_eq!(rejected["error"]["code"], "stale_plan", "{rejected}");
+    let record = engine
+        .state
+        .join("launches")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()));
+    assert!(
+        !record.exists(),
+        "a decrypt-window change still created a durable intent"
+    );
+    assert!(
+        !copy.exists(),
+        "a rejected resume still wrote the private copy"
+    );
+    // No decoded staging tree is left behind by the rejected attempt.
+    let leftover = fs::read_dir(&engine.state)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .any(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with(".lintel-work-stage-")
+        });
+    assert!(
+        !leftover,
+        "rejected resume left a decoded staging directory"
+    );
+    let _ = root;
+}
+
+#[test]
+fn resume_change_after_copy_does_not_launch_and_stays_query_only() {
+    let (_t, engine, plan, project, _root) = supported_resume_fixture();
+    let copy = std::path::PathBuf::from(plan["resume"]["private_copy_path"].as_str().unwrap());
+    // The settings/MCP source changes after the verified private copy and the
+    // explicit staging cleanup. The pre-launch recheck must stop the launch; the
+    // original ID, copy and intent are retained and only queryable.
+    RESUME_WINDOW_FILE.with(|slot| {
+        *slot.borrow_mut() = Some((
+            project.join(".mcp.json"),
+            r#"{"mcpServers":{"y":{"command":"PRIVATE_MCP_COMMAND"}}}"#.to_string(),
+            "pre_launch",
+        ))
+    });
+    let failed = engine.request(
+        json!({"command":"resume_request","request_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    RESUME_WINDOW_FILE.with(|slot| *slot.borrow_mut() = None);
+    assert_eq!(failed["error"]["code"], "stale_plan", "{failed}");
+    // The verified copy remains intact and the attempt is recorded, not replayed.
+    assert!(
+        copy.exists(),
+        "pre-launch rejection removed the verified copy"
+    );
+    assert_eq!(
+        fs::read(&copy).unwrap(),
+        "{\"type\":\"user\",\"sessionId\":\"s\",\"cwd\":\"/p\",\"uuid\":\"u\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"hi\"}]}}\n"
+            .as_bytes(),
+        "pre-launch rejection altered the verified private copy"
+    );
+    let record_path = engine
+        .state
+        .join("launches")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()));
+    let record: Value = load(&record_path).unwrap();
+    assert_eq!(record["status"], "launch_failed", "{record}");
+    assert_eq!(record["error"]["code"], "stale_plan", "{record}");
+    // A repeat is query-only, never a second launch attempt.
+    let replay = engine.request(
+        json!({"command":"resume_request","request_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(replay["data"]["replayed_query"], true, "{replay}");
+}
+
 #[test]
 fn resume_checks_the_same_startup_sources_before_copy_or_intent() {
     let (_t, mut engine, e, root) = setup();

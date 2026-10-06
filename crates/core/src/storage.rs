@@ -11,7 +11,7 @@ use std::{
     io::{Read, Write},
     os::unix::ffi::OsStrExt,
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
 
 pub fn digest(bytes: &[u8]) -> String {
@@ -95,9 +95,106 @@ pub fn atomic_new(path: &Path, bytes: &[u8], mode: u32) -> Result<()> {
     write_atomic(path, bytes, mode, false, |_| Ok(()))
 }
 /// Publish an already-complete staged file to `path` without replacing a
-/// concurrently created target. The caller owns `tmp` cleanup on failure.
+/// concurrently created target, then enforce the same durability barrier as
+/// [`atomic_new`]: the destination parent directory is flushed so the new name
+/// survives an interruption. The caller owns `tmp` cleanup on failure.
+///
+/// The barrier is inside this primitive, so a caller cannot mark the operation
+/// completed just because the rename returned. A rename that lands but whose
+/// parent sync fails is reported as an error; the exact destination and intent
+/// stay query-only rather than being re-published.
 pub(crate) fn publish_staged_new(tmp: &Path, path: &Path) -> Result<()> {
-    publish_new(tmp, path)
+    publish_new(tmp, path)?;
+    sync_parent(path)
+}
+
+/// Test-only fault injection for the two durability barriers: the parent
+/// directory flush after a no-replace publication (`owner_sync`) and the staged
+/// temp-file flush before publication (`staged_sync`). Each is armed
+/// independently so a test can exercise exactly one writer-flow failure.
+/// Never present in production.
+#[cfg(test)]
+pub(crate) mod sync_fault {
+    use std::cell::Cell;
+    thread_local! {
+        static OWNER: Cell<bool> = const { Cell::new(false) };
+        static STAGED: Cell<bool> = const { Cell::new(false) };
+    }
+    /// Arm the parent-directory durability barrier to fail after a rename lands.
+    pub(crate) fn arm_owner() {
+        OWNER.with(|a| a.set(true));
+    }
+    pub(crate) fn disarm_owner() {
+        OWNER.with(|a| a.set(false));
+    }
+    pub(crate) fn owner_armed() -> bool {
+        OWNER.with(|a| a.get())
+    }
+    /// Arm the staged temp-file flush to fail before publication.
+    pub(crate) fn arm_staged() {
+        STAGED.with(|a| a.set(true));
+    }
+    pub(crate) fn disarm_staged() {
+        STAGED.with(|a| a.set(false));
+    }
+    pub(crate) fn staged_armed() -> bool {
+        STAGED.with(|a| a.get())
+    }
+}
+
+/// Flush a staged temp file before publication. Routes through the test-only
+/// staged-sync fault so a synthetic test can model an interrupted writer-flow
+/// step without a production knob.
+pub(crate) fn sync_staged_file(file: &std::fs::File) -> Result<()> {
+    #[cfg(test)]
+    if sync_fault::staged_armed() {
+        return Err(err("io_error", "文件操作未完成；检查访问权限与可用空间"));
+    }
+    file.sync_all()?;
+    Ok(())
+}
+
+/// Flush the destination directory entry so the published name is durable.
+fn sync_parent(path: &Path) -> Result<()> {
+    #[cfg(test)]
+    if sync_fault::owner_armed() {
+        return Err(err("io_error", "文件操作未完成；检查访问权限与可用空间"));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| err("invalid_path", "缺少父目录"))?;
+    std::fs::File::open(parent)?.sync_all()?;
+    Ok(())
+}
+
+/// Owns one private publication temp file. The writer names the temp while it
+/// is still unpublished; dropping the guard removes only that exact name, so a
+/// normal error on any later step (sync, path recheck, journal save, publish)
+/// never leaves an accumulated unpublished temp. Publication consumes the name,
+/// after which [`StagedTemp::disarm`] stops the (now harmless) cleanup, and a
+/// published file is never removed. This never scans or sweeps unrelated names,
+/// so a killed process's leftovers are not touched.
+pub(crate) struct StagedTemp {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl StagedTemp {
+    pub(crate) fn new(path: PathBuf) -> Self {
+        Self { path, armed: true }
+    }
+    /// Stop owning the temp name once it has been consumed by a rename.
+    pub(crate) fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for StagedTemp {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
 }
 fn publish_new(tmp: &Path, path: &Path) -> Result<()> {
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -192,13 +289,46 @@ fn write_atomic(
     }
     result
 }
+// One admission budget for persisted plans, jobs and registry records. A
+// successful write must remain readable through `load`; content capacity alone
+// does not bound the expanded paths and mappings in a frozen work plan.
+const STATE_JSON_LIMIT: u64 = 16 * 1024 * 1024;
 pub fn save(path: &Path, value: &Value) -> Result<()> {
-    atomic(path, &serde_json::to_vec_pretty(value)?, 0o600)
+    let bytes = serde_json::to_vec_pretty(value)?;
+    if bytes.len() as u64 > STATE_JSON_LIMIT {
+        return Err(err(
+            "state_limit",
+            "记录超过 16 MiB 持久化预算，未保存；工作预览可缩小精确原件选择后重新生成。",
+        ));
+    }
+    atomic(path, &bytes, 0o600)
 }
 
 #[cfg(test)]
 mod publication_tests {
     use super::*;
+
+    #[test]
+    fn saved_json_is_readable_and_oversize_never_replaces_or_publishes() {
+        let temporary = tempfile::tempdir().unwrap();
+        let base = temporary.path().canonicalize().unwrap();
+        let existing = base.join("existing.json");
+        let absent = base.join("absent.json");
+        // A JSON string adds exactly two quotes, covering the inclusive limit.
+        let at_limit = Value::String("x".repeat(STATE_JSON_LIMIT as usize - 2));
+        save(&existing, &at_limit).unwrap();
+        assert_eq!(fs::metadata(&existing).unwrap().len(), STATE_JSON_LIMIT);
+        assert_eq!(load(&existing).unwrap(), at_limit);
+        let over_limit = Value::String("x".repeat(STATE_JSON_LIMIT as usize - 1));
+        assert_eq!(
+            save(&existing, &over_limit).unwrap_err().code,
+            "state_limit"
+        );
+        assert_eq!(save(&absent, &over_limit).unwrap_err().code, "state_limit");
+        assert!(!absent.exists());
+        assert_eq!(load(&existing).unwrap(), at_limit);
+        assert_eq!(fs::read_dir(base).unwrap().count(), 1);
+    }
 
     #[test]
     fn published_package_is_recoverable_before_any_followup_cleanup() {
@@ -223,9 +353,64 @@ mod publication_tests {
         assert_eq!(fs::metadata(&published).unwrap().nlink(), 1);
         assert!(!staged.exists());
     }
+
+    #[test]
+    fn publish_staged_new_reports_parent_sync_failure_without_claiming_success() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let staged = base.join(".lintel-staged.tmp");
+        let published = base.join("work.age");
+        fs::write(&staged, b"synthetic complete ciphertext").unwrap();
+        // The rename lands (the destination is created), but the directory flush
+        // fails, so the primitive must surface an error rather than Ok: a caller
+        // must never record "completed" without the durability barrier.
+        sync_fault::arm_owner();
+        let result = publish_staged_new(&staged, &published);
+        sync_fault::disarm_owner();
+        assert!(result.is_err(), "parent sync failure reported as success");
+        // The rename consumed the staged name; the destination holds the exact
+        // bytes and nothing re-publishes on its own.
+        assert!(!staged.exists());
+        assert_eq!(
+            fs::read(&published).unwrap(),
+            b"synthetic complete ciphertext"
+        );
+        assert_eq!(
+            fs::read_dir(&base).unwrap().count(),
+            1,
+            "parent sync failure left an extra temp"
+        );
+    }
+
+    #[test]
+    fn staged_temp_removes_only_its_own_name_and_never_after_disarm() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let mine = base.join(".lintel-mine.tmp");
+        let neighbor = base.join(".lintel-neighbor.tmp");
+        fs::write(&mine, b"mine").unwrap();
+        fs::write(&neighbor, b"neighbor left by another process").unwrap();
+        {
+            let _guard = StagedTemp::new(mine.clone());
+        }
+        assert!(!mine.exists(), "guard did not remove its own temp");
+        assert_eq!(
+            fs::read(&neighbor).unwrap(),
+            b"neighbor left by another process",
+            "guard touched an unrelated/killed-process leftover"
+        );
+        // Once disarmed (name consumed by a publish) the guard leaves a file at
+        // that name alone, so a published destination is never removed.
+        let published = base.join(".lintel-consumed.tmp");
+        fs::write(&published, b"published bytes").unwrap();
+        let mut guard = StagedTemp::new(published.clone());
+        guard.disarm();
+        drop(guard);
+        assert_eq!(fs::read(&published).unwrap(), b"published bytes");
+    }
 }
 pub fn load(path: &Path) -> Result<Value> {
-    parse(&read(path, 16 * 1024 * 1024)?)
+    parse(&read(path, STATE_JSON_LIMIT)?)
 }
 pub fn snapshot(path: &Path) -> Result<Value> {
     guard(path)?;

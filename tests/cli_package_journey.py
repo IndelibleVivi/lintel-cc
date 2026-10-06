@@ -611,6 +611,49 @@ def main() -> int:
         receipt = json.loads(subprocess.run(
             [str(native_cli), "job", "submit", "--plan", plan["id"], "--approval", plan["hash"]],
             text=True, capture_output=True, env=env, timeout=60, check=True).stdout)["data"]
+        policy_finished = journey.run_native(native_cli, "job", "wait", receipt["id"],
+                                             "--timeout", "30s", env=env)["data"]
+        assert policy_finished["status"] == "completed", policy_finished
+        # The installed native binary performs a useful complete work journey
+        # with no Rust/Node or source-checkout paths in its runtime environment.
+        # A second install opens the ciphertext without the original job/state.
+        session_relative = "projects/synthetic/session.jsonl"
+        session = claude_root / session_relative
+        session.parent.mkdir(parents=True)
+        original_session = b'{"type":"user","message":{"content":"synthetic installed candidate"}}\r\n'
+        session.write_bytes(original_session)
+        passphrase = "synthetic-installed-work-passphrase"
+        def native_data(exe: Path, actor: dict, command: str, **fields):
+            result = subprocess.run([str(exe), "request"], input=json.dumps({"command": command, **fields}),
+                                    text=True, capture_output=True, cwd=base, env=actor, timeout=180)
+            response = json.loads(result.stdout)
+            assert response["ok"], response
+            assert result.returncode == 0, result.stderr
+            assert passphrase not in result.stderr and passphrase not in result.stdout
+            return response["data"]
+        work_plan = native_data(native_cli, env, "plan_preserve", environment_id=registered["id"],
+                                categories=["instructions", "sessions"], activate={"instructions": False})
+        work_receipt = native_data(native_cli, env, "execute", plan_id=work_plan["id"], approval=work_plan["hash"],
+                                   archive_passphrase=passphrase)
+        assert work_receipt["status"] == "completed" and work_receipt["outcome"] == "preserved", work_receipt
+        assert (Path(work_receipt["new_root"]) / "lintel-imports" / session_relative).read_bytes() == original_session
+        assert not (Path(work_receipt["new_root"]) / "CLAUDE.md").exists(), "reference instructions were activated"
+        independent_home = base / "independent-home"; independent_home.mkdir()
+        independent_env = dict(env, HOME=str(independent_home), LINTEL_TEST_HOME=str(independent_home),
+                               LINTEL_STATE_DIR=str(base / "independent-state"))
+        work_source = {"archive_path": work_receipt["archive_path"], "archive_passphrase": passphrase}
+        manifest = native_data(native_cli, independent_env, "archive_inspect", **work_source)
+        assert {file["path"] for file in manifest["files"]} == {"CLAUDE.md", session_relative}
+        destination = independent_home / "import-root"; destination.mkdir()
+        imported_environment = native_data(native_cli, independent_env, "register", name="synthetic independent", root=str(destination))
+        import_plan = native_data(native_cli, independent_env, "plan_import", environment_id=imported_environment["id"],
+                                  categories=["instructions", "sessions"], activate={"instructions": False}, **work_source)
+        imported = native_data(native_cli, independent_env, "execute", plan_id=import_plan["id"], approval=import_plan["hash"],
+                               archive_passphrase=passphrase)
+        assert imported["status"] == "completed", imported
+        assert (destination / "lintel-imports" / session_relative).read_bytes() == original_session
+        assert session.read_bytes() == original_session, "installed journey changed the original transcript"
+        assert native_data(native_cli, env, "job", job_id=work_receipt["id"])["status"] == "completed"
         out_new = base / "native-out-new"
         result_new = journey.package(out_new, inputs, version=version, revision=SECOND_REVISION)
         assert result_new.returncode == 0, result_new.stderr
@@ -629,6 +672,9 @@ def main() -> int:
             [str(new_cli), "job", "show", receipt["id"]], text=True, capture_output=True,
             env=env, timeout=60, check=True).stdout)["data"]
         assert shown["id"] == receipt["id"] and shown["plan_id"] == plan["id"], shown
+        retained_work = native_data(new_cli, env, "job", job_id=work_receipt["id"])
+        assert retained_work["id"] == work_receipt["id"] and retained_work["status"] == "completed"
+        assert retained_work["archive_path"] == work_receipt["archive_path"]
 
         # --- documented non-destructive extraction flow -----------------------
         pack_parent = base / "installed"

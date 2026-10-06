@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-07 · **0.1.0 产品基线的流式工作包与启动来源源码后续**；本地 native／CLI 候选仍是 2026-10-05 的构建。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
+2026-10-07 · **0.1.0 development candidate 的 Preview 收口**；本批源码增加发布持久化、resume 暂存与来源复查、计划容量及阅读等待修复。macOS release CLI 与双 Linux musl runner 已重建；干净提交的 App／独立包候选尚待构建核对，旧 native 候选保留 2026-10-05 的边界。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
 
 ## 当前交付与证据
 
@@ -10,11 +10,12 @@
 | App 界面 | 安静的 Clawd 首页／56 句原创时段问候与日期／整分钟／稀有彩蛋；日期只在当天首次打开显示，点击后展开六任务，保留持续目标；配置 root／项目 cwd 分离；资料阅读／交接稿；CLI 核对与 Agent。默认 1120、最低 900、宽 1440 成品 UI 检查通过；保护／保全／清理底栏独立于正文滚动 |
 | 2026-10-06 连续性修复 | 本机→A／B→A 打开 A 的回执后，查询、Agent 包及启动预览均固定 A；参考指令与重名副本再次保全，不自动激活。官方注销将完整认证状态摘要冻结在私有计划，主体缺失拒绝，执行前及保全后复查；只验证 synthetic CLI，Keychain-only token 世代仍未验证 |
 | 关联组件与容量预检 | core／named CLI／App 接通有限组件清单、明确 project cwd 来源、认证位置元数据、原任务 coverage 与最多 8 个原 unit 的当前核验；账号未知、Desktop／IDE 暂不支持、浏览器独立。容量预检不读正文，列出超限文件与未覆盖路径；FIFO 不打开、不计入；按类别或精确原件重新检查。有限 SSH controller 已放行这几个明确只读入口 |
-| 工作选择与流式包 | App 项目／会话／原件选择与 named CLI --path 共用 core；容量来自实际 runner，超限对象可明确排除，选择不保存到草案。当前源码支持 256 MiB/文件、1 GiB 合计、10,000 文件，以 age + lintel.work/1 流式完整核验；私有磁盘暂存、完整 EOF／digest、原子不覆盖发布，旧合法小包与整类调用保留。新限额不是旧候选升级或 1 GiB 实跑证据；4 个原件共 36 MiB（含 24 MiB 非 UTF-8 与 12 MiB JSONL），完整归档／独立 state inspect、页、import／preserve 与旧 v1 8 场景通过 |
-| 会话与启动 | reader 页面 ≤256 KiB，完整包每次先认证与暂存，原字节／CRLF／未知块和 opaque thinking 保全。普通 launch／resume 共享有限启动来源，公开声明存在和认证未知，私有 salted digest／身份在首次 intent、运行副本与 Terminal 前复查；缺绑定旧预览需重做，既有原 ID 只查询。App 缺来源不能新批准；报错后只有原查询确认未尝试的计划才可生成新预览，稿件／cwd 保留并撤回审阅。静态 resume 仍限 2.1.283／2.1.285 与 ≤8 MiB transcript，真实认证尚未验收 |
-| macOS native 候选 | 2026-10-05 unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
-| CLI 与分层验证 | 本批最终 Rust workspace（4 test threads）、product-baseline CLI 与 built work-ui 已通过；startup/components App 两条最终旅程通过，1120 Day／900 Night 来源页已目视。较早同批四条 work／components／baseline／remote-task UI 通过；默认 23/23 通过（RUST_TEST_THREADS=4）；大包 8 场景通过，默认 age KDF 实测 log N 14，macOS arm64 debug 各进程峰值 24.5–26.3 MiB；36 MiB inspect 35.4s、每页 36.6–53.7s、preserve 131.3s，读一页仍完整核验全包。元数据 1 GiB+1 阻塞有证据，1 GiB 完整 runtime／release 性能未验收。合成启动观察不越出临时 fixture，也不读本机 managed paths；新 source 不代表 native WebKit、真实 manager／认证／浏览器重验。前提交 ee57165 的完整 macOS／Linux CI 仍仅是该提交证据 |
-| 资源与包装 | 2026-10-05 macOS arm64 CLI 与两架构 Linux musl runner 已构建，canonical App bundles 已更新；native host／非 fixture Chromium 与 Firefox 扩展由原 source 生成。CLI candidate 包装含真实输入 smoke 通过；生成物不进 Git。cross-build 不证明其他架构 runtime，checksums 不证明签名或来源 |
+| 工作选择与流式包 | 当前 runner 准入 256 MiB/文件、1 GiB 合计、10,000 文件，以 age + lintel.work/1 完整核验；App 精确选择与 named CLI 共用 core。持久 JSON 读写另共用 16 MiB 上限，过大深路径计划保存前拒绝，精确缩小选择仍可继续。发布与迁入必须完成文件／目的地父目录同步和完整读回；失败保留原路径与 ID、正常回收本次未发布临时名。当前 release 的 1 GiB／10,000 文件完整资源旅程尚在验收，早先 36 MiB debug 证据不能替代它 |
+| 会话与启动 | reader 每页 ≤256 KiB，每次先完整认证并私有暂存全包；原字节、CRLF、未知块和 opaque thinking 保全。resume 在解包后、首次 intent／复制前及复制后启动前复查冻结 target／startup；成功 exec 前明确关闭整包明文暂存，失败阻止启动并保留原 ID。真正 PTY 与 inert Claude 的清理路径通过，不等于真实认证／续聊。静态支持仍限 2.1.283／2.1.285 与 ≤8 MiB transcript |
+| 历史 native runtime | 2026-10-05 unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
+| 阅读等待交互 | `archive-wait-ui` 在 built App 验首读、翻页、旧页标记、跨页面队列占用、错误释放和迟到结果隔离；1120 Day／900 Night 已目视。persistent activity 只含有限操作名、主机标签和队列状态。Chromium 合成延迟不证明 native WebKit 或解密性能 |
+| CLI 与分层验证 | 最终默认 synthetic suite 25/25 通过（RUST_TEST_THREADS=4），包括深路径计划预算、真正 PTY cleanup、共享 workspace 与两个独立 Rust crates；补充原密文逐字节不变断言后的 PTY journey 再次通过。built App 的 work／components／baseline／archive-wait／remote-task 五条相关 UI 旅程通过。扩充的 native `cli-candidate` 通过解包后保全、独立 state inspect／import、原字节核对及升级后原任务查询，PATH 仅系统工具；真实三平台输入包装 smoke 通过。base 7e23371 的 macOS／Linux CI 已完成成功；本批新源码尚无 CI 结论 |
+| 资源与包装 | 本批 macOS arm64 release CLI 与 Linux x86_64／aarch64 static musl runner 已构建，canonical runner-bundles 已重新生成；本批干净 source 的 Tauri App／host／extension 与独立 CLI archives 尚待最终构建和包内核对。cross-build 不证明其他架构 runtime，checksums 不证明签名或来源；生成物不进 Git |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存 25fdb43 与更早候选的 CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。

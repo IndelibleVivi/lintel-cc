@@ -96,7 +96,7 @@ jobs:
           LINTEL_COMPONENTS_UI_REPORT: ${{ runner.temp }}/lintel-verify/components-ui.json
           LINTEL_BASELINE_UI_REPORT: ${{ runner.temp }}/lintel-verify/baseline-ui.json
         run: |
-          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui,service-ui,remote-task-ui,work-ui,components-ui,baseline-ui,site-ui,clawd-app-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
+          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui,service-ui,remote-task-ui,work-ui,components-ui,baseline-ui,archive-wait-ui,site-ui,clawd-app-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
 
       - name: Disposable Linux VM lifecycle acceptance
         if: runner.os == 'Linux'

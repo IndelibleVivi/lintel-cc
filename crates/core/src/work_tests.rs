@@ -206,6 +206,56 @@ fn archive_output_path_freezes_and_refuses_overwrite() {
 }
 
 #[test]
+fn imported_publication_sync_failure_keeps_original_job_query_only() {
+    let (_temporary, engine, source, root) = fixture();
+    fs::write(root.join("CLAUDE.md"), b"synthetic exact instruction").unwrap();
+    let archive_plan = ok(
+        &engine,
+        json!({"command":"plan_archive",
+        "environment_id":source["id"],"categories":["instructions"]}),
+    );
+    let archived = ok(
+        &engine,
+        json!({"command":"execute","plan_id":archive_plan["id"],
+        "approval":archive_plan["hash"],"archive_passphrase":PASS}),
+    );
+    let destination = engine.home.join("destination");
+    fs::create_dir(&destination).unwrap();
+    let target = engine
+        .register("synthetic destination", &destination, false)
+        .unwrap();
+    let plan = ok(
+        &engine,
+        json!({"command":"plan_import","environment_id":target["id"],
+        "job_id":archived["id"],"archive_passphrase":PASS,"categories":["instructions"]}),
+    );
+    storage::sync_fault::arm_owner();
+    let result = engine.request(json!({"command":"execute","plan_id":plan["id"],
+        "approval":plan["hash"],"archive_passphrase":PASS}));
+    storage::sync_fault::disarm_owner();
+    assert_eq!(result["ok"], true, "{result}");
+    assert_eq!(result["data"]["status"], "needs_reconciliation", "{result}");
+    assert_eq!(result["data"]["error"]["code"], "io_error");
+    assert_eq!(
+        fs::read(destination.join("CLAUDE.md")).unwrap(),
+        b"synthetic exact instruction"
+    );
+    let queried = ok(&engine, json!({"command":"job","job_id":plan["id"]}));
+    assert_eq!(queried["status"], "needs_reconciliation");
+    let repeated = ok(
+        &engine,
+        json!({"command":"execute","plan_id":plan["id"],
+        "approval":plan["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(repeated["status"], "needs_reconciliation");
+    assert_eq!(fs::read_dir(&destination).unwrap().count(), 1);
+    assert_eq!(
+        fs::read(root.join("CLAUDE.md")).unwrap(),
+        b"synthetic exact instruction"
+    );
+}
+
+#[test]
 fn encrypted_package_travels_to_independent_install() {
     let (_t, engine, e, root) = fixture();
     seed_work(&root);

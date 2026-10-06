@@ -93,6 +93,8 @@ def _cli_package_binary(system: str, machine: str) -> Optional[Path]:
 
 
 _CLI_PACKAGE_BINARY = _cli_package_binary(platform.system(), platform.machine())
+if _CLI_PACKAGE_BINARY is not None and os.environ.get("LINTEL_CLI_CANDIDATE_BINARY"):
+    _CLI_PACKAGE_BINARY = Path(os.environ["LINTEL_CLI_CANDIDATE_BINARY"]).resolve()
 _CLI_PACKAGE_TOOLS = (("node", "tar", "cc", "shasum") if platform.system() == "Darwin"
                       else ("node", "tar", "sha256sum"))
 
@@ -162,6 +164,8 @@ CHECKS: List[Check] = [
     _check("work-ui", "built App exact selection, archive/preserve and portable import (real synthetic core)", "independent", *(NODE or "node", "tests/work_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="isolated headless Chromium and invoke fixture; not native WebKit"),
     _check("components-ui", "built component/original task/metadata capacity journey (real synthetic core)", "independent", *(NODE or "node", "tests/components_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic cores; finite SSH/invoke modeled; not native WebKit/production"),
     _check("baseline-ui", "built product-baseline task/session/Agent/approval journey (real synthetic core)", "independent", *(NODE or "node", "tests/baseline_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic core; static CLI/clipboard/launch-error boundary modeled; not native WebKit/Claude"),
+    _check("archive-wait-ui", "built App delayed package read, accessible feedback and cross-page queue lifecycle", "independent", *(NODE or "node", "tests/archive_wait_ui_journey.mjs"), tools=("node",), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, independent=True, reason="isolated Chromium + delayed synthetic invoke; not decryption performance or native WebKit"),
+    _check("work-scale", "release 256 MiB/member, 1 GiB package and 10,000-file runtime evidence", "independent", PYTHON, "tests/work_scale_journey.py", paths=(Path(os.environ.get("LINTEL_SCALE_RUNNER", str(ROOT / "target/release/lintel"))),), independent=True, requires="explicit release runner and temporary filesystem with >=16 GiB free; LINTEL_SCALE_RUNNER/LINTEL_SCALE_TMPDIR/LINTEL_SCALE_REPORT select local evidence paths", reason="slow independent capacity/resource acceptance; never implicit default or production data"),
     _check("remote-task-ui", "built App original SSH task/reopen/conflict/separate restore (synthetic transport)",
            "independent", *(NODE or "node", "tests/remote_task_ui_journey.mjs"),
            tools=("node",), paths=(
@@ -201,7 +205,9 @@ for _id, _desc, _file in (
      "large_work_journey.py"),
     ("journey-work-capacity", "read-only work-capacity preflight (metadata-only admission, blockers, strict schema)",
      "work_capacity_journey.py"),
+    ("journey-plan-capacity", "long-path plan admission, readable persisted state and exact-scope recovery", "plan_capacity_journey.py"),
     ("journey-launch", "interactive CLI/TUI launch and custom policy (real PTY, synthetic roots)", "launch_journey.py"),
+    ("journey-resume-staging", "successful PTY resume exec removes full-package plaintext and retains only the approved copy", "resume_staging_journey.py"),
     ("journey-policy", "versioned policy journey (version/value/ownership compatibility)", "policy_journey.py"),
 ):
     CHECKS.append(_check(_id, _desc, "journey", PYTHON, f"tests/{_file}", tools=("cargo",),

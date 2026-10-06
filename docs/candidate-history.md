@@ -6,6 +6,12 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 流式工作包与有限启动来源（7e23371，2026-10-07）
+
+该源码阶段默认 23/23 synthetic checks（`RUST_TEST_THREADS=4`）通过，built work／components／baseline／remote-task UI 及后续 startup/components 相关旅程有分层证据。macOS／Ubuntu [CI run 37507737481](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37507737481) 已完成成功；这个结论只属于 `7e2337160d77969935d6ed0e07a8307613179e18`。
+
+4 份原件共 36 MiB（24 MiB 非 UTF-8、12 MiB JSONL 及小参考文件）的归档、独立 state inspect／页面／import／preserve 与旧 v1 等 8 场景通过。macOS arm64 debug 的 age 实测 scrypt log N 14，各进程峰值 RSS 24.5–26.3 MiB；36 MiB inspect 35.4s、每页 36.6–53.7s、preserve 131.3s。元数据 1 GiB+1 阻塞有证据，当时未实跑 1 GiB 完整链路。这些 debug 数值不能推广到后来的 release KDF 或容量实测。native／CLI 候选当时仍是 2026-10-05 的构建，有限来源投影不证明实际加载、认证或 OS 隔离。
+
 ## 源码连续性与认证修复（628ce84，2026-10-06）
 
 `093ca73` 合并 Clawd 问候与首次日期彩蛋；`cacd5ef` 绑定原回执主机、保全重名参考指令并冻结官方注销的认证状态；`628ce84` 保存后续方案。当轮默认 20 项首次 19 项通过，workspace 两项已有安装测试触发 4 秒 transport deadline；12 项安装测试串行诊断与原样 workspace 补跑均通过，未放宽产品 timeout。独立 baseline-ui／remote-task-ui 通过。该证据为源码与 synthetic 旅程；native／CLI 产物仍限于 2026-10-05，真实 Keychain token 世代未验证。

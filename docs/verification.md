@@ -50,8 +50,10 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-components` | journey | named CLI finite metadata/config sources, original-ID scope, no auth/body disclosure or journal reconciliation |
 | `journey-large-work` | journey | `python3 tests/large_work_journey.py`; >8 MiB files / >32 MiB total archive, independent state import and preserve, full hashes, metadata blockers and isolated per-process RSS |
 | `journey-work-capacity` | journey | metadata-only byte/file bounds, incomplete scans, strict schema and unchanged full archive admission |
+| `journey-plan-capacity` | journey | deep-path frozen plan admission, readable persisted state and exact smaller selection |
 | `journey-work-preservation` | journey | `python3 tests/work_preservation_journey.py` |
 | `journey-launch` | journey | `python3 tests/launch_journey.py` (CLI/TUI real PTY launch plus custom policy approval and restoration, synthetic roots) |
+| `journey-resume-staging` | journey | real PTY successful exec, complete decoded staging removal, private byte-exact copy and original-ID query |
 | `journey-policy` | journey | `python3 tests/policy_journey.py` (versioned policy, custom keep/disable/remove, no-op, restoration and external edits) |
 
 The two standalone Rust entrypoints beyond the root workspace (`apps/desktop/src-tauri`,
@@ -67,6 +69,25 @@ where a tool cannot run for environment reasons simply shows the check failing
 or skipped, which is that host's environment, not a change to the check.
 
 The default desktop build already runs TypeScript checking; `desktop-typecheck` remains separately selectable.
+
+The `cli-candidate` native journey also covers preservation, independent-state package inspection/import, original-byte agreement, and querying the original work task after selecting a new candidate directory. Runtime PATH is `/usr/bin:/bin`, and work requests run outside the source checkout. `LINTEL_CLI_CANDIDATE_BINARY` selects an explicit native release binary for this check; platform support is unchanged. Its packaging rejection fixtures for other architectures remain visibly synthetic, and those fixtures do not count as Linux runtime evidence.
+
+Independent `archive-wait-ui` runs the built App in isolated Chromium with delayed synthetic invoke responses. It checks first-read and next-page feedback, `role=status` / `aria-busy`, the previous-page label, visible queue occupancy after leaving for Agent, late-result isolation, private page-state clearing and queue release after authentication failure. It checks 1120 Day / 900 Night and keyboard pagination; this is UI evidence, not real decryption performance or native WebKit. CI selects it through this same entrypoint.
+
+Default `journey-resume-staging` uses a real PTY and an inert synthetic Claude executable. After successful process replacement it checks that the complete decoded package staging is gone, the approved private transcript copy remains byte-identical and private, unselected synthetic sensitive contents do not remain in state, and querying the original launch ID does not run the client again. It does not authenticate or invoke a real Claude client.
+
+Default `journey-plan-capacity` creates 10,000 real synthetic deep-path originals. Metadata preflight and archive-only preview remain independent from the larger preserve plan; an unreadable frozen plan must be refused before publication, while an exact smaller selection remains available. It never accepts a mutation job or touches personal roots.
+
+Independent `work-scale` uses an explicitly selected release runner, exactly four 256 MiB synthetic members (1 GiB total), and a separate 10,000-file set. It measures archive/readback, independent inspect, head/middle/tail pages, import and byte/digest agreement. Peak RSS comes from an isolated child; disk figures sample the entire temporary fixture once per second, include originals/ciphertext/copies, and are sampled maxima rather than an exact filesystem peak. This slow check is not in implicit defaults or CI. Select a temporary filesystem with at least 16 GiB free:
+
+```sh
+LINTEL_SCALE_RUNNER=/absolute/release/lintel \
+LINTEL_SCALE_TMPDIR=/absolute/synthetic-temporary-root \
+LINTEL_SCALE_REPORT=/absolute/local-evidence/work-scale.json \
+python3 tests/verify.py --checks work-scale --timeout 14400 --json /absolute/local-evidence/work-scale-entry.json
+```
+
+The caller declaration of a release runner does not attest its source revision, signing or other-architecture runtime. Candidate identity and real account/client evidence remain separate.
 
 `desktop-tauri-bundle` also prepares non-fixture Chromium / Firefox extension
 files and the existing browser native-host executable before the frontend/native

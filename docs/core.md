@@ -79,13 +79,13 @@
 
 `plan_reset` 仍只接受 `recipe: "rebuild"`，语义不变：仅归档后建立新根并迁入，旧 root/登录保留，receipt 维持 `partially_completed`（旧登录/客户端清理步骤未完成）；历史 receipt 不复绿。
 
-当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。内容准入为单文件 256 MiB、总量 1 GiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
+当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。内容准入为单文件 256 MiB、总量 1 GiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。持久计划、回执与 registry 的 JSON 读写共用 16 MiB 预算，保存前拒绝超限记录，不留下随后无法 `load` 的计划；正文容量通过不保证深路径及完整落点清单仍在计划预算内，可缩小精确原件选择重新预览。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
 工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
 
 `package.rs` 是工作包唯一生产 codec，复用 serde `DeserializeSeed`／`Visitor`、已有重复键检查及 age 流；旧完整 `Value` reader 只用于小包测试，`lintel.state/1` 的有限备份 writer 保留现有调用。正文逐块摘要并从冻结来源写入私有 0700／0600 暂存；读入将 byte arrays 逐 u8 写入暂存，不物化整包。元数据单字段最多 1 MiB、合计 16 MiB；单个 data token 在交给 serde 前限 128 字节，完整 JSON／密文另有按总内容计算的有限编码预算。缓冲位于预算 gate 下方，不能让上一字段预取的字节绕过当前预算。密文摘要、完整认证与尾部来自同一 non-following handle，读取前后核对 handle／path 身份；只返回有限 metadata 和请求窗口。age header 读取最多 64 KiB，scrypt reader 拒绝 `log N > 20`，不改变包原有强度；正常 writer 沿用 age 的设备成本选择，实际 KDF 内存与构建条件单独测量。
 
-发布前记录准确目的地与密文摘要，重新核对冻结输出父目录，原子不覆盖发布，再完整解密读回；完成事实不由 intent 推断。迁入／resume 副本逐块复制到同目录临时文件，摘要匹配与 fsync 后再原子不覆盖发布，目标读回之后才完成；失败保留原 job／已发布产物，不改名重发。暂存只由本操作 RAII 清理；kill 后可能保留私有随机目录，不自动扫历史暂存。state 与输出磁盘分别需要展开／密文／临时发布空间，流式内存路线不消除磁盘和核验时间成本。
+发布前记录准确目的地与密文摘要，重新核对冻结输出父目录，原子不覆盖发布并同步目的地父目录，再完整解密读回；完成事实不由 intent 推断。目录同步失败保留准确发布路径与原 intent，原 ID 查询保持 `needs_reconciliation`，可读产物不追认为完成。迁入／resume 副本逐块复制到同目录临时文件，摘要匹配与文件 fsync 后再原子不覆盖发布并同步目的地父目录，目标读回之后才完成；失败保留原 job／已发布产物，不改名重发。本次临时密文与复制文件由准确临时名的 RAII guard 清理，正常写入／同步／保存 intent 失败不会积累未发布临时文件；已发布产物保留。解密暂存通常由本操作 RAII 清理，resume 在可能成功 `exec` 前另行明确关闭整包暂存，清除失败阻止启动并保留原 ID；kill 后可能保留私有随机目录，不自动扫历史暂存。state 与输出磁盘分别需要展开／密文／临时发布空间，流式内存路线不消除磁盘和核验时间成本。
 
 下面是当前 core 源码的数据流；原始工作文件只读，只有批准后的 core 可以发布包或迁入目标。图中“核验成功”不是实际客户端加载／认证证据。
 
@@ -94,16 +94,16 @@ flowchart TD
     F["冻结选择／完整摘要"] --> S["work.rs：私有原件暂存"]
     S --> E["package.rs：流式 age 编码"]
     E --> J["持久 archive intent"]
-    J --> P["原子不覆盖发布密文"]
+    J --> P["原子不覆盖发布密文／父目录同步"]
     P --> V["package.rs：完整认证／摘要／EOF"]
     C["已有 job 包或独立包"] --> V
     V --> D["本操作私有解密暂存"]
     D --> R["session.rs：≤256 KiB 页面"]
     D --> A["已批准 mapping／完整摘要"]
-    A --> I["archive.rs：临时复制后不覆盖发布／读回"]
+    A --> I["archive.rs：临时复制／不覆盖发布／父目录同步／读回"]
 ```
 
-每次打开或翻页都会走完整核验路径；RAII 只清理本操作的私有解密暂存，强制终止后的残留需按原任务核对。
+每次打开或翻页都会走完整核验路径。resume 在完整解包后、首个 intent／复制前再次复查冻结 root、cwd、客户端及 startup binding，复制和明确清除整包暂存后再于启动前复查；后续变化保留已记 intent 与准确副本，只查询原 ID。RAII 只清理本操作的私有解密暂存，强制终止后的残留需按原任务核对。
 
 工作包与状态备份仅在归档完成后才创建新根。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { requester, RequestError, transport } from './api';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { requester, RequestError, transport, subscribePackageActivity, getPackageActivity } from './api';
 import BrowserPanel from './BrowserPanel';
 import Clawd from './Clawd';
 import type { ClawdDestination } from './ClawdFlightMenu';
@@ -37,6 +37,7 @@ function errorText(error: unknown) { return error instanceof RequestError ? `${e
 export default function App({ greeting }: { greeting: string }) {
   const [hostAlias, setHostAlias] = useState<string | null>(null);
   const request = useMemo(() => requester(hostAlias), [hostAlias]);
+  const packageActivity = useSyncExternalStore(subscribePackageActivity, getPackageActivity);
   const activeHost = useRef(hostAlias); activeHost.current = hostAlias;
   const mainRef = useRef<HTMLElement>(null);
   const [actionsMount, setActionsMount] = useState<HTMLElement | null>(null);
@@ -184,6 +185,7 @@ export default function App({ greeting }: { greeting: string }) {
     <div className="workspace">
       <header className={`target-bar ${page === 'environments' ? 'home-target' : ''}`}><div className="target-icon"><Icon name="environments" size={19}/></div><div className="target-context"><span className="eyebrow">当前操作目标</span>{<div className="target-line"><button className="host-switch" disabled={!!busy} onClick={() => setDialog('remote')}>{hostAlias ?? '本机'}<Icon name="chevron" size={11}/></button><span className="slash">/</span><select aria-label="当前环境" disabled={!!busy} value={selectedId} onChange={event => selectEnvironment(event.target.value)}>{!environments.length && <option value="">尚未选择环境</option>}{environments.map(env => <option key={env.id} value={env.id}>{env.name}</option>)}</select></div>}{selected && <code className="target-root" title={selected.root}>{selected.root}</code>}</div><ThemeSwitch theme={theme} onChange={setTheme}/><span className="connection"><span className="status-dot"/>{transport === 'native' ? '本地执行器' : transport === 'synthetic' ? '合成测试执行器' : '桌面连接不可用'}</span><button className="icon-button refresh-button" aria-label="重新检查环境" disabled={!!busy || loading} onClick={() => void perform('refresh', refresh)}><Icon name="refresh"/></button></header>
       {hostAlias && <div className="remote-banner"><Icon name="terminal" size={13}/>远程工作空间 · {hostAlias}<span>环境、计划与记录均来自这台主机</span></div>}{transport === 'synthetic' && <div className="fixture-banner"><Icon name="terminal" size={15}/><span>测试空间 · 操作仅作用于合成数据</span></div>}
+      {packageActivity.length>0 && <aside className="package-activity" role="status" aria-live="polite" aria-label="工作包读取状态">{packageActivity.map(item=><div key={item.id}><strong>{item.hostAlias?`SSH · ${item.hostAlias}`:'本机'} · {item.running?`正在${item.label}`:`等待当前操作结束后${item.label}`}</strong><span>每次读取都会完整核验工作包，较大资料可能需要较长时间。离开页面会清除页面中的口令与正文，已提交的读取仍会继续。{item.waiting>0?` 同一队列中还有 ${item.waiting} 个请求等待这次操作结束。`:''}</span></div>)}</aside>}
       <main ref={mainRef} className={`main-content ${page === 'environments' ? 'home-content' : page === 'sessions' ? 'reading-content' : ''}`} id="main-content">
         {activeGoal && page!=='environments' && <aside className="current-goal" aria-label="当前任务目标"><div><span className="eyebrow">现在要完成</span><strong>{activeGoal.label}</strong><details><summary>任务范围与后续</summary><p>{activeGoal.summary}</p></details></div><button className="text-button" onClick={()=>setPage('environments')}>选择其他任务 →</button></aside>}
         {error && !flow && <div className="error-wrap"><RequestFailure error={error}/><button className="text-button" onClick={() => setError('')}>收起</button></div>}

@@ -663,6 +663,12 @@ button:disabled{opacity:.6}
 .task-outcome summary{cursor:pointer;color:var(--muted)}
 
 /* Source → read → reviewed context. Text never gains link or script authority. */
+.package-activity{flex-shrink:0;padding:10px 26px;border-bottom:1px solid var(--line);background:var(--soft);font-size:12px;line-height:1.6}
+.package-activity strong,.package-activity span{display:block;overflow-wrap:anywhere}
+.package-activity span{color:var(--muted)}
+.reader-pending{padding:14px;margin-bottom:14px;border:1px solid var(--line);border-radius:8px;background:var(--soft);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.reader-pending strong{display:block}
+.reader-pending p{color:var(--muted);margin-top:6px}
 .main-content.reading-content{padding:26px 26px 32px}
 .reading-content .page-heading{margin-bottom:22px}
 .source-open{border-bottom:1px solid var(--line);padding-bottom:20px}

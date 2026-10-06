@@ -42,7 +42,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 # `argv[1]` may be an explicit binary path; every other non-flag argument is a
@@ -186,30 +186,45 @@ class Install:
         )
 
 
-def measure(argv: list[str], env: dict[str, str], cwd: Path, stdin_text: str = "") -> dict[str, Any]:
+def measure(argv: list[str], env: dict[str, str], cwd: Path, stdin_text: str = "", *,
+            timeout: int = 600, on_data: Optional[Callable[[Any], None]] = None,
+            disk_root: Optional[Path] = None, require_completed: bool = True) -> dict[str, Any]:
     """Run one command in an isolated child and report its peak RSS + elapsed.
 
     `resource.getrusage(RUSAGE_CHILDREN)` is measured inside a dedicated
     wrapper process so the value covers exactly this command (macOS reports
     bytes, Linux kilobytes; the raw value and platform are both recorded).
     """
-    wrapper = (
-        "import json,resource,subprocess,sys,time\n"
-        "argv=json.loads(sys.argv[1]); cwd=sys.argv[2]; env=json.loads(sys.argv[3]);"
-        "payload=sys.stdin.read()\n"
-        "start=time.monotonic()\n"
-        "proc=subprocess.run(argv,cwd=cwd,env=env,input=payload,"
-        "stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)\n"
-        "elapsed=time.monotonic()-start\n"
-        "usage=resource.getrusage(resource.RUSAGE_CHILDREN)\n"
-        "print(json.dumps({'response':json.loads(proc.stdout),'returncode':proc.returncode,'elapsed':elapsed,"
-        "'ru_maxrss':usage.ru_maxrss,'maxrss_units':"
-        "('bytes' if sys.platform=='darwin' else 'kilobytes'),"
-        "'platform':sys.platform}))\n"
-    )
+    wrapper = '''
+import json,os,resource,subprocess,sys,threading,time
+argv=json.loads(sys.argv[1]); cwd=sys.argv[2]; env=json.loads(sys.argv[3]); disk=sys.argv[4]
+payload=sys.stdin.read(); stop=threading.Event(); peaks={'logical_bytes':0,'allocated_bytes':0}
+def sample():
+    logical=allocated=0
+    for parent,dirs,files in os.walk(disk):
+        for name in files:
+            try:
+                stat=os.lstat(os.path.join(parent,name)); logical+=stat.st_size; allocated+=stat.st_blocks*512
+            except FileNotFoundError: pass
+    peaks['logical_bytes']=max(peaks['logical_bytes'],logical)
+    peaks['allocated_bytes']=max(peaks['allocated_bytes'],allocated)
+def watch():
+    while not stop.is_set():
+        sample(); stop.wait(1)
+if disk:
+    sample(); watcher=threading.Thread(target=watch,daemon=True); watcher.start()
+start=time.monotonic()
+proc=subprocess.run(argv,cwd=cwd,env=env,input=payload,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+elapsed=time.monotonic()-start
+if disk: stop.set(); watcher.join(); sample()
+usage=resource.getrusage(resource.RUSAGE_CHILDREN)
+print(json.dumps({'response':json.loads(proc.stdout),'returncode':proc.returncode,'elapsed':elapsed,
+ 'ru_maxrss':usage.ru_maxrss,'maxrss_units':('bytes' if sys.platform=='darwin' else 'kilobytes'),
+ 'platform':sys.platform,'peak_fixture_disk':peaks if disk else None}))
+'''
     result = subprocess.run(
-        [sys.executable, "-c", wrapper, json.dumps(argv), str(cwd), json.dumps(env)],
-        input=stdin_text, capture_output=True, text=True, timeout=600,
+        [sys.executable, "-c", wrapper, json.dumps(argv), str(cwd), json.dumps(env), str(disk_root) if disk_root else ""],
+        input=stdin_text, capture_output=True, text=True, timeout=timeout,
     )
     if result.returncode:
         raise AssertionError(result.stderr)
@@ -218,8 +233,10 @@ def measure(argv: list[str], env: dict[str, str], cwd: Path, stdin_text: str = "
     if not response.get("ok"):
         raise AssertionError(response)
     data = response["data"]
-    if "status" in data and data["status"] != "completed":
+    if require_completed and "status" in data and data["status"] != "completed":
         raise AssertionError(data)
+    if on_data:
+        on_data(data)
     measured["response_ok"] = True
     return measured
 

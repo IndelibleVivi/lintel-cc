@@ -681,6 +681,54 @@ impl Engine {
         )
     }
 
+    /// Re-verify the frozen resume target identity (project cwd, config root,
+    /// executable object, declared product/version) and the frozen startup
+    /// source binding. This is the same finite static/identity check the plan
+    /// froze, reused before the first intent/copy, after full decrypt and again
+    /// immediately before the process replacement, so a real external writer
+    /// that changes settings/MCP in the decrypt or copy window cannot be
+    /// launched against (no OS compare-and-swap protects those bodies).
+    fn recheck_resume_identity(
+        &self,
+        root: &Path,
+        project: &Path,
+        executable: &str,
+        resume: &Value,
+        startup_binding: &Value,
+    ) -> Result<()> {
+        if project_identity(project)? != resume["project_cwd_identity"] {
+            return Err(err(
+                "stale_plan",
+                "项目工作目录的实际对象在预览后改变，请重新预览",
+            ));
+        }
+        if dir_identity(root)? != resume["config_root_identity"] {
+            return Err(err(
+                "stale_plan",
+                "配置 root 的实际对象在预览后改变，请重新预览",
+            ));
+        }
+        if Some(executable) != self.executable().as_deref() {
+            return Err(err(
+                "executable_changed",
+                "启动来源在预览后改变，请重新预览",
+            ));
+        }
+        if exec_identity(Path::new(executable))? != resume["executable_identity"] {
+            return Err(err(
+                "stale_plan",
+                "客户端可执行文件的实际对象在预览后改变，请重新预览",
+            ));
+        }
+        if policy::product(Some(executable)) != resume["product"] {
+            return Err(err(
+                "stale_product",
+                "客户端产品/版本元数据在预览后改变，请重新预览",
+            ));
+        }
+        crate::components::startup::recheck(&self.home, root, project, startup_binding)
+    }
+
     /// Execute a frozen resume plan: write the private running copy from the
     /// archived bytes (byte-recheck, 0600) and record the concrete finite facts.
     /// The archive original is never modified. Authentication stays unverified.
@@ -720,46 +768,22 @@ impl Engine {
         let resume = &plan["extra"]["resume"];
         self.check_frozen_environment(&plan["environment_id"], &resume["config_root"])?;
         let name = string(resume, "transcript_path")?.to_string();
-        // Recheck the frozen target identity + executable identity + product
-        // metadata before any side effect, exactly like a plain launch.
         let project = check_project_cwd(
             resume["project_cwd"]
                 .as_str()
                 .ok_or_else(|| err("invalid_launch", "续聊请求缺少项目目录"))?,
         )?;
-        if project_identity(&project)? != resume["project_cwd_identity"] {
-            return Err(err(
-                "stale_plan",
-                "项目工作目录的实际对象在预览后改变，请重新预览",
-            ));
-        }
         let root = PathBuf::from(string(resume, "config_root")?);
         guard(&root)?;
-        if dir_identity(&root)? != resume["config_root_identity"] {
-            return Err(err(
-                "stale_plan",
-                "配置 root 的实际对象在预览后改变，请重新预览",
-            ));
-        }
         let executable = string(resume, "executable")?.to_string();
-        if Some(executable.as_str()) != self.executable().as_deref() {
-            return Err(err(
-                "executable_changed",
-                "启动来源在预览后改变，请重新预览",
-            ));
-        }
-        if exec_identity(Path::new(&executable))? != resume["executable_identity"] {
-            return Err(err(
-                "stale_plan",
-                "客户端可执行文件的实际对象在预览后改变，请重新预览",
-            ));
-        }
-        if policy::product(Some(&executable)) != resume["product"] {
-            return Err(err(
-                "stale_product",
-                "客户端产品/版本元数据在预览后改变，请重新预览",
-            ));
-        }
+        let startup_binding = &plan["extra"]["startup_binding"];
+        // Recheck the frozen target identity + executable identity + product
+        // metadata + startup source binding before any side effect, exactly like
+        // a plain launch. This same check is repeated below after the full
+        // decrypt and again immediately before the process replacement, because
+        // the decrypt/copy window can be long enough for a real writer to change
+        // settings/MCP without an OS compare-and-swap.
+        self.recheck_resume_identity(&root, &project, &executable, resume, startup_binding)?;
         // A plan frozen under a different adapter-policy revision is stale before
         // its first launch, so a code/policy change cannot silently reuse it.
         if resume["policy_version"] != RESUME_POLICY_VERSION {
@@ -775,12 +799,6 @@ impl Engine {
                 "该组合暂不支持原生续聊；可改用阅读或提取上下文入口",
             ));
         }
-        crate::components::startup::recheck(
-            &self.home,
-            &root,
-            &project,
-            &plan["extra"]["startup_binding"],
-        )?;
         // Re-read and re-verify the exact transcript bytes from the frozen source.
         let source = json!({
             "archive_path": resume["source"]["archive_path"],
@@ -795,6 +813,11 @@ impl Engine {
         if entry.digest != string(resume, "transcript_digest")? {
             return Err(err("stale_archive", "会话文件在预览后改变，请重新预览"));
         }
+        // The plaintext staging path and frozen digest must outlive the opens
+        // we take below; copy them so the whole full-package staging can be
+        // explicitly closed before any possible process replacement.
+        let plain = entry.plain.clone();
+        let entry_digest = entry.digest.clone();
         let copy = Path::new(string(resume, "private_copy_path")?);
         guard(copy)?;
         if !copy.is_absolute() {
@@ -803,6 +826,15 @@ impl Engine {
         if let Some(parent) = copy.parent() {
             private_dir(parent)?;
         }
+        #[cfg(test)]
+        if let Some(hook) = self.resume_window_hook {
+            hook("pre_intent");
+        }
+        // Full decrypt is complete and the package/digest/entry checks have all
+        // passed; recheck the frozen target and startup sources before the first
+        // durable intent, so a settings/MCP change during the (potentially long)
+        // decrypt window is rejected as query-first, not launched.
+        self.recheck_resume_identity(&root, &project, &executable, resume, startup_binding)?;
         // Durable publication intent BEFORE the copy and the Terminal attempt.
         let mut record = json!({
             "status": "resume_intent",
@@ -823,12 +855,43 @@ impl Engine {
             // Stream-copy the verified plaintext into the private running copy
             // and read it back, hashing both, so a large transcript is never
             // loaded whole.
-            crate::archive::copy_staged_verified(&entry.plain, copy, &entry.digest)
+            crate::archive::copy_staged_verified(&plain, copy, &entry_digest)
         })();
         if let Err(failure) = prepared {
             record["status"] = json!("launch_failed");
             record["error"] = json!({"code":failure.code,"message":failure.message});
             record["message"] = json!("私有运行副本未完成；保留原 ID 和确切路径，不启动或重试。");
+            save(&result_path, &record)?;
+            return Err(failure);
+        }
+        // Explicitly remove this read's full decoded plaintext tree (which still
+        // holds the unselected package members) now that the verified selected
+        // copy is complete and before any possible `exec`. A successful exec
+        // replaces the process, so the ordinary `Drop` would never run and the
+        // decoded package would be left behind. Report a failed cleanup and do
+        // not launch, preserving the original ID and copy facts.
+        if let Err(failure) = opened.close() {
+            record["status"] = json!("launch_failed");
+            record["error"] = json!({"code":failure.code,"message":failure.message});
+            record["message"] = json!("私有暂存目录未清除；保留原 ID、副本与意图，不启动或重试。");
+            save(&result_path, &record)?;
+            return Err(failure);
+        }
+        #[cfg(test)]
+        if let Some(hook) = self.resume_window_hook {
+            hook("pre_launch");
+        }
+        // Recheck the frozen target and startup sources once more after the copy
+        // and staging cleanup, immediately before the process replacement, so a
+        // change during the copy window can no longer launch. Any failure keeps
+        // the recorded intent and stays query-only.
+        if let Err(failure) =
+            self.recheck_resume_identity(&root, &project, &executable, resume, startup_binding)
+        {
+            record["status"] = json!("launch_failed");
+            record["error"] = json!({"code":failure.code,"message":failure.message});
+            record["message"] =
+                json!("启动前目标来源核对未通过；保留原 ID、副本与意图，不启动或重试。");
             save(&result_path, &record)?;
             return Err(failure);
         }

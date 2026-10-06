@@ -128,6 +128,22 @@ impl Staging {
             .custom_flags(libc::O_NOFOLLOW)
             .open(path)?)
     }
+
+    /// Explicitly remove this read's private decoded plaintext tree and report
+    /// whether it is actually gone. Used on the launch path, where a successful
+    /// `exec` would skip [`Drop`]: the caller must confirm the full-package
+    /// staging is closed before any process replacement. Only names this
+    /// process created live under `dir`, so this never sweeps unrelated paths.
+    pub(crate) fn close(self) -> Result<()> {
+        match fs::remove_dir_all(&self.dir) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(_) => Err(err(
+                "staging_cleanup_failed",
+                "无法清除本次读取的私有暂存目录；未启动客户端。请检查原请求记录的阶段与错误后再决定下一步；若该请求已持久化意图，只有原请求 ID 可查询，不会自动重试。",
+            )),
+        }
+    }
 }
 
 impl Drop for Staging {

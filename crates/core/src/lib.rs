@@ -158,6 +158,15 @@ pub struct Engine {
     // tests never spawn a real Terminal. Never present in production.
     #[cfg(test)]
     launch_opener: Option<fn(&Path, &str) -> Result<Value>>,
+    // Test-only fault-injection seam for the resume window. Invoked with a phase
+    // name after the full decrypt and package/digest validation but BEFORE the
+    // post-decrypt identity/startup recheck ("pre_intent"), and after the
+    // verified private copy plus staging cleanup but before the final pre-launch
+    // recheck ("pre_launch"). Lets a synthetic test model a real external writer
+    // that mutates settings/MCP during the decrypt or copy window. Never present
+    // in production.
+    #[cfg(test)]
+    resume_window_hook: Option<fn(&str)>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -184,6 +193,8 @@ impl Engine {
             executable_search_path: None,
             #[cfg(test)]
             launch_opener: None,
+            #[cfg(test)]
+            resume_window_hook: None,
         })
     }
     fn executable(&self) -> Option<String> {

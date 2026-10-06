@@ -79,7 +79,7 @@ Service unit 只接受准确 `.service` 名称，例如 `claude.service` 或 `cl
 
 `inspect_components` 对准确 environment 返回有限静态来源与原任务投影，`project_cwd` 可选且属于目标主机。它不调用 Claude、不读取凭据正文、不查询并改写 job；服务仅核对最多 8 个已有记录中的明确 unit，不能代替全局 supervisor 发现。`records` 最多 50 份，扫描／展示缺口分别标记；原任务的历史 coverage 不等于当前运行状态。浏览器 profile 属于独立本机模块，不由 root 推断归属。
 
-`work_preflight` 只读取元数据，返回所选原件数量／字节、限额、阻塞相对路径及扫描完整性；`eligible` 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 `plan_archive`／`plan_preserve` 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。单个大 session 的完整归档路线仍未交付。
+`work_preflight` 只读取元数据，返回所选原件数量／字节、限额、阻塞相对路径及扫描完整性；`eligible` 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 `plan_archive`／`plan_preserve` 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。当前流式路线可完整归档该 runner 限额内的大 session；超过其单文件／合计限额仍拒绝。原生 resume 的格式核对另限 ≤8 MiB，不限制独立归档与分页阅读。
 
 `work_inventory` 是有界 metadata-only 分页清单，返回准确 environment/root、`files` 的原相对路径／类别／字节数、`total_files`、`complete`、`digest` 和 `next_offset`。继续页使用返回的 `--offset` 与同一个 `--expected-digest`；元数据清单改变拒绝 `stale_inventory`，不能拼接两份快照。这个摘要只绑定分页元数据，不是内容验证或执行批准；正文摘要由正式计划拥有。
 
@@ -158,7 +158,7 @@ lintel work archive list
 
 output_path 可省略以保存在 Lintel state；填写路径时父目录须存在且目的地尚未使用。计划冻结父目录的 device/inode，在接受和发布前复查；目录被替换返回 `stale_plan`，没有这份身份的旧显式输出计划也须重新预览。原任务回执继续只查询、不重跑。archive-only 不建立环境、不处理登录、不改变源文件。`work preserve plan --environment ID --categories ... [--name NAME]` 另行表示归档并准备新环境，成功为完成，outcome=preserved；旧登录保留，接着选新环境保护方案、正常登录与启动。归档仍为 `lintel.work/1`，包含类别、相对路径、原字节和文件 digest，不复制 credentials/settings/hooks/MCP。
 
-当前源码准入为单文件 256 MiB、所选合计 1 GiB、10,000 文件；先用 `work preflight` 读取实际 runner 的 limits，旧候选可能更低。work codec 流式编码、完整解密并核验所有原件，再按冻结 mapping 迁入；每页 reader 至多取 256 KiB，正文不常驻整个包。每次读取仍核验全包，state 磁盘须容纳展开原件，目的地另需密文／逐文件临时空间。正常返回清除私有暂存；强制终止可能留下 `.lintel-work-stage-*`，不会自动扫除。reader 限制 scrypt log N ≤ 20；高成本包明确返回 `archive_limit`，不会降级解密。旧 reader 仍有自己的容量限制，不能据包格式相同推断大包可在旧版本读入。 有限 SSH 的 60 秒／2 MiB 响应边界不因 core 容量增加而改变，慢包预览或阅读可能 `transport_unknown`；在目标机独立运行 CLI 核对，已接受 job 保留原 ID 查询。
+当前源码准入为单文件 256 MiB、所选合计 1 GiB、10,000 文件；先用 `work preflight` 读取实际 runner 的 limits，旧候选可能更低。持久 JSON 记录读写共用 16 MiB 上限；超大冻结计划在保存前返回 `state_limit`，正文容量预检通过不代替计划成立，可缩小精确选择后重新预览。work codec 流式编码、完整解密并核验所有原件，再按冻结 mapping 迁入；每页 reader 至多取 256 KiB，正文不常驻整个包。每次读取仍核验全包，state 磁盘须容纳展开原件，目的地另需密文／逐文件临时空间。正常返回清除私有暂存；强制终止可能留下 `.lintel-work-stage-*`，不会自动扫除。reader 限制 scrypt log N ≤ 20；高成本包明确返回 `archive_limit`，不会降级解密。旧 reader 仍有自己的容量限制，不能据包格式相同推断大包可在旧版本读入。 有限 SSH 的 60 秒／2 MiB 响应边界不因 core 容量增加而改变，慢包预览或阅读可能 `transport_unknown`；在目标机独立运行 CLI 核对，已接受 job 保留原 ID 查询。
 
 把**密文**复制到新机器/独立安装后，不需要源 inventory 或源 job：
 

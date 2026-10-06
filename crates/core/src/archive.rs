@@ -59,6 +59,14 @@ impl OpenedArchive {
             .find(|file| file.path == name)
             .ok_or_else(|| err("archive_file_missing", "归档没有该文件"))
     }
+
+    /// Explicitly close this read's private decoded plaintext tree, reporting
+    /// whether it is actually gone. Launch callers use this before a possible
+    /// `exec`, which would skip [`OpenedArchive`]'s normal drop and leave the
+    /// full decoded package (including unselected sensitive members) behind.
+    pub(crate) fn close(self) -> Result<()> {
+        self._staging.close()
+    }
 }
 
 impl Engine {
@@ -369,6 +377,12 @@ fn atomic_new_from_file(target: &Path, source: &Path, expected: &str) -> Result<
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW)
         .open(&tmp)?;
+    // Arm the guard only after `create_new` proved this process created the
+    // name. It then owns exactly this temp name across the bounded
+    // read/verify/write and the no-replace publication, so a normal error on any
+    // step (including a post-rename parent-sync failure) removes only that
+    // unpublished name, never a pre-existing or unrelated file.
+    let mut staged = crate::storage::StagedTemp::new(tmp.clone());
     let result = (|| -> Result<()> {
         let mut hash = sha2::Sha256::new();
         let mut count = 0u64;
@@ -393,16 +407,17 @@ fn atomic_new_from_file(target: &Path, source: &Path, expected: &str) -> Result<
                 "暂存来源与冻结摘要不一致；未发布迁入文件",
             ));
         }
-        output.sync_all()?;
+        crate::storage::sync_staged_file(&output)?;
         // Publish the completed file with the same no-replace primitive as all
-        // other new-file mutations. An interrupted copy leaves no partial file
-        // at its approved final name.
-        publish_staged_new(&tmp, target)
+        // other new-file mutations, which also flushes the destination parent
+        // directory so the new name survives an interruption. An interrupted
+        // copy leaves no partial file at its approved final name.
+        publish_staged_new(&tmp, target)?;
+        staged.disarm();
+        Ok(())
     })();
     drop(output);
-    if result.is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
+    drop(staged);
     result
 }
 
@@ -487,5 +502,48 @@ mod streaming_publication_tests {
         use std::os::unix::fs::MetadataExt;
         assert_eq!(fs::metadata(&fresh).unwrap().nlink(), 1);
         assert_eq!(fs::metadata(&fresh).unwrap().mode() & 0o777, 0o600);
+    }
+
+    #[test]
+    fn verified_copy_parent_sync_failure_is_reported_and_leaves_no_temp() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path().canonicalize().unwrap();
+        let source = base.join("source.bin");
+        let target = base.join("target.bin");
+        fs::write(&source, b"synthetic exact original").unwrap();
+        let expected = digest(b"synthetic exact original");
+        // The imported copy's rename lands, but the destination directory flush
+        // fails: the streaming publication must report an error (the migration
+        // step cannot be "completed") and leave no temp or republish.
+        crate::storage::sync_fault::arm_owner();
+        let result = copy_staged_verified(&source, &target, &expected);
+        crate::storage::sync_fault::disarm_owner();
+        assert!(result.is_err(), "parent sync failure reported as success");
+        assert_eq!(fs::read(&target).unwrap(), b"synthetic exact original");
+        assert_eq!(
+            fs::read_dir(&base).unwrap().count(),
+            2,
+            "parent sync failure left a temp or dropped the source"
+        );
+    }
+
+    #[test]
+    fn verified_copy_staged_sync_failure_leaves_no_temp_or_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path().canonicalize().unwrap();
+        let source = base.join("source.bin");
+        let target = base.join("target.bin");
+        fs::write(&source, b"synthetic exact original").unwrap();
+        let expected = digest(b"synthetic exact original");
+        crate::storage::sync_fault::arm_staged();
+        let result = copy_staged_verified(&source, &target, &expected);
+        crate::storage::sync_fault::disarm_staged();
+        assert!(result.is_err(), "staged sync failure reported as success");
+        assert!(!target.exists());
+        assert_eq!(
+            fs::read_dir(&base).unwrap().count(),
+            1,
+            "staged sync failure left a temp"
+        );
     }
 }

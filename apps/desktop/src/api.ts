@@ -31,8 +31,41 @@ async function send<C extends keyof Api>(command: C, fields: Api[C]['request']):
 // Core holds one transaction lock for its local journal. Serialize this window
 // so its own independent reads do not compete with discovery or execution.
 let coreQueue: Promise<unknown> = Promise.resolve();
+// Only finite operation names and host labels leave the transport closure.
+// Paths, passphrases, request fields and decoded content never enter this store.
+const packageLabels: Partial<Record<keyof Api, string>> = {
+  archive_inspect: '核验并解锁工作包', session_read: '核验工作包并读取一页',
+  plan_import: '核验工作包并冻结迁入落点', plan_resume: '核验工作包并检查续聊',
+};
+type QueueItem = { id: number; hostAlias: string | null; command: keyof Api; running: boolean; queue: object };
+export type PackageActivity = { id: number; hostAlias: string | null; label: string; running: boolean; waiting: number };
+const localQueue = {};
+let nextActivityId = 0;
+const queueItems = new Map<number, QueueItem>();
+const activityListeners = new Set<() => void>();
+let activitySnapshot: PackageActivity[] = [];
+function publishActivity() {
+  activitySnapshot = [...queueItems.values()].filter(item => packageLabels[item.command]).map(item => ({
+    id: item.id, hostAlias: item.hostAlias, label: packageLabels[item.command]!, running: item.running,
+    waiting: [...queueItems.values()].filter(other => other.queue === item.queue && other.id > item.id).length,
+  }));
+  activityListeners.forEach(listener => listener());
+}
+export function subscribePackageActivity(listener: () => void) {
+  activityListeners.add(listener); return () => { activityListeners.delete(listener); };
+}
+export function getPackageActivity() { return activitySnapshot; }
+function queued<C extends keyof Api>(queue: Promise<unknown>, owner: object, hostAlias: string | null, command: C, action: () => Promise<Api[C]['response']>) {
+  const item: QueueItem = { id: ++nextActivityId, hostAlias, command, running: false, queue: owner };
+  queueItems.set(item.id, item); publishActivity();
+  return queue.then(async () => {
+    item.running = true; publishActivity();
+    try { return await action(); }
+    finally { queueItems.delete(item.id); publishActivity(); }
+  });
+}
 export function request<C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> {
-  const result = coreQueue.then(() => send(command, fields));
+  const result = queued(coreQueue, localQueue, null, command, () => send(command, fields));
   coreQueue = result.catch(() => undefined);
   return result;
 }
@@ -41,8 +74,9 @@ export function request<C extends keyof Api>(command: C, fields: Api[C]['request
 export function requester(alias: string | null): typeof request {
   if (!alias) return request;
   let remoteQueue: Promise<unknown> = Promise.resolve();
+  const owner = {};
   return <C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> => {
-    const result = remoteQueue.then(async () => {
+    const result = queued(remoteQueue, owner, alias, command, async () => {
       // Remote resume asks for the package secret in its real PTY. The App's
       // ephemeral secret is used only by the separately approved read/preview.
       const remoteFields = command === 'resume_request'
