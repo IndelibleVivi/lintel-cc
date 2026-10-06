@@ -81,7 +81,7 @@ Named execute 与有限远端新提交的 `approval` 必须是原计划返回的
 
 专用真实 TTY `lintel launch ID` 与 `capabilities --environment ID` 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 `invalid_request`，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。
 
-`env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
+`env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，并以 `identity_observed` 布尔值说明主体是否可核对；官方注销的主体缺失会拒绝预览，认证状态变化会使旧批准失效。未执行旧注销计划缺少绑定时需要新预览，已接受任务仍只查询原 ID。`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
 
 普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。专用 `launch` 是交互进程接管入口，启动失败诊断写 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。
 

@@ -96,7 +96,7 @@ export interface Api {
   service_inspect: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: ServiceInspection };
   plan_service_quiesce: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: Plan };
   plan_service_resume: { request: { job_id: string }; response: Plan };
-  auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; remote_revocation: string } };
+  auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; identity_observed?: boolean; remote_revocation: string } };
   plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[]; activate?:{instructions:boolean} }; response: Plan };
   reactivate_environment: { request: { environment_id: string }; response: { status: string } };
   archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };

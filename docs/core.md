@@ -79,15 +79,17 @@
 
 `plan_reset` 仍只接受 `recipe: "rebuild"`，语义不变：仅归档后建立新根并迁入，旧 root/登录保留，receipt 维持 `partially_completed`（旧登录/客户端清理步骤未完成）；历史 receipt 不复绿。
 
-当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。枚举预算为单文件 8 MiB、总量 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
+当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。枚举预算为单文件 8 MiB、总量 32 MiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
 工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
 
-工作包与状态备份仅在归档完成后才创建新根。`CLAUDE.md` 迁入新根，会话/记忆资料进入 `lintel-imports`；不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的记忆与会话按原逻辑路径重新计入 manifest，不会遗漏。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
+工作包与状态备份仅在归档完成后才创建新根。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
 ## 有限清理与认证
 
-`cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。
+`cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；只新增 `identity_observed` 布尔值，不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。
+
+官方注销的已登录 claude.ai 预览必须观察到非空 `email`；缺失时返回 `auth_identity_unverified`，独立 auth probe 与仅本地清理仍可用。私有 `extra.auth_binding` 保存 `lintel.auth-status/1`、本计划随机 nonce 和完整解析 JSON／登录结果的摘要，不保存原始主体或未知字段。执行前及保全后的 `check_cleanup` 使用相同 nonce 核对；观察字段变化返回 `stale_auth`。凭据文件身份／内容变化或 fallback 新出现仍由原文件快照返回 `stale_plan`。完整状态中的其他字段变化也需要新预览。public_plan 删除整个 extra，回执和 Agent 元数据不携带此绑定。未尝试的旧官方注销计划缺少绑定须新预览；既有接受任务优先查询原 ID。CLI 报告不是 Keychain 凭据世代或来源认证，真实认证、同账号 Keychain-only token 更新和外部并发边界仍未验收。
 
 `plan_cleanup` 接受 `repair_login`、`reset_client`、`retire`，要求 `writers_confirmed_stopped: true`，可选 `official_logout`。默认根的混合状态是 home 下 `.claude.json`；专用根使用其 `.claude.json`。修复登录只处理 `.credentials.json`；其余两类还处理预览中的混合状态文件。工作、settings、hooks、MCP 与插件文件不会被通配删除。
 

@@ -13,8 +13,10 @@ const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const desktop=path.join(repo,'apps/desktop');
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE || path.join(repo,'extensions/browser/node_modules/playwright/index.mjs')).href);
 const alias='synthetic-writing-server';
+const otherAlias='synthetic-other-server';
 const local={id:'11111111-1111-4111-8111-111111111111',name:'Synthetic local workspace',host:'local',surface:'claude-code',root:'/synthetic/local',executable:null,ownership:'registered',status:'discovered'};
-const remote={...local,id:'22222222-2222-4222-8222-222222222222',name:'Synthetic remote workspace',host:alias,root:'/synthetic/remote'};
+const remote={...local,id:'22222222-2222-4222-8222-222222222222',name:'Synthetic remote workspace',host:alias,root:'/synthetic/remote',executable:'/synthetic/bin/claude'};
+const otherRemote={...remote,id:'66666666-6666-4666-8666-666666666666',host:otherAlias,root:'/synthetic/other'};
 const original='33333333-3333-4333-8333-333333333333',restoreId='44444444-4444-4444-8444-444444444444';
 const launchId='55555555-5555-4555-8555-555555555555';
 const launches=[{alias,request_id:launchId,status:'launch_attempt',mode:'interactive',runner_digest:'c'.repeat(64),binding_resolution:'original_launch_record'}];
@@ -29,26 +31,26 @@ async function invoke(command,args){
   if(command==='inspect_cli')return ok({executable:args.executable,version:{version:'0.1.0',protocol:1,platform:'macos',architecture:'aarch64'},context:executionContext,candidate:{status:'unknown'},checked_at:Date.now()});
   if(command==='remote_request'){
     switch(p.op){
-      case 'hosts':return ok({hosts:removed?[]:[{alias}],tasks,installations,launches});
-      case 'aliases':return ok({aliases:[alias],coverage:'Synthetic SSH inventory; no real connection'});
+      case 'hosts':return ok({hosts:removed?[{alias:otherAlias}]:[{alias},{alias:otherAlias}],tasks,installations,launches});
+      case 'aliases':return ok({aliases:[alias,otherAlias],coverage:'Synthetic SSH inventory; no real connection'});
       case 'prepare_runner':return ok({...installation});
       case 'install_runner':
         installations.push({...installation,install_id:'original-install',status:'needs_reconciliation'});
         return {ok:false,error:{code:'install_reconciliation_required',message:'Synthetic original install still needs reconciliation',diagnostic:{stage:'local',reason:'install_reconciliation_required',summary:'先核对原安装',next_steps:['查询原安装，保留现有版本绑定。'],submission_uncertain:false,alias,install_id:'original-install'}}};
       case 'query_install':assert.equal(p.install_id,'original-install');installations[0]={...installations[0],status:'superseded'};return ok({...installations[0]});
-      case 'connect':assert.equal(p.alias,alias);return ok({status:'connected'});
+      case 'connect':assert.ok([alias,otherAlias].includes(p.alias));return ok({status:'connected'});
       case 'remove_host':removed=true;return ok({status:'removed'});
       case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok(await core({command:'job',job_id:p.plan_id},true));
       case 'launch_query':assert.equal(p.alias,alias);assert.equal(p.request_id,launchId);return ok({...launches[0],root:remote.root,project_cwd:'/synthetic/project',message:'Synthetic original launch remains query-only'});
-      case 'request':assert.equal(p.alias,alias);return ok(await core(p.request,true));
+      case 'request':assert.ok([alias,otherAlias].includes(p.alias));return ok(await core(p.request,true,p.alias));
       case 'execute':assert.equal(p.alias,alias);return ok(await core({...p,command:'execute'},true));
       default:throw new Error('unexpected remote operation: '+p.op);
     }
   }
   assert.equal(command,'request');return ok(await core(p,false));
 }
-async function core(p,isRemote){
-  const environment=isRemote?remote:local;
+async function core(p,isRemote,selectedAlias=alias){
+  const environment=isRemote?(selectedAlias===otherAlias?otherRemote:remote):local;
   switch(p.command){
     case 'context':return executionContext;
     case 'launches':return {launches:[]};
@@ -58,6 +60,9 @@ async function core(p,isRemote){
     case 'jobs':return {jobs:isRemote?receipts.map(r=>({...r})):[]};
     case 'inspect':return {environment,settings:[],assets:[],warnings:[]};
     case 'plan_policy':assert.ok(isRemote);return plan();
+    case 'plan_launch':
+      assert.ok(isRemote);assert.equal(selectedAlias,alias);assert.equal(p.environment_id,remote.id);
+      return {...plan(),launch_request:{id:launchId,config_root:remote.root,project_cwd:p.project_cwd,executable:remote.executable,client_version:'synthetic'}};
     case 'execute':{
       assert.ok(isRemote);const restore=p.plan_id===restoreId;
       assert.equal(p.approval,plan(restore).hash);assert.ok(!receipts.some(r=>r.id===p.plan_id),'duplicate submission');
@@ -92,7 +97,7 @@ try{
   await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'本机',exact:true}).click();
   const dialog=page.getByRole('dialog');
-  await dialog.getByRole('button',{name:'检查并准备运行器',exact:true}).click();
+  await dialog.locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'检查并准备运行器',exact:true}).click();
   await dialog.getByRole('button',{name:'批准并安装这个运行器',exact:true}).click();
   await dialog.getByRole('button',{name:'核对这份未确认安装',exact:false}).click();
   await dialog.getByText('已核实 · 当前绑定已更新',{exact:true}).waitFor();
@@ -101,7 +106,7 @@ try{
   assert.equal(calls.filter(c=>c.op==='query_install').length,1);
   await dialog.getByRole('button',{name:'收起',exact:true}).click();
   report.checks.push('unresolved installation diagnostic renders; direct original-install query exposes superseded binding without another upload');
-  await dialog.getByRole('button',{name:'连接并管理',exact:true}).click();
+  await dialog.locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'连接并管理',exact:true}).click();
   await page.getByRole('button',{name:'开始一项任务',exact:true}).click();
   await page.locator('.task-home [data-task-id="reduce_egress"]').getByRole('button',{name:'选择保护方案',exact:true}).click();
   await page.getByRole('button',{name:'预览变更',exact:true}).click();await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();
@@ -117,6 +122,45 @@ try{
   assert.match(await dialog.locator('.plan-target').innerText(),new RegExp(alias));
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
   report.checks.push('ACK loss then App reload queries same original task; keyboard opens full receipt on exact alias/environment; no resubmit');
+
+  async function openFrom(sourceHost) {
+    if (await page.getByRole('dialog').count()) await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+    await page.locator('.host-switch').click();
+    if (sourceHost===null) await dialog.getByRole('button',{name:'切换到本机',exact:true}).click();
+    else await dialog.locator('.host-row').filter({hasText:sourceHost}).getByRole('button',{name:'连接并管理',exact:true}).click();
+    await page.getByRole('button',{name:sourceHost ?? '本机',exact:true}).waitFor();
+    await page.locator('.host-switch').click();
+    await dialog.locator('.remote-task').filter({hasText:original}).getByRole('button',{name:'查询原任务',exact:true}).click();
+    await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();
+    await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();
+  }
+  for (const sourceHost of [null,otherAlias]) {
+    await openFrom(sourceHost);
+    const queryStart=calls.length;
+    await dialog.getByRole('button',{name:'查询最新结果',exact:true}).click();
+    await assertWait(()=>calls.slice(queryStart).some(c=>c.op==='reconnect'&&c.alias===alias&&c.plan_id===original));
+    await assertWait(async()=>!await pageBusy());
+    assert.ok(!calls.slice(queryStart).some(c=>c.command==='job'&&c.job_id===original),'remote receipt must never query a local job');
+    await dialog.getByRole('button',{name:'交给 Agent',exact:true}).click();
+    await page.getByLabel('Lintel CLI 完整路径').fill('/synthetic/bin/lintel');
+    await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();
+    const handoff=JSON.parse(await page.getByRole('textbox',{name:'Agent 操作交接包',exact:true}).inputValue());
+    assert.equal(handoff.target.host.kind,'ssh');assert.equal(handoff.target.host.alias,alias);
+    assert.equal(handoff.target.environment.id,remote.id);assert.equal(handoff.target.environment.config_root,remote.root);
+    assert.equal(handoff.job.id,original);assert.match(handoff.next_action.commands[0],new RegExp(`remote job '${alias}' '${original}'`));
+    const oldStatus=receipts[0].status;receipts[0].status='completed';
+    await openFrom(sourceHost);
+    await dialog.getByRole('button',{name:'打开 Claude',exact:true}).click();
+    await dialog.getByLabel('项目工作目录').fill('/synthetic/project');
+    const launchStart=calls.length;await dialog.getByRole('button',{name:'核对启动目标',exact:true}).click();
+    await dialog.getByRole('heading',{name:'这次将使用',exact:true}).waitFor();
+    assert.deepEqual(calls.slice(launchStart).find(c=>c.request?.command==='plan_launch'),{command:'remote_request',op:'request',alias,request:{command:'plan_launch',environment_id:remote.id,project_cwd:'/synthetic/project',mode:'interactive'}});
+    receipts[0].status=oldStatus;
+  }
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.locator('.host-switch').click();await dialog.locator('.remote-task').filter({hasText:original}).getByRole('button',{name:'查询原任务',exact:true}).click();
+  await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();
+  report.checks.push('local→A and B→A retain original host/environment in refresh, Agent packet/query command and startup preview; no new mutation');
 
   // An outstanding original-job query must not reopen a receipt closed by the user.
   heldJob=hold();await dialog.getByRole('button',{name:'查询最新结果',exact:true}).click();

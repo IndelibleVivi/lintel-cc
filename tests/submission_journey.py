@@ -171,7 +171,7 @@ with tempfile.TemporaryDirectory(prefix="lintel-submit-default-") as tmp:
     fake.parent.mkdir(parents=True)
     fake.write_text("""#!/bin/sh
 case "$1:$2" in
-auth:status) printf '{"configDirectory":"%s","authMethod":"claude.ai"}' "$CLAUDE_CONFIG_DIR"; exit 0;;
+auth:status) printf '{"configDirectory":"%s","authMethod":"claude.ai","email":"synthetic@example.invalid"}' "$CLAUDE_CONFIG_DIR"; exit 0;;
 auth:logout) touch "$CLAUDE_CONFIG_DIR/unexpected-logout"; exit 0;;
 *) exit 9;;
 esac

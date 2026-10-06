@@ -145,8 +145,8 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and shared Rust controller; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | Built desktop frontend, Rust and Playwright Chromium, with a real restart that emits `runtime.onStartup`. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
-| `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, original-task query, full receipt, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
-| `baseline-ui` | Built frontend + real synthetic core; task/target isolation, source-bound reader, explicit context, clipboard failure, original request recovery and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
+| `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, local→A/B→A full receipt routing through refresh, Agent packet/query command and startup preview, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
+| `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, clipboard failure, original request recovery and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
 | `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, wrong password, task help, keyboard and Day/Night; synthetic invoke, not native WebKit. |
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `site-ui` | Static website, Playwright Chromium and an ephemeral loopback server; no native/core transport or external requests. |
@@ -466,6 +466,7 @@ real core/native-host processes. Build the desktop frontend first. Its additiona
 App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
-The default group includes 19 checks; the CI independent browser/UI group includes
+The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
+The default group includes 20 checks; the CI independent browser/UI group includes
 browser-smoke, browser-pairing-ui, service-ui, work-ui, baseline-ui, remote-task-ui, site-ui and
 clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.

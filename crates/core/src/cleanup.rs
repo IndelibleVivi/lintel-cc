@@ -9,6 +9,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn auth_status_digest(public: &Value, raw: &Value, nonce: &str) -> String {
+    // Canonical JSON detects account/organization/status changes without
+    // retaining their values. A per-plan nonce prevents a public stable ID.
+    digest(&serde_json::to_vec(&json!([nonce, public["logged_in"], raw])).unwrap())
+}
+
 pub(crate) fn bounded(mut command: Command) -> Result<(i32, Vec<u8>)> {
     use std::os::unix::process::CommandExt;
     command
@@ -79,6 +85,12 @@ impl Engine {
     }
 
     pub(crate) fn auth_probe(&self, r: &Value) -> Result<Value> {
+        self.auth_observation(r).map(|(public, _)| public)
+    }
+
+    // Keep the raw status only in memory. Public callers receive no account,
+    // organization, token, or opaque comparison value.
+    fn auth_observation(&self, r: &Value) -> Result<(Value, Value)> {
         let e = self.env(r)?;
         let (code, bytes) = bounded(self.auth_command(&e, "status")?)?;
         let raw = parse(&bytes).map_err(|_| {
@@ -102,10 +114,13 @@ impl Engine {
         {
             return Err(err("auth_scope_unverified","认证来源或 configDirectory 无法匹配；需要支持 configDirectory 的 Claude 版本（官方说明为 2.1.268+）"));
         }
-        // Deliberately discard email, account identity, organization and all unknown fields.
-        Ok(
-            json!({"environment_id":e["id"],"config_directory":e["root"],"auth_method":raw["authMethod"],"logged_in":code==0,"checked_at":now(),"remote_revocation":"unverified"}),
-        )
+        let identity_observed = code == 0
+            && raw["authMethod"] == "claude.ai"
+            && raw["email"]
+                .as_str()
+                .is_some_and(|email| !email.trim().is_empty());
+        let public = json!({"environment_id":e["id"],"config_directory":e["root"],"auth_method":raw["authMethod"],"logged_in":code==0,"identity_observed":identity_observed,"checked_at":now(),"remote_revocation":"unverified"});
+        Ok((public, raw))
     }
 
     fn cleanup_files(&self, e: &Value, recipe: &str) -> Result<Vec<Value>> {
@@ -216,17 +231,22 @@ impl Engine {
             return Err(err("writers_active","仍检测到 Claude 进程且无法确认所属 root；请核对并关闭目标写入者，Lintel 不会全局杀进程"));
         }
         let services = self.check_cleanup_services(&e)?;
-        let auth = if logout {
-            let a = self.auth_probe(r)?;
+        let (auth, auth_binding) = if logout {
+            let (a, raw) = self.auth_observation(r)?;
             if a["auth_method"] != "claude.ai" && a["auth_method"] != "none" {
                 return Err(err(
                     "auth_source_external",
                     "当前认证来自 key、helper、token 或第三方来源；不会把这些来源当成本地登录删除",
                 ));
             }
-            a
+            if a["logged_in"] == true && a["identity_observed"] != true {
+                return Err(err("auth_identity_unverified", "CLI 没有提供可核对的登录主体；不能冻结官方注销对象。可仅处理预览内的本地文件，或核对客户端后重新预览"));
+            }
+            let nonce = crate::id();
+            let binding = json!({"schema":"lintel.auth-status/1","nonce":nonce,"status_digest":auth_status_digest(&a, &raw, &nonce)});
+            (a, binding)
         } else {
-            Value::Null
+            (Value::Null, Value::Null)
         };
         let categories = if recipe == "repair_login" {
             vec![]
@@ -272,7 +292,7 @@ impl Engine {
         } else {
             Value::Null
         };
-        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"],"frozen_target":frozen_target,"work_purpose":work::purposes(&categories),"activate":activation}))
+        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"auth_binding":auth_binding,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"],"frozen_target":frozen_target,"work_purpose":work::purposes(&categories),"activate":activation}))
     }
 
     fn check_auth_scope(&self) -> Result<()> {
@@ -316,11 +336,18 @@ impl Engine {
             {
                 return Err(err("executable_changed", "Claude 启动来源改变，请重新检查"));
             }
-            let auth = self.auth_probe(&json!({"environment_id":e["id"]}))?;
+            let binding = &p["extra"]["auth_binding"];
+            let nonce = binding["nonce"].as_str().filter(|_| binding["schema"] == "lintel.auth-status/1")
+                .ok_or_else(|| err("stale_auth", "这份未执行计划没有认证主体绑定；请重新预览官方注销，原任务 ID 仍只用于查询"))?;
+            let (auth, raw) = self.auth_observation(&json!({"environment_id":e["id"]}))?;
             if auth["auth_method"] != p["extra"]["auth"]["auth_method"]
                 || auth["logged_in"] != p["extra"]["auth"]["logged_in"]
+                || binding["status_digest"] != auth_status_digest(&auth, &raw, nonce)
             {
-                return Err(err("stale_auth", "预览后登录来源改变；未注销新的登录"));
+                return Err(err(
+                    "stale_auth",
+                    "预览后认证主体或状态改变；未注销新的登录，请重新核对并预览",
+                ));
             }
         }
         Ok(())

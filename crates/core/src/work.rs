@@ -295,9 +295,17 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
     if relative == Path::new("CLAUDE.md") {
         return Some("instructions");
     }
+    // A reference instruction that an earlier migration left in the inactive
+    // work area keeps the instructions category so a later archive still covers
+    // it. The only files this can match are names Lintel itself produced in that
+    // one slot: the reference `CLAUDE.md` and its collision disambiguations
+    // (`lintel-<n>-CLAUDE.md`). This finite rule never promotes arbitrary
+    // unknown files.
+    if is_reference_instructions(relative) {
+        return Some("instructions");
+    }
     // Work previously preserved into lintel-imports keeps its category so a
-    // later archive covers it again; only the active root CLAUDE.md counts as
-    // instructions.
+    // later archive covers it again; instruction slots were handled above.
     let work_area =
         relative.starts_with("projects") || relative.starts_with("lintel-imports/projects");
     if work_area
@@ -310,6 +318,34 @@ pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
         return Some("sessions");
     }
     None
+}
+
+/// The inactive reference-rotation slot for the instructions category is
+/// `lintel-imports/<name>`, where `<name>` is `CLAUDE.md` or a collision
+/// disambiguation like `lintel-1-CLAUDE.md`. Only a file placed directly under
+/// `lintel-imports` matches; deeper paths keep their own category rules.
+fn is_reference_instructions(relative: &Path) -> bool {
+    let mut components = relative.components();
+    let first = match components.next() {
+        Some(Component::Normal(part)) => part,
+        _ => return false,
+    };
+    if first != "lintel-imports" || components.clone().count() != 1 {
+        return false;
+    }
+    let name = match components.next() {
+        Some(Component::Normal(name)) => match name.to_str() {
+            Some(name) => name,
+            None => return false,
+        },
+        _ => return false,
+    };
+    if name == "CLAUDE.md" {
+        return true;
+    }
+    name.strip_prefix("lintel-")
+        .and_then(|rest| rest.strip_suffix("-CLAUDE.md"))
+        .is_some_and(|index| !index.is_empty() && index.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// Map one selected batch into the inactive work area. Reserve every original
@@ -1315,6 +1351,187 @@ mod tests {
                 .iter()
                 .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
                 .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn classify_covers_reference_instruction_names_only() {
+        // The active root slot.
+        assert_eq!(classify(Path::new("CLAUDE.md")), Some("instructions"));
+        // The inactive reference slot and its generated collision names.
+        assert_eq!(
+            classify(Path::new("lintel-imports/CLAUDE.md")),
+            Some("instructions")
+        );
+        assert_eq!(
+            classify(Path::new("lintel-imports/lintel-1-CLAUDE.md")),
+            Some("instructions")
+        );
+        assert_eq!(
+            classify(Path::new("lintel-imports/lintel-42-CLAUDE.md")),
+            Some("instructions")
+        );
+        // Finite rule: unrelated lookalikes are not promoted to user assets.
+        assert_eq!(classify(Path::new("lintel-imports/README.md")), None);
+        assert_eq!(classify(Path::new("lintel-imports/lintel-CLAUDE.md")), None);
+        assert_eq!(
+            classify(Path::new("lintel-imports/lintel-x-CLAUDE.md")),
+            None
+        );
+        assert_eq!(classify(Path::new("lintel-imports/nested/CLAUDE.md")), None);
+        assert_eq!(classify(Path::new("lintel-imports/CLAUDE.md.bak")), None);
+    }
+
+    #[test]
+    fn reference_instructions_survive_repeated_imports_without_double_wrap() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        // A reference position produced by an earlier `instructions_active:false`
+        // migration, plus its collision disambiguation, plus unrelated memory.
+        let instruction = b"reference instruction".as_slice();
+        let collision = b"reference collision".as_slice();
+        let memory = b"reference memory".as_slice();
+        let groups = json!([
+            {"path":"lintel-imports/CLAUDE.md","category":"instructions"},
+            {"path":"lintel-imports/lintel-1-CLAUDE.md","category":"instructions"},
+            {"path":"lintel-imports/projects/demo/memory/MEMORY.md","category":"memory"},
+        ]);
+        // Model what the manifest would classify from that tree, then freeze the
+        // reference mapping (instructions inactive) and assert it is unchanged.
+        let mut files = vec![];
+        for (entry, bytes) in
+            groups
+                .as_array()
+                .unwrap()
+                .iter()
+                .zip([instruction, collision, memory])
+        {
+            let path = entry["path"].as_str().unwrap();
+            assert_eq!(
+                classify(Path::new(path)),
+                Some(entry["category"].as_str().unwrap()),
+                "classification of retained path {path}"
+            );
+            files.push(json!({
+                "path": path,
+                "category": entry["category"],
+                "data": bytes,
+                "digest": digest(bytes),
+            }));
+        }
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        engine
+            .migrate_files(
+                &environment,
+                "synthetic",
+                &files,
+                &mut receipt,
+                &journal,
+                None,
+                &json!({"instructions": false}),
+            )
+            .unwrap();
+        let destination = Path::new(receipt["new_root"].as_str().unwrap());
+        // Reference instructions stay reference (no root CLAUDE.md) and keep
+        // their exact names; nothing is wrapped a second time.
+        assert!(!destination.join("CLAUDE.md").exists());
+        assert_eq!(
+            fs::read(destination.join("lintel-imports/CLAUDE.md")).unwrap(),
+            instruction
+        );
+        assert_eq!(
+            fs::read(destination.join("lintel-imports/lintel-1-CLAUDE.md")).unwrap(),
+            collision
+        );
+        assert_eq!(
+            fs::read(destination.join("lintel-imports/projects/demo/memory/MEMORY.md")).unwrap(),
+            memory
+        );
+        assert!(!destination.join("lintel-imports/lintel-imports").exists());
+        // A later archive over the migrated tree still sees all three sources.
+        let again = manifest(destination, &["instructions".into(), "memory".into()]).unwrap();
+        let paths: Vec<&str> = again
+            .iter()
+            .map(|file| file["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "lintel-imports/CLAUDE.md",
+                "lintel-imports/lintel-1-CLAUDE.md",
+                "lintel-imports/projects/demo/memory/MEMORY.md",
+            ]
+        );
+        // Repeated imports keep the same targets: reference stays reference.
+        assert_eq!(
+            migration_paths(&again, false).unwrap(),
+            again
+                .iter()
+                .map(|file| PathBuf::from(file["path"].as_str().unwrap()))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn active_and_reference_instructions_coexist_with_generated_names() {
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let home = base.join("home");
+        let root = home.join("source");
+        fs::create_dir_all(&root).unwrap();
+        // Active root instructions, a reference instruction and an already
+        // collided reference must all be retained distinctly.
+        let active = b"active instruction".as_slice();
+        let reference = b"reference instruction".as_slice();
+        let collided = b"already collided reference".as_slice();
+        let files = vec![
+            json!({"path":"CLAUDE.md","category":"instructions","data":active,"digest":digest(active)}),
+            json!({"path":"lintel-imports/CLAUDE.md","category":"instructions","data":reference,"digest":digest(reference)}),
+            json!({"path":"lintel-imports/lintel-1-CLAUDE.md","category":"instructions","data":collided,"digest":digest(collided)}),
+        ];
+        let engine = Engine::new(home, base.join("state")).unwrap();
+        let environment = engine.register("synthetic", &root, false).unwrap();
+        let journal = engine.state.join("jobs/synthetic.json");
+        let mut receipt = json!({"steps":[]});
+        // Instructions inactive: the active root CLAUDE.md joins the reference
+        // area, where it must not overwrite either existing reference.
+        engine
+            .migrate_files(
+                &environment,
+                "synthetic",
+                &files,
+                &mut receipt,
+                &journal,
+                None,
+                &json!({"instructions": false}),
+            )
+            .unwrap();
+        let destination = Path::new(receipt["new_root"].as_str().unwrap());
+        let mut retained = fs::read_dir(destination.join("lintel-imports"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect::<Vec<_>>();
+        retained.sort();
+        assert_eq!(
+            retained,
+            vec!["CLAUDE.md", "lintel-1-CLAUDE.md", "lintel-2-CLAUDE.md"]
+        );
+        let bytes: HashSet<Vec<u8>> = retained
+            .iter()
+            .map(|name| fs::read(destination.join("lintel-imports").join(name)).unwrap())
+            .collect();
+        assert_eq!(
+            bytes,
+            [active, reference, collided]
+                .iter()
+                .map(|b| b.to_vec())
+                .collect::<HashSet<_>>()
         );
     }
 

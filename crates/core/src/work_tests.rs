@@ -417,7 +417,7 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
     fs::create_dir_all(script.parent().unwrap()).unwrap();
     fs::write(
         &script,
-        "#!/bin/sh\ncase \"$2\" in\n status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n logout) exit 3;;\nesac\nexit 9\n",
+        "#!/bin/sh\ncase \"$2\" in\n status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n logout) exit 3;;\nesac\nexit 9\n",
     )
     .unwrap();
     fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();

@@ -116,6 +116,195 @@ fn changed_credentials_block_cleanup_before_acceptance() {
     );
 }
 
+fn auth_fixture() -> (tempfile::TempDir, Engine, Value, PathBuf) {
+    let (temp, mut engine, mut environment, root) = fixture();
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    let script = engine.home.join(".local/bin/claude");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    fs::write(&script, r##"#!/bin/sh
+case "$2" in
+status)
+count=0
+if test -f "$CLAUDE_CONFIG_DIR/probe-count"; then count=$(cat "$CLAUDE_CONFIG_DIR/probe-count"); fi
+count=$((count + 1))
+printf '%s' "$count" > "$CLAUDE_CONFIG_DIR/probe-count"
+if test "$count" -ge 3 && test -f "$CLAUDE_CONFIG_DIR/after-preserve-auth.json"; then
+cat "$CLAUDE_CONFIG_DIR/after-preserve-auth.json"
+else
+cat "$CLAUDE_CONFIG_DIR/synthetic-auth.json"
+fi
+if test -f "$CLAUDE_CONFIG_DIR/signed-out"; then exit 1; else exit 0; fi;;
+logout)
+touch "$CLAUDE_CONFIG_DIR/logout-attempted" "$CLAUDE_CONFIG_DIR/signed-out"
+printf '{"configDirectory":"%s","authMethod":"none"}' "$CLAUDE_CONFIG_DIR" > "$CLAUDE_CONFIG_DIR/synthetic-auth.json"
+exit 0;;
+esac
+exit 9
+"##).unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+    environment["executable"] = json!(script);
+    save(
+        &engine.state.join("inventory.json"),
+        &json!([environment.clone()]),
+    )
+    .unwrap();
+    set_auth_status(&root, Some("account-a@example.invalid"));
+    (temp, engine, environment, root)
+}
+
+fn set_auth_status(root: &Path, email: Option<&str>) {
+    save(&root.join("synthetic-auth.json"), &json!({"configDirectory":root,"authMethod":"claude.ai","email":email,"orgId":"synthetic-org","privateExtra":"SYNTHETIC_AUTH_STATUS_DO_NOT_PUBLISH"})).unwrap();
+}
+
+#[test]
+fn cleanup_auth_account_switch_without_local_file_change_blocks_before_acceptance() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    let plan = clean_plan(&engine, &environment, "repair_login", true);
+    set_auth_status(&root, Some("account-b@example.invalid"));
+    let result =
+        engine.request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"]}));
+    assert_eq!(result["error"]["code"], "stale_auth", "{result}");
+    assert!(!engine.path("jobs", plan["id"].as_str().unwrap()).exists());
+    assert!(!root.join("logout-attempted").exists());
+}
+
+#[test]
+fn cleanup_auth_missing_subject_refuses_logout_preview_but_allows_local_cleanup() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    set_auth_status(&root, None);
+    let probe = data(
+        &engine,
+        json!({"command":"auth_probe","environment_id":environment["id"]}),
+    );
+    assert_eq!(probe["identity_observed"], false);
+    let result = engine.request(json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":true}));
+    assert_eq!(
+        result["error"]["code"], "auth_identity_unverified",
+        "{result}"
+    );
+    let local = clean_plan(&engine, &environment, "repair_login", false);
+    run(&engine, &local);
+    assert!(!root.join("logout-attempted").exists());
+}
+
+#[test]
+fn cleanup_auth_changed_after_preservation_retains_work_without_logout() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    fs::write(root.join("CLAUDE.md"), "Synthetic instructions retained").unwrap();
+    fs::write(
+        root.join(".credentials.json"),
+        "Synthetic credential generation",
+    )
+    .unwrap();
+    let plan = clean_plan(&engine, &environment, "reset_client", true);
+    let changed = json!({"configDirectory":root,"authMethod":"claude.ai","email":"account-b@example.invalid","orgId":"synthetic-org","privateExtra":"SYNTHETIC_AUTH_STATUS_DO_NOT_PUBLISH"});
+    save(&root.join("after-preserve-auth.json"), &changed).unwrap();
+    let job = run(&engine, &plan);
+    assert_eq!(job["error"]["code"], "stale_auth", "{job}");
+    assert!(job["archive_path"].is_string());
+    let target = PathBuf::from(job["new_root"].as_str().unwrap());
+    assert_eq!(
+        fs::read_to_string(target.join("CLAUDE.md")).unwrap(),
+        "Synthetic instructions retained"
+    );
+    assert!(root.join(".credentials.json").exists());
+    assert!(!root.join("logout-attempted").exists());
+}
+
+#[test]
+fn cleanup_auth_binding_is_private_and_unchanged_subject_can_finish() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    let plan = clean_plan(&engine, &environment, "repair_login", true);
+    let internal = load(&engine.path("plans", plan["id"].as_str().unwrap())).unwrap();
+    assert!(internal["extra"]["auth_binding"]["status_digest"].is_string());
+    assert!(internal["extra"]["auth_binding"]["nonce"].is_string());
+    let job = run(&engine, &plan);
+    assert_eq!(job["status"], "completed", "{job}");
+    for value in [&plan, &internal, &job] {
+        let text = value.to_string();
+        assert!(!text.contains("account-a@example.invalid"));
+        assert!(!text.contains("SYNTHETIC_AUTH_STATUS_DO_NOT_PUBLISH"));
+    }
+    assert!(!plan.to_string().contains("status_digest"));
+    assert!(!job.to_string().contains("status_digest"));
+    assert!(root.join("logout-attempted").exists());
+}
+
+#[test]
+fn cleanup_auth_same_account_new_file_generation_or_fallback_blocks() {
+    for had_credentials in [false, true] {
+        let (_temp, engine, environment, root) = auth_fixture();
+        if had_credentials {
+            fs::write(root.join(".credentials.json"), "Synthetic token A").unwrap();
+        }
+        let plan = clean_plan(&engine, &environment, "repair_login", true);
+        fs::write(
+            root.join(".credentials.json"),
+            "Synthetic token B or Keychain fallback",
+        )
+        .unwrap();
+        let result = engine
+            .request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"]}));
+        assert_eq!(result["error"]["code"], "stale_plan", "{result}");
+        assert!(!root.join("logout-attempted").exists());
+        assert!(!engine.path("jobs", plan["id"].as_str().unwrap()).exists());
+    }
+}
+
+#[test]
+fn cleanup_auth_organization_change_blocks_even_with_same_email() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    let plan = clean_plan(&engine, &environment, "repair_login", true);
+    let mut status = load(&root.join("synthetic-auth.json")).unwrap();
+    status["orgId"] = json!("different-synthetic-org");
+    save(&root.join("synthetic-auth.json"), &status).unwrap();
+    let result =
+        engine.request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"]}));
+    assert_eq!(result["error"]["code"], "stale_auth", "{result}");
+    assert!(!root.join("logout-attempted").exists());
+}
+
+#[test]
+fn cleanup_auth_unattempted_legacy_logout_requires_new_preview_and_finished_jobs_stay_query_only() {
+    let (_temp, engine, environment, root) = auth_fixture();
+    let plan = clean_plan(&engine, &environment, "repair_login", true);
+    let path = engine.path("plans", plan["id"].as_str().unwrap());
+    let mut internal = load(&path).unwrap();
+    let binding = internal["extra"]
+        .as_object_mut()
+        .unwrap()
+        .remove("auth_binding")
+        .unwrap();
+    internal.as_object_mut().unwrap().remove("hash");
+    internal["hash"] = json!(digest(&serde_json::to_vec(&internal).unwrap()));
+    save(&path, &internal).unwrap();
+    let result = engine
+        .request(json!({"command":"execute","plan_id":internal["id"],"approval":internal["hash"]}));
+    assert_eq!(result["error"]["code"], "stale_auth", "{result}");
+    assert!(!root.join("logout-attempted").exists());
+    internal["extra"]["auth_binding"] = binding;
+    internal.as_object_mut().unwrap().remove("hash");
+    internal["hash"] = json!(digest(&serde_json::to_vec(&internal).unwrap()));
+    save(&path, &internal).unwrap();
+    let job = run(&engine, &plan);
+    internal["extra"]
+        .as_object_mut()
+        .unwrap()
+        .remove("auth_binding");
+    internal.as_object_mut().unwrap().remove("hash");
+    internal["hash"] = json!(digest(&serde_json::to_vec(&internal).unwrap()));
+    save(&path, &internal).unwrap();
+    fs::remove_file(root.join("logout-attempted")).unwrap();
+    set_auth_status(&root, Some("account-b@example.invalid"));
+    fs::remove_file(root.join("signed-out")).unwrap();
+    let repeated = run(&engine, &internal);
+    assert_eq!(repeated["id"], job["id"]);
+    assert!(
+        !root.join("logout-attempted").exists(),
+        "an accepted original job must never replay logout"
+    );
+}
+
 #[test]
 fn retirement_and_reactivation_do_not_delete_work() {
     let (_tmp, engine, e, root) = fixture();

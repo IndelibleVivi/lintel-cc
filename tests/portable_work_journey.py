@@ -277,7 +277,7 @@ class PortableWorkJourney(unittest.TestCase):
         script.parent.mkdir(parents=True)
         script.write_text(
             "#!/bin/sh\ncase \"$2\" in\n"
-            " status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n"
+            " status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n"
             " logout) exit 3;;\nesac\nexit 9\n"
         )
         script.chmod(0o700)
@@ -327,7 +327,7 @@ class PortableWorkJourney(unittest.TestCase):
             marker = directory / "calls"
             script.write_text(
                 '#!/bin/sh\nprintf "%s\\n" "$2" >> "' + str(marker) + '"\n'
-                "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"\n"
+                "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"\n"
             )
             script.chmod(0o700)
             scripts.append(directory)
@@ -359,7 +359,7 @@ class PortableWorkJourney(unittest.TestCase):
         logout_marker = self.base / "unexpected-logout"
         script.write_text(
             '#!/bin/sh\nif test "$2" = logout; then touch "' + str(logout_marker) + '"; exit 3; fi\n'
-            "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\"}' \"$CLAUDE_CONFIG_DIR\"\n"
+            "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"\n"
         )
         script.chmod(0o700)
         # This inert sleeper has the process name that the production ps check
