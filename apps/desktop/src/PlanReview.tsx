@@ -7,6 +7,7 @@ export default function PlanReview({ plan }: { plan: Plan }) {
   const target=plan.planned_target;
   const manifest = target ? { files:target.files,package:plan.import_manifest?.package ?? null } : plan.import_manifest;
   return <>
+    {plan.work_selection&&<section className="work-selection-review" aria-label="批准中的原件范围"><h4>{plan.work_selection.mode==='paths'?'仅保全这些原件':'按整类保全原件'}</h4><p>{plan.work_selection.mode==='paths'?'这份精确清单已经冻结。未列出的原件不会加入归档；选中内容改变会要求重新预览。':'归档范围由所选类别的完整原件清单冻结；执行时再次核对。'}</p>{plan.work_selection.paths&&<ul>{plan.work_selection.paths.map(path=><li key={path}><code>{path}</code></li>)}</ul>}</section>}
     {target && <section className="frozen-destination"><span className="eyebrow">{target.create?'将准备新的配置环境':'使用已登记配置环境'}</span><h4>批准中的最终配置 root</h4><code>{target.new_root}</code><p>计划阶段未创建新 root。执行时复查目录身份、文件落点与外部占用。</p></section>}
     {manifest && <section className="import-review" aria-label="最终迁入清单">
       <div className="import-review-heading"><div><span className="eyebrow">from archive to this environment</span><h4>这些文件，会放在这里</h4></div><span>{manifest.files.length} 个文件 · {formatBytes(manifest.files.reduce((sum, file) => sum + file.size, 0))}</span></div>

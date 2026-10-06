@@ -22,7 +22,9 @@ pub const HELP: &str = concat!(
   "  lintel restore plan --job ID                Prepare an independent restoration\n",
   "  lintel work archive plan --environment ID --categories instructions,memory,sessions\n",
   "  lintel work archive list | inspect | read   Use --job ID or --archive-path PATH\n",
-  "  lintel work preflight --environment ID --categories instructions,memory,sessions\n",
+  "  lintel work inventory --environment ID --categories ... [--offset N --expected-digest HEX]\n",
+  "  lintel work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n",
+  "  lintel work archive|preserve plan ... [--path RELATIVE_PATH ...]  Exact original-file subset\n",
   "  lintel work session read                    Bounded paged read; passphrase via JSON stdin\n",
   "  lintel work preserve plan --environment ID --categories instructions,memory,sessions\n",
   "  lintel work import plan --environment ID --archive-path PATH --categories memory,sessions\n",
@@ -163,6 +165,14 @@ pub fn dispatch(request: Value) -> Value {
 }
 
 fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
+    // `--path` is repeatable only for the exact work-selection commands; every
+    // other command keeps its existing single `--path` string (archive/session
+    // read). `selected_paths` is name-gated by `named()` so it cannot leak into
+    // an unsupported command's request.
+    let repeats_path = matches!(
+        request.get("command").and_then(Value::as_str),
+        Some("work_preflight" | "plan_archive" | "plan_preserve")
+    );
     let mut i = 0;
     while i < args.len() {
         let flag = args[i].as_str();
@@ -207,6 +217,20 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
             _ => flag.trim_start_matches("--"),
         };
         let key = key.replace('-', "_");
+        if repeats_path && key == "path" {
+            let raw = &args[i + 1];
+            let list = request
+                .as_object_mut()
+                .unwrap()
+                .entry("selected_paths")
+                .or_insert_with(|| json!([]));
+            let list = list
+                .as_array_mut()
+                .ok_or_else(|| error("invalid_argument", "selected_paths 必须是数组"))?;
+            list.push(json!(raw));
+            i += 2;
+            continue;
+        }
         if request.get(&key).is_some() {
             return Err(error("duplicate_argument", &key));
         }
@@ -216,6 +240,10 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
         } else if key == "custom_settings" {
             serde_json::from_str(raw)
                 .map_err(|_| error("invalid_argument", "custom-settings 需要 JSON object"))?
+        } else if key == "offset" {
+            json!(raw
+                .parse::<u64>()
+                .map_err(|_| error("invalid_argument", "offset 需要非负整数"))?)
         } else {
             json!(raw)
         };
@@ -224,12 +252,17 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
     Ok(request)
 }
 
-fn named(command: &str, args: &[String], seed: Value, input: bool) -> Value {
+fn named(command: &str, args: &[String], mut seed: Value, input: bool) -> Value {
     if command == "launch" {
         return error(
             "interactive_launch_required",
             "请在真实交互终端使用 lintel launch <environment-id> 启动；该入口核对 stdin/stdout TTY，并且不接受 prompt",
         );
+    }
+    // The operation is known before parsing argv. Repeatable --path belongs to
+    // exact work selection; archive/session read retain their single path.
+    if seed.get("command").is_none() {
+        seed["command"] = json!(command);
     }
     let mut request = match flags(args, seed) {
         Ok(r) => r,
@@ -308,7 +341,7 @@ const GROUP_HELP: &[(&str, &str)] = &[
     ("network", "network serve --config PATH\n  明确前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
     ("env", "env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n  list/inspect/components 只读；components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
-    ("work", "work preflight --environment ID --categories instructions,memory,sessions\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  preflight 只读元数据容量预检，不读正文、不计算摘要、不修改原件；session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
+    ("work", "work inventory --environment ID --categories instructions,memory,sessions [--offset N] [--expected-digest HEX]\n  work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  inventory 返回有界只读原件元数据清单（分页/摘要绑定同一次扫描）；preflight 只读元数据容量预检。archive/preserve plan 可用可重复 --path 精确选择所选类别内的原件，排除未选的大会话而不截断。session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
     ("job", "job show ID | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
     ("restore", "restore plan --job ID\n  为仍属于本工具的字段准备独立恢复预览。"),
     ("remote", "remote hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID | control\n  remote launch request|resume ALIAS REQUEST_ID APPROVAL；remote launch query ALIAS REQUEST_ID | remote launch list ALIAS。有限 OpenSSH controller；execute 只走 submit，恢复只查询原任务。"),
@@ -487,13 +520,14 @@ pub fn run(args: &[String]) -> Value {
                 ("archive", "inspect", _) => ("archive_inspect", 3, true),
                 ("archive", "read", _) => ("archive_read", 3, true),
                 ("preflight", _, _) => ("work_preflight", 2, false),
+                ("inventory", _, _) => ("work_inventory", 2, false),
                 ("session", "read", _) => ("session_read", 3, true),
                 ("preserve", "plan", _) => ("plan_preserve", 3, false),
                 ("import", "plan", _) => ("plan_import", 3, true),
                 _ => {
                     return error(
                         "invalid_argument",
-                        "work preflight --environment ID --categories ... | archive plan/list/inspect/read | session read | preserve plan | import plan",
+                        "work inventory|preflight --environment ID --categories ... [--path REL ...] | archive plan/list/inspect/read | session read | preserve plan | import plan",
                     )
                 }
             };

@@ -149,7 +149,7 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
 | `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, local→A/B→A full receipt routing through refresh, Agent packet/query command and startup preview, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
 | `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, clipboard failure, original request recovery and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
-| `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, wrong password, task help, keyboard and Day/Night; synthetic invoke, not native WebKit. |
+| `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, metadata paging, exact project/session/file selection excluding 9 MiB, frozen approval/bytes, old-runner refusal, wrong password, keyboard and Day/Night; synthetic invoke, not native WebKit. |
 | `components-ui` | Built frontend, runner and Playwright Chromium; real synthetic cores, component/cwd facts, malformed settings, exact original alias/ID, late-response isolation and capacity correction. Invoke/SSH are modeled; not native WebKit or production. Set `LINTEL_COMPONENTS_UI_REPORT` for external evidence. |
 | `service-ui` | Built desktop frontend and Playwright Chromium. Service inspection, exact approval, lost ACK query, external-edit conflict and separate resume approval; service manager/invoke are synthetic. |
 | `site-ui` | Static website, Playwright Chromium and an ephemeral loopback server; no native/core transport or external requests. |
@@ -324,9 +324,12 @@ The built service UI can be checked separately with
 its JSON and `LINTEL_SERVICE_UI_ARTIFACTS` for optional Git-external screenshots.
 `work-ui` uses real core processes in two independent synthetic homes to verify
 archive-only, preservation and portable selective import through the built App.
+It also verifies bounded metadata pagination, project/session/file choices,
+explicit oversized-file exclusion, exact archive and preserve destinations,
+unselected-file changes, and refusal when a runner ignores exact selection.
 Set `LINTEL_WORK_UI_REPORT` for its JSON; fixture screenshots stay outside Git.
-It uses real headless Chromium with synthetic service state, not real systemd
-or native WebKit. Independent browser, pairing, service, remote-task and work UI checks are explicitly selected in CI;
+It uses real headless Chromium and core with a synthetic invoke transport, not
+native WebKit or authenticated Claude. Independent browser, pairing, service, remote-task and work UI checks are explicitly selected in CI;
 their actual current results are recorded in [current-state](current-state.md).
 
 These are the same gaps recorded in [current-state](current-state.md#完整目标仍缺少)

@@ -36,11 +36,18 @@ export interface WorkPreflight {
   categories:{category:string;count:number;bytes:number}[];
   blockers:{code:string;path?:string|null;message:string}[];blockers_truncated:boolean;
 }
+export interface WorkFile {path:string;category:string;bytes:number}
+export interface WorkInventory {
+  environment_id:string;root:string;complete:boolean;digest:string;
+  files:WorkFile[];total_files:number;next_offset:number|null;
+  reason?:string|null;unobserved?:string|null;
+}
 export interface Plan {
   id: string; hash: string; environment_id: string; title: string;
   changes: { key: string; label: string; before: string | null; after: string | null; path: string }[];
   preserves: string[]; warnings: string[]; actions: { id: string; label: string; reversible: boolean }[];
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
+  work_selection?:{mode:'paths'|'categories';paths?:string[]};
   policy?: PolicyAssessment;
   service?: ServicePlan;
   plan_revision?: string;
@@ -104,10 +111,11 @@ export interface Api {
   create_environment: { request: { name: string }; response: Environment };
   inspect: { request: { environment_id: string; trusted_devices?: TrustedDevices }; response: Inspection };
   inspect_components:{request:{environment_id:string;project_cwd?:string};response:ComponentInspection};
-  work_preflight:{request:{environment_id:string;categories:string[]};response:WorkPreflight};
+  work_inventory:{request:{environment_id:string;categories:string[];offset?:number;expected_digest?:string};response:WorkInventory};
+  work_preflight:{request:{environment_id:string;categories:string[];selected_paths?:string[]};response:WorkPreflight};
   plan_policy: { request: { environment_id: string; preset: PolicyPreset; keep_remote_control: boolean; trusted_devices?: TrustedDevices; release_settings?: string[]; custom_settings?: CustomSettings }; response: Plan };
-  plan_archive: { request: { environment_id: string; categories: string[]; output_path?: string }; response: Plan };
-  plan_preserve: { request: { environment_id: string; categories: string[]; activate?:{instructions:boolean}; name?: string }; response: Plan };
+  plan_archive: { request: { environment_id: string; categories: string[]; selected_paths?:string[]; output_path?: string }; response: Plan };
+  plan_preserve: { request: { environment_id: string; categories: string[]; selected_paths?:string[]; activate?:{instructions:boolean}; name?: string }; response: Plan };
   plan_show: { request: { plan_id: string }; response: Plan };
   plan_reset: { request: { environment_id: string; recipe: 'rebuild'; categories: string[]; activate?:{instructions:boolean} }; response: Plan };
   plan_restore: { request: { job_id: string }; response: Plan };

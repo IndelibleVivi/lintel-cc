@@ -93,6 +93,8 @@
 
 `work_preflight` 与工作统计共用 metadata scanner，选择类别、单文件／合计／文件数、目录预算与 symlink 规则沿用实际归档范围；阻塞对象最多列 200 项，截断不改变拒绝结论；扫描预算保持 50,000 目录项／30 秒，首个未覆盖来源保留相对路径。它没有摘要、冻结计划或副作用批准；内容准入仍由 manifest 和执行复查拥有。既有包格式与 8 MiB／32 MiB／10,000 文件 limits 未改变。
 
+`work_inventory` 按原始路径排序并有界分页，只读取元数据；`complete` 表示整次扫描是否完整，与 `next_offset` 独立。分页摘要绑定完整观察，后续页必须核对 `expected_digest`，变化拒绝 `stale_inventory`。它不授予执行。`work_preflight`／`plan_archive`／`plan_preserve` 的 additive `selected_paths` 是有限精确原件集合；省略保持旧整类调用。静态类别由 operations 与 core 共用，路径、数量／实际 JSON 编码大小及祖先 guard 分别验证。精确模式只核对选中原件，未选 oversized／非普通项不会被读取；正式 plan 冻结 exact paths、source device/inode/owner/ctime 与完整正文 manifest，同字节替换也必须重新预览，读取前后及接受前复查。它不提供对外部 writer 的 OS CAS。public `work_selection` 只投影 mode／paths；保全新根仍使用原冻结 target／mapping。内部身份不写入 lintel.work/1；旧类别计划、cleanup/reset/import 和包原件格式保持兼容。
+
 ## 有限清理与认证
 
 `cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；只新增 `identity_observed` 布尔值，不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。

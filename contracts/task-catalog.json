@@ -38,6 +38,7 @@
       "route": "#/work",
       "help_anchor": "work",
       "operations": [
+        "work_inventory",
         "work_preflight",
         "plan_archive",
         "plan_preserve",
@@ -47,6 +48,7 @@
         "job"
       ],
       "cli_examples": [
+        "lintel work inventory --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
         "lintel work preflight --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
         "lintel work archive plan --environment <ENVIRONMENT_ID> --categories instructions,memory,sessions",
         "lintel work preserve plan --environment <ENVIRONMENT_ID> --categories instructions,memory",

@@ -19,7 +19,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'work_preflight', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'work_preflight', 'work_inventory', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {
@@ -29,7 +29,7 @@ function fixtureBridge(): Plugin {
           res.statusCode = 403; res.end('Local fixture access only'); return;
         }
         let body = '';
-        req.on('data', chunk => { body += chunk; if (body.length > 65536) req.destroy(); });
+        req.on('data', chunk => { body += chunk; if (Buffer.byteLength(body) > 2*1024*1024) req.destroy(); });
         req.on('end', () => {
           let payload: Record<string, unknown>;
           try { payload = JSON.parse(body); } catch { res.statusCode = 400; res.end('Invalid JSON'); return; }

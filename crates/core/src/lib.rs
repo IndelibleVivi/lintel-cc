@@ -478,7 +478,22 @@ impl Engine {
                     ));
                 }
                 let root = PathBuf::from(string(&e, "root")?);
-                let report = work::preflight(string(&e, "id")?, &root, &categories)?;
+                let report = work::preflight(string(&e, "id")?, &root, &categories, r)?;
+                Ok(report)
+            }
+            // Read-only bounded metadata inventory for the finite work-selection
+            // UI. Metadata only: no content, digest of content, Claude, or state.
+            "work_inventory" => {
+                let e = self.env(r)?;
+                let categories = work::categories(r)?;
+                if categories.is_empty() {
+                    return Err(err(
+                        "invalid_categories",
+                        "工作原件清单需要至少选择一种工作类别；空选择不会被当作通过",
+                    ));
+                }
+                let root = PathBuf::from(string(&e, "root")?);
+                let report = work::inventory(string(&e, "id")?, &root, &categories, r)?;
                 Ok(report)
             }
             "plan_policy" => {
@@ -752,15 +767,18 @@ impl Engine {
         }
         if p["kind"] == "rebuild" {
             work::check_passphrase(r)?;
-            let manifest = work::manifest(&root, &work::categories(&p["extra"])?)?;
+            let manifest = work::frozen_manifest(&root, &p["extra"])?;
             if json!(manifest) != p["extra"]["manifest"] {
                 return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
             }
         } else if p["kind"] == "archive" || p["kind"] == "preserve" {
             work::check_passphrase(r)?;
-            let manifest = work::manifest(&root, &work::categories(&p["extra"])?)?;
+            let manifest = work::frozen_manifest(&root, &p["extra"])?;
             if json!(manifest) != p["extra"]["manifest"] {
-                return Err(err("stale_plan", "预览后工作内容发生变化，请重新预览"));
+                return Err(err(
+                    "stale_plan",
+                    "预览后所选工作内容发生变化（选中原件增加、消失或内容改变）；未选文件的变化不影响精确计划。请重新预览。",
+                ));
             }
             if p["kind"] == "archive" {
                 // Explicit output must remain free in the same approved directory.
@@ -1221,6 +1239,11 @@ fn public_plan(mut p: Value) -> Result<Value> {
     if p["extra"]["archive_passphrase_required"] == true {
         p["archive_passphrase_required"] = json!(true);
         p["file_count"] = json!(p["extra"]["manifest"].as_array().map_or(0, Vec::len));
+    }
+    // Publish the finite work-selection description (mode + exact paths) so the
+    // App and CLI show exactly what was chosen; the private extra stays hidden.
+    if p["extra"]["work_selection"].is_object() {
+        p["work_selection"] = work::work_selection(&work::selection(&p["extra"])?);
     }
     // Frozen new-target/import mapping, published for the same allowlist the App
     // and CLI render. The private raw snapshot and root identity stay stripped.

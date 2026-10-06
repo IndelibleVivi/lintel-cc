@@ -68,6 +68,8 @@ lintel env list --json
 lintel env inspect <environment-id> --json
 lintel env components <environment-id> --project-cwd /synthetic/project --json
 lintel work preflight --environment <environment-id> --categories instructions,memory,sessions --json
+lintel work inventory --environment <environment-id> --categories memory,sessions --json
+lintel work archive plan --environment <environment-id> --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
 lintel capabilities --environment <environment-id>
 ```
 
@@ -77,7 +79,11 @@ Service unit 只接受准确 `.service` 名称，例如 `claude.service` 或 `cl
 
 `inspect_components` 对准确 environment 返回有限静态来源与原任务投影，`project_cwd` 可选且属于目标主机。它不调用 Claude、不读取凭据正文、不查询并改写 job；服务仅核对最多 8 个已有记录中的明确 unit，不能代替全局 supervisor 发现。`records` 最多 50 份，扫描／展示缺口分别标记；原任务的历史 coverage 不等于当前运行状态。浏览器 profile 属于独立本机模块，不由 root 推断归属。
 
-`work_preflight` 只读取元数据，返回所选类别数量／字节、限额、阻塞相对路径及扫描完整性；`eligible` 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 `plan_archive`／`plan_preserve` 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。暂未交付按文件排除或单个大 session 的完整归档路线。
+`work_preflight` 只读取元数据，返回所选原件数量／字节、限额、阻塞相对路径及扫描完整性；`eligible` 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 `plan_archive`／`plan_preserve` 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。单个大 session 的完整归档路线仍未交付。
+
+`work_inventory` 是有界 metadata-only 分页清单，返回准确 environment/root、`files` 的原相对路径／类别／字节数、`total_files`、`complete`、`digest` 和 `next_offset`。继续页使用返回的 `--offset` 与同一个 `--expected-digest`；元数据清单改变拒绝 `stale_inventory`，不能拼接两份快照。这个摘要只绑定分页元数据，不是内容验证或执行批准；正文摘要由正式计划拥有。
+
+`work preflight`、`work archive plan`、`work preserve plan` 的 repeatable `--path` 对应 additive `selected_paths`。省略则保留整类语义；提供时必须非空、唯一、canonical 相对路径，属于已选类别，不能有 `. / ..`、绝对路径、控制字符或模糊匹配。每个路径最多 4096 UTF-8 字节，最多 10,000 项，序列化数组最多 512 KiB。core 再核对每个原件、祖先和读取边界；只读取选中原件，缺失或不支持对象拒绝，不回退到整类。public plan 的 `work_selection` 显示冻结选择，新环境的 `planned_target` 显示完整最终落点。执行再次核对同一选中 manifest，未选文件增改不扩大范围。cleanup/reset/import 不接受这一字段；既有 archive/session read 的 `--path` 仍表示阅读包内文件。
 
 Named CLI 与有限 SSH 的 `environment_id`、`plan_id`、`job_id` 按 schema 的 UUID 格式检查，接受大小写十六进制的 `8-4-4-4-12` 连字符形式。错误格式返回 `invalid_request`，在本机 state 初始化或 SSH 调用前拒绝；始终使用执行器返回的原 ID。旧 raw protocol-1 仍由 core 按既有 ID 规则处理。
 

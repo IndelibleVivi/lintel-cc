@@ -16,13 +16,19 @@ await mkdir(path.join(root,'lintel-imports/projects/synthetic/memory'),{recursiv
 await writeFile(path.join(root,'lintel-imports/projects/synthetic/memory/MEMORY.md'),'Synthetic previously imported memory\n');
 const sourceBytes=await readFile(path.join(root,'settings.json'));
 let context={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:path.join(fixture,'source-state')};
-const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],resources=[];
+const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],resources=[],payloads=[];
+let inventoryUnsupported=false,dropSelection=false;
 // Fixture-side assertions and the rendered window share one synthetic actor.
 // Serialize their real core requests, as the App transport does, and retain
 // the original home's context even if the next journey switches installation.
 let coreQueue=Promise.resolve();
-function core(payload){calls.push(payload.command);const requestContext=context;
-  const result=coreQueue.then(()=>runCore(payload,requestContext));coreQueue=result.catch(()=>undefined);return result;
+function core(payload){calls.push(payload.command);payloads.push(payload);const requestContext=context;
+  const result=coreQueue.then(async()=>{
+    if(inventoryUnsupported&&payload.command==='work_inventory')return {ok:false,error:{code:'unsupported_command',message:'Synthetic old runner has no work_inventory'}};
+    const result=await runCore(payload,requestContext);
+    if(dropSelection&&['plan_archive','plan_preserve'].includes(payload.command)&&payload.selected_paths)delete result.data?.work_selection;
+    return result;
+  });coreQueue=result.catch(()=>undefined);return result;
 }
 async function runCore(payload,requestContext){return new Promise((resolve,reject)=>{
   const child=spawn(runner,['request'],{env:requestContext,stdio:['pipe','pipe','pipe']});let output='',errors='';
@@ -58,6 +64,73 @@ try{
   await dialog.locator('.plan-steps .action-description').first().waitFor();assert.equal(await dialog.locator('.plan-steps .action-description').count(),3);await approve();await dialog.getByText(/工作保全已完成/).waitFor();
   await dialog.getByRole('button',{name:'为新环境选择保护方案',exact:true}).click();await page.getByRole('heading',{name:'保护方案',exact:true}).waitFor();assert.notEqual(await page.getByLabel('当前环境',{exact:true}).inputValue(),source.id);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
   report.checks.push('Preserve → completed outcome → new environment policy; old root/login untouched');
+  // Metadata pages and real exact selection, with a 9 MiB excluded transcript.
+  // Existing category-only journeys above retain their original coverage.
+  const oversized=path.join(root,'projects/synthetic/oversized.jsonl');
+  await writeFile(oversized,'x'.repeat(9*1024*1024));
+  await writeFile(path.join(root,'projects/direct.jsonl'),'SYNTHETIC DIRECT SESSION\n');
+  await mkdir(path.join(root,'projects/other/memory'),{recursive:true});
+  for(let i=0;i<101;i++)await writeFile(path.join(root,`projects/other/memory/item${String(i).padStart(3,'0')}.md`),`Synthetic other ${i}\n`);
+  await mkdir(path.join(root,'projects/synthetic/session/subagents'),{recursive:true});
+  for(const name of ['agent-a','agent-b'])await writeFile(path.join(root,`projects/synthetic/session/subagents/${name}.jsonl`),`{"synthetic":"${name}"}\n`);
+  await page.getByLabel('当前环境',{exact:true}).selectOption(source.id);
+  await page.getByRole('button',{name:'工作保全',exact:true}).click();
+  await page.getByLabel(/只生成工作归档/).check();
+  const selector=page.getByRole('region',{name:'精确原件选择'});
+  inventoryUnsupported=true;
+  await page.getByRole('button',{name:'按项目／会话／文件选择',exact:true}).focus();await page.keyboard.press('Enter');
+  await selector.getByRole('alert').waitFor();assert.equal(await page.getByRole('button',{name:'预览保全计划',exact:true}).isDisabled(),true);
+  assert.equal(payloads.filter(p=>p.selected_paths&&['plan_archive','plan_preserve'].includes(p.command)).length,0,'Unsupported inventory must not degrade into whole-category preview');
+  inventoryUnsupported=false;await selector.getByRole('button',{name:'刷新文件清单',exact:true}).click();
+  await selector.getByText('109 个原件已选',{exact:true}).waitFor();
+  assert.ok(payloads.some(p=>p.command==='work_inventory'&&p.offset>0&&p.expected_digest),'App must retrieve later metadata pages bound to the same inventory');
+  const directGroup=selector.locator('.work-project-group').filter({has:page.locator('summary>span').filter({hasText:/^projects 直属资料$/})});
+  assert.equal(await directGroup.count(),1,'A direct projects transcript must not be labeled as personal instructions');
+  await directGroup.getByRole('checkbox',{name:'保留 projects/direct.jsonl',exact:true}).uncheck();
+  await selector.getByRole('button',{name:'排除超限文件',exact:true}).click();
+  await selector.getByRole('checkbox',{name:'选择项目 other全部文件',exact:true}).uncheck();
+  const sessionGroup=selector.getByRole('checkbox',{name:'选择会话 session.jsonl全部文件',exact:true});
+  await sessionGroup.uncheck();
+  for(const name of ['projects/synthetic/session.jsonl','projects/synthetic/session/subagents/agent-a.jsonl','projects/synthetic/session/subagents/agent-b.jsonl'])assert.equal(await selector.getByRole('checkbox',{name:`保留 ${name}`,exact:true}).isChecked(),false);
+  await sessionGroup.check();
+  await selector.getByRole('checkbox',{name:'保留 projects/synthetic/memory/MEMORY.md',exact:true}).uncheck();
+  await selector.getByLabel('筛选原件路径').fill('item100');
+  await selector.getByRole('checkbox',{name:'保留 projects/other/memory/item100.md',exact:true}).check();
+  await selector.getByLabel('筛选原件路径').fill('');
+  const selected=['CLAUDE.md','lintel-imports/projects/synthetic/memory/MEMORY.md','projects/other/memory/item100.md','projects/synthetic/session.jsonl','projects/synthetic/session/subagents/agent-a.jsonl','projects/synthetic/session/subagents/agent-b.jsonl'].sort();
+  await selector.getByText('6 个原件已选',{exact:true}).waitFor();
+  await page.getByRole('region',{name:'工作容量预检'}).getByText(/当前元数据在容量范围内/).waitFor();
+  for(const [width,height,theme,button] of [[1120,800,'day','浅色 Day'],[900,640,'night','深色 Night']]){
+    await page.setViewportSize({width,height});await page.getByRole('button',{name:button,exact:true}).click();
+    await selector.locator('h2').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(fixture,`selection-${theme}.png`)});
+    await sessionGroup.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(fixture,`selection-session-${theme}.png`)});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Exact selector horizontal overflow');
+    const previewButton=page.getByRole('button',{name:'预览保全计划',exact:true});assert.ok(await previewButton.evaluate(el=>{const box=el.getBoundingClientRect();return box.top>=0&&box.bottom<=innerHeight;}),'Selection action dock clipped');
+  }
+  const selectedArchive=path.join(home,'selected.age');await page.getByLabel('另存加密包的完整路径（可选）').fill(selectedArchive);
+  dropSelection=true;await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:/没有确认这份精确原件选择/}).waitFor();assert.equal(await dialog.count(),0,'A runner that ignores exact selection must not reach approval');
+  dropSelection=false;await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
+  const range=dialog.getByRole('region',{name:'批准中的原件范围'});await range.waitFor();
+  assert.deepEqual((await range.locator('li code').allTextContents()).sort(),selected);
+  assert.deepEqual(payloads.filter(p=>p.command==='plan_archive'&&p.selected_paths).at(-1).selected_paths.sort(),selected);
+  // An unselected external write/new file cannot expand or invalidate this plan.
+  await writeFile(oversized,'y'.repeat(9*1024*1024));await writeFile(path.join(root,'projects/synthetic/new-unselected.jsonl'),'SYNTHETIC UNSELECTED\n');
+  await approve();
+  const selectedReceipt=(await data({command:'jobs'})).jobs.find(job=>job.archive_path===selectedArchive);assert.ok(selectedReceipt);
+  const archived=await data({command:'archive_inspect',job_id:selectedReceipt.id,archive_passphrase:password});assert.deepEqual(archived.files.map(file=>file.path).sort(),selected);
+  assert.equal((await readFile(oversized)).length,9*1024*1024);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.getByLabel(/保全并准备新环境/).check();await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
+  const selectedMap=dialog.getByRole('region',{name:'最终迁入清单'});await selectedMap.waitFor();
+  const exactTargets=await selectedMap.locator('.import-file-list>li').evaluateAll(rows=>rows.map(row=>({source:row.querySelector('.import-path code').textContent,destination:row.querySelector('.destination code').textContent})));
+  assert.deepEqual(exactTargets.map(file=>file.source).sort(),selected);await approve();
+  for(const file of exactTargets)assert.deepEqual(await readFile(file.destination),await readFile(path.join(root,file.source)),'Exact preserve must write complete bytes to the approved destination');
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.getByRole('button',{name:'记录与恢复',exact:true}).click();await page.getByRole('button',{name:'工作保全',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'按项目／会话／文件选择',exact:true}).count(),1,'Exact path metadata is interaction-scoped');
+  assert.ok(!JSON.stringify(await page.evaluate(()=>({...localStorage}))).includes('agent-a.jsonl'),'Exact path selection stays out of persistent drafts');
+  report.checks.push('Paged metadata → old-runner refusal → project/session/file controls → exclude 9MiB → exact archive and preserve; frozen approved paths/bytes, unselected changes excluded; Day/Night and action dock; ignored selection rejected');
   const targetHome=path.join(fixture,'target-home');await mkdir(targetHome);context={...context,HOME:targetHome,LINTEL_TEST_HOME:targetHome,LINTEL_STATE_DIR:path.join(fixture,'target-state')};
   const portable=path.join(targetHome,'portable.age');await copyFile(carried,portable);const destination=await data({command:'create_environment',name:'Synthetic destination'});
   await page.reload();await page.getByRole('button',{name:'会话与资料',exact:true}).click();assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);

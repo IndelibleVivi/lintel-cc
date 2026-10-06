@@ -34,7 +34,7 @@ code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size
 strong{font-weight:600}
 input,textarea,select{color:var(--text)}
 input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:16px;height:16px;cursor:pointer;margin:0;flex-shrink:0}
-input[type=text],input:not([type]),textarea{border:1px solid var(--line);border-radius:7px;padding:9px 11px;background:var(--paper);width:100%}
+input[type=text],input[type=search],input:not([type]),textarea{border:1px solid var(--line);border-radius:7px;padding:9px 11px;background:var(--paper);width:100%}
 .muted{color:var(--muted)}
 .eyebrow{font-size:12px;color:var(--muted);letter-spacing:1.15px;font-weight:600}
 .small-label{font-size:13px;color:var(--muted);font-weight:400}
@@ -813,3 +813,26 @@ h1[tabindex="-1"]:focus{outline:none}
 .capacity-blockers li { margin: 12px 0; }
 .capacity-blockers code, .capacity-blockers span, .capacity-blockers small { display: block; overflow-wrap: anywhere; }
 .capacity-blockers small { color: var(--muted); font-size: 10px; }
+
+/* Exact work selection uses bounded path groups within the existing work page. */
+.work-selection-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:14px 0; }
+.work-selection-tools strong { margin-right:auto; font-size:13px; }
+.work-selection-tools button, .work-list-pages button { font-size:11px; }
+.work-project-group { border-top:1px solid var(--line); padding:14px 0; min-width:0; }
+.work-project-group>summary, .work-file-family>summary { display:list-item; cursor:pointer; overflow-wrap:anywhere; font-size:13px; }
+.work-project-group>summary small, .work-file-family>summary small { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+.work-group-choice { display:flex; align-items:center; gap:10px; margin:14px 0; font-size:12px; cursor:pointer; }
+.work-group-choice input, .work-file-list input { flex-shrink:0; }
+.work-file-family { margin:10px 0 10px 12px; border-left:2px solid var(--line); padding-left:14px; min-width:0; }
+.work-file-list { list-style:none; padding:0; margin:10px 0; }
+.work-file-list li { margin:0; padding:10px 0; border-bottom:1px solid var(--line); }
+.work-file-list label { display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
+.work-file-list label>span { min-width:0; }
+.work-file-list code, .missing-work-path, .work-selection-review code { display:block; overflow-wrap:anywhere; font-size:11px; }
+.work-file-list small { display:block; color:var(--muted); margin-top:5px; font-size:11px; }
+.work-file-list em { color:var(--accent); font-style:normal; }
+.work-list-pages { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin:12px 0; font-size:11px; }
+.work-selection-review { margin:20px 0; }
+.work-selection-review p { font-size:12px; line-height:1.8; }
+.work-selection-review ul { max-height:220px; overflow:auto; padding-left:20px; }
+.work-selection-review li { margin:8px 0; }

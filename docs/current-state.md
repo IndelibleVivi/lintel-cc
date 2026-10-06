@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-06 · **0.1.0 产品基线的环境覆盖与容量预检源码后续**；本地 native／CLI 候选仍是 2026-10-05 的构建。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
+2026-10-06 · **0.1.0 产品基线的环境覆盖、容量预检与精确保全源码后续**；本地 native／CLI 候选仍是 2026-10-05 的构建。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
 
 ## 当前交付与证据
 
@@ -9,10 +9,11 @@
 | 共享产品合同 | 六任务 catalog；计划新增冻结目标／完整落点与用途；结构化任务结果与覆盖；旧协议、历史计划、包与原 ID 恢复保留 |
 | App 界面 | 安静的 Clawd 首页／56 句原创时段问候与日期／整分钟／稀有彩蛋；日期只在当天首次打开显示，点击后展开六任务，保留持续目标；配置 root／项目 cwd 分离；资料阅读／交接稿；CLI 核对与 Agent。默认 1120、最低 900、宽 1440 成品 UI 检查通过；保护／保全／清理底栏独立于正文滚动 |
 | 2026-10-06 连续性修复 | 本机→A／B→A 打开 A 的回执后，查询、Agent 包及启动预览均固定 A；参考指令与重名副本再次保全，不自动激活。官方注销将完整认证状态摘要冻结在私有计划，主体缺失拒绝，执行前及保全后复查；只验证 synthetic CLI，Keychain-only token 世代仍未验证 |
-| 关联组件与容量预检 | core／named CLI／App 接通有限组件清单、明确 project cwd 来源、认证位置元数据、原任务 coverage 与最多 8 个原 unit 的当前核验；账号未知、Desktop／IDE 暂不支持、浏览器独立。容量预检不读正文，列出超限文件与未覆盖路径；FIFO 不打开、不计入，按类别取消后重新检查。完整计划仍读取全部所选原件，8 MiB／32 MiB／10,000 文件限额未放宽；按文件选择与大文件路线尚未交付 |
+| 关联组件与容量预检 | core／named CLI／App 接通有限组件清单、明确 project cwd 来源、认证位置元数据、原任务 coverage 与最多 8 个原 unit 的当前核验；账号未知、Desktop／IDE 暂不支持、浏览器独立。容量预检不读正文，列出超限文件与未覆盖路径；FIFO 不打开、不计入；按类别或精确原件重新检查。有限 SSH controller 已放行这几个明确只读入口 |
+| 精确工作保全 | App 项目路径组／会话子文件组／单文件选择、分页 metadata 清单和 named CLI repeatable --path 接入同一 core。排除 9 MiB 会话后，其余原字节归档／迁入通过；批准冻结 paths、source identity、完整正文 manifest 和新根落点，选中变动／消失／同字节替换在接受前拒绝，未选变动不扩张清单。旧 runner 缺失清单或忽略精确范围不能进入批准；选择不保存到草案。lintel.work/1、旧整类调用和 8 MiB／32 MiB／10,000 文件限额保留；大文件本身路线未交付 |
 | 会话与启动 | bounded reader、未知块与 thinking 原件保全；普通启动／独立 resume／原启动 query/list 接入。持久 intent 先于私有副本／Terminal，未知后只查询原 ID。有限 adapter 仅静态识别 2.1.283／2.1.285；inert 参数、cwd、配置根与副本机制通过，真实认证 resume 尚未验收 |
 | macOS native 候选 | 2026-10-05 unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
-| CLI 与静态检查 | context/tasks/深层嵌套帮助和原启动 query/list；App 明确 executable 的有限 native 探测。2026-10-06 本次默认 22 项一次通过；独立 components-ui／work-ui／baseline-ui／remote-task-ui 通过。组件与容量使用真实 synthetic core／named CLI，UI 的 SSH／invoke 为模型化 transport；1120 Day／900 Night 新面板已检查。新源码未重新验收 native WebKit、真实 Linux manager、认证或正式浏览器 |
+| CLI 与静态检查 | context/tasks/深层嵌套帮助和原启动 query/list；App 明确 executable 的有限 native 探测。本次默认 22 项首跑 21 项通过，workspace 已有安装 fixture 触发 4 秒并发 deadline；12 项安装测试串行及 workspace 4 线程复验均通过，未放宽等待时限。独立 components-ui／work-ui／baseline-ui／remote-task-ui 通过，最终样式后 work-ui 再通过；1120 Day／900 Night 选择及会话组已目视检查。真实 synthetic core／named CLI、有限 SSH stdin 传递与非法选择前拒绝有证据；UI 的 SSH／invoke 为模型化 transport。新源码未重新验收 native WebKit、真实 Linux manager、认证或正式浏览器 |
 | 资源与包装 | 2026-10-05 macOS arm64 CLI 与两架构 Linux musl runner 已构建，canonical App bundles 已更新；native host／非 fixture Chromium 与 Firefox 扩展由原 source 生成。CLI candidate 包装含真实输入 smoke 通过；生成物不进 Git。cross-build 不证明其他架构 runtime，checksums 不证明签名或来源 |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
 
@@ -25,7 +26,7 @@
 | 人类任务、保全／重建、继续工作、原任务核对 | [操作指南](operator-guide.md) |
 | 独立 CLI、用户候选安装、stdin、schema 与 Agent | [Agent CLI](agents.md) |
 | 前端构图、组件入口与 Selen 后续工作 | [桌面](desktop.md)、[视觉身份](visual-language.md) |
-| 关联组件、容量与完整收尾的后续实现 | [环境覆盖与使用收尾方案](specs/environment-completion-plan.md)；组件清单与容量预检已接通源码，其余阶段保留依赖、有限范围、验收场景和发行 gates |
+| 关联组件、保全与完整收尾的后续实现 | [环境覆盖与使用收尾方案](specs/environment-completion-plan.md)；组件清单、容量预检与精确原件选择已接通源码，大文件等阶段保留依赖、有限范围、验收场景和发行 gates |
 | 当前 native／browser／Linux 验证边界 | [验证说明](verification.md)、[验收记录](specs/product-baseline-status.md) |
 | 官网、示例与 opt-in 共享游戏 | [网站](../apps/site/README.md)；尚未部署、无正式下载 |
 | core／SSH／systemd／browser／network | [core](core.md)、[remote](remote.md)、[services](services.md)、[browser](browser.md)、[network](network.md) |

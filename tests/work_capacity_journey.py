@@ -107,6 +107,66 @@ class WorkCapacityJourney(unittest.TestCase):
         ])
 
     # -- tests ----------------------------------------------------------------
+    def test_inventory_pages_are_complete_observations_and_reject_drift(self) -> None:
+        for index in range(101):
+            self.write(f"projects/demo/memory/{index:03}.md", b"synthetic\n")
+        environment_id = self.register()
+        args = ["work", "inventory", "--environment", environment_id, "--categories", "memory"]
+        first = self.named(args)
+        self.assertTrue(first["complete"], "More pages must not mean incomplete scan")
+        self.assertEqual(first["total_files"], 101)
+        self.assertEqual(len(first["files"]), 100)
+        self.assertEqual(first["next_offset"], 100)
+        second = self.named(args + ["--offset", "100", "--expected-digest", first["digest"]])
+        self.assertTrue(second["complete"])
+        self.assertIsNone(second["next_offset"])
+        self.assertEqual(len(second["files"]), 1)
+        paths = [row["path"] for row in first["files"] + second["files"]]
+        self.assertEqual(paths, sorted(paths))
+        self.assertEqual(len(set(paths)), 101)
+        self.assertLessEqual(len(json.dumps(first).encode()), 128 * 1024)
+        self.write("projects/demo/memory/new.md", b"appeared\n")
+        failure = self.named(args + ["--offset", "100", "--expected-digest", first["digest"]], good=False)
+        self.assertEqual(failure["code"], "stale_inventory")
+        failure = self.named(args + ["--offset", "100"], good=False)
+        self.assertEqual(failure["code"], "invalid_request")
+
+    def test_exact_preflight_skips_unselected_objects_and_guards_parents(self) -> None:
+        relative = "projects/demo/keep.jsonl"
+        self.write(relative, b"chosen original\n")
+        self.sparse("projects/demo/large.jsonl", FILE_LIMIT + 1)
+        os.mkfifo(self.root / "projects/demo/unselected.jsonl")
+        outside = self.home / "synthetic-outside"
+        outside.mkdir()
+        (outside / "session.jsonl").write_bytes(b"outside\n")
+        (self.root / "projects/linked").symlink_to(outside, target_is_directory=True)
+        environment_id = self.register()
+        args = ["work", "preflight", "--environment", environment_id, "--categories", "sessions"]
+        self.assertFalse(self.named(args)["eligible"])
+        exact = self.named(args + ["--path", relative])
+        self.assertTrue(exact["complete"])
+        self.assertTrue(exact["eligible"])
+        self.assertEqual(exact["totals"], {"files": 1, "bytes": len(b"chosen original\n")})
+        self.assertEqual(self.named(args + ["--path", "projects/linked/session.jsonl"], good=False)["code"], "symlink_target")
+        self.assertEqual(self.named(args + ["--path", "projects/demo/missing.jsonl"], good=False)["code"], "selected_missing")
+
+    def test_invalid_exact_selection_is_refused_before_named_state(self) -> None:
+        fresh = self.base / "untouched-named-state"
+        context = {**self.environment, "LINTEL_STATE_DIR": str(fresh)}
+        # Quotes are valid filename characters but double their JSON encoding.
+        encoded_large = [f'projects/demo/{index}-' + '"' * 2000 + '.jsonl' for index in range(200)]
+        self.assertLess(sum(len(path.encode()) for path in encoded_large), 512 * 1024)
+        self.assertGreater(len(json.dumps(encoded_large, separators=(',', ':')).encode()), 512 * 1024)
+        for paths in [[], ["../escape"], ["projects/demo/a.jsonl"] * 2, [".credentials.json"], ["CLAUDE.md"], encoded_large]:
+            proc = subprocess.run([str(BINARY), "call", "plan_archive"], input=json.dumps({
+                "environment_id": "00000000-0000-4000-8000-000000000001",
+                "categories": ["sessions"], "selected_paths": paths,
+            }), env=context, cwd=self.base, capture_output=True, text=True, timeout=45)
+            result = json.loads(proc.stdout)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["error"]["code"], "invalid_request")
+            self.assertFalse(fresh.exists(), "Malformed exact selection must reject before state/SSH")
+
     def test_named_preflight_strict_schema_and_totals(self) -> None:
         self.write("settings.json", b"{}")
         self.write("CLAUDE.md", b"Instruction only.\n")

@@ -892,6 +892,9 @@ const REQUEST_COMMANDS: &[&str] = &[
     "register",
     "create_environment",
     "inspect",
+    "inspect_components",
+    "work_preflight",
+    "work_inventory",
     "drift",
     "accept_drift",
     "cleanup_inspect",
@@ -1757,6 +1760,9 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             json!({"command":"execute","plan_id":"x","approval":"x"}),
             json!({"command":"shell","argv":["bad"]}),
             json!({"command":"discover","shell":"bad"}),
+            json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["../escape.jsonl"]}),
+            json!({"command":"work_preflight","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"selected_paths":["projects/demo/session.jsonl"]}),
+            json!({"command":"work_inventory","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"offset":100}),
             json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":"false"}),
         ] {
             assert!(controller
@@ -1891,6 +1897,11 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         let (temp, controller) =
             fixture("printf '%s' '{\"ok\":true,\"data\":'; cat input; printf '}\\n'");
         let requests = [
+            json!({"command":"inspect_components","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/synthetic/project"}),
+            json!({"command":"work_inventory","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"offset":100,"expected_digest":"a".repeat(64)}),
+            json!({"command":"work_preflight","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
+            json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
+            json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
             json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}),
             json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"categories":[]}),
             json!({"command":"plan_show","plan_id":"00000000-0000-4000-8000-000000000002"}),

@@ -147,12 +147,14 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 
 连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install / launch_query 对已移除 alias 仅开放本地仍有持久记录的原任务、安装或启动，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
 
-- `discover`、`inspect`、`register`、`create_environment`；
+- `discover`、`inspect`、`inspect_components`、`work_preflight`、`work_inventory`、`register`、`create_environment`；
 - `plan_policy`、`plan_reset`、`plan_archive`、`plan_preserve`、`plan_cleanup`、`plan_restore`、`plan_import`、`plan_launch`、`plan_resume`；
 - `cleanup_inspect`、`auth_probe`、`archive_inspect`、`archive_read`、`session_read`、`service_inspect`、`plan_service_quiesce`、`plan_service_resume`；
 - `jobs`、`job`、`drift`、`accept_drift`、`reactivate_environment`、`export_support`。
 
 字段与 core 协议一致；未知字段或任意 shell / generic file 命令被拒绝。`execute` 不能从普通 `request` 绕过持久意图记录。归档正文只在明确阅读请求中经响应返回，不写入普通任务或诊断；口令只进入本次 stdin，不进入 SSH argv 或控制端记录。启动由有限 Terminal owner、服务暂停/恢复由 core service owner 独立核验；此 bridge 不提供任意命令、通用安装或强约束网络组件操作。
+
+关联组件、容量预检和分页原件清单是目标主机上的有限只读入口；精确 `selected_paths` 沿用共享 work schema，经 stdin 完整传递，正式计划冻结所选原件，执行仍经独立 submit。无效路径、类别不符或后续页缺少原摘要在 SSH 前拒绝；旧 runner 不支持时明确报错，不能静默扩大为整类。
 
 ## 连接错误与本机诊断
 

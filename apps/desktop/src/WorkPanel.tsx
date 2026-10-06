@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { request } from './api';
 import Clawd from './Clawd';
 import WorkCapacity from './WorkCapacity';
+import WorkFileSelection from './WorkFileSelection';
 import {readTaskDraft,saveTaskDraft} from './taskDrafts';
 import { ResourceLink } from './Resources';
 import type { Environment, Inspection, Plan, WorkPreflight } from './types';
@@ -21,14 +22,19 @@ export default function WorkPanel({ send = request, environment, inspection, onP
   const [error,setError] = useState<Error|null>(null);
   const [activateInstructions,setActivateInstructions] = useState(initial.activateInstructions);
   const [capacity,setCapacity] = useState<WorkPreflight|null>(null);
+  // Path metadata is scoped to this host/environment interaction, not persisted
+  // into ordinary drafts or reused after leaving the page.
+  const [selectedPaths,setSelectedPaths]=useState<string[]|null>(null);
+  const [selectionReady,setSelectionReady]=useState(true);
   const alive = useRef(true);const actionLock=useRef(false);
   useEffect(() => { alive.current=true; return () => {alive.current=false;}; }, []);
   useEffect(()=>saveTaskDraft(draftKey,{mode,categories,output,name,activateInstructions}),[draftKey,mode,categories,output,name,activateInstructions]);
   async function preview() {
     if(actionLock.current)return;actionLock.current=true;setBusy(true); setError(null);
     try {
-      const fields = { environment_id:environment.id,categories };
+      const fields = { environment_id:environment.id,categories,...(selectedPaths!==null?{selected_paths:selectedPaths}:{}) };
       const plan = mode === 'archive' ? await send('plan_archive',{...fields,...(output.trim()?{output_path:output.trim()}:{})}) : await send('plan_preserve',{...fields,activate:{instructions:activateInstructions && categories.includes('instructions')},...(name.trim()?{name:name.trim()}:{})});
+      if(selectedPaths!==null&&(plan.work_selection?.mode!=='paths'||JSON.stringify([...(plan.work_selection.paths??[])].sort())!==JSON.stringify([...selectedPaths].sort())))throw new Error('执行器没有确认这份精确原件选择；没有打开批准入口。请更新 runner 后重新预览。');
       if (alive.current) onPlan(plan);
     } catch(err) { if(alive.current) setError(asError(err)); }
     finally { actionLock.current=false;if(alive.current) setBusy(false); }
@@ -38,9 +44,10 @@ export default function WorkPanel({ send = request, environment, inspection, onP
     {error && <RequestFailure error={error} context="工作保全"/>}
     <fieldset className="recipe-grid work-modes" disabled={busy}><legend className="sr-only">工作保全目标</legend>{[['archive','只生成工作归档','加密收好选定资料；不建立环境、不改登录。'],['preserve','保全并准备新环境','先加密归档，再建立新根、迁入所选资料。']].map(([id,title,detail]) => <label className={`recipe ${mode===id?'chosen':''}`} key={id}><input type="radio" name="work-mode" checked={mode===id} onChange={() => {setMode(id as typeof mode);setError(null);}}/><span><strong>{title}</strong><small>{detail}</small></span></label>)}</fieldset>
     <section className="surface work-selection"><div className="surface-heading"><h2>保留哪些工作内容</h2><span className="small-label">{environment.name}</span></div>{classes.map(([id,title,detail]) => {const asset=inspection?.assets.find(a=>a.category===id);return <label className="checkbox-row" key={id}><span><strong>{title}{asset&&<small> · {asset.count} 个文件 / {formatBytes(asset.bytes)}</small>}</strong><span>{detail}</span></span><input type="checkbox" disabled={busy} checked={categories.includes(id)} onChange={event=>setCategories(current=>event.target.checked?[...current,id]:current.filter(c=>c!==id))}/></label>;})}<div className="padded">{mode==='archive'?<label className="field">另存加密包的完整路径（可选）<input aria-label="另存加密包的完整路径（可选）" value={output} disabled={busy} onChange={event=>setOutput(event.target.value)} placeholder="留空则保存在 Lintel 的工作归档中"/><span className="small-print">路径属于当前目标主机；已有文件不会被覆盖。把加密包带去另一台机器后，可以不依赖原任务记录读取和迁入。</span></label>:<label className="field">新环境名称（可选）<input value={name} disabled={busy} onChange={event=>setName(event.target.value)} placeholder="给这份新开始起个名字"/></label>}</div>{mode==='preserve' && <label className="checkbox-row"><span><strong>启用已审阅的个人指令</strong><span>勾选后 CLAUDE.md 进入客户端可能自动读取的指令位置；否则与记忆、会话一起作为待用资料保留。</span></span><input type="checkbox" disabled={busy || !categories.includes('instructions')} checked={activateInstructions} onChange={event=>setActivateInstructions(event.target.checked)}/></label>}</section>
-    <WorkCapacity send={send} environment={environment} categories={categories} onResult={setCapacity}/>
+    <WorkFileSelection send={send} environment={environment} categories={categories} paths={selectedPaths} disabled={busy} onChange={setSelectedPaths} onReady={setSelectionReady}/>
+    <WorkCapacity send={send} environment={environment} categories={categories} selectedPaths={selectedPaths} selectionReady={selectionReady} onResult={setCapacity}/>
     <Notice>旧配置、旧登录与原始工作内容保留。归档不带入凭据、settings、hooks 或 MCP；新环境仍需选择保护方案并正常登录。</Notice>
-    <WorkspaceActions><button disabled={busy} onClick={onArchives}>阅读或迁入已有工作包</button><button className="primary" disabled={busy||!categories.length||capacity?.eligible===false|| (mode==='archive'&&!!output.trim()&&!output.trim().startsWith('/'))} onClick={()=>void preview()}>{busy?'正在核对文件范围…':'预览保全计划'}<Icon name="arrow" size={15}/></button></WorkspaceActions>
+    <WorkspaceActions><button disabled={busy} onClick={onArchives}>阅读或迁入已有工作包</button><button className="primary" disabled={busy||!categories.length||!selectionReady||(selectedPaths!==null&&!selectedPaths.length)||capacity?.eligible===false|| (mode==='archive'&&!!output.trim()&&!output.trim().startsWith('/'))} onClick={()=>void preview()}>{busy?'正在核对文件范围…':'预览保全计划'}<Icon name="arrow" size={15}/></button></WorkspaceActions>
     <div className="inline-route"><ResourceLink resource="work-guide">保全、迁移与跨主机使用</ResourceLink></div>
   </>;
 }

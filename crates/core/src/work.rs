@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs::{self, OpenOptions},
+    io::Read,
     os::unix::ffi::OsStrExt,
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
     path::{Component, Path, PathBuf},
@@ -10,6 +11,15 @@ use std::{
 };
 const MAX_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_FILES: usize = 10000;
+/// Upper bound for one serialized inventory page. A page that cannot fit within
+/// this budget is reported as explicitly incomplete rather than silently
+/// truncated (dropping rows). The page size is also capped at 100 rows.
+const INVENTORY_PAGE_BYTES: usize = 128 * 1024;
+const INVENTORY_PAGE_ROWS: usize = 100;
+/// Explicit path selection bounds. These mirror the finite transport contract
+/// so the named CLI, finite SSH and the raw core all enforce the same shape.
+const SELECTION_MAX_PATHS: usize = 10000;
+const SELECTION_TOTAL_BYTES: usize = 512 * 1024;
 
 /// Absolute-path guard for an explicit archive destination: parent must already
 /// exist (we never create directories outside the frozen path), the path must be
@@ -153,6 +163,99 @@ pub fn categories(r: &Value) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// Whether an explicit exact-path selection was requested.
+///
+/// `selected_paths` is additive and only meaningful for archive/preserve-style
+/// plans: absent keeps the historical whole-category behavior (older raw/named
+/// callers), while a present array selects the exact original files instead of
+/// every file in the named categories. An empty array is never a silent
+/// fallback to the whole category and is rejected by `selection`.
+pub(crate) fn has_selection(r: &Value) -> bool {
+    r.get("selected_paths").is_some()
+}
+
+/// The finite public description of a plan's work selection, published in place
+/// of the private `extra`. Category mode carries no path list; exact mode names
+/// the frozen paths so the App and CLI show exactly what was chosen.
+pub(crate) fn work_selection(selected: &[String]) -> Value {
+    if selected.is_empty() {
+        json!({"mode": "categories"})
+    } else {
+        json!({"mode": "paths", "paths": selected})
+    }
+}
+
+/// Rebuild the exact manifest a frozen plan was approved with. Whole-category
+/// plans use `manifest`; a plan that froze `extra.selected_paths` (an additive
+/// field, absent for legacy callers) re-derives the same exact selection. The
+/// caller compares the result to the frozen `extra.manifest` and refuses on any
+/// difference, so a changed/vanished selected path is a pre-publication stale
+/// error rather than a partial archive.
+pub(crate) fn frozen_manifest(root: &Path, extra: &Value) -> Result<Vec<Value>> {
+    let categories = categories(extra)?;
+    if has_selection(extra) {
+        selected_manifest(root, &categories, &selection(extra)?)
+    } else {
+        manifest(root, &categories)
+    }
+}
+
+/// Validate the finite structural shape of an explicit `selected_paths`
+/// request and return the unique canonical relative paths in request order.
+///
+/// Reuses operations' canonical path syntax (including raw core requests).
+/// Category and on-disk identity checks live in `selected_manifest`.
+pub fn selection(r: &Value) -> Result<Vec<String>> {
+    if r.get("selected_paths").is_none() {
+        return Ok(vec![]);
+    }
+    let values = r["selected_paths"]
+        .as_array()
+        .ok_or_else(|| err("invalid_selection", "selected_paths 必须是路径数组"))?;
+    if values.is_empty() {
+        return Err(err(
+            "invalid_selection",
+            "empty selected_paths 是无效请求；不会退回整类选择，请给出至少一个精确原件路径",
+        ));
+    }
+    if values.len() > SELECTION_MAX_PATHS {
+        return Err(err(
+            "invalid_selection",
+            "selected_paths 超过 10000 项上限；请缩小精确选择范围",
+        ));
+    }
+    let mut out: Vec<String> = Vec::with_capacity(values.len());
+    if serde_json::to_vec(&r["selected_paths"])?.len() > SELECTION_TOTAL_BYTES {
+        return Err(err(
+            "invalid_selection",
+            "selected_paths 序列化后超过 512 KiB 上限",
+        ));
+    }
+    let mut seen = HashSet::new();
+    for value in values {
+        let raw = value
+            .as_str()
+            .ok_or_else(|| err("invalid_selection", "selected_paths 只能包含字符串路径"))?;
+        let relative = valid_relative_path(raw)?;
+        if !seen.insert(relative.clone()) {
+            return Err(err("invalid_selection", "selected_paths 含重复路径"));
+        }
+        out.push(relative);
+    }
+    Ok(out)
+}
+
+/// Adapt the shared static path rule to a core error; never normalize a path.
+fn valid_relative_path(raw: &str) -> Result<String> {
+    if !lintel_operations::valid_selected_path(raw) {
+        return Err(err(
+            "invalid_selection",
+            "selected_paths 需要有限 canonical 相对路径；不接受空白、控制字符、. / .. 或空路径段，最多 4096 UTF-8 字节",
+        ));
+    }
+    Ok(raw.to_string())
+}
+
 /// The purpose of each selected category. Only CLAUDE.md (instructions) has a
 /// position the client auto-discovers; memory/sessions stay in the reference
 /// area and are never registered as active native sessions this round.
@@ -291,61 +394,7 @@ pub(crate) fn check_frozen_target(plan: &Value) -> Result<PathBuf> {
     Ok(PathBuf::from(new_root))
 }
 pub(crate) fn classify(relative: &Path) -> Option<&'static str> {
-    let name = relative.file_name()?.to_str()?;
-    if relative == Path::new("CLAUDE.md") {
-        return Some("instructions");
-    }
-    // A reference instruction that an earlier migration left in the inactive
-    // work area keeps the instructions category so a later archive still covers
-    // it. The only files this can match are names Lintel itself produced in that
-    // one slot: the reference `CLAUDE.md` and its collision disambiguations
-    // (`lintel-<n>-CLAUDE.md`). This finite rule never promotes arbitrary
-    // unknown files.
-    if is_reference_instructions(relative) {
-        return Some("instructions");
-    }
-    // Work previously preserved into lintel-imports keeps its category so a
-    // later archive covers it again; instruction slots were handled above.
-    let work_area =
-        relative.starts_with("projects") || relative.starts_with("lintel-imports/projects");
-    if work_area
-        && relative.components().any(|c| c.as_os_str() == "memory")
-        && relative.extension().is_some_and(|x| x == "md")
-    {
-        return Some("memory");
-    }
-    if work_area && name.ends_with(".jsonl") {
-        return Some("sessions");
-    }
-    None
-}
-
-/// The inactive reference-rotation slot for the instructions category is
-/// `lintel-imports/<name>`, where `<name>` is `CLAUDE.md` or a collision
-/// disambiguation like `lintel-1-CLAUDE.md`. Only a file placed directly under
-/// `lintel-imports` matches; deeper paths keep their own category rules.
-fn is_reference_instructions(relative: &Path) -> bool {
-    let mut components = relative.components();
-    let first = match components.next() {
-        Some(Component::Normal(part)) => part,
-        _ => return false,
-    };
-    if first != "lintel-imports" || components.clone().count() != 1 {
-        return false;
-    }
-    let name = match components.next() {
-        Some(Component::Normal(name)) => match name.to_str() {
-            Some(name) => name,
-            None => return false,
-        },
-        _ => return false,
-    };
-    if name == "CLAUDE.md" {
-        return true;
-    }
-    name.strip_prefix("lintel-")
-        .and_then(|rest| rest.strip_suffix("-CLAUDE.md"))
-        .is_some_and(|index| !index.is_empty() && index.bytes().all(|b| b.is_ascii_digit()))
+    lintel_operations::work_path_category(relative)
 }
 
 /// Map one selected batch into the inactive work area. Reserve every original
@@ -765,7 +814,15 @@ fn scan(root: &Path) -> Result<Scan> {
 /// or vanish in between. A real archive/preserve plan still runs the full
 /// `manifest` content + digest check before approval, and only that check
 /// admits or refuses the selection.
-pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Result<Value> {
+pub fn preflight(
+    environment_id: &str,
+    root: &Path,
+    categories: &[String],
+    r: &Value,
+) -> Result<Value> {
+    if has_selection(r) {
+        return selected_preflight(environment_id, root, categories, r);
+    }
     let scan = scan(root)?;
     let selected = |category: &str| categories.iter().any(|c| c == category);
     let roots = ["instructions", "memory", "sessions"];
@@ -798,7 +855,7 @@ pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Re
                     "file_too_large",
                     Some(&entry.1),
                     format!(
-                        "单个文件 {} 字节，超过 {} 字节上限。可取消整个类别后重新检查；按文件选择和大文件保全暂不支持。原件不受影响。",
+                        "单个文件 {} 字节，超过 {} 字节上限。可取消整个类别、或改用 --path 精确选择其余原件后重新检查。原件不受影响。",
                         entry.2, FILE_LIMIT_BYTES
                     ),
                 );
@@ -824,7 +881,7 @@ pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Re
                 "total_bytes_exceeded",
                 None,
                 format!(
-                    "所选合计 {} 字节，超过 {} 字节上限；未截断，可取消整个类别后重新检查；按文件选择暂不支持",
+                    "所选合计 {} 字节，超过 {} 字节上限；未截断，可取消整个类别或改用 --path 精确选择后重新检查",
                     totals.1, MAX_BYTES
                 ),
             );
@@ -858,6 +915,7 @@ pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Re
         "checked_at": now(),
         "complete": scan.complete,
         "eligible": eligible,
+        "work_selection": {"mode": "categories"},
         "totals": {"files": totals.0, "bytes": totals.1},
         "limits": {
             "file_bytes": FILE_LIMIT_BYTES,
@@ -869,6 +927,127 @@ pub fn preflight(environment_id: &str, root: &Path, categories: &[String]) -> Re
             let (count, bytes) = per.get(c).copied().unwrap_or((0, 0));
             json!({"category": c, "count": count, "bytes": bytes})
         }).collect::<Vec<_>>(),
+        "blockers": blockers,
+        "blockers_truncated": blocker_count > BLOCKER_LIMIT,
+    }))
+}
+
+/// Metadata-only preflight for an exact `selected_paths` selection. It inspects
+/// only the chosen original files' metadata; it never walks or reads the
+/// unselected neighbours, so an unrelated oversized session or FIFO elsewhere
+/// in the same category cannot block an exact selection. Root/parent symlink
+/// guards from `guard` still apply. A missing selected path is an explicit
+/// failure (it is not an empty directory and not an eligible selection).
+fn selected_preflight(
+    environment_id: &str,
+    root: &Path,
+    categories: &[String],
+    r: &Value,
+) -> Result<Value> {
+    guard(root)?;
+    let selected = selection(r)?;
+    let mut files = vec![];
+    let mut totals = (0u64, 0u64);
+    let mut blockers: Vec<Value> = vec![];
+    let mut blocker_count = 0usize;
+    let mut push_blocker = |code: &str, path: &str, message: String| {
+        blocker_count += 1;
+        if blockers.len() < BLOCKER_LIMIT {
+            blockers.push(json!({"code": code, "path": path, "message": message}));
+        }
+    };
+    for raw in &selected {
+        let rel = Path::new(raw);
+        let category = classify(rel).ok_or_else(|| {
+            err(
+                "invalid_selection",
+                &format!("精确路径不属于受支持的工作类别: {raw}"),
+            )
+        })?;
+        if !categories.iter().any(|c| c == category) {
+            return Err(err(
+                "invalid_selection",
+                &format!("精确路径 {raw} 的类别 {category} 不在显式选择的 categories 内"),
+            ));
+        }
+        let path = root.join(rel);
+        guard(&path)?;
+        let meta = fs::symlink_metadata(&path).map_err(|_| {
+            err(
+                "selected_missing",
+                &format!("所选原件不存在或不可读: {raw}"),
+            )
+        })?;
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return Err(err(
+                "invalid_selection",
+                &format!("所选路径不是常规文件（符号链接/特殊文件）: {raw}"),
+            ));
+        }
+        let bytes = meta.len();
+        totals.0 += 1;
+        totals.1 += bytes;
+        if bytes > FILE_LIMIT_BYTES {
+            push_blocker(
+                "file_too_large",
+                raw,
+                format!(
+                    "所选单个文件 {} 字节，超过 {} 字节上限。取消对该路径的选择即可完整保全其余原件；原件不受影响。",
+                    bytes, FILE_LIMIT_BYTES
+                ),
+            );
+        }
+        files.push(json!({"path": raw, "category": category, "bytes": bytes}));
+    }
+    if totals.1 > MAX_BYTES {
+        push_blocker(
+            "total_bytes_exceeded",
+            "",
+            format!(
+                "精确选择合计 {} 字节，超过 {} 字节上限；未截断，请缩小精确选择",
+                totals.1, MAX_BYTES
+            ),
+        );
+    }
+    if totals.0 > MAX_FILES as u64 {
+        push_blocker(
+            "file_count_exceeded",
+            "",
+            format!(
+                "精确选择合计 {} 个文件，超过 {} 个上限；请缩小精确选择",
+                totals.0, MAX_FILES
+            ),
+        );
+    }
+    files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    let eligible = blocker_count == 0;
+    let category_rows: Vec<Value> = ["instructions", "memory", "sessions"]
+        .iter()
+        .map(|c| {
+            let count = files.iter().filter(|f| f["category"] == *c).count() as u64;
+            let bytes: u64 = files
+                .iter()
+                .filter(|f| f["category"] == *c)
+                .map(|f| f["bytes"].as_u64().unwrap_or(0))
+                .sum();
+            json!({"category": c, "count": count, "bytes": bytes})
+        })
+        .collect();
+    Ok(json!({
+        "environment_id": environment_id,
+        "root": root.to_string_lossy(),
+        "checked_at": now(),
+        "complete": true,
+        "eligible": eligible,
+        "work_selection": {"mode": "paths", "paths": selected},
+        "totals": {"files": totals.0, "bytes": totals.1},
+        "limits": {
+            "file_bytes": FILE_LIMIT_BYTES,
+            "total_bytes": MAX_BYTES,
+            "files": MAX_FILES,
+            "entries": SCAN_ENTRIES,
+        },
+        "categories": category_rows,
         "blockers": blockers,
         "blockers_truncated": blocker_count > BLOCKER_LIMIT,
     }))
@@ -932,6 +1111,263 @@ pub fn manifest(root: &Path, categories: &[String]) -> Result<Vec<Value>> {
     out.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
     Ok(out)
 }
+
+/// Build the exact-selection content manifest for a frozen plan.
+///
+/// Unlike the whole-category `manifest` it never reads unrelated files: for
+/// every selected relative path it independently re-derives the category from
+/// the path (never trusting a caller-supplied category), verifies the entry is
+/// a regular file inside the frozen root, reads and digests only the selected
+/// bytes, and refuses absolute escapes, symlinks, non-regular files and
+/// unselected oversized neighbours. It applies the same 8 MiB/32 MiB/10000-file
+/// limits but excludes every unselected oversized session, exactly as intended.
+///
+/// A missing/changed selected path is an explicit failure (`selected_missing`/
+/// `selected_changed`), never read as an empty or eligible selection.
+fn source_identity(metadata: &fs::Metadata) -> Value {
+    json!({"device":metadata.dev(),"inode":metadata.ino(),"owner":metadata.uid(),"ctime":metadata.ctime(),"ctime_nsec":metadata.ctime_nsec()})
+}
+
+/// Read the chosen original through one non-following, nonblocking handle and
+/// bind its path and handle identity before/after reading. ctime distinguishes
+/// immediate inode reuse. This is observation, not OS CAS against external writers.
+fn read_selected_original(path: &Path) -> Result<(Vec<u8>, Value)> {
+    guard(path)?;
+    let before = fs::symlink_metadata(path)?;
+    if !before.is_file() || before.len() > FILE_LIMIT_BYTES {
+        return Err(err("selected_changed", "所选原件不是普通文件或已超限"));
+    }
+    let identity = source_identity(&before);
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    if !file.metadata()?.is_file() || source_identity(&file.metadata()?) != identity {
+        return Err(err("selected_changed", "所选原件在读取前被替换"));
+    }
+    let mut data = Vec::new();
+    (&mut file)
+        .take(FILE_LIMIT_BYTES + 1)
+        .read_to_end(&mut data)?;
+    guard(path)?;
+    if data.len() as u64 > FILE_LIMIT_BYTES
+        || source_identity(&file.metadata()?) != identity
+        || source_identity(&fs::symlink_metadata(path)?) != identity
+    {
+        return Err(err("selected_changed", "所选原件在读取期间被替换或修改"));
+    }
+    Ok((data, identity))
+}
+
+pub fn selected_manifest(
+    root: &Path,
+    categories: &[String],
+    selected: &[String],
+) -> Result<Vec<Value>> {
+    guard(root)?;
+    if selected.is_empty() {
+        return Err(err(
+            "invalid_selection",
+            "empty selected_paths 是无效请求；不会退回整类选择",
+        ));
+    }
+    let mut out = vec![];
+    let mut bytes = 0u64;
+    for raw in selected {
+        let relative = valid_relative_path(raw)?;
+        let rel = Path::new(&relative);
+        let category = classify(rel).ok_or_else(|| {
+            err(
+                "invalid_selection",
+                &format!("精确路径不属于受支持的工作类别: {relative}"),
+            )
+        })?;
+        if !categories.iter().any(|c| c == category) {
+            return Err(err(
+                "invalid_selection",
+                &format!("精确路径 {relative} 的类别 {category} 不在显式选择的 categories 内"),
+            ));
+        }
+        // Refuse special files before the bounded nonblocking read. Unselected
+        // neighbours are never opened or included in this exact manifest.
+        let path = root.join(rel);
+        guard(
+            path.parent()
+                .ok_or_else(|| err("invalid_selection", "所选原件缺少父路径"))?,
+        )?;
+        let meta = fs::symlink_metadata(&path).map_err(|_| {
+            err(
+                "selected_missing",
+                &format!("所选原件不存在或不可读: {relative}"),
+            )
+        })?;
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return Err(err(
+                "invalid_selection",
+                &format!("所选路径不是常规文件（符号链接/特殊文件）: {relative}"),
+            ));
+        }
+        let (data, identity) = read_selected_original(&path)?;
+        bytes += data.len() as u64;
+        if bytes > MAX_BYTES || out.len() >= MAX_FILES {
+            return Err(err(
+                "archive_limit",
+                "精确选择的内容超过本候选的 32 MiB / 10000 文件上限；未截断或删除",
+            ));
+        }
+        out.push(json!({
+            "path": relative,
+            "category": category,
+            "bytes": data.len(),
+            "digest": digest(&data),
+            "source_identity":identity,
+        }));
+    }
+    out.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    Ok(out)
+}
+
+/// Metadata inventory for the finite read-only `work_inventory` operation.
+///
+/// Shares the exact traversal scope, budgets, symlink/non-regular refusal and
+/// classification of `scan`, so it reports the same file set a real plan would
+/// select. It reads metadata only: no content/content digest, Claude or credential,
+/// and it writes no state. The scan is performed once per request; paging is a
+/// deterministic slice of that single complete snapshot keyed by `offset`.
+pub fn inventory(
+    environment_id: &str,
+    root: &Path,
+    categories: &[String],
+    r: &Value,
+) -> Result<Value> {
+    let expected = r
+        .get("expected_digest")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let offset = match r.get("offset") {
+        None | Some(Value::Null) => 0usize,
+        Some(v) => v
+            .as_u64()
+            .map(|n| n as usize)
+            .ok_or_else(|| err("invalid_offset", "offset 必须是非负整数"))?,
+    };
+    if r.get("expected_digest").is_some()
+        && !r["expected_digest"]
+            .as_str()
+            .is_some_and(lintel_operations::valid_plan_hash)
+    {
+        return Err(err(
+            "invalid_inventory",
+            "expected_digest 需要原清单的 64 位小写摘要",
+        ));
+    }
+    if offset > 9007199254740991usize || (offset > 0 && expected.is_none()) {
+        return Err(err(
+            "invalid_inventory",
+            "后续 metadata 页需要原清单摘要和有限 offset",
+        ));
+    }
+    let scan = scan(root)?;
+    // Grouped by full relative path (UTF-8 byte order), categories filtered to
+    // the explicit selection. A path that cannot be expressed as UTF-8 already
+    // makes the whole scan incomplete below.
+    let selected = |category: &str| categories.iter().any(|c| c == category);
+    let mut rows: Vec<(&'static str, String, u64)> = vec![];
+    let mut total_files = 0u64;
+    let mut utf8_error = false;
+    for (category, rel, bytes) in &scan.files {
+        if !selected(category) {
+            continue;
+        }
+        total_files += 1;
+        match rel.to_str() {
+            Some(text) if lintel_operations::valid_selected_path(text) => {
+                rows.push((category, text.to_string(), *bytes))
+            }
+            Some(_) => utf8_error = true,
+            None => utf8_error = true,
+        }
+    }
+    rows.sort_by(|a, b| a.1.as_bytes().cmp(b.1.as_bytes()));
+    // The digest binds the complete metadata inventory of this scan. It is
+    // stable across paging of the same snapshot and changes when the observed
+    // file set/order/sizes change.
+    let digests: Vec<Value> = rows
+        .iter()
+        .map(|(category, path, bytes)| json!({"path":path,"category":category,"bytes":bytes}))
+        .collect();
+    let digest_value = digest(&serde_json::to_vec(&digests)?);
+    // A stale expected_digest means a previous page came from another snapshot;
+    // refuse to stitch two observations together.
+    if let Some(expected) = &expected {
+        if expected != &digest_value {
+            return Err(err(
+                "stale_inventory",
+                "目录在分页之间发生变化；不会拼接两次快照，请从 offset 0 重新读取",
+            ));
+        }
+    }
+    if offset > rows.len() {
+        return Err(err(
+            "invalid_offset",
+            "offset 超过此快照的文件数量；不会返回空页冒充完整",
+        ));
+    }
+
+    // Build one bounded page. The page keeps whole rows up to the byte budget;
+    // if a single row cannot be shown the caller is told the result is
+    // incomplete instead of dropping rows silently.
+    let mut files: Vec<Value> = vec![];
+    // Reserve the bounded root/envelope/reason fields too, not only row bytes.
+    let mut used = serde_json::to_vec(&json!({"environment_id":environment_id,"root":root,"unobserved":scan.unobserved.as_deref().map(|path|path.to_string_lossy()),"reason":scan.reason}))?.len()+1024;
+    let mut index = offset;
+    let mut row_too_large = false;
+    while index < rows.len() && files.len() < INVENTORY_PAGE_ROWS {
+        let (category, path, bytes) = &rows[index];
+        let row = json!({"path":path,"category":category,"bytes":bytes});
+        let size = serde_json::to_vec(&row)?.len() + 1;
+        if used + size > INVENTORY_PAGE_BYTES {
+            if files.is_empty() {
+                row_too_large = true;
+            }
+            break;
+        }
+        used += size;
+        files.push(row);
+        index += 1;
+    }
+    let next_offset = index;
+    let page_complete = next_offset >= rows.len();
+    let scan_complete = scan.complete && !utf8_error && !row_too_large;
+    let complete = scan_complete;
+    let reason = if row_too_large {
+        Some("page_row_too_large")
+    } else if utf8_error {
+        Some("path_not_selectable")
+    } else if !scan.complete {
+        scan.reason
+    } else {
+        None
+    };
+    let unobserved = if utf8_error {
+        Some("<unselectable-path>".to_string())
+    } else {
+        scan.unobserved
+            .as_deref()
+            .map(|p| p.to_string_lossy().into_owned())
+    };
+    Ok(json!({
+        "environment_id": environment_id,
+        "root": root.to_string_lossy(),
+        "complete": complete,
+        "digest": digest_value,
+        "files": files,
+        "total_files": total_files,
+        "next_offset": if page_complete || !scan_complete { Value::Null } else { json!(next_offset) },
+        "reason": reason,
+        "unobserved": unobserved,
+    }))
+}
 /// Overview statistics for the inspector. This walk reads metadata only: no
 /// file contents, no digests, and none of the archive admission limits (those
 /// stay on `manifest`, which destructive plans must still pass in full). When
@@ -978,10 +1414,12 @@ impl Engine {
     ) -> Result<(PathBuf, Vec<Value>)> {
         let pass = check_passphrase(r)?;
         let root = PathBuf::from(string(e, "root")?);
-        let categories = categories(&p["extra"])?;
-        let entries = manifest(&root, &categories)?;
+        let entries = frozen_manifest(&root, &p["extra"])?;
         if json!(entries) != p["extra"]["manifest"] {
-            return Err(err("stale_plan", "工作内容在执行前改变，请重新生成计划"));
+            return Err(err(
+                "stale_plan",
+                "所选工作内容在执行前改变（选中原件增加、消失或内容变化），请重新生成计划",
+            ));
         }
         let size: u64 = entries
             .iter()
@@ -998,7 +1436,16 @@ impl Engine {
         }
         let mut files = vec![];
         for entry in &entries {
-            let data = read(&root.join(string(entry, "path")?), 8 * 1024 * 1024)?;
+            let path = root.join(string(entry, "path")?);
+            let data = if entry.get("source_identity").is_some() {
+                let (data, identity) = read_selected_original(&path)?;
+                if identity != entry["source_identity"] {
+                    return Err(err("stale_plan", "归档期间所选原件身份改变"));
+                }
+                data
+            } else {
+                read(&path, 8 * 1024 * 1024)?
+            };
             if digest(&data) != entry["digest"] {
                 return Err(err("stale_plan", "归档期间工作内容变化；原环境保持不变"));
             }
@@ -1054,7 +1501,13 @@ impl Engine {
     pub(crate) fn plan_archive(&self, r: &Value) -> Result<Value> {
         let e = self.env(r)?;
         let categories = categories(r)?;
-        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let selected = selection(r)?;
+        let root = Path::new(string(&e, "root")?);
+        let manifest = if selected.is_empty() {
+            manifest(root, &categories)?
+        } else {
+            selected_manifest(root, &categories, &selected)?
+        };
         let (output, output_parent_identity) = match r.get("output_path") {
             Some(Value::String(s)) if !s.is_empty() => {
                 let (path, identity) = freeze_output_path(Path::new(s))?;
@@ -1063,14 +1516,29 @@ impl Engine {
             _ => (None, None),
         };
         let actions = json!([{"id":"archive","label":"加密归档选中的工作内容","reversible":false}]);
+        let mut extra = json!({
+            "categories": categories,
+            "manifest": manifest,
+            "archive_passphrase_required": true,
+            "output_path": output,
+            "output_parent_identity": output_parent_identity,
+            "outcome": "archive_only",
+            "work_selection": work_selection(&selected),
+        });
+        if !selected.is_empty() {
+            extra["selected_paths"] = json!(selected);
+        }
         self.plan(
             &e,
             "archive",
             "仅加密归档所选工作内容",
             json!([]),
-            vec!["原环境全部内容（不注销、不删除、不新建）", "settings、hooks、MCP 与插件文件"],
+            vec![
+                "原环境全部内容（不注销、不删除、不新建）",
+                "settings、hooks、MCP 与插件文件",
+            ],
             actions,
-            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"output_path":output,"output_parent_identity":output_parent_identity,"outcome":"archive_only"}),
+            extra,
         )
     }
 
@@ -1081,7 +1549,13 @@ impl Engine {
     pub(crate) fn plan_preserve(&self, r: &Value) -> Result<Value> {
         let e = self.env(r)?;
         let categories = categories(r)?;
-        let manifest = manifest(Path::new(string(&e, "root")?), &categories)?;
+        let selected = selection(r)?;
+        let root = Path::new(string(&e, "root")?);
+        let manifest = if selected.is_empty() {
+            manifest(root, &categories)?
+        } else {
+            selected_manifest(root, &categories, &selected)?
+        };
         let name = r
             .get("name")
             .and_then(Value::as_str)
@@ -1096,14 +1570,31 @@ impl Engine {
             {"id":"create","label":"创建新的配置目录","reversible":false},
             {"id":"migrate","label":"选择性迁入；不启用 hooks/MCP","reversible":false}
         ]);
+        let mut extra = json!({
+            "categories": categories,
+            "manifest": manifest,
+            "archive_passphrase_required": true,
+            "preserve_name": name,
+            "outcome": "preserve",
+            "frozen_target": frozen_target,
+            "work_purpose": purposes(&categories),
+            "activate": activation,
+            "work_selection": work_selection(&selected),
+        });
+        if !selected.is_empty() {
+            extra["selected_paths"] = json!(selected);
+        }
         self.plan(
             &e,
             "preserve",
             "保全工作内容并准备新环境",
             json!([]),
-            vec!["原环境全部内容（不注销、不删除、不停止进程）", "settings、hooks、MCP 与插件文件"],
+            vec![
+                "原环境全部内容（不注销、不删除、不停止进程）",
+                "settings、hooks、MCP 与插件文件",
+            ],
             actions,
-            json!({"categories":categories,"manifest":manifest,"archive_passphrase_required":true,"preserve_name":name,"outcome":"preserve","frozen_target":frozen_target,"work_purpose":purposes(&categories),"activate":activation}),
+            extra,
         )
     }
 
@@ -1905,5 +2396,230 @@ mod tests {
             );
             assert_eq!(fs::read(scratch.join("placeholder")).unwrap(), b"");
         }
+    }
+
+    fn selection_root() -> (tempfile::TempDir, PathBuf) {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().canonicalize().unwrap().join("root");
+        fs::create_dir_all(root.join("projects/demo/memory")).unwrap();
+        (temp, root)
+    }
+
+    #[test]
+    fn selection_syntax_is_finite_and_rejects_escapes() {
+        assert_eq!(selection(&json!({})).unwrap(), Vec::<String>::new());
+        assert!(selection(&json!({"selected_paths": []})).is_err());
+        for bad in [
+            json!([""]),
+            json!(["/abs"]),
+            json!(["../escape"]),
+            json!(["./x"]),
+            json!(["a//b"]),
+            json!(["a/./b"]),
+            json!(["back\\slash"]),
+            json!(["ctrl\nchar"]),
+            json!(["  padded  "]),
+            json!(["dup", "dup"]),
+            json!([1]),
+            json!(["猫".repeat(2000)]),
+        ] {
+            assert!(selection(&json!({"selected_paths": bad})).is_err(), "{bad}");
+        }
+        assert_eq!(
+            selection(&json!({"selected_paths": ["projects/demo/session.jsonl"]})).unwrap(),
+            vec!["projects/demo/session.jsonl".to_string()]
+        );
+        assert!(has_selection(&json!({"selected_paths": []})));
+        assert!(!has_selection(&json!({})));
+    }
+
+    #[test]
+    fn selected_manifest_excludes_unselected_oversized_files() {
+        let (_t, root) = selection_root();
+        fs::create_dir_all(root.join("projects/demo")).unwrap();
+        let good = b"kept session bytes\n";
+        fs::write(root.join("projects/demo/keep.jsonl"), good).unwrap();
+        fs::write(root.join("projects/demo/other.jsonl"), b"unrelated\n").unwrap();
+        // An unselected 9 MiB session exceeds the 8 MiB per-file limit.
+        let big = root.join("projects/demo/huge.jsonl");
+        fs::write(&big, vec![b'x'; 9 * 1024 * 1024]).unwrap();
+        let memory = b"# memory\n";
+        fs::write(root.join("projects/demo/memory/MEMORY.md"), memory).unwrap();
+
+        // Whole-category manifest refuses the oversized neighbour.
+        let categories = vec!["memory".to_string(), "sessions".to_string()];
+        assert!(manifest(&root, &categories).is_err());
+
+        // Exact selection that excludes it keeps the other originals intact.
+        let entries = selected_manifest(
+            &root,
+            &categories,
+            &[
+                "projects/demo/keep.jsonl".to_string(),
+                "projects/demo/memory/MEMORY.md".to_string(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["path"], "projects/demo/keep.jsonl");
+        assert_eq!(entries[0]["digest"], digest(good));
+        assert_eq!(entries[0]["category"], "sessions");
+        assert_eq!(entries[1]["category"], "memory");
+        assert_eq!(fs::read(&big).unwrap().len(), 9 * 1024 * 1024);
+        assert_eq!(
+            fs::read(root.join("projects/demo/other.jsonl")).unwrap(),
+            b"unrelated\n"
+        );
+    }
+
+    #[test]
+    fn selected_manifest_rejects_missing_out_of_category_and_nonregular() {
+        let (_t, root) = selection_root();
+        fs::write(root.join("projects/demo/keep.jsonl"), b"x\n").unwrap();
+        let categories = vec!["sessions".to_string()];
+        assert_eq!(
+            selected_manifest(&root, &categories, &["projects/demo/keep.jsonl".into()])
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            selected_manifest(&root, &categories, &["projects/demo/missing.jsonl".into()])
+                .unwrap_err()
+                .code,
+            "selected_missing"
+        );
+        // A path whose category is not in the explicit selection is refused.
+        fs::write(root.join("projects/demo/memory/notes.md"), b"# n\n").unwrap();
+        assert_eq!(
+            selected_manifest(
+                &root,
+                &categories,
+                &["projects/demo/memory/notes.md".into()]
+            )
+            .unwrap_err()
+            .code,
+            "invalid_selection"
+        );
+        // A symlinked selected path is refused, never followed.
+        std::os::unix::fs::symlink(
+            root.join("projects/demo/keep.jsonl"),
+            root.join("projects/demo/link.jsonl"),
+        )
+        .unwrap();
+        assert_eq!(
+            selected_manifest(&root, &categories, &["projects/demo/link.jsonl".into()])
+                .unwrap_err()
+                .code,
+            "invalid_selection"
+        );
+    }
+
+    #[test]
+    fn inventory_is_bounded_paged_and_digest_bound() {
+        let (_t, root) = selection_root();
+        fs::write(root.join("projects/demo/session.jsonl"), b"{\"a\":1}\n").unwrap();
+        fs::write(root.join("projects/demo/memory/MEMORY.md"), b"# m\n").unwrap();
+        let categories = vec!["memory".to_string(), "sessions".to_string()];
+        let first = inventory("env", &root, &categories, &json!({})).unwrap();
+        assert_eq!(first["complete"], true);
+        assert_eq!(first["next_offset"], Value::Null);
+        assert_eq!(first["total_files"], 2);
+        let digest_value = first["digest"].as_str().unwrap().to_string();
+        assert_eq!(digest_value.len(), 64);
+        // Rows are ordered by full relative UTF-8 path.
+        let paths: Vec<_> = first["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["path"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "projects/demo/memory/MEMORY.md",
+                "projects/demo/session.jsonl"
+            ]
+        );
+        assert!(first["reason"].is_null());
+
+        // Paging with the matching digest is accepted; a mismatched one is stale.
+        assert!(inventory(
+            "env",
+            &root,
+            &categories,
+            &json!({"offset": 1, "expected_digest": digest_value}),
+        )
+        .is_ok());
+        assert_eq!(
+            inventory(
+                "env",
+                &root,
+                &categories,
+                &json!({"expected_digest": "a".repeat(64)}),
+            )
+            .unwrap_err()
+            .code,
+            "stale_inventory"
+        );
+    }
+
+    #[test]
+    fn inventory_first_page_is_complete_and_exact_encoding_is_bounded() {
+        let (_temp, root) = selection_root();
+        for index in 0..101 {
+            fs::write(
+                root.join(format!("projects/demo/memory/{index:03}.md")),
+                b"synthetic",
+            )
+            .unwrap();
+        }
+        let categories = vec!["memory".into()];
+        let first = inventory("env", &root, &categories, &json!({})).unwrap();
+        assert_eq!(first["complete"], true);
+        assert_eq!(first["next_offset"], 100);
+        let last = inventory(
+            "env",
+            &root,
+            &categories,
+            &json!({"offset":100,"expected_digest":first["digest"]}),
+        )
+        .unwrap();
+        assert_eq!(last["complete"], true);
+        assert!(last["next_offset"].is_null());
+        assert_eq!(last["files"].as_array().unwrap().len(), 1);
+        let paths: Vec<String> = (0..200)
+            .map(|index| format!("projects/demo/{index}-{}.jsonl", "\"".repeat(2000)))
+            .collect();
+        assert!(paths.iter().map(String::len).sum::<usize>() < SELECTION_TOTAL_BYTES);
+        assert!(selection(&json!({"selected_paths":paths})).is_err());
+        assert!(
+            frozen_manifest(
+                &root,
+                &json!({"categories":["memory"],"selected_paths":null})
+            )
+            .is_err(),
+            "Malformed frozen selection must never become whole category"
+        );
+    }
+
+    #[test]
+    fn inventory_marks_scan_incomplete_without_reading_content() {
+        let (_t, root) = selection_root();
+        fs::write(root.join("projects/demo/real.jsonl"), b"x\n").unwrap();
+        os_symlink("/etc/hosts", &root.join("projects/demo/link.jsonl"));
+        let report = inventory("env", &root, &["sessions".to_string()], &json!({})).unwrap();
+        assert_eq!(report["complete"], false);
+        assert!(
+            report["next_offset"].is_null(),
+            "Incomplete scan cannot offer a page that makes no progress"
+        );
+        assert_eq!(report["reason"], "symlink_in_scope");
+        assert_eq!(report["unobserved"], "projects/demo/link.jsonl");
+        assert_eq!(report["total_files"], 1);
+    }
+
+    fn os_symlink(target: &str, link: &Path) {
+        std::os::unix::fs::symlink(target, link).unwrap();
     }
 }

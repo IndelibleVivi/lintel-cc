@@ -29,7 +29,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else ROOT / 'target/debug/lintel'
 PASSPHRASE = "synthetic-lintel-regression-only"
-ALLOWED = {"register", "inspect", "plan_reset", "plan_preserve", "execute", "archive_inspect"}
+ALLOWED = {"register", "inspect", "plan_reset", "plan_preserve", "plan_archive", "execute", "archive_inspect"}
 
 
 class WorkPreservationJourney(unittest.TestCase):
@@ -131,6 +131,85 @@ class WorkPreservationJourney(unittest.TestCase):
         self.assertEqual(response["data"]["environment"]["id"], environment_id)
         # Asset completeness is reported separately; this does not relax the
         # archive's own admission rules.
+
+    def exact_plan(self, command: str, environment_id: str, paths: list[str]) -> dict[str, Any]:
+        # Exercise repeatable named CLI argv, not a private helper.
+        args = [str(BINARY), "work", "archive" if command == "plan_archive" else "preserve", "plan",
+                "--environment", environment_id, "--categories", "memory,sessions"]
+        for path in paths:
+            args.extend(["--path", path])
+        proc = subprocess.run(args, env=self.environment, cwd=self.base, capture_output=True, text=True, timeout=45)
+        result = json.loads(proc.stdout)
+        self.assertTrue(result["ok"], result)
+        plan = result["data"]
+        self.approved_plans[plan["id"]] = plan["hash"]
+        self.assertEqual(plan["work_selection"], {"mode": "paths", "paths": paths})
+        self.assertNotIn("extra", plan)
+        self.assertNotIn("source_identity", json.dumps(plan))
+        return plan
+
+    def test_named_exact_archive_and_preserve_keep_complete_original_bytes(self) -> None:
+        originals = {"projects/demo/session.jsonl": b'{"synthetic":"complete"}\n',
+                     "projects/demo/memory/MEMORY.md": b"# complete original memory\n"}
+        for path, data in originals.items():
+            self.write(path, data)
+        huge = self.root / "projects/demo/huge.jsonl"
+        with huge.open("wb") as file:
+            file.truncate(9 * 1024 * 1024)
+        environment_id = self.register()
+        whole = self.envelope("plan_archive", environment_id=environment_id, categories=["sessions"])
+        self.assertFalse(whole["ok"])
+        for command in ["plan_archive", "plan_preserve"]:
+            plan = self.exact_plan(command, environment_id, list(originals))
+            # New and modified unselected files cannot invalidate or expand it.
+            self.write("projects/demo/not-selected.jsonl", b"unselected change\n")
+            with huge.open("ab") as file:
+                file.write(b"unselected growth")
+            receipt = self.data("execute", plan_id=plan["id"], approval=plan["hash"], archive_passphrase=PASSPHRASE)
+            self.assertEqual(receipt["status"], "completed")
+            archive = self.data("archive_inspect", job_id=receipt["id"], archive_passphrase=PASSPHRASE)
+            self.assertEqual({item["path"] for item in archive["files"]}, set(originals))
+            self.assertEqual({item["path"]: item["digest"] for item in archive["files"]},
+                             {path: hashlib.sha256(data).hexdigest() for path, data in originals.items()})
+            # Existing archive read --path must retain its single string meaning.
+            for path, data in originals.items():
+                proc = subprocess.run([str(BINARY), "work", "archive", "read", "--job", receipt["id"], "--path", path],
+                                      input=json.dumps({"archive_passphrase": PASSPHRASE}), env=self.environment,
+                                      capture_output=True, text=True, cwd=self.base, timeout=45)
+                read = json.loads(proc.stdout)
+                self.assertTrue(read["ok"], read)
+                self.assertEqual(read["data"]["text"].encode(), data)
+            if command == "plan_preserve":
+                self.assertEqual({item["source"] for item in plan["planned_target"]["files"]}, set(originals))
+                for item in plan["planned_target"]["files"]:
+                    self.assertEqual(Path(item["destination"]).read_bytes(), originals[item["source"]])
+        self.assertGreater(huge.stat().st_size, 9 * 1024 * 1024)
+
+    def test_exact_selected_changes_are_rejected_before_acceptance(self) -> None:
+        path = "projects/demo/session.jsonl"
+        for mutation in ["content", "missing", "same-bytes-replacement"]:
+            for command in ["plan_archive", "plan_preserve"]:
+                with self.subTest(mutation=mutation, command=command):
+                    self.write(path, b"frozen bytes\n")
+                    environment_id = self.register()
+                    plan = self.exact_plan(command, environment_id, [path])
+                    source = self.root / path
+                    if mutation == "content":
+                        source.write_bytes(b"changed bytes\n")
+                    elif mutation == "missing":
+                        source.unlink()
+                    else:
+                        # Retain the old inode so the replacement cannot reuse it.
+                        backup = self.base / (plan["id"] + ".original")
+                        source.rename(backup)
+                        source.write_bytes(b"frozen bytes\n")
+                    result = self.envelope("execute", plan_id=plan["id"], approval=plan["hash"], archive_passphrase=PASSPHRASE)
+                    self.assertFalse(result["ok"], result)
+                    self.assertIn(result["error"]["code"], ["stale_plan", "selected_missing", "selected_changed"])
+                    self.assertFalse((self.state / "jobs" / (plan["id"] + ".json")).exists())
+                    self.assertFalse((self.state / "archives" / (plan["id"] + ".age")).exists())
+                    if command == "plan_preserve":
+                        self.assertFalse(Path(plan["planned_target"]["new_root"]).exists())
 
     def test_two_rebuilds_preserve_previously_imported_work_in_next_archive(self) -> None:
         self.write("settings.json", b"{}")

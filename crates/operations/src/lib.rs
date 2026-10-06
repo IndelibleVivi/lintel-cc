@@ -1,6 +1,10 @@
 //! Static operation contract shared by the agent CLI and finite transports.
 //! Reading this catalog never opens a home, state, target, or executable.
 use serde_json::{json, Map, Value};
+use std::{
+    collections::HashSet,
+    path::{Component, Path},
+};
 
 const SETTINGS: &[&str] = &[
     "DISABLE_TELEMETRY",
@@ -27,6 +31,97 @@ pub fn valid_plan_hash(value: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
+
+/// Canonical finite exact-path rule shared by strict transports and raw core.
+/// It only checks syntax (relative, no absolute/`.`/`..`/empty/control/`\\`,
+/// bounded UTF-8 length); the core still re-derives the category and on-disk
+/// identity. The named/finite transport rejects a
+/// malformed selection before the core, an SSH call or any mutation.
+pub fn valid_selected_path(raw: &str) -> bool {
+    !raw.is_empty()
+        && raw.len() <= 4096
+        && !raw.contains('\\')
+        && !raw.contains('\0')
+        && !raw.chars().any(char::is_control)
+        && raw == raw.trim()
+        && !raw.contains("//")
+        && !raw.starts_with('/')
+        && raw
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
+}
+
+pub fn valid_selected_paths(value: &Value) -> bool {
+    value.as_array().is_some_and(|items| {
+        let mut seen = HashSet::new();
+        !items.is_empty()
+            && items.len() <= 10000
+            && items.iter().all(|item| {
+                item.as_str()
+                    .is_some_and(|path| valid_selected_path(path) && seen.insert(path))
+            })
+            && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 512 * 1024)
+    })
+}
+/// Static work-path categories shared by strict transports and core content admission.
+/// This function inspects a relative path only, never a filesystem or credential.
+pub fn work_path_category(relative: &Path) -> Option<&'static str> {
+    let name = relative.file_name()?.to_str()?;
+    if relative == Path::new("CLAUDE.md") {
+        return Some("instructions");
+    }
+    // A reference instruction that an earlier migration left in the inactive
+    // work area keeps the instructions category so a later archive still covers
+    // it. The only files this can match are names Lintel itself produced in that
+    // one slot: the reference `CLAUDE.md` and its collision disambiguations
+    // (`lintel-<n>-CLAUDE.md`). This finite rule never promotes arbitrary
+    // unknown files.
+    if is_reference_instructions(relative) {
+        return Some("instructions");
+    }
+    // Work previously preserved into lintel-imports keeps its category so a
+    // later archive covers it again; instruction slots were handled above.
+    let work_area =
+        relative.starts_with("projects") || relative.starts_with("lintel-imports/projects");
+    if work_area
+        && relative.components().any(|c| c.as_os_str() == "memory")
+        && relative.extension().is_some_and(|x| x == "md")
+    {
+        return Some("memory");
+    }
+    if work_area && name.ends_with(".jsonl") {
+        return Some("sessions");
+    }
+    None
+}
+
+/// The inactive reference-rotation slot for the instructions category is
+/// `lintel-imports/<name>`, where `<name>` is `CLAUDE.md` or a collision
+/// disambiguation like `lintel-1-CLAUDE.md`. Only a file placed directly under
+/// `lintel-imports` matches; deeper paths keep their own category rules.
+fn is_reference_instructions(relative: &Path) -> bool {
+    let mut components = relative.components();
+    let first = match components.next() {
+        Some(Component::Normal(part)) => part,
+        _ => return false,
+    };
+    if first != "lintel-imports" || components.clone().count() != 1 {
+        return false;
+    }
+    let name = match components.next() {
+        Some(Component::Normal(name)) => match name.to_str() {
+            Some(name) => name,
+            None => return false,
+        },
+        _ => return false,
+    };
+    if name == "CLAUDE.md" {
+        return true;
+    }
+    name.strip_prefix("lintel-")
+        .and_then(|rest| rest.strip_suffix("-CLAUDE.md"))
+        .is_some_and(|index| !index.is_empty() && index.bytes().all(|b| b.is_ascii_digit()))
+}
 fn property(name: &str) -> Value {
     match name {
         "approval" => plan_hash_schema(),
@@ -38,6 +133,13 @@ fn property(name: &str) -> Value {
         }
         "categories" => {
             json!({"type":"array","items":choice(&["instructions","memory","sessions"]),"minItems":1,"uniqueItems":true})
+        }
+        // Exact original-file selection. Additive: absent keeps the historical
+        // whole-category behavior. Non-empty unique canonical relative paths;
+        // string-level limits are enforced here, category and on-disk identity
+        // by the core. The validator additionally bounds encoded bytes to 512 KiB.
+        "selected_paths" => {
+            json!({"type":"array","minItems":1,"maxItems":10000,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":4096}})
         }
         "trusted_devices" => choice(&["unknown", "required", "not_required"]),
         "preset" => choice(&["preserve", "reduce", "custom"]),
@@ -78,7 +180,9 @@ fn property(name: &str) -> Value {
         }
         "request_id" => json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096}),
         "offset" => json!({"type":"integer","minimum":0,"maximum":9007199254740991i64}),
-        "expected_digest" => json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64}),
+        "expected_digest" => {
+            json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64})
+        }
         "root" | "archive_path" | "output_path" => {
             json!({"type":"string","pattern":"^/","description":"目标主机上的准确绝对路径；执行器另行复查实际文件与 ownership"})
         }
@@ -113,7 +217,11 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
         "create_environment" => (&["name"], &[]),
         "inspect" => (&["environment_id"], &["trusted_devices"]),
         "inspect_components" => (&["environment_id"], &["project_cwd"]),
-        "work_preflight" => (&["environment_id", "categories"], &[]),
+        "work_preflight" => (&["environment_id", "categories"], &["selected_paths"]),
+        "work_inventory" => (
+            &["environment_id", "categories"],
+            &["offset", "expected_digest"],
+        ),
         "drift"
         | "accept_drift"
         | "cleanup_inspect"
@@ -126,8 +234,14 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
             &["trusted_devices", "release_settings", "custom_settings"],
         ),
         "plan_reset" => (&["environment_id", "recipe", "categories"], &[]),
-        "plan_archive" => (&["environment_id", "categories"], &["output_path"]),
-        "plan_preserve" => (&["environment_id", "categories"], &["name", "activate"]),
+        "plan_archive" => (
+            &["environment_id", "categories"],
+            &["output_path", "selected_paths"],
+        ),
+        "plan_preserve" => (
+            &["environment_id", "categories"],
+            &["name", "activate", "selected_paths"],
+        ),
         "plan_cleanup" => (
             &[
                 "environment_id",
@@ -137,13 +251,21 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
             ],
             &["categories", "activate"],
         ),
-        "plan_launch" => (&["environment_id", "project_cwd", "mode"], &["input_reference"]),
+        "plan_launch" => (
+            &["environment_id", "project_cwd", "mode"],
+            &["input_reference"],
+        ),
         "launch_request" => (&["request_id", "approval"], &[]),
         "resume_request" => (&["request_id", "approval"], &["archive_passphrase"]),
         "launch_query" => (&["request_id"], &[]),
         "launches" => (&[], &[]),
         "plan_resume" => (
-            &["environment_id", "project_cwd", "path", "archive_passphrase"],
+            &[
+                "environment_id",
+                "project_cwd",
+                "path",
+                "archive_passphrase",
+            ],
             &["job_id", "archive_path"],
         ),
         "service_inspect" | "plan_service_quiesce" => (&["environment_id", "manager", "unit"], &[]),
@@ -172,6 +294,7 @@ pub const COMMANDS: &[&str] = &[
     "inspect",
     "inspect_components",
     "work_preflight",
+    "work_inventory",
     "plan_policy",
     "plan_reset",
     "plan_archive",
@@ -230,8 +353,15 @@ pub fn schema(command: &str) -> Option<Value> {
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
     let mut value = json!({"$schema":"https://json-schema.org/draft/2020-12/schema","title":command,"type":"object","properties":properties,"required":required,"additionalProperties":false});
-    if ["archive_inspect", "archive_read", "session_read", "plan_import", "plan_resume", "job"]
-        .contains(&command)
+    if [
+        "archive_inspect",
+        "archive_read",
+        "session_read",
+        "plan_import",
+        "plan_resume",
+        "job",
+    ]
+    .contains(&command)
     {
         let alternate = if command == "job" {
             "plan_id"
@@ -304,9 +434,11 @@ fn check_property(value: &Value, schema: &Value) -> bool {
             // The only patterns used here are the fixed plan-hash shape; keep the
             // check minimal and exact rather than pulling in a regex engine.
             if pattern == "^[a-f0-9]{64}$" {
-                value
-                    .as_str()
-                    .is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+                value.as_str().is_some_and(|s| {
+                    s.len() == 64
+                        && s.bytes()
+                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                })
             } else {
                 value.as_str().is_some()
             }
@@ -328,7 +460,9 @@ pub fn validate(request: &Value) -> Result<(), String> {
         let prop = s["properties"]
             .get(key)
             .ok_or_else(|| format!("未支持的字段 {key}"))?;
-        if !check_property(value, prop) {
+        // The exact-path validator handles typed items, count, uniqueness and
+        // encoding together without the generic O(n²) uniqueItems scan.
+        if key != "selected_paths" && !check_property(value, prop) {
             return Err(format!("字段 {key} 的类型或取值无效"));
         }
         if key == "unit" && !valid_service_unit(value.as_str().unwrap()) {
@@ -342,6 +476,30 @@ pub fn validate(request: &Value) -> Result<(), String> {
         {
             return Err(format!("{key} 需要绝对路径"));
         }
+        if key == "selected_paths" && !valid_selected_paths(value) {
+            return Err(
+                "selected_paths 需要非空、唯一、相对、无 . / .. 或控制字符的精确原件路径".into(),
+            );
+        }
+    }
+    if let Some(paths) = request["selected_paths"].as_array() {
+        for path in paths {
+            let category = work_path_category(Path::new(path.as_str().unwrap()))
+                .ok_or("selected_paths 不属于受支持工作类别")?;
+            if !request["categories"]
+                .as_array()
+                .is_some_and(|categories| categories.iter().any(|item| item == category))
+            {
+                return Err("selected_paths 类别不在显式 categories 内".into());
+            }
+        }
+    }
+    if command == "work_inventory"
+        && request["offset"].as_u64().is_some_and(|offset| {
+            offset > 9007199254740991 || (offset > 0 && request.get("expected_digest").is_none())
+        })
+    {
+        return Err("后续 metadata 页需要原清单摘要和有限 offset".into());
     }
     if let Some(branches) = s["oneOf"].as_array() {
         let satisfied = branches
@@ -389,7 +547,10 @@ pub fn validate(request: &Value) -> Result<(), String> {
     if let Some(activate) = request.get("activate").and_then(Value::as_object) {
         for key in ["memory", "sessions"] {
             if activate.get(key).and_then(Value::as_bool) == Some(true) {
-                return Err("memory/sessions 本轮没有可注册的活动会话位置；activate 只支持 instructions".into());
+                return Err(
+                    "memory/sessions 本轮没有可注册的活动会话位置；activate 只支持 instructions"
+                        .into(),
+                );
             }
         }
     }
@@ -405,6 +566,7 @@ pub fn describe(command: &str) -> Option<Value> {
         "launch_query" | "launches" => "readonly_launch_records",
         "inspect_components" => "read_finite_component_sources_and_original_records",
         "work_preflight" => "read_selected_work_metadata_only",
+        "work_inventory" => "read_selected_work_metadata_inventory",
         "plan_archive" | "plan_preserve" | "plan_reset" | "plan_cleanup" => {
             "read_selected_work_for_frozen_plan"
         }
@@ -424,6 +586,7 @@ pub fn describe(command: &str) -> Option<Value> {
         "launch_query" | "launches" => "read_launch_records_only",
         "inspect_components" => "read_original_records_without_reconciliation",
         "work_preflight" => "readonly_metadata_scan_no_state_written",
+        "work_inventory" => "readonly_metadata_scan_no_state_written",
         "accept_drift" => "write_baseline",
         "execute" => "persist_receipt_and_recovery",
         _ if planning => "persist_frozen_plan",
@@ -442,8 +605,12 @@ pub fn describe(command: &str) -> Option<Value> {
         ],
     };
     let launch_conditions = match command {
-        "launch" => json!({"named_cli":"real_TTY_required_no_prompt","named_cli_entry":"lintel launch <environment-id>","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"}),
-        "plan_launch" | "launch_request" | "plan_resume" => json!({"named_cli":"real_TTY_required_no_prompt","core_json":"macos_Terminal_only","finite_ssh":"bound_runner_request_id_only","prompt":false,"queue":false}),
+        "launch" => {
+            json!({"named_cli":"real_TTY_required_no_prompt","named_cli_entry":"lintel launch <environment-id>","core_json":"macos_Terminal_only","finite_ssh":"use_separate_remote_launch_control_macos_client"})
+        }
+        "plan_launch" | "launch_request" | "plan_resume" => {
+            json!({"named_cli":"real_TTY_required_no_prompt","core_json":"macos_Terminal_only","finite_ssh":"bound_runner_request_id_only","prompt":false,"queue":false})
+        }
         _ => Value::Null,
     };
     Some(json!({
@@ -553,7 +720,7 @@ mod tests {
             schema("plan_archive").unwrap()["properties"]["categories"]["minItems"],
             1
         );
-        for command in ["plan_archive", "plan_preserve"] {
+        for command in ["plan_archive", "plan_preserve", "work_preflight"] {
             assert!(validate(
                 &json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":[]})
             )
@@ -561,6 +728,95 @@ mod tests {
             assert!(validate(&json!({"command":command,"environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"]})).is_ok());
         }
         assert!(validate(&json!({"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"reduce","keep_remote_control":false,"release_settings":[]})).is_ok());
+    }
+
+    #[test]
+    fn work_inventory_is_a_strict_readonly_operation() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        assert!(COMMANDS.contains(&"work_inventory"));
+        assert!(validate(
+            &json!({"command":"work_inventory","environment_id":id,"categories":["memory"]})
+        )
+        .is_ok());
+        // offset/expected_digest are the only optional fields and are finite.
+        assert!(validate(
+            &json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"offset":0,"expected_digest":"a".repeat(64)})
+        )
+        .is_ok());
+        for invalid in [
+            json!({"command":"work_inventory","categories":["memory"]}),
+            json!({"command":"work_inventory","environment_id":id}),
+            json!({"command":"work_inventory","environment_id":id,"categories":[]}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["bogus"]}),
+            json!({"command":"work_inventory","environment_id":"synthetic","categories":["memory"]}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"offset":-1}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"offset":"0"}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"expected_digest":"short"}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"extra":true}),
+            json!({"command":"work_inventory","environment_id":id,"categories":["memory"],"approval":"x"}),
+        ] {
+            assert!(validate(&invalid).is_err(), "{invalid}");
+        }
+        let describe = describe("work_inventory").unwrap();
+        assert_eq!(describe["requires_plan"], false);
+        assert_eq!(
+            describe["effects"]["target"],
+            "read_selected_work_metadata_inventory"
+        );
+        assert_eq!(
+            describe["effects"]["lintel_state"],
+            "readonly_metadata_scan_no_state_written"
+        );
+        assert!(describe["secret_fields"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn selected_paths_are_finite_and_transport_validated() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        for command in ["plan_archive", "plan_preserve", "work_preflight"] {
+            assert!(validate(
+                &json!({"command":command,"environment_id":id,"categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]})
+            )
+            .is_ok());
+        }
+        // A named transport must reject an empty or malformed selection before
+        // the core; it never revisits whole-category behavior silently.
+        for bad in [
+            json!([]),
+            json!([""]),
+            json!(["/etc/hosts"]),
+            json!(["../escape"]),
+            json!(["./dot"]),
+            json!(["a//b"]),
+            json!(["a/./b"]),
+            json!(["projects\\demo"]),
+            json!([" spaced "]),
+            json!(["a\nb"]),
+            json!(["dup", "dup"]),
+        ] {
+            assert!(
+                validate(&json!({"command":"plan_archive","environment_id":id,"categories":["sessions"],"selected_paths":bad})).is_err(),
+                "{bad}"
+            );
+        }
+        // `selected_paths` is not accepted by operations that do not select work.
+        assert!(validate(
+            &json!({"command":"work_preflight","environment_id":id,"categories":["sessions"],"selected_paths":["x"]})
+        )
+        .is_err());
+        assert!(validate(
+            &json!({"command":"plan_import","environment_id":id,"categories":["sessions"],"archive_passphrase":"twelve-chars!","selected_paths":["x"]})
+        )
+        .is_err());
+        assert!(valid_selected_path("projects/demo/memory/MEMORY.md"));
+        assert!(!valid_selected_path(""));
+        assert!(!valid_selected_path("/abs"));
+        assert!(!valid_selected_path("a/../b"));
+        assert!(!valid_selected_path("猫".repeat(2000).as_str()));
+        let encoded: Vec<String> = (0..200)
+            .map(|index| format!("projects/demo/{index}-{}.jsonl", "\"".repeat(2000)))
+            .collect();
+        assert!(!valid_selected_paths(&json!(encoded)));
     }
     #[test]
     fn work_preflight_is_a_strict_readonly_operation() {
@@ -679,13 +935,19 @@ mod tests {
         assert!(validate(&ok).is_ok(), "{ok}");
         // Exactly one source; both or neither is rejected.
         assert!(validate(&json!({"command":"session_read","job_id":"00000000-0000-4000-8000-000000000001","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x"})).is_err());
-        assert!(validate(&json!({"command":"session_read","archive_passphrase":"synthetic-only","path":"x"})).is_err());
+        assert!(validate(
+            &json!({"command":"session_read","archive_passphrase":"synthetic-only","path":"x"})
+        )
+        .is_err());
         // offset bounded integer; digest lowercase hex only.
         assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","offset":-1})).is_err());
         assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","offset":10})).is_ok());
         assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","expected_digest":"A".repeat(64)})).is_err());
         assert!(validate(&json!({"command":"session_read","archive_path":"/tmp/a.age","archive_passphrase":"synthetic-only","path":"x","expected_digest":"a".repeat(64)})).is_ok());
-        assert_eq!(schema("session_read").unwrap()["properties"]["archive_passphrase"]["writeOnly"], true);
+        assert_eq!(
+            schema("session_read").unwrap()["properties"]["archive_passphrase"]["writeOnly"],
+            true
+        );
     }
 
     #[test]
@@ -698,9 +960,15 @@ mod tests {
         assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"interactive","input_reference":reference})).is_ok());
         assert!(validate(&json!({"command":"plan_launch","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","mode":"interactive","input_reference":{"body":"secret"}})).is_err());
         assert!(validate(&json!({"command":"launch_request","request_id":"00000000-0000-4000-8000-000000000001","approval":"a".repeat(64)})).is_ok());
-        assert!(validate(&json!({"command":"launch_request","request_id":"not-a-uuid","approval":"a".repeat(64)})).is_err());
+        assert!(validate(
+            &json!({"command":"launch_request","request_id":"not-a-uuid","approval":"a".repeat(64)})
+        )
+        .is_err());
         assert!(validate(&json!({"command":"plan_resume","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/tmp/project","job_id":"00000000-0000-4000-8000-000000000002","archive_passphrase":"synthetic-only","path":"p/s.jsonl"})).is_ok());
-        assert_eq!(schema("launch_request").unwrap()["x-lintel-interactive"], json!(true));
+        assert_eq!(
+            schema("launch_request").unwrap()["x-lintel-interactive"],
+            json!(true)
+        );
     }
 
     #[test]
@@ -710,7 +978,10 @@ mod tests {
         assert!(validate(&json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"],"activate":{"instructions":"yes"}})).is_err());
         assert!(validate(&json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["instructions"],"activate":{"credentials":true}})).is_err());
         let bad = json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"activate":{"sessions":true}});
-        assert!(validate(&bad).is_err(), "activating an unavailable session position must be refused");
+        assert!(
+            validate(&bad).is_err(),
+            "activating an unavailable session position must be refused"
+        );
     }
 
     #[test]
@@ -721,20 +992,39 @@ mod tests {
         let list = catalog["tasks"].as_array().unwrap();
         assert_eq!(list.len(), 6);
         let ids: Vec<&str> = list.iter().map(|t| t["id"].as_str().unwrap()).collect();
-        assert_eq!(ids, ["reduce_egress", "preserve_work", "repair_cleanup_retire", "browser_profile", "ssh_remote", "recover_results"]);
+        assert_eq!(
+            ids,
+            [
+                "reduce_egress",
+                "preserve_work",
+                "repair_cleanup_retire",
+                "browser_profile",
+                "ssh_remote",
+                "recover_results"
+            ]
+        );
         // Every referenced operation must be a real operation this catalog owns.
         for task in list {
             for op in task["operations"].as_array().unwrap() {
-                assert!(schema(op.as_str().unwrap()).is_some(), "task references unknown operation {op}");
+                assert!(
+                    schema(op.as_str().unwrap()).is_some(),
+                    "task references unknown operation {op}"
+                );
             }
             assert!(task["route"].as_str().unwrap().starts_with('#'), "route");
-            assert!(!task["help_anchor"].as_str().unwrap().is_empty(), "help_anchor");
+            assert!(
+                !task["help_anchor"].as_str().unwrap().is_empty(),
+                "help_anchor"
+            );
             assert!(!task["label"].as_str().unwrap().is_empty(), "label");
             assert!(!task["summary"].as_str().unwrap().is_empty(), "summary");
             // Every CLI example must invoke `lintel` with a real top-level grammar.
             for example in task["cli_examples"].as_array().unwrap() {
                 let example = example.as_str().unwrap();
-                assert!(example.contains("lintel "), "cli example grammar: {example}");
+                assert!(
+                    example.contains("lintel "),
+                    "cli example grammar: {example}"
+                );
             }
         }
     }
