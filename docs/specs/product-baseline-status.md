@@ -13,7 +13,7 @@
 | A05 | A 冻结新 root／清单 | core／UI／native 通过 | 新 root、命名、用途与全部文件落点先冻结；碰撞／父目录更换拒绝旧计划。native preserve 的三份文件逐字节读回一致 |
 | A06 | A 原任务 intent／恢复 | core／UI 通过 | 部分迁入、私有副本失败、重复启动／丢回复保留原 intent、位置和阶段；原 ID 查询，不再建 root 或打开第二次 Terminal；本批 publication 的目录／文件同步与 intent 保存失败回归覆盖准确产物路径、未完成状态及本次临时文件回收 |
 | A07 | C 原件与私有阅读 | core／资料旅程通过 | 非 ASCII、未知字段、signature、特殊换行包字节不变；提取排除 opaque thinking／signature；正文不入操作回执和 Agent 包 |
-| A08 | C 有界分页／来源身份 | core／UI 通过 | 6000 条记录完整有界分页，损坏／未知格式明确展示；path、package／entry digest 与记录索引绑定，源变化拒绝旧选择。当前源码每页 ≤256 KiB；36 MiB 工作集的 archive、独立 state inspect／pages／import／preserve 与原始 CRLF／非 UTF-8 offsets 合成旅程通过，先完整认证并私有暂存全包；资源条件见 current-state；`archive-wait-ui` 验首读／翻页等待、旧页标记、离开后的队列状态及迟到结果隔离 |
+| A08 | C 有界分页／来源身份 | core／UI 通过 | 6000 条记录完整有界分页，损坏／未知格式明确展示；path、package／entry digest 与记录索引绑定，源变化拒绝旧选择。当前源码每页 ≤256 KiB；36 MiB 工作集的 archive、独立 state inspect／pages／import／preserve 与原始 CRLF／非 UTF-8 offsets 合成旅程通过，先完整认证并私有暂存全包；release 四个 256 MiB 原件／1 GiB 合计及 10,000 文件的归档、独立读取与迁入已通过，资源条件见 current-state；`archive-wait-ui` 验首读／翻页等待、旧页标记、离开后的队列状态及迟到结果隔离 |
 | A09 | A/B 资料用途与启用 | core／UI／native 通过 | App 默认参考资料；启用指令另行选择，批准与落盘一致。旧 raw import 默认激活语义保留；新工作交接稿不自动写入指令位置 |
 | A10 | B/C 审阅／复制／启动 | core／UI 通过 | 编辑使审阅失效，复制失败不启动；启动失败／未知只查原请求，阶段不冒充模型接收；普通新上下文与原生 resume 各自明确选择 |
 | A11 | C 有限 resume／支持证据 | 静态／inert 通过；真实认证未验证 | 仅静态识别的 2.1.283／2.1.285 与 ≤8 MiB 的受支持 JSONL shape 开放；私有 byte-identical 副本、`--resume` 与 `--fork-session`、cwd／config、原件不变受测试覆盖；`journey-resume-staging` 的真正 PTY exec 验整包明文暂存清除，解包／复制窗口的来源变化测试分别拒绝首次 intent 或保留原 intent 只查询。真实 Claude 接受和实际写入／原路径读取尚未验收 |

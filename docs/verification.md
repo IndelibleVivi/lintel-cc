@@ -89,6 +89,18 @@ python3 tests/verify.py --checks work-scale --timeout 14400 --json /absolute/loc
 
 The caller declaration of a release runner does not attest its source revision, signing or other-architecture runtime. Candidate identity and real account/client evidence remain separate.
 
+2026-10-07 local release acceptance for the production source in `57e8eb9` passed `work-scale`: four synthetic 256 MiB deterministic binary members, exactly 1 GiB plaintext; an independent state verified all package digests, bounded head/middle/tail pages, and every imported/source digest. A separate 10,000 short-path file set completed archive/inspect/import with every copy byte checked. Normal completions left no decoded staging. macOS 26.5.2 arm64, release, scrypt log N 19, temporary external-volume filesystem:
+
+| Operation | Observed elapsed | Peak process RSS |
+| --- | ---: | ---: |
+| 1 GiB archive + complete readback | 120.6s | 518.3 MiB |
+| Independent package inspect | 70.9s | 518.2 MiB |
+| Head / middle / tail page | 66.3 / 66.2 / 59.1s | 518.2–518.3 MiB |
+| Import preview / execute | 57.4 / 54.3s | 518.4–518.5 MiB |
+| 10,000-file archive / inspect / import | 29.9 / 11.0 / 194.7s | 532.8 / 519.6 / 550.8 MiB |
+
+The 1 GiB pattern produced 3,834,530,852 ciphertext bytes because v1 carries JSON byte arrays. Whole-fixture allocated-block samples peaked at about 6.51 GiB; this includes originals, ciphertext and copies as well as staging, and is not a pure temporary-space peak or an exact physical disk measurement. Some steps overlapped other local QA/build work, so elapsed values describe this run rather than an idle-machine performance baseline. Earlier log N 14 debug RSS figures are separate historical evidence. Full-package validation still occurs for each page; these local readings cannot establish operation within the finite SSH 60-second/2 MiB boundary. No real transcript, personal account, installed browser profile or VPS was used.
+
 `desktop-tauri-bundle` also prepares non-fixture Chromium / Firefox extension
 files and the existing browser native-host executable before the frontend/native
 build. It does not register a personal
