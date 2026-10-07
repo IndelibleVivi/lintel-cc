@@ -47,6 +47,7 @@ const docBase = 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/';
 // Finite named asset map only: the server never serves arbitrary files.
 const assets = new Map([['/', 'index.html'], ...[
   'index.html','styles.css','site.mjs',
+  'workflow-trail.mjs','site-world.mjs',
   'clawd-game.mjs','clawd-game.css',
   'assets/favicon.svg',
   'assets/lintel-landscape.png','assets/lintel-landscape-night.png',
@@ -132,6 +133,7 @@ try {
       assert.equal(await page.locator(id).count() > 0, true, `no-JS: ${id} present`);
     }
     assert.equal(await page.locator('.brand-wordmark-svg').count(), 3, 'no-JS: three native wordmarks');
+    for (const id of ['lake-light','lake-touch','moon-toggle','clawd-hello','tail-secret','scene-tools']) assert.equal(await page.locator(`#${id}`).isVisible(), false, `no-JS: ${id} does not leave an inert control`);
     const text = await page.locator('#main').innerText();
     assert.match(text, /Claude Code|Claude/, 'no-JS: product description visible');
     // The six capabilities are server-rendered: ids match the catalog and every card is readable.
@@ -141,6 +143,17 @@ try {
     assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, 'no-JS: four workflow steps present');
     await assertProductCopyVisible(page, 'no-JS');
     assert.equal(await page.locator('#how-it-works .execution-entries > div').count(), 3, 'no-JS: three execution entries present');
+    // The interactive workflow trail ships hidden: without JS its host stays hidden and the
+    // four-step explanation is still the authoritative, visible copy.
+    const noJsTrail = page.locator('#how-it-works #workflow-trail');
+    assert.equal(await noJsTrail.count(), 1, 'no-JS: workflow trail host is present in the markup');
+    assert.equal(await noJsTrail.evaluate(node => node.hidden), true, 'no-JS: workflow trail host stays hidden');
+    const noJsTrailVisible = await noJsTrail.evaluate(node => {
+      const style = getComputedStyle(node);
+      return style.display !== 'none' && node.getClientRects().length > 0 && !node.hidden;
+    });
+    assert.equal(noJsTrailVisible, false, 'no-JS: no interactive trail surface is shown');
+    assert.match(await page.locator('#how-it-works .workflow').innerText(), /[\u4e00-\u9fff]{4,}/, 'no-JS: the four-step text is still readable');
     // Reading-example snippets live inside a collapsed <details>; assert on textContent so the
     // closed (but server-rendered) content is still required to be present without JavaScript.
     const sampleSource = await page.locator('#sample-pages').evaluate(node => node.textContent);
@@ -168,6 +181,85 @@ try {
   await page.goto(base, {waitUntil:'networkidle'});
   assert.match(await page.title(), /Lintel/);
   assert.equal(await page.locator('h1').count(), 1, 'a single page headline');
+
+  // The hero is the same local illustration, with one disposable scene owner.
+  const scene = page.locator('.hero-overlay');
+  const canvasPixels = () => page.locator('#lake-light').evaluate(node => node.toDataURL());
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
+  const initialPixels = await canvasPixels();
+  await page.waitForTimeout(180);
+  assert.notEqual(await canvasPixels(), initialPixels, 'automatic character light actually changes across time');
+  const lockupBefore = await page.locator('.hero-lockup').boundingBox();
+  await page.mouse.move(1240, 540);
+  await page.waitForFunction(() => Math.abs(parseFloat(document.querySelector('.hero-overlay').style.getPropertyValue('--scene-x'))) > .4);
+  const lockupAfter = await page.locator('.hero-lockup').boundingBox();
+  assert.deepEqual(lockupAfter, lockupBefore, 'pointer depth keeps native identity anchored');
+  await page.locator('#lake-touch').click({position:{x:940,y:45}});
+  assert.equal(await scene.getAttribute('data-ripple'), '1', 'a real lake click creates a ripple');
+  const river = await canvasPixels();
+  await page.waitForTimeout(180);
+  assert.notEqual(await canvasPixels(), river, 'the water response expands across time');
+  await page.locator('#moon-toggle').focus(); await page.keyboard.press('Enter');
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'moon and header share the theme owner');
+  assert.equal(await page.locator('#scene-note').isVisible(), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#scene-note').isVisible(), false, 'Escape dismisses a scene note');
+  assert.equal(await page.locator('#moon-toggle').evaluate(node => node === document.activeElement), true, 'dismissal preserves the originating keyboard focus');
+  await page.locator('#clawd-hello').focus(); await page.keyboard.press('Space');
+  assert.match(await page.locator('#scene-message').innerText(), /工作|一起/);
+  await page.locator('#scene-note-close').click();
+  await page.locator('#clawd-hello').click();
+  assert.match(await page.locator('#scene-discoveries').innerText(), /2 \/ 3/, 'repeat greeting does not fabricate another discovery');
+  assert.equal(await page.locator('#scene-detour').isVisible(), true, 'a later greeting offers the existing game');
+  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready', 'offering a detour still requires game opt-in');
+  await page.locator('#scene-note-close').click();
+  await page.locator('#tail-secret').focus(); await page.keyboard.press('Enter');
+  assert.match(await page.locator('#scene-message').innerText(), /橙色|余地/);
+  assert.match(await page.locator('#scene-discoveries').innerText(), /3 \/ 3/, 'three distinct discoveries counted once');
+  await page.locator('#scene-note-close').click();
+  await page.locator('#sky-toggle').click();
+  assert.equal(await scene.getAttribute('data-sky'), 'stars');
+  await page.locator('#scene-note-close').click();
+  await page.mouse.click(8, 400);
+  await page.keyboard.type('lintel');
+  assert.equal(await scene.getAttribute('data-sky'), 'quiet', 'typing LINTEL in the scenery toggles the discovered sky');
+  await page.locator('#scene-note-close').click();
+  await page.locator('#motion-toggle').click();
+  assert.equal(await page.locator('html').getAttribute('data-motion'), 'paused');
+  const still = await canvasPixels();
+  await page.mouse.move(100, 500); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), still, 'pause actually freezes canvas and pointer depth');
+  assert.equal(await page.locator('.hero-reflection').evaluate(node => getComputedStyle(node).animationName), 'none', 'pause also stills the reflection');
+  await page.locator('#lake-touch').focus(); await page.keyboard.press('Enter');
+  assert.equal(await scene.getAttribute('data-ripple'), '2', 'keyboard makes the same water response while paused');
+  assert.match(await page.locator('#scene-message').innerText(), /静静|水纹/);
+  await page.locator('#scene-note-close').click();
+  await page.locator('#motion-toggle').click();
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
+  // Headless tabs stay 'visible'; inject only the hidden flag to exercise the real visibility
+  // handler. This is a synthetic branch check, not evidence of switching a foreground OS tab.
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {configurable:true, value:true});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.equal(await scene.getAttribute('data-animation'), 'resting');
+  const hiddenPixels = await canvasPixels(); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), hiddenPixels, 'hidden visibility handler cancels actual ambient work');
+  await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
+  check('synthetic hidden/visible input pauses and resumes the browser canvas owner');
+  await page.locator('#how-it-works').evaluate(node => node.scrollIntoView({block:'start',behavior:'instant'}));
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'resting');
+  const away = await canvasPixels(); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), away, 'leaving the scene stops actual canvas work');
+  await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
+  // Put the baseline back into daylight, without erasing the owner's saved preference rules.
+  await page.locator('#theme-toggle').click();
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
+  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready', 'world discoveries never auto-start the runner');
+  check('scene: real timed light/ripple, anchored identity, keyboard discoveries + focus, pause/resume and offscreen stop');
+
 
   // --- Header navigation targets the real sections and every in-page anchor resolves. ---
   for (const target of ['#capabilities','#how-it-works','#try']) {
@@ -373,6 +465,85 @@ try {
   }
   check('#how-it-works: four explicit steps, shared-core execution entries and a bounded site/browser entry');
 
+  // --- #workflow-trail: the four-step "work package journey" interaction (workflow-trail.mjs). ---
+  // Contract: host #workflow-trail inside #how-it-works, four button[data-trail-step=0..3] with
+  // aria-pressed (exactly one true), button[data-trail-next], p[data-trail-caption][role=status].
+  // host.dataset.step drives the coordinator's SVG/CSS picture. Native click/Enter/Space open a
+  // step; stepping only updates the explicitly synthetic caption and never fabricates a real
+  // result receipt or approval. The module owns this JS state; the coordinator owns HTML/CSS.
+  const trail = page.locator('#how-it-works #workflow-trail');
+  assert.equal(await trail.count(), 1, 'single #workflow-trail host inside #how-it-works');
+  assert.equal(await trail.evaluate(node => node.hidden), false, 'workflow trail reveals itself once initialised');
+  const trailSteps = page.locator('#workflow-trail [data-trail-step]');
+  assert.equal(await trailSteps.count(), 4, 'four interactive steps');
+  assert.deepEqual(await trailSteps.evaluateAll(nodes => nodes.map(n => n.dataset.trailStep)), ['0','1','2','3'], 'steps are ordered 0..3');
+  const trailCaption = page.locator('#workflow-trail [data-trail-caption]');
+  assert.equal(await trailCaption.count(), 1, 'one caption line');
+  assert.equal(await trailCaption.getAttribute('role'), 'status', 'caption is a polite status region');
+  const trailNext = page.locator('#workflow-trail [data-trail-next]');
+  assert.equal(await trailNext.count(), 1, 'one next-step control');
+  // The four plain <li> steps keep their text; the interaction only adds a near-by highlight.
+  assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, 'plain four-step list retained beside the interaction');
+  // Initial state is step 0 with exactly one pressed step.
+  assert.equal(await trail.evaluate(node => node.dataset.step), '0', 'starts on step 0');
+  assert.deepEqual(await trailSteps.evaluateAll(nodes => nodes.map(n => n.getAttribute('aria-pressed'))), ['true','false','false','false'], 'only step 0 pressed initially');
+  assert.match(await trailCaption.innerText(), /第 1 步/, 'caption explains step 1');
+  assert.match(await trailCaption.innerText(), /合成/, 'caption is explicitly synthetic');
+
+  // Latest-state wins: click step 3, then immediately reselect another step; the final state must
+  // reflect only the last selection (one pressed step, matching dataset.step and caption).
+  const settleTrail = async step => {
+    await page.waitForFunction(s => document.querySelector('#workflow-trail')?.dataset.step === String(s), step, {timeout:2000});
+    const pressed = await trailSteps.evaluateAll(nodes => nodes.map(n => n.getAttribute('aria-pressed')));
+    assert.equal(pressed.filter(v => v === 'true').length, 1, `exactly one step pressed at step ${step}`);
+    assert.equal(pressed[step], 'true', `aria-pressed follows step ${step}`);
+  };
+  await trailSteps.nth(3).click();
+  await settleTrail(3);
+  await trailSteps.nth(1).click();
+  await settleTrail(1);
+  // Step 2 wording: the same plan is approved; a condition change needs a new preview.
+  await trailSteps.nth(2).click();
+  await settleTrail(2);
+  const approveCopy = await trailCaption.innerText();
+  assert.match(approveCopy, /批准/, 'approval step explains approval of the same plan');
+  assert.match(approveCopy, /条件|变化/, 'approval step states a condition change needs a new preview');
+  assert.match(approveCopy, /新.*预览|重新预览/, 'approval step names a fresh preview');
+  // Step 4 wording: accepted ≠ completed, query the original ID and never replay; originals remain.
+  await trailSteps.nth(3).click();
+  await settleTrail(3);
+  const receiptCopy = await trailCaption.innerText();
+  assert.match(receiptCopy, /已接收|接收/, 'receipt step separates accepted');
+  assert.match(receiptCopy, /已完成|完成/, 'receipt step separates completed');
+  assert.match(receiptCopy, /原 ID|原任务|原 id/i, 'receipt step points at the original ID');
+  assert.match(receiptCopy, /不重(新)?提交|不重放/, 'receipt step says no replay/re-submit');
+  assert.match(receiptCopy, /原件/, 'receipt step keeps the originals present');
+  // The narrative explanation never claims the website performed a real operation.
+  for (const copy of [approveCopy, receiptCopy]) {
+    assert.match(copy, /合成|示例|只讲|不读取|不生成|不执行|不接受/, 'caption stays visibly synthetic');
+    assert.doesNotMatch(copy, /已批准|执行成功|已执行|权限已|operation succeeded/i, 'no fabricated approval/success receipt');
+  }
+  check('#workflow-trail initial step 0, latest-state reselection, and honest approve/receipt captions');
+
+  // Keyboard parity: real Enter and Space on a focused step select it (native button behaviour).
+  await trailSteps.nth(0).click(); await settleTrail(0);
+  await trailSteps.nth(2).focus();
+  await page.keyboard.press('Enter');
+  await settleTrail(2);
+  await trailSteps.nth(1).focus();
+  await page.keyboard.press('Space');
+  await settleTrail(1);
+
+  // next advances 0→1→2→3 then loops back to step 0 with a changed label.
+  await trailSteps.nth(0).click(); await settleTrail(0);
+  await trailNext.click(); await settleTrail(1);
+  await trailNext.click(); await settleTrail(2);
+  await trailNext.click(); await settleTrail(3);
+  const lastNextLabel = await trailNext.innerText();
+  assert.match(lastNextLabel, /回到|第 1 步|第 一 步|↺/, 'next relabels to return at the last step');
+  await trailNext.click(); await settleTrail(0);
+  check('#workflow-trail keyboard Enter/Space select a step and next advances then loops home');
+
   // --- #try carries scope/limits, the unverified-download boundary and real CN/EN + docs links. ---
   const tryText = await page.locator('#try').innerText();
   assert.match(tryText, /未|没有|尚无|未验收|未验证|no .*download|not .*verified/i, '#try states unverified/absent delivery boundaries');
@@ -425,13 +596,28 @@ try {
 
   // --- Reduced motion: reveals complete, decorative cursor static. ---
   await page.emulateMedia({reducedMotion:'reduce'});
+  await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
+  await page.waitForFunction(() => document.documentElement.dataset.motion === 'reduced');
+  assert.equal(await page.locator('#motion-toggle').isDisabled(), true, 'system reduced motion stays authoritative');
+  const reducedPixels = await canvasPixels(); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), reducedPixels, 'reduced motion freezes actual ambient drawing');
+  await page.locator('#lake-touch').click();
+  assert.match(await page.locator('#scene-message').innerText(), /水纹/);
+  await page.locator('#scene-note-close').click();
+
   assert.equal(await page.locator('.cursor').first().evaluate(node=>getComputedStyle(node).animationName), 'none');
   assert.equal(await page.locator('#try').evaluate(node=>getComputedStyle(node).opacity), '1');
   for (const art of await page.locator('.story-art').all()) {
     assert.equal(await art.evaluate(node=>getComputedStyle(node).transform), 'none');
     assert.ok(await art.evaluate(node=>Number(getComputedStyle(node).opacity)) > 0, 'reduced motion shows every scene immediately');
   }
-  check('reduced motion completes reveals and stills the decorative wordmark cursor');
+  // The workflow trail stays usable with motion reduced: it is a state switch, not an animation.
+  await page.locator('#workflow-trail [data-trail-step="2"]').scrollIntoViewIfNeeded();
+  await page.locator('#workflow-trail [data-trail-step="2"]').click();
+  await page.waitForFunction(() => document.querySelector('#workflow-trail')?.dataset.step === '2', null, {timeout:2000});
+  assert.equal(await page.locator('#workflow-trail [data-trail-step="2"]').getAttribute('aria-pressed'), 'true', 'workflow trail still switches steps under reduced motion');
+  await page.locator('#workflow-trail [data-trail-step="0"]').click();
+  check('reduced motion completes reveals, stills the decorative cursor and keeps the workflow trail usable');
 
   // --- Mobile 390 and 320: no horizontal overflow, all six capabilities and four steps keep
   //     their content, no clipped paths. Names match the theme: switch to night and assert before
@@ -442,6 +628,13 @@ try {
   await assertProductCopyVisible(page, '390px');
   assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, '390px keeps all four workflow steps');
   assert.equal(await page.locator('#how-it-works .execution-entries > div').count(), 3, '390px keeps all three execution entries');
+  // The interaction stays reachable and functional at mobile width.
+  assert.equal(await page.locator('#workflow-trail [data-trail-step]').count(), 4, '390px keeps all four trail steps');
+  await page.locator('#workflow-trail [data-trail-step="1"]').scrollIntoViewIfNeeded();
+  await page.locator('#workflow-trail [data-trail-step="1"]').click();
+  await page.waitForFunction(() => document.querySelector('#workflow-trail')?.dataset.step === '1', null, {timeout:2000});
+  assert.equal(await page.locator('#workflow-trail [data-trail-step="1"]').getAttribute('aria-pressed'), 'true', '390px trail switches steps');
+  await page.locator('#workflow-trail [data-trail-step="0"]').click();
   if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.getByRole('button',{name:'切换到夜色'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'mobile-night capture is night');
   await capture(page, 'mobile-night.png');
@@ -469,6 +662,18 @@ try {
   const blockedPage = await blocked.newPage();
   blockedPage.on('pageerror',error=>errors.push(error.message));
   await blockedPage.goto(base);
+  const themeBeforeTouch = await blockedPage.locator('html').getAttribute('data-theme');
+  await blockedPage.locator('#scene-theme').tap();
+  assert.notEqual(await blockedPage.locator('html').getAttribute('data-theme'), themeBeforeTouch, 'mobile theme works with blocked storage');
+  await blockedPage.locator('#scene-note-close').tap();
+  await blockedPage.locator('#clawd-hello').tap();
+  assert.match(await blockedPage.locator('#scene-message').innerText(), /工作|一起/);
+  await blockedPage.locator('#scene-note-close').tap();
+  await blockedPage.locator('#lake-touch').tap();
+  assert.equal(await blockedPage.locator('.hero-overlay').getAttribute('data-ripple'), '1', 'touch creates the same local water response');
+  assert.equal(await blockedPage.locator('.clawd-game').getAttribute('data-state'), 'ready', 'touch discoveries keep the game opt-in');
+  check('390px real touch scene controls stay usable with blocked storage');
+
   assert.match(await blockedPage.locator('.cg-storage').innerText(), /存储不可用/);
   await blockedPage.locator('.cg-jump').tap();
   assert.equal(await blockedPage.locator('.clawd-game').getAttribute('data-state'), 'running');

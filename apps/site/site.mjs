@@ -1,4 +1,6 @@
 import { mountClawdGame } from './clawd-game.mjs';
+import { mountSiteWorld } from './site-world.mjs';
+import { mountWorkflowTrail } from './workflow-trail.mjs';
 
 const root = document.documentElement;
 const themeButton = document.querySelector('#theme-toggle');
@@ -14,13 +16,20 @@ function applyTheme() {
   themeButton.setAttribute('aria-label', label);
   themeButton.title = label;
   themeButton.firstElementChild.textContent = theme === 'light' ? '☾' : '☼';
+  const sceneTheme = document.querySelector('#scene-theme');
+  const sceneLabel = theme === 'light' ? '切换夜色主题' : '切换日光主题';
+  sceneTheme.setAttribute('aria-label', sceneLabel);
+  sceneTheme.firstElementChild.textContent = theme === 'light' ? '☾' : '☼';
+  document.querySelector('#moon-toggle').setAttribute('aria-label', `碰一下月亮，${sceneLabel}`);
+  root.dispatchEvent(new Event('site-theme-change'));
 }
 applyTheme();
-themeButton.addEventListener('click', () => {
+function toggleTheme() {
   theme = theme === 'light' ? 'dark' : 'light';
   applyTheme();
   try { localStorage.setItem('lintel.site.theme', theme); } catch {}
-});
+}
+themeButton.addEventListener('click', toggleTheme);
 
 // The page is a product story. Reading uses native <details>; no execution demo.
 const readingExample = document.querySelector('#sample-pages');
@@ -29,26 +38,11 @@ document.querySelector('a[href="#sample-pages"]').addEventListener('click', () =
   readingExample.querySelector('summary').focus({ preventScroll: true });
 });
 
-// Only scenery moves on entry: prose and trial links stay available immediately.
-const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-const scenery = [...document.querySelectorAll('.story-art')];
-if (typeof IntersectionObserver === 'function' && !reduced.matches) {
-  root.classList.add('scene-motion');
-  const observer = new IntersectionObserver((entries, obs) => {
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('arrived');
-        obs.unobserve(entry.target);
-      }
-    }
-  }, { threshold: 0.08 });
-  scenery.forEach(node => observer.observe(node));
-  reduced.addEventListener('change', () => {
-    if (reduced.matches) {
-      observer.disconnect();
-      scenery.forEach(node => node.classList.add('arrived'));
-    }
-  });
-}
-
-mountClawdGame(document.querySelector('#clawd-game'));
+// Only illustration moves. Copy and real trial links are available immediately.
+const disposeTrail = mountWorkflowTrail(document.querySelector('#workflow-trail'));
+const disposeWorld = mountSiteWorld({ toggleTheme });
+const disposeGame = mountClawdGame(document.querySelector('#clawd-game'));
+// Preserve live mounts across the browser back/forward cache; ordinary unload disposes them.
+addEventListener('pagehide', event => {
+  if (!event.persisted) { disposeWorld(); disposeTrail(); disposeGame(); }
+});

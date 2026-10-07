@@ -222,9 +222,12 @@ private paths.
 
 The standalone static website source is in [`apps/site`](apps/site/README.md).
 It explains the six current tasks and uses a synthetic preservation journey to
-show preview, approved execution, and original-job verification. Character
-landscapes, a source-reading example, Chinese and English trial links, and the
-Clawd jumping game remain part of the page. It can be previewed locally today;
+show preview, approved execution, and original-job verification. The character
+landscape responds to day/night changes, lake taps, and Clawd greetings, with
+a hidden star map. An interactive four-step work-package journey explains the
+flow; scenery can be paused and respects reduced motion. Source-reading examples,
+Chinese and English trial links, and the opt-in Clawd game remain available.
+It can be previewed locally today;
 it is not bound to a domain or deployed, and does not connect to the local
 execution core. See the
 [site README](apps/site/README.md) to start it.
