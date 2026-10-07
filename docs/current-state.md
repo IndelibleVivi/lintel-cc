@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-07 · **0.1.0 development candidate 的 Preview 收口**；本批源码增加发布持久化、resume 暂存与来源复查、计划容量及阅读等待修复。当前本地候选为 clean source `57e8eb99d2690e80bc9464afdac212c5990db65f` 构建的 App 与 `0.1.0-candidate-57e8eb99d269` 三平台 CLI；只有本地生成与分层验证，未正式发行或激活。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
+2026-10-07 · **Lintel 0.1.0 Preview / 开发预览**；本批源码增加发布持久化、resume 暂存与来源复查、计划容量及阅读等待修复。当前本地候选为 clean source `57e8eb99d2690e80bc9464afdac212c5990db65f` 构建的 App 与 `0.1.0-candidate-57e8eb99d269` 三平台 CLI；只有本地生成与分层验证，未正式发行或激活。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
 
 ## 当前交付与证据
 
@@ -15,8 +15,9 @@
 | 历史 native runtime | 2026-10-05 unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
 | 阅读等待交互 | `archive-wait-ui` 在 built App 验首读、翻页、旧页标记、跨页面队列占用、错误释放和迟到结果隔离；1120 Day／900 Night 已目视。persistent activity 只含有限操作名、主机标签和队列状态。Chromium 合成延迟不证明 native WebKit 或解密性能 |
 | Release 资源实测 | macOS arm64 release，scrypt log N 19、四个确定字节模式原件共 1 GiB：archive/readback 120.6s，inspect 70.9s，每页 59.1–66.3s，import preview 57.4s／execute 54.3s，峰值 RSS 518.2–518.5 MiB；10,000 文件 import 194.7s，峰值 RSS 550.8 MiB。整个 fixture 的已分配块采样最大约 6.51 GiB，含原件／密文／副本，不能当纯暂存峰值。部分步骤与本地 QA／build 并行；这些是此次成本观察，不是普适性能预算 |
-| CLI 与分层验证 | 最终默认 synthetic suite 25/25 通过（RUST_TEST_THREADS=4），包括深路径计划预算、真正 PTY cleanup、共享 workspace 与两个独立 Rust crates；补充原密文逐字节不变断言后的 PTY journey 再次通过。built App 的 work／components／baseline／archive-wait／remote-task 五条相关 UI 旅程通过。扩充的 native `cli-candidate` 通过解包后保全、独立 state inspect／import、原字节核对及升级后原任务查询，PATH 仅系统工具；真实三平台输入包装 smoke 通过。producer `57e8eb9` 的 [CI run 37523781020](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37523781020) 已启动、核对时仍在运行，尚无通过结论。base 7e23371 的成功 CI 只作历史证据 |
+| CLI 与分层验证 | 最终默认 synthetic suite 25/25 通过（RUST_TEST_THREADS=4），包括深路径计划预算、真正 PTY cleanup、共享 workspace 与两个独立 Rust crates；补充原密文逐字节不变断言后的 PTY journey 再次通过。built App 的 work／components／baseline／archive-wait／remote-task 五条相关 UI 旅程通过。扩充的 native `cli-candidate` 通过解包后保全、独立 state inspect／import、原字节核对及升级后原任务查询，PATH 仅系统工具；真实三平台输入包装 smoke 通过。2026-10-07 直接核对 GitHub：producer `57e8eb9` 的 [CI run 37523781020](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37523781020) 与记录源码 `3afaa7b` 的 [CI run 37524901927](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37524901927) 均为 completed / success；对应 SHA 已核对。CI 不替代真实认证或生产 runtime 验收 |
 | 资源与包装 | clean `57e8eb9` App 构建与包内核对通过，约 24.66 MiB；内置 x86_64／aarch64 runner 5,279,664／4,614,728 bytes 与 canonical static outputs 一致，host 789,392 bytes，非 fixture Chromium／Firefox 各 8 文件（52,522／52,684 bytes），供应图标逐字节一致、无 woff2。编译 docs revision 为该 clean source。三平台 CLI archives 的 candidate identity／checksums／runner bytes 已独立解包核对，macOS 解包静态调用通过；cross-built Linux archives 未在本机执行。仅 linker ad-hoc signature，无 distribution Team ID、资源签封或公证；产物不进 Git |
+| Preview 试用入口 | 中英文 README／quickstart、官网 Preview 能力与试用导航、有限反馈表已接通源码。当前 CLI build 通过；中文命令以真实 PTY 实跑并直接核对输出／fixture：精确选择 3/4 原件、只归档、原 ID 查询、独立 state inspect/read，六份合成源文件字节未变、口令未回显、父 shell 不变。双语 17 个 shell blocks 一致，英文未重复独立 PTY 实跑。网站/game canonical checks 通过，320–1440px 导航及无 JavaScript 文档入口另已核对；未重建 App 发行候选 |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存 25fdb43 与更早候选的 CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
@@ -25,6 +26,7 @@
 
 | 读者／任务 | 权威入口 |
 | --- | --- |
+| 首次合成试用与英文入口 | [中文 quickstart](quickstart.md)、[English quickstart](quickstart.en.md)、[English README](../README.en.md)；公开源码构建，无公开 Release 下载 |
 | 人类任务、保全／重建、继续工作、原任务核对 | [操作指南](operator-guide.md) |
 | 独立 CLI、用户候选安装、stdin、schema 与 Agent | [Agent CLI](agents.md) |
 | 前端构图、组件入口与 Selen 后续工作 | [桌面](desktop.md)、[视觉身份](visual-language.md) |

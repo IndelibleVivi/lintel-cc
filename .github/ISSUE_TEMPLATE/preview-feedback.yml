@@ -1,0 +1,33 @@
+name: Preview feedback / 试用反馈
+description: Tell us where your first Lintel Preview journey got stuck.
+title: "[Preview] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        中文 / English 均可。请描述试用卡点或实际观察。
+        Please use synthetic examples. Do not attach credentials, raw conversations,
+        work packages, personal browser data, or an unredacted Lintel state export.
+        请用合成示例，不附凭据、原始会话、工作包、个人浏览器资料或未脱敏的 state。
+  - type: input
+    id: version
+    attributes:
+      label: Source revision and platform / 源码版本与平台
+      description: Copy the source commit or candidate identity and OS/architecture.
+      placeholder: "source commit; macOS arm64 / Linux x86_64 / Linux aarch64"
+    validations:
+      required: true
+  - type: textarea
+    id: journey
+    attributes:
+      label: Goal and steps / 想做什么，走到哪一步
+      description: Which quickstart or App/CLI path did you follow?
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: Expected and observed / 预期与实际
+      description: Include the error code or a redacted screenshot if useful.
+    validations:
+      required: true

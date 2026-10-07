@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Lintel 是一个本地 Claude 环境工具。减少不必要的外发，保全工作内容，预览每一次改动。macOS 桌面与 Linux CLI，正在开发中。">
-  <meta property="og:title" content="Lintel — 你的 Claude，你的边界。">
-  <meta property="og:description" content="一个本地 Claude 环境工具。减少外发，保全工作，看清每次改动。开发中。">
+  <meta name="description" content="Lintel 0.1.0 Preview：本地 Claude Code 环境工具。审阅配置变化，保全选中的工作资料，核对操作结果。macOS App 与独立 CLI；可从源码试用，尚无正式下载。">
+  <meta property="og:title" content="Lintel 0.1.0 Preview — 你的 Claude，你的边界。">
+  <meta property="og:description" content="审阅变化，保全选中的指令、记忆与会话，独立阅读工作包并核对原任务。源码开发预览，尚未正式发行。">
   <meta property="og:type" content="website">
-  <title>Lintel — 你的 Claude，你的边界。</title>
+  <title>Lintel 0.1.0 Preview — 你的 Claude，你的边界。</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./clawd-game.css">
@@ -18,17 +18,17 @@
   <a class="skip-link" href="#main">跳到正文</a>
   <header class="site-header wrap">
     <a class="wordmark" href="#" aria-label="Lintel 首页">lintel<span class="cursor">_</span></a>
-    <nav aria-label="主导航"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md">终端与 Agent</a><a href="#inside">认识 Lintel</a><a href="#fieldnotes">开发手记</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="主导航"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md">试用与文档</a><a href="#inside">认识 Lintel</a><a href="#fieldnotes">开发手记</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
     <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色"><span aria-hidden="true">☾</span></button>
   </header>
   <main id="main">
     <section class="hero wrap" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="tiny-mark" aria-hidden="true">⌐</span> A QUIETER PLACE FOR CLAUDE</p>
+        <p class="eyebrow"><span class="tiny-mark" aria-hidden="true">⌐</span> LINTEL 0.1.0 PREVIEW</p>
         <h1 id="hero-title">你的 Claude，<br>你的<span class="accent">边界。</span></h1>
-        <p class="hero-description">少一点不必要的外发，<br>好好留下你的工作。<br>一个让 Claude 使用环境清晰、可控的本地工具。</p>
-        <div class="hero-actions"><a class="button primary" href="#inside">看看它怎么工作 <span aria-hidden="true">↓</span></a><a class="quiet-link" href="https://github.com/IndelibleVivi/lintel-cc">去源码里看看 <span aria-hidden="true">↗</span></a></div>
-        <p class="development-note"><span class="development-symbol" aria-hidden="true">◌</span> 正在生长 · 尚未正式发布 <span class="note-divider">/</span> macOS + Linux</p>
+        <p class="hero-description">审阅配置变化，保全选中的工作资料，<br>核对操作结果。<br>一个本地 Claude Code 环境工具。</p>
+        <div class="hero-actions"><a class="button primary" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md">第一次试用 <span aria-hidden="true">↗</span></a><a class="quiet-link" href="#inside">看看它怎么工作 <span aria-hidden="true">↓</span></a></div>
+        <p class="development-note"><span class="development-symbol" aria-hidden="true">◌</span> 0.1.0 Preview · 无正式下载 <span class="note-divider">/</span> macOS App · 独立 CLI</p>
       </div>
       <figure class="hero-figure">
         <div class="specimen-label"><span>FIG. 01</span><span>留出属于自己的空间</span></div>
@@ -50,10 +50,10 @@
       <div class="section-heading"><div><p class="eyebrow">01 / UNDER THE LINTEL</p><h2 id="inside-title">动手之前，<br>先看清楚。</h2></div><p>散落在设置、目录和终端里的事，<br>在一个地方，按你的意愿处理。</p></div>
       <div class="feature-stage">
         <div class="feature-index" role="tablist" aria-label="了解 Lintel 的三个工作流程" aria-orientation="vertical">
-          <button id="tab-protect" role="tab" aria-selected="true" aria-controls="demo-panel" data-feature="protect"><span class="feature-number">01</span><span><strong>减少外发</strong><small>保留需要的功能，关掉多余的交付。</small></span><span class="tab-sign" aria-hidden="true">−</span></button>
-          <button id="tab-preserve" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-feature="preserve"><span class="feature-number">02</span><span><strong>保住工作</strong><small>环境可以重建，心血值得留下。</small></span><span class="tab-sign" aria-hidden="true">+</span></button>
+          <button id="tab-protect" role="tab" aria-selected="true" aria-controls="demo-panel" data-feature="protect"><span class="feature-number">01</span><span><strong>减少外发</strong><small>保留需要的功能，关掉多余的外发。</small></span><span class="tab-sign" aria-hidden="true">−</span></button>
+          <button id="tab-preserve" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-feature="preserve"><span class="feature-number">02</span><span><strong>保住工作</strong><small>选中原件，加密保全，之后独立阅读。</small></span><span class="tab-sign" aria-hidden="true">+</span></button>
           <button id="tab-restore" role="tab" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-feature="restore"><span class="feature-number">03</span><span><strong>看清改动</strong><small>从预览到回执，再到有依据的恢复。</small></span><span class="tab-sign" aria-hidden="true">+</span></button>
-          <p class="feature-aside">Mac 上点一点，Linux 上敲一行。<br>背后是同一个执行核心。</p>
+          <p class="feature-aside">macOS App 与独立 CLI。<br>背后是同一个执行核心。</p>
         </div>
         <div class="demo-shell"><div class="demo-titlebar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>lintel_</span><span class="sample-label">交互示意</span></div><div id="demo-panel" role="tabpanel" aria-labelledby="tab-protect" tabindex="0">
           <div class="demo-context"><span>这台 Mac <span class="muted">/</span> 写作环境</span><span>本地</span></div>
@@ -67,11 +67,11 @@
       <div class="principles"><article><span class="principle-glyph" aria-hidden="true">⌂</span><h3>在你自己的机器上。</h3><p>无需 Lintel 账号、模型 key 或在线激活。环境与工作资料留在所属机器，不默认上传。</p></article><article><span class="principle-glyph" aria-hidden="true">≡</span><h3>把动作摊开来。</h3><p>先给出具体计划，再经你批准执行。留下可检查的结果，恢复时也会核对后续改动。</p></article><article><span class="principle-glyph" aria-hidden="true">⌁</span><h3>边界，也讲清楚。</h3><p>改了配置，不等于拦住所有流量。重建本地环境，不等于改变服务端的账号状态。</p></article></div>
     </div></section>
     <section id="fieldnotes" class="fieldnotes wrap" aria-labelledby="fieldnotes-title">
-      <div class="fieldnotes-intro"><p class="eyebrow">03 / WORK IN THE OPEN</p><h2 id="fieldnotes-title">还在搭建。<br>欢迎来看看。</h2><p>Lintel 目前是 <code>0.1.0</code> 开发候选。<br>源码已经公开，正式发行还需要一些时间。</p><a class="quiet-link" href="https://github.com/IndelibleVivi/lintel-cc">在 GitHub 跟着它长大 <span aria-hidden="true">↗</span></a></div>
-      <div class="fieldnotes-ledger"><div class="ledger-heading"><span>目前走到哪里</span><span>DEVELOPMENT NOTES</span></div><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md"><span class="ledger-number">01</span><span><strong>本地环境，已有可走的路</strong><small>保护方案、工作归档、清理与变更记录</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md"><span class="ledger-number">02</span><span><strong>桌面与终端，共用一个核心</strong><small>macOS App、Linux CLI 与有限 SSH 控制</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md"><span class="ledger-number">03</span><span><strong>已实现，不等于已验收</strong><small>正式浏览器、真实认证与生产远端仍待验证</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md"><span class="ledger-number">04</span><span><strong>终端与 Agent，有准确的交接入口</strong><small>取得 CLI、核对上下文、沿原任务接手</small></span><span aria-hidden="true">↗</span></a><p>这里链接 main 的最新开发说明。尚未提供签名、公证的正式下载。想尝试的话，先读<a href="https://github.com/IndelibleVivi/lintel-cc#本地构建与试用">源码构建说明</a>。</p></div>
+      <div class="fieldnotes-intro"><p class="eyebrow">03 / WORK IN THE OPEN</p><h2 id="fieldnotes-title">开发预览。<br>从一次试用开始。</h2><p>Lintel 目前是 <code>0.1.0 Preview</code>。<br>可从公开源码构建并试用；没有公开 Release 下载。原创材料的通用复用许可仍待选定。</p><a class="quiet-link" href="https://github.com/IndelibleVivi/lintel-cc">在 GitHub 跟着它长大 <span aria-hidden="true">↗</span></a></div>
+      <div class="fieldnotes-ledger"><div class="ledger-heading"><span>目前走到哪里</span><span>DEVELOPMENT NOTES</span></div><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md"><span class="ledger-number">01</span><span><strong>选原件，独立打开工作包</strong><small>指令、记忆与会话精确选择；阅读、交接稿与另行批准的迁入</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md"><span class="ledger-number">02</span><span><strong>认准环境，再批准操作</strong><small>配置 root 与项目 cwd 分开；App / CLI 共用核心，SSH 任务沿原 ID 核对</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md"><span class="ledger-number">03</span><span><strong>已实现，不等于已验收</strong><small>正式浏览器、真实认证与生产远端仍待验证</small></span><span aria-hidden="true">↗</span></a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md"><span class="ledger-number">04</span><span><strong>先走一次合成保全旅程</strong><small>源码构建 → 审阅计划 → 保全 → 原任务查询 → 独立读包</small></span><span aria-hidden="true">↗</span></a><p>这里链接 main 的最新开发说明。先从<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md">中文 quickstart</a> 或 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.en.md" lang="en">English quickstart</a> 开始，英文产品入口见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.en.md" lang="en">English README</a>。每页阅读先完整认证全包，须留出时间与临时磁盘；正式签名、公证下载和非开发者安装仍未完成。</p></div>
     </section>
     <section id="play" class="play-section wrap" aria-labelledby="play-title"><div class="play-heading"><div><p class="eyebrow">A SMALL DETOUR</p><h2 id="play-title">正事说完了。<br class="mobile-break">跳一小段？</h2></div><p>Clawd 已经等了一会儿。</p></div><div id="clawd-game"></div><noscript><p class="noscript-game">开启 JavaScript，就可以陪 Clawd 跳一小段。上面的内容与文档链接无需 JavaScript。</p></noscript></section>
   </main>
-  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="#">lintel<span class="cursor">_</span></a><p>承住复杂，留出余地。</p><a href="#main" class="back-top">回到上面 ↑</a></div><div class="footer-bottom"><p>独立制作，与 Anthropic 无官方关联。<br>Clawd 形象属于 Anthropic。</p><p>没有追踪器。只有一只想跳高的小家伙。</p><div><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md">终端与 Agent</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md">使用指南</a><a href="https://github.com/IndelibleVivi/lintel-cc">源码</a></div></div></footer>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="#">lintel<span class="cursor">_</span></a><p>承住复杂，留出余地。</p><a href="#main" class="back-top">回到上面 ↑</a></div><div class="footer-bottom"><p>独立制作，与 Anthropic 无官方关联。<br>Clawd 形象属于 Anthropic。</p><p>没有追踪器。只有一只想跳高的小家伙。</p><div><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md">首次试用</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.en.md" lang="en">English</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md">终端与 Agent</a><a href="https://github.com/IndelibleVivi/lintel-cc">源码</a></div></div></footer>
 </body>
 </html>

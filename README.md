@@ -1,8 +1,20 @@
 # Lintel
 
-让 Claude 使用环境清晰、可控。Lintel 将外发设置、工作内容、浏览器操作和变更记录放在同一个本地工具中，提供 macOS 桌面界面与独立 CLI。
+中文 · [English](README.en.md)
 
-**当前是 0.1.0 开发候选，完整 SPEC 尚未交付，未正式发布。** 可以在独立测试环境中使用已接通的功能；已接入有限本地清理、官方注销入口、工作归档迁入与 SSH 控制；真实认证、正式 Chrome/Edge/Firefox/AdsPower、进程级网络强约束和生产远端环境仍未验收。具体证据与缺口见 [当前状态](docs/current-state.md)。
+一个本地 Claude Code 环境工具：审阅配置变化，保全选中的指令、记忆和会话，并核对操作结果。提供 macOS App 与独立 CLI，两者共用执行核心。
+
+**Lintel 0.1.0 Preview / 开发预览。** 源码已公开，可从源码在独立测试环境中试用；目前没有公开 Release 下载或正式签名、公证分发。完整 SPEC 尚未交付；真实认证、正式 Chrome/Edge/Firefox/AdsPower、进程级网络强约束和生产远端环境仍未验收。当前候选来源与分层证据见 [当前状态](docs/current-state.md)。源码公开不构成通用复用许可，原创材料的许可仍待选定。
+
+首次试用从 [中文 quickstart](docs/quickstart.md) 或 [English quickstart](docs/quickstart.en.md) 开始：在一次性测试目录中选择合成原件、审阅归档计划、批准保全、查询原任务，再用独立 state 打开工作包。整个旅程保留源原件，不使用个人登录或浏览器资料。想直接看 App，可用下文的 `dev:synthetic`。
+
+三个可以先体验的场景：
+
+- **收好工作：** 按具体原件选择，加密保全后独立阅读；选择片段整理可编辑交接稿，迁入另行预览批准。
+- **审阅变化：** 先看准确目标、范围和 diff，再批准；配置读回与实际运行效果分别核对。
+- **核对结果：** 接收与完成分开；中断后查询原任务 ID，恢复时保留后续编辑。
+
+试用遇到卡点，可通过 [Issues](https://github.com/IndelibleVivi/lintel-cc/issues) 反馈目标、步骤与实际结果；请使用合成示例，不附凭据、原始会话、工作包或未脱敏的 state。
 
 ## 从眼前的目标开始
 
@@ -65,7 +77,7 @@ npm run desktop:build
 
 构建会自动准备 Chromium / Firefox 扩展并编译、打包当前平台的 browser host，目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 会明确拒绝；默认前端构建排除仅供本机使用的可选字体，使用系统 fallback。输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。App 用户可直接从内置文件准备扩展目录；独立开发 ZIP 与各浏览器加载限制见 [浏览器指南](docs/browser.md)。
 
-独立 CLI：
+独立 CLI（在 repository 根目录执行）：
 
 ```sh
 ./target/debug/lintel --help
@@ -105,9 +117,9 @@ python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 - [产品目标](docs/SPEC.md)、[本轮产品基线与 18 项行为验收](docs/specs/product-baseline-status.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
 - [统一验证与独立 runtime 关口](docs/verification.md)
 - [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)、[视觉身份与源资产](docs/visual-language.md)
-- [人类操作指南](docs/operator-guide.md)、[Agent CLI 与安装](docs/agents.md)
+- [首次试用](docs/quickstart.md)、[English quickstart](docs/quickstart.en.md)、[人类操作指南](docs/operator-guide.md)、[Agent CLI 与安装](docs/agents.md)
 - [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)、[Linux 服务暂停与恢复](docs/services.md)
-- [目标架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
+- [当前实现架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
 
 源码：`crates/core` 为计划与文件操作权威，`apps/runner` 提供 CLI，`apps/desktop` 为 Tauri + React，`extensions/browser` 为扩展和 Native Messaging host，`crates/egress` 为受控代理，`crates/operations` 为静态操作/schema 与严格字段合同，`crates/remote` 是 GUI/CLI 共用有限 SSH controller，桌面 `src-tauri/src/remote.rs` 只定位 App 资源并适配 native command；`platform/ssh` 保留已有 Python caller 的兼容子集，新增能力只由共享 Rust 路径拥有。
 

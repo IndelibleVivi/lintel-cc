@@ -1,6 +1,8 @@
 # Lintel Agent CLI
 
-此指南面向已有操作授权的 coding agent 和脚本作者。当前为 0.1.0 source candidate，协议 1 / catalog 1；没有正式签名发行。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
+此指南面向已有操作授权的 coding agent 和脚本作者。当前为 Lintel 0.1.0 Preview / 源码开发预览，协议 1 / catalog 1；没有正式签名发行或公开 Release 下载。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
+
+首次试用可先走 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。
 
 ## 从 App 接到终端或 Agent
 
