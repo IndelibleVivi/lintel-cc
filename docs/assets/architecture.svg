@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1360" viewBox="0 0 1200 1360" role="img" aria-labelledby="title desc" lang="zh-CN">
+  <title id="title">Lintel：执行归属与独立通道</title>
+  <desc id="desc">macOS App 与 CLI 共享本机 core，也可通过有限 SSH controller 请求目标 runner。冻结计划、批准、变更和回执由执行端拥有。浏览器 host 与扩展、loopback 代理各有独立边界；静态官网没有执行通道。本图描述当前源码，不证明所有 runtime 已验收。</desc>
+  <style>
+    text{fill:#3D3D3A;font-family:"Avenir Next","PingFang SC",Arial,sans-serif;font-size:20px}
+    .display{font-family:"Iowan Old Style","Songti SC",Georgia,serif;font-size:39px}
+    .head{font-size:27px;font-weight:600}
+    .body{font-size:21px}
+    .code{font-family:"SFMono-Regular",Consolas,monospace;font-size:19px}
+    .note{fill:#686356;font-size:19px}
+    .accent{fill:#995134}
+    .zone{fill:#F3F1E9;stroke:#CBC6BA;stroke-width:1.2}
+    .node{fill:#FAF9F5;stroke:#BBB4A6;stroke-width:1.2}
+    .route{fill:none;stroke:#686356;stroke-width:1.8;marker-end:url(#arrow)}
+    .bus{fill:none;stroke:#686356;stroke-width:1.8}
+    .label{paint-order:stroke fill;stroke:#FAF9F5;stroke-width:8px;stroke-linejoin:round;font-size:19px}
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#686356" stroke-width="1.4"/></marker>
+  </defs>
+  <rect width="1200" height="1360" fill="#FAF9F5"/>
+  <g id="heading">
+    <text x="54" y="69" class="display">同一套执行核心，清楚的边界。</text>
+    <text x="54" y="114" class="body">当前源码的执行归属 · runtime 与发行证据另见 current-state</text>
+  </g>
+  <g id="routes">
+    <path d="M214 266 V304 H400 M598 266 V304 H400" class="bus"/>
+    <path d="M400 304 V420" class="route"/>
+    <path d="M400 304 H974 V362" class="route"/>
+  </g>
+  <g id="UI">
+    <rect x="64" y="167" width="300" height="99" class="node"/>
+    <text x="90" y="208" class="head">macOS App</text>
+    <text x="90" y="243" class="note">目标、审阅、批准与结果</text>
+  </g>
+  <g id="CLI">
+    <rect x="448" y="167" width="300" height="99" class="node"/>
+    <text x="474" y="208" class="head">CLI / TUI</text>
+    <text x="474" y="243" class="note">同一合同与操作语义</text>
+  </g>
+  <text x="436" y="351" class="label">本机调用</text>
+  <text x="787" y="285" class="label">有限远端请求</text>
+  <g id="local-runtime">
+    <rect x="54" y="376" width="710" height="545" class="zone"/>
+    <text x="82" y="404" class="note">01 / 本机执行端</text>
+    <g id="Core">
+      <rect x="164" y="420" width="490" height="163" class="node"/>
+      <text x="190" y="462" class="head">本机 core</text>
+      <text x="190" y="497" class="code">crates/core</text>
+      <text x="190" y="535" class="body">冻结计划 → 核对批准 → 精确操作</text>
+      <text x="190" y="565" class="note">operations 提供静态合同，不执行副作用</text>
+    </g>
+    <path d="M320 583 V682" class="route"/>
+    <path d="M500 583 V622 H565 V682" class="route"/>
+    <text x="151" y="642" class="body">持久记录与读回</text>
+    <text x="466" y="660" class="body">批准后精确变更</text>
+    <g id="Journal">
+      <rect x="91" y="682" width="288" height="133" class="node"/>
+      <text x="115" y="723" class="head">计划 / 原任务回执</text>
+      <text x="115" y="761" class="body">accepted ≠ completed</text>
+      <text x="115" y="795" class="note">读回证据决定完成状态</text>
+    </g>
+    <g id="Files">
+      <rect x="413" y="682" width="310" height="133" class="node"/>
+      <text x="437" y="723" class="head">配置 / 工作文件</text>
+      <text x="437" y="761" class="body">加密包、迁入与字段恢复</text>
+      <text x="437" y="795" class="note">冻结范围；保留后续外部编辑</text>
+    </g>
+    <text x="92" y="867" class="body accent">不确定时查原 ID；不重放副作用。</text>
+    <text x="92" y="898" class="note">portable work 可独立读包；系统文件传输另行显式选择</text>
+  </g>
+  <g id="SSH">
+    <rect x="810" y="362" width="336" height="97" class="node"/>
+    <text x="838" y="402" class="head">有限 SSH controller</text>
+    <text x="838" y="436" class="code">crates/remote</text>
+  </g>
+  <g id="remote-runtime">
+    <rect x="810" y="493" width="336" height="428" class="zone"/>
+    <text x="836" y="526" class="note">02 / 目标主机执行端</text>
+    <path d="M974 459 V553" class="route"/>
+    <text x="889" y="483" class="label">SSH / JSON stdin</text>
+    <g id="Runner">
+      <rect x="835" y="553" width="286" height="116" class="node"/>
+      <text x="857" y="593" class="head">runner · submit</text>
+      <text x="857" y="628" class="body">持久接受后 ACK</text>
+      <text x="857" y="654" class="note">重连只查询原任务 ID</text>
+    </g>
+    <path d="M974 669 V739" class="route"/>
+    <rect x="838" y="686" width="283" height="36" fill="#F3F1E9"/>
+    <text x="846" y="710" class="body">同一 core：执行 / 持久记录</text>
+    <g id="RemoteCore">
+      <rect x="835" y="739" width="286" height="89" class="node"/>
+      <text x="857" y="776" class="head">目标 core / journal</text>
+      <text x="857" y="809" class="body">计划、变更、原任务结果</text>
+    </g>
+    <text x="836" y="867" class="note">controller 不替代执行端回执</text>
+    <text x="836" y="897" class="note">不隐式传包或重新提交任务</text>
+  </g>
+  <g id="browser-channel">
+    <rect x="54" y="959" width="520" height="270" class="zone"/>
+    <text x="81" y="997" class="body">03 / App 与 macOS CLI 的独立浏览器通道</text>
+    <g id="Host">
+      <text x="82" y="1052" class="head">Native host</text>
+      <text x="82" y="1088" class="body">配对与任务协调</text>
+    </g>
+    <g id="Ext">
+      <text x="344" y="1052" class="head">profile 扩展</text>
+      <text x="344" y="1088" class="body">原生 API / journal</text>
+    </g>
+    <path d="M247 1044 H326" class="route" marker-start="url(#arrow)"/>
+    <text x="239" y="1132" class="note">连接 / 原 ID</text>
+    <text x="82" y="1175" class="body">clear：真实重启 + 再次批准 → 完成</text>
+    <text x="82" y="1209" class="note">Linux runner 不提供本机 browser host control</text>
+  </g>
+  <g id="proxy-channel">
+    <rect x="602" y="959" width="544" height="270" class="zone"/>
+    <text x="629" y="997" class="body">04 / App、CLI 各自持有代理通道</text>
+    <g id="Proxy">
+      <text x="630" y="1052" class="head">loopback CONNECT</text>
+      <text x="630" y="1088" class="code">crates/egress</text>
+    </g>
+    <g id="Destination">
+      <text x="965" y="1052" class="head">允许的目的地</text>
+      <text x="965" y="1088" class="body">或上游代理</text>
+    </g>
+    <path d="M905 1044 H947" class="route"/>
+    <text x="630" y="1132" class="note">匹配 host / port 规则的连接</text>
+    <text x="630" y="1175" class="body">仅代理路径；不解密 TLS。</text>
+    <text x="630" y="1209" class="note">不证明进程直接出站已被强制阻止</text>
+  </g>
+  <g id="Site">
+    <path d="M54 1271 H1146" fill="none" stroke="#CBC6BA"/>
+    <text x="54" y="1321" class="head">独立官网</text>
+    <text x="223" y="1321" class="body">静态说明与示例 · 共享展示模块 · 没有执行通道</text>
+  </g>
+</svg>
