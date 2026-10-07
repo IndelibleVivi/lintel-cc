@@ -13,7 +13,7 @@ Lintel 的图形由承重横梁、两根支撑和右下方的光标构成。横�
 | App 内小标记 | [`Brand()`](../apps/desktop/src/ui.tsx) | 32-unit 无底色图形；横梁／光标跟随 accent，支撑跟随 text，适配 Day / Night |
 | 左上角字标 | [`App.tsx`](../apps/desktop/src/App.tsx)、[`styles.css`](../apps/desktop/src/styles.css) | 保留现有 serif `lintel_`、分割线与 2.6 秒慢闪光标；reduced motion 下静止 |
 | 可编辑展示资产 | [`assets/identity`](../apps/desktop/assets/identity/README.md) | 透明、单色、outlined 字标、横向组合、16/24/32 optical 与可选 dark 图标 |
-| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；湖岸书页／过桥的两幕插画与三段简短产品叙事；favicon 复用 32 px optical；页尾 Clawd 与 App 共用四腿动画／收星 runner，仅主动开始后运动 |
+| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；六能力索引、湖岸书页／过桥插画、四步保全流程与继续工作寄语；favicon 复用 32 px optical；页尾 Clawd 与 App 共用四腿动画／收星 runner，仅主动开始后运动 |
 | Preview 展示 | [`assets/preview`](../assets/preview/README.md)、[`prepare-preview-art.mjs`](../scripts/prepare-preview-art.mjs) | 从 canonical SVG 字标／标记与所提供概念图的本地插画背景组合暖纸／夜色 banner 和 1280×640 分享图；SVG 引用仓库背景，PNG 是便携导出；未上传社交设置 |
 
 文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于官网与导出材料，App 侧栏保留自己的 serif 字体。字标的橙色字脚压住最后一个 `l` 的下部，再向右伸出一小截；橙色底边与 `l` 的基线贴齐，接合处直切，不在下方露出原色字脚；单独字标按横向组合的比例修正画布和 cursor，避免旧画布留白把它推开。静态小标记的光标不闪烁；侧栏字标的慢闪是保留的交互风格。
@@ -30,7 +30,9 @@ Day 的 paper / support / beam 是 `#FAF9F5` / `#3D3D3A` / `#C16A47`；Night 为
 
 ## 验收边界
 
-官网与桌面保持同一身份，但官网是独立介绍页面。首屏沿用完整山湖构图，正文用湖岸书页、带包过桥与原任务延续讲精确保全、预览批准、阅读和继续工作；中英文试用与详细边界在明确入口展开。原件阅读用原生 details，内容显式标为合成示例；页面没有 App 假窗口、执行模拟或编辑草稿。小游戏、阅读示例和主题不调用本机执行能力。
+官网与桌面保持同一身份，但官网是独立介绍页面。首屏沿用完整山湖构图，紧接六个任务的能力索引，标题直接进入对应指南，能力与限制就近说明。湖岸书页、带包过桥与原任务延续继续讲精确保全、预览批准、阅读和继续工作；中英文试用入口保持可达。原件阅读用原生 details，内容显式标为合成示例；页面没有 App 假窗口、执行模拟或编辑草稿。小游戏、阅读示例和主题不调用本机执行能力。
+
+Capabilities 使用开放的双栏索引，手机改为单栏，沿用 serif 标题、细线与原色字脚；不把每个条目包进模拟 App 面板。How it works 用“只保全、不清理”的合成例子按四步说明对象、预览、批准执行和原任务核对，随后说明 App／CLI 共用 core 与 SSH 目标主机执行的分工。步骤是可直接阅读的正文，不模拟操作或用滚动进度隐藏内容。
 
 大幅插画采用概念图的细密字符纹理、分层森林与湖面；本地 hero 背景经 imagegen 移除文字与品牌，再叠 canonical SVG。正文两幅新景是同一视觉语言的插画延展，品牌字形不由 imagegen 重画。App 原四幅 72×24 风景仍由桌面 `clawd-landscapes.ts` 维护，官网不再抽取这个小画 composer。
 

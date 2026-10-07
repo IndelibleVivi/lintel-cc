@@ -221,8 +221,12 @@ private paths.
 ## Development and documentation
 
 The standalone static website source is in [`apps/site`](apps/site/README.md).
-It can be previewed locally today; it is not bound to a domain or deployed, and
-does not connect to the local execution core. See the
+It explains the six current tasks and uses a synthetic preservation journey to
+show preview, approved execution, and original-job verification. Character
+landscapes, a source-reading example, Chinese and English trial links, and the
+Clawd jumping game remain part of the page. It can be previewed locally today;
+it is not bound to a domain or deployed, and does not connect to the local
+execution core. See the
 [site README](apps/site/README.md) to start it.
 
 ```sh

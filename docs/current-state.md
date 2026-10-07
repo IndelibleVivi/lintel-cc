@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-07 · **Lintel 0.1.0 Preview / 开发预览**；本批源码增加发布持久化、resume 暂存与来源复查、计划容量及阅读等待修复。当前本地候选为 clean source `57e8eb99d2690e80bc9464afdac212c5990db65f` 构建的 App 与 `0.1.0-candidate-57e8eb99d269` 三平台 CLI；只有本地生成与分层验证，未正式发行或激活。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
+2026-10-08 · **Lintel 0.1.0 Preview / 开发预览**；本批源码增加发布持久化、resume 暂存与来源复查、计划容量及阅读等待修复。当前本地候选为 clean source `57e8eb99d2690e80bc9464afdac212c5990db65f` 构建的 App 与 `0.1.0-candidate-57e8eb99d269` 三平台 CLI；只有本地生成与分层验证，未正式发行或激活。产品基线从 main@2f29b59 接续 [产品基线 v1.0](specs/product-baseline.md)，并保留 [完整 SPEC](SPEC.md) 的 G01–G04。A01–A18 已接通源码及分层验证；真实认证与完整原生窗口矩阵仍有具体未验证项，不等于原完整产品已经发行。
 
 ## 当前交付与证据
 
@@ -18,7 +18,7 @@
 | CLI 与分层验证 | 最终默认 synthetic suite 25/25 通过（RUST_TEST_THREADS=4），包括深路径计划预算、真正 PTY cleanup、共享 workspace 与两个独立 Rust crates；补充原密文逐字节不变断言后的 PTY journey 再次通过。built App 的 work／components／baseline／archive-wait／remote-task 五条相关 UI 旅程通过。扩充的 native `cli-candidate` 通过解包后保全、独立 state inspect／import、原字节核对及升级后原任务查询，PATH 仅系统工具；真实三平台输入包装 smoke 通过。2026-10-07 直接核对 GitHub：producer `57e8eb9` 的 [CI run 37523781020](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37523781020) 与记录源码 `3afaa7b` 的 [CI run 37524901927](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37524901927) 均为 completed / success；对应 SHA 已核对。CI 不替代真实认证或生产 runtime 验收 |
 | 资源与包装 | clean `57e8eb9` App 构建与包内核对通过，约 24.66 MiB；内置 x86_64／aarch64 runner 5,279,664／4,614,728 bytes 与 canonical static outputs 一致，host 789,392 bytes，非 fixture Chromium／Firefox 各 8 文件（52,522／52,684 bytes），供应图标逐字节一致、无 woff2。编译 docs revision 为该 clean source。三平台 CLI archives 的 candidate identity／checksums／runner bytes 已独立解包核对，macOS 解包静态调用通过；cross-built Linux archives 未在本机执行。仅 linker ad-hoc signature，无 distribution Team ID、资源签封或公证；产物不进 Git |
 | Preview 试用入口 | 中英文 README／quickstart、官网 Preview 能力与试用导航、有限反馈表已接通源码。当前 CLI build 通过；中文命令以真实 PTY 实跑并直接核对输出／fixture：精确选择 3/4 原件、只归档、原 ID 查询、独立 state inspect/read，六份合成源文件字节未变、口令未回显、父 shell 不变。双语 17 个 shell blocks 一致，英文未重复独立 PTY 实跑。网站/game canonical checks 通过，320–1440px 导航及无 JavaScript 文档入口另已核对；未重建 App 发行候选 |
-| Preview 视觉源码 | 官网下半页重构为字符湖岸／过桥插画与三段产品叙事，旧 App 假窗口／选择表单／草稿演示已退场，原生 details 保留合成原件阅读。canonical SVG 字标与 README banner／分享图、执行权威 SVG 已接入源码；末尾橙色字脚与最后一个 l 底线贴齐。canonical site-ui／site-game-test 通过；1440×900／390×844 日夜页面已目视，320px 无溢出；无 JavaScript 阅读、键盘开合、场景实际加载及无外部请求已核对。此前 App frontend build／clawd-app-ui 与展示资产检查仍限定于各自范围。网站未部署，native 发行候选未重建，视觉接受另行区分 |
+| Preview 视觉源码 | 首屏后增加与六任务 catalog 对齐的 Capabilities 索引，How it works 用合成保全例说明四步流程、App／CLI 共用 core 与 SSH 目标主机执行。山湖／湖岸／过桥字符插画、canonical SVG 字标和橙色 l 字脚保留；原生 details 显式展示合成原件，旧执行模拟已退场。本轮 canonical site-ui 通过，实际点击／Enter 导航、无 JavaScript 正文、390／320px 可见布局、字脚几何、场景加载、主题／reduced motion／共享游戏和无外部请求已核对；1440／390px 日夜页面已目视。此前共享游戏 unit、App frontend build／clawd-app-ui 与展示资产检查保留各自范围。网站未部署，native 发行候选未重建，视觉接受与检查结果分别记录 |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作、官网托管或生产 VPS 激活；公开源码不等于正式发行 |
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存 25fdb43 与更早候选的 CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
