@@ -52,10 +52,10 @@
      aria-label="lintel" />
   <rect
      x="1117"
-     y="215"
+     y="218"
      width="82"
      height="18"
-     rx="2"
+     rx="0"
      fill="#c16a47"
      id="rect5" />
 </svg>

@@ -117,7 +117,7 @@ CHECKS: List[Check] = [
            *(NODE or "node", "--test", "tests/site_game.test.mjs"), tools=("node",)),
     _check("home-greetings-test", "Clawd greeting pools, local date dedup and egg priorities", "js",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/home_greetings.test.mjs"), tools=("node",)),
-    _check("site-ui", "static website responsive, theme, demo and Clawd journey", "independent",
+    _check("site-ui", "static website responsive story, native reading, theme and Clawd journey", "independent",
            *(NODE or "node", "tests/site_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),
            loopback=True, independent=True, reason="isolated headless Chromium; website only, no native bridge"),

@@ -2,6 +2,8 @@
 
 中文 · [English](README.en.md)
 
+![Lintel Preview：末尾橙色 l 字脚与字符山湖](assets/preview/lintel-banner.png)
+
 一个本地 Claude Code 环境工具：审阅配置变化，保全选中的指令、记忆和会话，并核对操作结果。提供 macOS App 与独立 CLI，两者共用执行核心。
 
 **Lintel 0.1.0 Preview / 开发预览。** 源码已公开，可从源码在独立测试环境中试用；目前没有公开 Release 下载或正式签名、公证分发。完整 SPEC 尚未交付；真实认证、正式 Chrome/Edge/Firefox/AdsPower、进程级网络强约束和生产远端环境仍未验收。当前候选来源与分层证据见 [当前状态](docs/current-state.md)。源码公开不构成通用复用许可，原创材料的许可仍待选定。
