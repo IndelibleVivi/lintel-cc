@@ -120,7 +120,9 @@ requires a new preview and approval, and old IDs are never redone.
   approved finite entry using a byte-identical private transcript copy.
 - The default home screen is a quiet Clawd companion, with original time-of-day
   greetings; an explicit action opens six task choices. Day / Night / System
-  themes are available.
+  themes are available. The pocket playroom shares one opt-in runner with the
+  website: Clawd keeps its connected short legs, bounces over obstacles, and
+  collects stars at different reachable heights. Scores stay local to each client.
 - Optionally start a loopback proxy in the desktop environment detail, set a
   default allow/block and exact host/port rules, read back the live config, and
   explicitly request opening Claude through that channel. Only connections
@@ -222,9 +224,13 @@ private paths.
 
 The standalone static website source is in [`apps/site`](apps/site/README.md).
 It explains the six current tasks and uses a synthetic preservation journey to
-show preview, approved execution, and original-job verification. The character
-landscape responds to day/night changes, lake taps, and Clawd greetings, with
-a hidden star map. An interactive four-step work-package journey explains the
+show preview, approved execution, and original-job verification. The spacious character
+landscape uses the native wordmark with a full orange final-l foot and a separate
+slow-blinking header underscore. Lake taps make ripples that expand, fade and
+expire; the three Clawds have quiet, temporary visual responses, with no discovery
+counter or coaching prompts. Night scenery uses soft warm-gray tones while keeping
+the original orange bodies and dark eyes. A hidden star map remains in the scenery.
+An interactive four-step work-package journey explains the
 flow; scenery can be paused and respects reduced motion. Source-reading examples,
 Chinese and English trial links, and the opt-in Clawd game remain available.
 It can be previewed locally today;

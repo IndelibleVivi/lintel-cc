@@ -2,8 +2,7 @@
 //
 // New stable page contract (coordinator-owned markup):
 //   header nav   #capabilities / #how-it-works / #try / the GitHub link.
-//   #top       hero: native .brand-wordmark-svg lockup, the terracotta tail overlapping the
-//              final l; day/night raster plates assets/lintel-landscape{,-night}.png; the
+//   #top       hero: native .brand-wordmark-svg lockup, the whole orange final-l foot and detached slow-blinking header cursor; day/night raster plates assets/lintel-landscape{,-night}.png; the
 //              decorative .cursor blinks slowly in the header/footer and stays still under
 //              prefers-reduced-motion.
 //   #capabilities   six <article data-capability> entries whose ids must equal the six stable
@@ -122,6 +121,34 @@ async function assertProductCopyVisible(page, label) {
   }));
   for (const copy of copies) assert.ok(copy.visible && copy.text.length > 0, `${label}: product copy stays visible (${copy.text.slice(0, 24)})`);
 }
+// Read the actual browser composite, including SVG clipping, filters and responsive cropping.
+// The PNG is a disposable screenshot; it never becomes a product asset or leaves this context.
+async function assertNightClawdEyes(page, label) {
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  for (const [section, eyes, body] of [
+    ['keep', [[1474,670],[1493,670]], [[1480,674],[1484,674]]],
+    ['review', [[529,507],[550,507]], [[538,515],[542,515]]],
+  ]) {
+    await page.locator(`#${section} .story-clawd`).scrollIntoViewIfNeeded();
+    await page.locator(`#${section} .story-art`).evaluate(img => img.decode());
+    await page.waitForFunction(id => Number(getComputedStyle(document.querySelector(`#${id} .story-world`)).opacity) === 1, section);
+    const png = (await page.screenshot({animations:'disabled'})).toString('base64');
+    const colors = await page.evaluate(async ({png, section, eyes, body}) => {
+      const image = new Image(); image.src = `data:image/png;base64,${png}`; await image.decode();
+      const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const art = document.querySelector(`#${section} .story-art`), box = art.getBoundingClientRect();
+      const scale = (getComputedStyle(art).objectFit === 'cover' ? Math.max : Math.min)(box.width / art.naturalWidth, box.height / art.naturalHeight);
+      const x = box.x + (box.width - art.naturalWidth * scale) / 2, y = box.y + (box.height - art.naturalHeight * scale) / 2;
+      const sample = points => points.map(([sx,sy]) => [...ctx.getImageData(Math.floor(x + sx * scale), Math.floor(y + sy * scale), 1, 1).data].slice(0,3));
+      return {eyes:sample(eyes), body:sample(body)};
+    }, {png, section, eyes, body});
+    const brightness = color => color.reduce((sum, channel) => sum + channel, 0) / 3;
+    const face = colors.body.reduce((sum, color) => sum + brightness(color), 0) / colors.body.length;
+    for (const eye of colors.eyes) assert.ok(brightness(eye) < face - 20, `${label} ${section}: both original eyes stay dark, not inverted white holes`);
+    for (const color of colors.body) assert.ok(color[0] - color[1] > 30 && color[1] - color[2] > 10, `${label} ${section}: the original body stays warm orange`);
+  }
+}
 try {
   // --- Without JavaScript every product section, reading example and doc link stays visible. ---
   browser = await chromium.launch({headless:true});
@@ -133,7 +160,7 @@ try {
       assert.equal(await page.locator(id).count() > 0, true, `no-JS: ${id} present`);
     }
     assert.equal(await page.locator('.brand-wordmark-svg').count(), 3, 'no-JS: three native wordmarks');
-    for (const id of ['lake-light','lake-touch','moon-toggle','clawd-hello','tail-secret','scene-tools']) assert.equal(await page.locator(`#${id}`).isVisible(), false, `no-JS: ${id} does not leave an inert control`);
+    for (const id of ['lake-light','lake-touch','moon-toggle','clawd-hello','tail-secret','motion-toggle','keep-clawd','crossing-clawd']) assert.equal(await page.locator(`#${id}`).isVisible(), false, `no-JS: ${id} does not leave an inert control`);
     const text = await page.locator('#main').innerText();
     assert.match(text, /Claude Code|Claude/, 'no-JS: product description visible');
     // The six capabilities are server-rendered: ids match the catalog and every card is readable.
@@ -182,84 +209,106 @@ try {
   assert.match(await page.title(), /Lintel/);
   assert.equal(await page.locator('h1').count(), 1, 'a single page headline');
 
-  // The hero is the same local illustration, with one disposable scene owner.
+  // Local visual responses: no coach, discovery count, note or automatic game start.
   const scene = page.locator('.hero-overlay');
   const canvasPixels = () => page.locator('#lake-light').evaluate(node => node.toDataURL());
+  const waterInk = () => page.locator('#lake-light').evaluate(node => {
+    const ctx = node.getContext('2d'), top = Math.floor(node.height * .7);
+    const {data} = ctx.getImageData(0, top, node.width, node.height - top);
+    let peak = 0, left = node.width, right = -1;
+    for (let i = 3; i < data.length; i += 4) {
+      if (!data[i]) continue;
+      peak = Math.max(peak, data[i]);
+      const x = ((i - 3) / 4) % node.width; left = Math.min(left, x); right = Math.max(right, x);
+    }
+    return {peak, span:right < 0 ? 0 : right - left};
+  });
   await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
-  const initialPixels = await canvasPixels();
-  await page.waitForTimeout(180);
+  assert.equal(await page.locator('#scene-note,#scene-discoveries,#sky-toggle,.scene-invitation,.water-hint').count(), 0, 'superseded guidance has been removed');
+  const initialPixels = await canvasPixels(); await page.waitForTimeout(180);
   assert.notEqual(await canvasPixels(), initialPixels, 'automatic character light actually changes across time');
   const lockupBefore = await page.locator('.hero-lockup').boundingBox();
+  const frameBox = await scene.boundingBox();
+  assert.ok(lockupBefore.width / frameBox.width < .35, 'desktop identity leaves more landscape breathing room');
+  const previewBox = await page.locator('.hero-preview').boundingBox();
+  assert.ok(previewBox.y - lockupBefore.y - lockupBefore.height > 24, 'Preview has its own space below the lockup');
   await page.mouse.move(1240, 540);
   await page.waitForFunction(() => Math.abs(parseFloat(document.querySelector('.hero-overlay').style.getPropertyValue('--scene-x'))) > .4);
-  const lockupAfter = await page.locator('.hero-lockup').boundingBox();
-  assert.deepEqual(lockupAfter, lockupBefore, 'pointer depth keeps native identity anchored');
+  assert.deepEqual(await page.locator('.hero-lockup').boundingBox(), lockupBefore, 'pointer depth keeps native identity anchored');
+  assert.equal((await waterInk()).peak, 0, 'daylight water canvas begins clear');
   await page.locator('#lake-touch').click({position:{x:940,y:45}});
-  assert.equal(await scene.getAttribute('data-ripple'), '1', 'a real lake click creates a ripple');
-  const river = await canvasPixels();
-  await page.waitForTimeout(180);
-  assert.notEqual(await canvasPixels(), river, 'the water response expands across time');
+  assert.equal(await scene.getAttribute('data-ripple'), '1', 'a real lake click creates a wave');
+  await page.waitForTimeout(180); const earlyWave = await waterInk();
+  assert.ok(earlyWave.peak > 0);
+  await page.waitForTimeout(700); const laterWave = await waterInk();
+  assert.ok(laterWave.span > earlyWave.span, 'the actual water rings expand');
+  assert.ok(laterWave.peak < earlyWave.peak, 'the actual ring opacity fades');
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.ripples === '0', null, {timeout:3500});
+  assert.equal((await waterInk()).peak, 0, 'expired rings really disappear from the canvas');
   await page.locator('#moon-toggle').focus(); await page.keyboard.press('Enter');
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'moon and header share the theme owner');
-  assert.equal(await page.locator('#scene-note').isVisible(), true);
-  await page.keyboard.press('Escape');
-  assert.equal(await page.locator('#scene-note').isVisible(), false, 'Escape dismisses a scene note');
-  assert.equal(await page.locator('#moon-toggle').evaluate(node => node === document.activeElement), true, 'dismissal preserves the originating keyboard focus');
+  assert.equal(await page.locator('#moon-toggle').evaluate(node => node === document.activeElement), true, 'a visual response leaves keyboard focus at its trigger');
   await page.locator('#clawd-hello').focus(); await page.keyboard.press('Space');
-  assert.match(await page.locator('#scene-message').innerText(), /工作|一起/);
-  await page.locator('#scene-note-close').click();
+  assert.equal(await page.locator('#clawd-hello').getAttribute('data-reacting'), 'true');
+  assert.equal(await page.locator('#clawd-hello .scene-response.heart').isVisible(), true, 'Clawd responds in the picture');
   await page.locator('#clawd-hello').click();
-  assert.match(await page.locator('#scene-discoveries').innerText(), /2 \/ 3/, 'repeat greeting does not fabricate another discovery');
-  assert.equal(await page.locator('#scene-detour').isVisible(), true, 'a later greeting offers the existing game');
-  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready', 'offering a detour still requires game opt-in');
-  await page.locator('#scene-note-close').click();
+  assert.equal(await page.locator('#clawd-hello .scene-response').count(), 1, 'repeated pokes replace their transient response');
+  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready', 'Clawd never recruits or starts the runner');
   await page.locator('#tail-secret').focus(); await page.keyboard.press('Enter');
-  assert.match(await page.locator('#scene-message').innerText(), /橙色|余地/);
-  assert.match(await page.locator('#scene-discoveries').innerText(), /3 \/ 3/, 'three distinct discoveries counted once');
-  await page.locator('#scene-note-close').click();
-  await page.locator('#sky-toggle').click();
-  assert.equal(await scene.getAttribute('data-sky'), 'stars');
-  await page.locator('#scene-note-close').click();
-  await page.mouse.click(8, 400);
+  assert.equal(await page.locator('.hero-word .tail-eyes').isVisible(), true, 'the quiet orange foot briefly opens its eyes');
+  await page.waitForFunction(() => !document.querySelector('.hero-word').dataset.reacting && !document.querySelector('#clawd-hello').dataset.reacting);
+  assert.equal(await page.locator('.tail-eyes').isVisible(), false, 'the wordmark returns to its minimal resting shape');
+  await page.mouse.click(8, 400); await page.keyboard.type('lintel');
+  assert.equal(await scene.getAttribute('data-sky'), 'stars', 'the unadvertised word reveals the sky');
   await page.keyboard.type('lintel');
-  assert.equal(await scene.getAttribute('data-sky'), 'quiet', 'typing LINTEL in the scenery toggles the discovered sky');
-  await page.locator('#scene-note-close').click();
+  assert.equal(await scene.getAttribute('data-sky'), 'quiet', 'the same word puts the sky away');
   await page.locator('#motion-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-motion'), 'paused');
-  const still = await canvasPixels();
-  await page.mouse.move(100, 500); await page.waitForTimeout(180);
-  assert.equal(await canvasPixels(), still, 'pause actually freezes canvas and pointer depth');
-  assert.equal(await page.locator('.hero-reflection').evaluate(node => getComputedStyle(node).animationName), 'none', 'pause also stills the reflection');
+  const still = await canvasPixels(); await page.mouse.move(100, 500); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), still, 'pause actually freezes ambient drawing and pointer depth');
+  assert.equal(await page.locator('.hero-reflection').evaluate(node => getComputedStyle(node).animationName), 'none');
   await page.locator('#lake-touch').focus(); await page.keyboard.press('Enter');
-  assert.equal(await scene.getAttribute('data-ripple'), '2', 'keyboard makes the same water response while paused');
-  assert.match(await page.locator('#scene-message').innerText(), /静静|水纹/);
-  await page.locator('#scene-note-close').click();
+  assert.equal(await scene.getAttribute('data-ripple'), '2', 'keyboard makes a static water response while paused');
+  const pausedWave = await canvasPixels(); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), pausedWave, 'paused waves do not animate');
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.ripples === '0', null, {timeout:3500});
+  assert.notEqual(await canvasPixels(), pausedWave, 'static responses still expire rather than accumulating forever');
   await page.locator('#motion-toggle').click();
   await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
-  // Headless tabs stay 'visible'; inject only the hidden flag to exercise the real visibility
-  // handler. This is a synthetic branch check, not evidence of switching a foreground OS tab.
+  // Headless tabs stay visible: this is a synthetic branch check, not an OS background claim.
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', {configurable:true, value:true});
     document.dispatchEvent(new Event('visibilitychange'));
   });
   assert.equal(await scene.getAttribute('data-animation'), 'resting');
   const hiddenPixels = await canvasPixels(); await page.waitForTimeout(180);
-  assert.equal(await canvasPixels(), hiddenPixels, 'hidden visibility handler cancels actual ambient work');
+  assert.equal(await canvasPixels(), hiddenPixels, 'hidden visibility cancels ambient work');
   await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
   await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
-  check('synthetic hidden/visible input pauses and resumes the browser canvas owner');
+  check('visual waves expand, fade and expire independently; quiet responses keep focus; pause/reduced lifetimes are finite');
+  // Both lower Clawds remain tied to their raster subject, including responsive crops.
+  for (const [section,id,kind] of [['keep','keep-clawd','boat'],['review','crossing-clawd','sparkles']]) {
+    await page.locator(`#${section} .story-world`).scrollIntoViewIfNeeded();
+    await page.locator(`#${section} img`).evaluate(img => img.decode());
+    const button = page.locator(`#${id}`); await button.waitFor({state:'visible'});
+    await button.click();
+    assert.equal(await button.locator(`.scene-response.${kind}`).isVisible(), true);
+    await button.focus(); await page.keyboard.press('Enter');
+    assert.equal(await button.locator('.scene-response').count(), 1, 'keyboard and repeat clicks share one response');
+    assert.equal(await button.evaluate(node => document.activeElement === node), true);
+    await page.waitForFunction(id => !document.getElementById(id).dataset.reacting, id, {timeout:3000});
+    assert.equal(await button.locator('.scene-response').count(), 0, 'lower-scene response cleans itself up');
+  }
   await page.locator('#how-it-works').evaluate(node => node.scrollIntoView({block:'start',behavior:'instant'}));
   await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'resting');
   const away = await canvasPixels(); await page.waitForTimeout(180);
-  assert.equal(await canvasPixels(), away, 'leaving the scene stops actual canvas work');
+  assert.equal(await canvasPixels(), away, 'leaving the scene stops ambient work');
   await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
   await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.animation === 'running');
-  // Put the baseline back into daylight, without erasing the owner's saved preference rules.
   await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
-  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready', 'world discoveries never auto-start the runner');
-  check('scene: real timed light/ripple, anchored identity, keyboard discoveries + focus, pause/resume and offscreen stop');
-
+  assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready');
+  check('scene: anchored identity, hidden keyboard sky, two lower Clawd reactions, offscreen stop and no guidance');
 
   // --- Header navigation targets the real sections and every in-page anchor resolves. ---
   for (const target of ['#capabilities','#how-it-works','#try']) {
@@ -316,16 +365,29 @@ try {
   assert.equal(await page.locator('.brand-wordmark-svg').count(), 3, 'header, hero and footer wordmarks');
   for (const logo of await page.locator('.brand-wordmark-svg').all()) {
     const relation = await logo.evaluate(svg => {
-      const b = svg.querySelector('path').getBBox(), c = svg.querySelector('rect').getBBox();
-      const glyph = svg.querySelector('path');
+      const glyph = svg.querySelector('.wordmark-glyphs'), b = glyph.getBBox();
       const foot = glyph.getPointAtLength(glyph.getTotalLength());
-      return {overlap:b.x+b.width-c.x, extension:c.x+c.width-b.x-b.width, height:b.height, y:c.y-b.y, bottom:c.y+c.height-b.y, baselineGap:Math.abs(c.y+c.height-foot.y)};
+      const tail = svg.querySelector('.wordmark-foot,.cursor'), c = tail.getBBox();
+      return {variant:svg.dataset.variant, gap:c.x-b.x-b.width, extension:c.x+c.width-b.x-b.width,
+        baselineGap:Math.abs(c.y+c.height-foot.y), footLeftGap:Math.abs(c.x-foot.x),
+        height:b.height, round:Number(tail.getAttribute('rx')), mask:glyph.getAttribute('mask')};
     });
-    assert.ok(relation.overlap > 0, 'orange tail overlaps the final l');
-    assert.ok(relation.extension > 0 && relation.extension < relation.height * .25, 'only a short orange extension past the foot');
-    assert.ok(relation.y > relation.height * .8 && relation.bottom <= relation.height, 'tail sits at the glyph foot');
-    assert.ok(relation.baselineGap < .02, 'orange tail and final l share the same bottom edge');
+    assert.ok(relation.baselineGap < .02, 'every cursor/foot retains the final l baseline');
+    assert.ok(relation.round > 0 && relation.round < relation.height * .03, 'rounding stays restrained');
+    if (relation.variant === 'integrated') {
+      assert.ok(relation.extension > 0 && relation.extension < relation.height * .25, 'the integrated orange tail remains short');
+      assert.ok(relation.footLeftGap < .02, 'hero orange covers the whole final l foot');
+      assert.match(relation.mask, /hero-word-foot-cut/, 'old foot is cut away so rounded corners cannot reveal it');
+    } else {
+      assert.equal(relation.variant, 'detached');
+      assert.ok(relation.gap > 0 && relation.gap < relation.height * .1, 'header/footer cursor stands just clear of the glyph');
+      assert.equal(relation.mask, null, 'detached cursor keeps the complete original glyph');
+    }
   }
+  const cursorStyle = await page.locator('.cursor').first().evaluate(node => {
+    const s = getComputedStyle(node); return {name:s.animationName,duration:s.animationDuration};
+  });
+  assert.deepEqual(cursorStyle,{name:'blink',duration:'2.6s'},'the independent underscore keeps the App slow blink');
   assert.match(await page.locator('.hero-art').evaluate(node=>getComputedStyle(node).backgroundImage), /lintel-landscape\.png/);
   const heroLoaded = await page.evaluate(async () => {
     const urls = [...getComputedStyle(document.querySelector('.hero-art')).backgroundImage.matchAll(/url\(["']?(.*?)["']?\)/g)].map(m => m[1]);
@@ -566,6 +628,11 @@ try {
   });
   assert.equal(nightLoaded, true, 'night raster plate decodes');
   check('night theme, night plate and local preference survive reload');
+  await assertNightClawdEyes(page, '1440px cover');
+  await page.setViewportSize({width:900,height:900});
+  await assertNightClawdEyes(page, '900px contain');
+  await page.setViewportSize({width:1440,height:900});
+  check('night story composites preserve orange bodies and dark eyes through cover/contain cropping');
 
   // --- Retained shared game: opt-in, pause on focus exit, resume. ---
   assert.equal(await page.locator('#clawd-game.clawd-game').count(), 1, 'single shared runner mounted at #clawd-game');
@@ -589,6 +656,7 @@ try {
   await capture(page, 'desktop-night.png');
   await page.getByRole('button',{name:'切换到日光'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
+  for (const character of await page.locator('.story-character').all()) assert.equal(await character.isVisible(), false, 'day keeps only the accepted original illustration');
   await capture(page, 'desktop-day.png');
   await captureFull(page, 'desktop-full.png');
   // Cover the new contract sections as well as the retained story sections.
@@ -602,8 +670,10 @@ try {
   const reducedPixels = await canvasPixels(); await page.waitForTimeout(180);
   assert.equal(await canvasPixels(), reducedPixels, 'reduced motion freezes actual ambient drawing');
   await page.locator('#lake-touch').click();
-  assert.match(await page.locator('#scene-message').innerText(), /水纹/);
-  await page.locator('#scene-note-close').click();
+  assert.equal(await scene.getAttribute('data-ripples'), '1');
+  const reducedWave = await canvasPixels(); await page.waitForTimeout(180);
+  assert.equal(await canvasPixels(), reducedWave, 'reduced-motion response stays static');
+  await page.waitForFunction(() => document.querySelector('.hero-overlay').dataset.ripples === '0', null, {timeout:3500});
 
   assert.equal(await page.locator('.cursor').first().evaluate(node=>getComputedStyle(node).animationName), 'none');
   assert.equal(await page.locator('#try').evaluate(node=>getComputedStyle(node).opacity), '1');
@@ -637,6 +707,7 @@ try {
   await page.locator('#workflow-trail [data-trail-step="0"]').click();
   if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.getByRole('button',{name:'切换到夜色'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'mobile-night capture is night');
+  await assertNightClawdEyes(page, '390px mobile crop');
   await capture(page, 'mobile-night.png');
   await captureFull(page, 'mobile-full.png');
   if (qa) for (const id of ['capabilities','how-it-works','keep','review','continue']) await captureSection(page, `#${id}`, `section-${id}-390.png`);
@@ -652,6 +723,8 @@ try {
   assert.equal(await page.locator('#capabilities article[data-capability]').count(), 6, '320px keeps all six capability cards');
   await assertProductCopyVisible(page, '320px');
   assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, '320px keeps all four workflow steps');
+  await page.locator('#theme-toggle').click();
+  await assertNightClawdEyes(page, '320px mobile crop');
   check('390px and 320px mobile reflow, six capabilities + four steps retained, no overflow and direct jump/pause controls');
 
   await context.close();
@@ -663,16 +736,22 @@ try {
   blockedPage.on('pageerror',error=>errors.push(error.message));
   await blockedPage.goto(base);
   const themeBeforeTouch = await blockedPage.locator('html').getAttribute('data-theme');
-  await blockedPage.locator('#scene-theme').tap();
+  await blockedPage.locator('#theme-toggle').tap();
   assert.notEqual(await blockedPage.locator('html').getAttribute('data-theme'), themeBeforeTouch, 'mobile theme works with blocked storage');
-  await blockedPage.locator('#scene-note-close').tap();
   await blockedPage.locator('#clawd-hello').tap();
-  assert.match(await blockedPage.locator('#scene-message').innerText(), /工作|一起/);
-  await blockedPage.locator('#scene-note-close').tap();
+  assert.equal(await blockedPage.locator('#clawd-hello .scene-response.heart').isVisible(), true);
   await blockedPage.locator('#lake-touch').tap();
   assert.equal(await blockedPage.locator('.hero-overlay').getAttribute('data-ripple'), '1', 'touch creates the same local water response');
   assert.equal(await blockedPage.locator('.clawd-game').getAttribute('data-state'), 'ready', 'touch discoveries keep the game opt-in');
-  check('390px real touch scene controls stay usable with blocked storage');
+  for (const [section,id,kind] of [['keep','keep-clawd','boat'],['review','crossing-clawd','sparkles']]) {
+    await blockedPage.locator(`#${section} .story-world`).scrollIntoViewIfNeeded();
+    await blockedPage.locator(`#${section} img`).evaluate(img => img.decode());
+    const button = blockedPage.locator(`#${id}`); await button.waitFor({state:'visible'});
+    const box = await button.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= 390, 'the raster Clawd hit area fits the mobile crop');
+    await button.tap(); assert.equal(await button.locator(`.scene-response.${kind}`).isVisible(), true);
+  }
+  check('390px real touch on hero and both lower raster Clawds works with blocked storage');
 
   assert.match(await blockedPage.locator('.cg-storage').innerText(), /存储不可用/);
   await blockedPage.locator('.cg-jump').tap();

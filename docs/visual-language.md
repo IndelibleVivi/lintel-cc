@@ -13,10 +13,10 @@ Lintel 的图形由承重横梁、两根支撑和右下方的光标构成。横�
 | App 内小标记 | [`Brand()`](../apps/desktop/src/ui.tsx) | 32-unit 无底色图形；横梁／光标跟随 accent，支撑跟随 text，适配 Day / Night |
 | 左上角字标 | [`App.tsx`](../apps/desktop/src/App.tsx)、[`styles.css`](../apps/desktop/src/styles.css) | 保留现有 serif `lintel_`、分割线与 2.6 秒慢闪光标；reduced motion 下静止 |
 | 可编辑展示资产 | [`assets/identity`](../apps/desktop/assets/identity/README.md) | 透明、单色、outlined 字标、横向组合、16/24/32 optical 与可选 dark 图标 |
-| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；六能力索引、湖岸书页／过桥插画、四步保全流程与继续工作寄语；favicon 复用 32 px optical；页尾 Clawd 与 App 共用四腿动画／收星 runner，仅主动开始后运动 |
-| Preview 展示 | [`assets/preview`](../assets/preview/README.md)、[`prepare-preview-art.mjs`](../scripts/prepare-preview-art.mjs) | 从 canonical SVG 字标／标记与所提供概念图的本地插画背景组合暖纸／夜色 banner 和 1280×640 分享图；SVG 引用仓库背景，PNG 是便携导出；未上传社交设置 |
+| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；六能力索引、湖岸书页／过桥插画、四步保全流程与继续工作寄语；favicon 复用 32 px optical；页尾 Clawd 与 App 共用连续短腿轮廓／整体弹跳／高低星星 runner，仅主动开始后运动 |
+| Preview 展示 | [`assets/preview`](../assets/preview/README.md)、[`prepare-preview-art.mjs`](../scripts/prepare-preview-art.mjs) | 从 canonical SVG 字标／标记与所提供概念图的本地插画背景组合暖纸／夜色 banner 和 1280×720 分享图；SVG 引用仓库背景，PNG 是便携导出；未上传社交设置 |
 
-文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于官网与导出材料，App 侧栏保留自己的 serif 字体。字标的橙色字脚压住最后一个 `l` 的下部，再向右伸出一小截；橙色底边与 `l` 的基线贴齐，接合处直切，不在下方露出原色字脚；单独字标按横向组合的比例修正画布和 cursor，避免旧画布留白把它推开。静态小标记的光标不闪烁；侧栏字标的慢闪是保留的交互风格。
+文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于官网与导出材料，App 侧栏保留自己的 serif 字体。展示字标的橙脚完整覆盖最后一个 `l` 的底部，并向右保留短截；底边与原字脚共线，圆角保持细小。canonical SVG 用局部 mask 去掉下面的原色字脚，避免圆角处露出黑／白边；原始 glyph path 不变。首屏与静态导出使用这个完整橙脚，header／footer 则用同一字形配独立、较细的 `_`，只让它按 App 的 2.6 秒节奏慢闪。字尾的小眼睛只在主动点击后短暂出现，默认形状仍然 minimal。静态梁柱标记不闪烁，App 侧栏字体与图标保持原有权威源。
 
 ## 保留的关系
 
@@ -30,13 +30,13 @@ Day 的 paper / support / beam 是 `#FAF9F5` / `#3D3D3A` / `#C16A47`；Night 为
 
 ## 验收边界
 
-官网与桌面保持同一身份，但官网是独立介绍页面。首屏沿用完整山湖构图，紧接六个任务的能力索引，标题直接进入对应指南，能力与限制就近说明。湖岸书页、带包过桥与原任务延续继续讲精确保全、预览批准、阅读和继续工作；中英文试用入口保持可达。原件阅读用原生 details，内容显式标为合成示例；页面没有 App 假窗口、执行模拟或编辑草稿。小游戏、阅读示例和主题不调用本机执行能力。
+官网与桌面保持同一身份，但官网是独立介绍页面。首屏缩小字标、拉开字标／Preview／标题间距并下移山湖，紧接六个任务的能力索引，标题直接进入对应指南，能力与限制就近说明。湖岸书页、带包过桥与原任务延续继续讲精确保全、预览批准、阅读和继续工作；中英文试用入口保持可达。原件阅读用原生 details，内容显式标为合成示例；页面没有 App 假窗口、执行模拟或编辑草稿。小游戏、阅读示例和主题不调用本机执行能力。
 
 Capabilities 使用开放的双栏索引，手机改为单栏，沿用 serif 标题、细线与原色字脚；不把每个条目包进模拟 App 面板。How it works 用“只保全、不清理”的合成例子按四步说明对象、预览、批准执行和原任务核对，随后说明 App／CLI 共用 core 与 SSH 目标主机执行的分工。四步正文立即可读；额外的开放线稿旅程可逐步点看原件、冻结计划、加密包与原任务核对，不执行操作或产生成功回执。手机图注独立排成可读文字，不随 SVG 整体缩小。
 
-大幅插画采用概念图的细密字符纹理、分层森林与湖面；本地 hero 背景经 imagegen 移除文字与品牌，再叠 canonical SVG。正文两幅新景是同一视觉语言的插画延展，品牌字形不由 imagegen 重画。App 原四幅 72×24 风景仍由桌面 `clawd-landscapes.ts` 维护，官网不再抽取这个小画 composer。
+大幅插画采用概念图的细密字符纹理、分层森林与湖面；本地 hero 背景经 imagegen 移除文字与品牌，再叠 canonical SVG。正文两幅新景是同一视觉语言的插画延展，品牌字形不由 imagegen 重画。正文夜景以暖灰和较低亮度投影风景，Clawd 则由同一原图的轮廓 clip 保留暖橙色身体与黑眼睛；风景与角色沿用同一 cover／contain 和手机裁景，不以整张反色翻白角色眼睛。App 原四幅 72×24 风景仍由桌面 `clawd-landscapes.ts` 维护，官网不再抽取这个小画 composer。
 
-桌面叙事将文字排进风景留白，手机先排可读文字再裁取完整主体；不把桌面整体缩小。首屏字符光点、水纹与景深回应鼠标和触摸，原生字标与 live heading 不跟着摇动；月亮、Clawd 和字尾橙线藏着本页彩蛋，发现后可点开星图，键盘也可在首屏空白处输入 LINTEL。自然滚动只触发风景进入与细线阅读进度，不接管滚轮，正文和试用入口立即可用。无 JavaScript 可展开原生阅读示例，“停下风景”同时停止自动风景、反光、淡入与线稿动效；reduced motion 时它们静止、按钮和步骤仍直接反馈，主动小游戏保留独立的开始／暂停控制。浏览器检查、源码完成、native 验收和用户审美接受分别记录；通过检查不能替代视觉接受。
+桌面叙事将文字排进风景留白，手机先排可读文字再裁取完整主体；不把桌面整体缩小。首屏字符光点、水纹与景深回应鼠标和触摸，原生字标与 live heading 不跟着摇动；月亮、三幅画中的 Clawd 与字尾橙线藏着小反应，均由主动点击／键盘触发并自行消失；不展示发现计数、纸条引导或游戏招募。水纹有各自的扩散／渐隐／到期清理，暂停与 reduced motion 时静态反馈仍会到期退出。在首屏空白处输入 LINTEL 可切换隐藏星图。自然滚动只触发风景进入与细线阅读进度，不接管滚轮，正文和试用入口立即可用。无 JavaScript 可展开原生阅读示例，“停下风景”同时停止自动风景、反光、淡入与线稿动效；reduced motion 时它们静止、按钮和步骤仍直接反馈，主动小游戏保留独立的开始／暂停控制。浏览器检查、源码完成、native 验收和用户审美接受分别记录；通过检查不能替代视觉接受。
 
 源码接入、打包、实际桌面辨识度和用户审美接受是不同事实。发布前仍需检查 macOS Dock、Finder、Spotlight、Cmd–Tab、安装器／About，以及正式 Linux launcher／window icon；同时看明暗桌面背景和小尺寸。提供 assets 或通过 build 不代表这些环境已经验收。当前实测状态见 [current-state](current-state.md)。
 

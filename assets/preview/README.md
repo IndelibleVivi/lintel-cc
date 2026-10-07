@@ -5,22 +5,24 @@ a Release, configure hosting or upload a GitHub social preview.
 
 | Asset | Intended surface |
 | --- | --- |
-| `lintel-banner.svg` / `.png` | Warm-paper README banner, 1600 × 800 |
-| `lintel-banner-night.svg` / `.png` | Night presentation sibling, 1600 × 800 |
-| `lintel-social-preview.svg` / `.png` | Share composition, 1280 × 640 |
+| `lintel-banner.svg` / `.png` | Warm-paper README banner, 1600 × 900 |
+| `lintel-banner-night.svg` / `.png` | Night presentation sibling, 1600 × 900 |
+| `lintel-social-preview.svg` / `.png` | Share composition, 1280 × 720 |
 
 The composition follows the supplied concept's fine character forest, layered
 mountains, moon and reflected lake. The tiny Clawd stays on the shore. Large
 presentation art is independent of the App's smaller 72 × 24 landscape album.
 
-The wordmark's terracotta tail **overlaps the last `l` foot and extends a short
-way beyond it**. Both share one bottom edge, with a square junction so the
-original dark/light foot does not peek out below the orange. It is the same relationship as the supplied horizontal lockup.
-The [standalone wordmark](../../apps/desktop/assets/identity/source/lintel-wordmark.svg)
-now projects that cursor geometry at its own scale and has a tight canvas;
-the obsolete wide canvas displaced the tail. Glyph outlines are preserved.
-The [mark](../../apps/desktop/assets/identity/source/lintel-mark.svg) remains
-native vector geometry. Image generation never redraws the identity.
+The wordmark's terracotta base **covers the whole last `l` foot and extends a
+short way beyond it**. The shared baseline remains exact; subtle rounded corners
+are clean because a local SVG mask removes the old foot underneath. The
+[standalone wordmark](../../apps/desktop/assets/identity/source/lintel-wordmark.svg)
+and horizontal lockup own this geometry. Glyph outlines are retained. Website
+header/footer use the same glyph with a detached slow-blinking underscore;
+presentation exports keep the integrated base static. The smaller lockup,
+additional sky space and lower landscape match the website's more open composition.
+The [mark](../../apps/desktop/assets/identity/source/lintel-mark.svg) remains native
+vector geometry. Image generation never redraws the identity.
 
 ## Sources and rebuilding
 

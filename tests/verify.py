@@ -113,7 +113,7 @@ CHECKS: List[Check] = [
            *(CARGO or "cargo", "build", "-p", "lintel-runner"), tools=("cargo",)),
     _check("js-engine-test", "browser engine JS unit tests (node:test, no deps)", "js",
            *(NODE or "node", "--test", "extensions/browser/tests/engine.test.mjs"), tools=("node",)),
-    _check("site-game-test", "shared Clawd gait, jump, stars, collision and pause physics (node:test, no deps)", "js",
+    _check("site-game-test", "shared Clawd silhouette, whole-body pose, jump, varied reachable stars, collision and pause physics (node:test, no deps)", "js",
            *(NODE or "node", "--test", "tests/site_game.test.mjs"), tools=("node",)),
     _check("home-greetings-test", "Clawd greeting pools, local date dedup and egg priorities", "js",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/home_greetings.test.mjs"), tools=("node",)),

@@ -16,10 +16,7 @@ function applyTheme() {
   themeButton.setAttribute('aria-label', label);
   themeButton.title = label;
   themeButton.firstElementChild.textContent = theme === 'light' ? '☾' : '☼';
-  const sceneTheme = document.querySelector('#scene-theme');
   const sceneLabel = theme === 'light' ? '切换夜色主题' : '切换日光主题';
-  sceneTheme.setAttribute('aria-label', sceneLabel);
-  sceneTheme.firstElementChild.textContent = theme === 'light' ? '☾' : '☼';
   document.querySelector('#moon-toggle').setAttribute('aria-label', `碰一下月亮，${sceneLabel}`);
   root.dispatchEvent(new Event('site-theme-change'));
 }

@@ -7,9 +7,13 @@ materials, not generated runtime resources.
 - The canonical App icon master is [`src/brand.svg`](../../src/brand.svg).
 - Tauri consumes the five supplied exports in [`src-tauri/icons`](../../src-tauri/icons).
 - `source/` contains transparent, monochrome and outlined display variants.
-  The standalone outlined wordmark uses the horizontal lockup's cursor geometry
-  at its own scale: terracotta overlaps the final `l` foot and extends slightly
-  beyond it. Both bottom edges align and the junction is square. Its canvas ends at that tail; do not restore the old empty width.
+  The outlined wordmark and horizontal lockup use a complete terracotta foot
+  under the final `l`, with a short right extension and subtle rounded corners.
+  A local SVG mask removes the original foot beneath that orange base, avoiding
+  dark/light corners showing through. The original outlined glyph path is retained.
+  The website header/footer project that same glyph without the mask and place a
+  separate, thinner cursor after it; the cursor alone blinks slowly. These two
+  display treatments share the same baseline and source, with no duplicate master.
 - `small/` contains optical 16, 24 and 32 px variants.
 - `dark/` contains an optional presentation variant; the packaged App icon retains
   its light paper container in both OS themes.

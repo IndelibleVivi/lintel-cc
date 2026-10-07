@@ -1,13 +1,29 @@
-// Clawd's body follows apps/desktop/src/Clawd.tsx; its four legs are drawn separately.
+// Clawd's connected silhouette, continuous short legs and eye marks are the canonical Sprite in
+// apps/desktop/src/Clawd.tsx (hand-drawn from the Clawd silhouette and its terminal appearance).
+// The four legs already descend from the body path, so the game never draws detached feet.
 // Clawd belongs to Anthropic. This game never calls the native App or a remote service.
-const BODY = 'M10 0H70V20H80V30H70V40H10V30H0V20H10Z';
+export const BODY = 'M10 0H70V20H80V30H70V40H66V50H60V40H56V50H50V40H30V50H24V40H20V50H14V40H10V30H0V20H10Z';
 const GROUND = 188, PLAYER_X = 48, HEIGHT = 40, GRAVITY = 1450;
+const EYES_OPEN = [[20, 10, 4, 10], [56, 10, 4, 10]];
+const EYES_SHUT = [[19, 18, 8, 3], [55, 18, 8, 3]];
+const STAR_HIT_X = 30, STAR_HIT_Y = 24;
+// Three visible star rows. The row advances every spawn, so successive stars sit at clearly
+// different heights; a small deterministic jitter keeps them from looking printed. All three rows
+// (and their jitter) stay inside one jump's reach at every speed, and none is collectible from the
+// ground, so each star still asks for a real jump.
+const STAR_ROWS = [98, 118, 138];
+const STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
 export function newRun() {
   return { status: 'ready', y: 0, velocity: 0, distance: 0, speed: 210, spawn: 1,
     obstacles: [], stars: [], collected: 0, elapsed: 0, landing: 0, buffer: 0,
-    particles: [], dust: 0, cleared: 0 };
+    particles: [], dust: 0, cleared: 0, spawns: 0 };
 }
 export function points(run) { return Math.floor(run.distance / 10) + run.collected * 25; }
+// The star keeps its horizontal bond to the obstacle (12px in) but takes the next visible row.
+export function spawnStar(obstacle, spawns = 0) {
+  const y = STAR_ROWS[spawns % STAR_ROWS.length] + STAR_JITTER[spawns % STAR_JITTER.length];
+  return { y, x: obstacle.x + 12 };
+}
 function burst(run, x, y, kind, count) {
   for (let i = 0; i < count; i++) run.particles.push({ x, y, vx: (i - (count - 1) / 2) * 35, vy: -40 - (i % 3) * 25, life: .4 + i * .025, kind });
 }
@@ -45,7 +61,8 @@ export function advance(run, dt, width, random = Math.random) {
     if (run.spawn <= 0) {
       const obstacle = { x: width + 16, width: 20 + Math.floor(random() * 8), height: 18 + Math.floor(random() * 12), kind: random() < .5 ? 'stone' : 'book', passed: false };
       run.obstacles.push(obstacle);
-      run.stars.push({ x: obstacle.x + 12, y: GROUND - 70 });
+      run.stars.push(spawnStar(obstacle, run.spawns));
+      run.spawns++;
       run.spawn = 1.4 + random() * .6;
     }
     for (const obstacle of run.obstacles) {
@@ -55,7 +72,7 @@ export function advance(run, dt, width, random = Math.random) {
     run.obstacles = run.obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
     for (const star of run.stars) {
       star.x -= run.speed * step;
-      if (Math.abs(star.x - (PLAYER_X + 32)) < 30 && Math.abs(star.y - (GROUND - HEIGHT / 2 - run.y)) < 24) {
+      if (Math.abs(star.x - (PLAYER_X + 32)) < STAR_HIT_X && Math.abs(star.y - (GROUND - HEIGHT / 2 - run.y)) < STAR_HIT_Y) {
         star.caught = true; run.collected++; burst(run, star.x, star.y, 'star', 7);
       }
     }
@@ -69,18 +86,24 @@ export function advance(run, dt, width, random = Math.random) {
 }
 export function clawdPose(run, reduced = false) {
   const air = run.y > 0 || run.velocity > 0;
-  const moving = run.status === 'running' || run.status === 'paused';
-  const gait = moving && !air ? run.distance / 13 : 0;
-  const landing = reduced ? 0 : run.landing / .14;
+  // A paused run (including the pause-on-blur mid-jump and just-after-landing cases) freezes the
+  // canonical shape exactly; only an actively running run bounces, stretches or squashes.
+  if (reduced || run.status !== 'running') return { anchor: 0, scaleX: 1, scaleY: 1, eyes: run.status === 'over' ? EYES_SHUT : EYES_OPEN };
+  const gait = air ? 0 : run.distance / 13;
+  const landing = run.landing / .14;
+  // A restrained whole-body bounce while the run is actually progressing, a stretch on the way up,
+  // and a squash on landing. The connected legs ride with the body instead of animating on their
+  // own. A ready, paused or just-restarted pose is exactly the canonical shape (scale 1, no lift).
+  const stepping = !air && run.distance > 0;
+  const anchor = !stepping ? 0 : Math.abs(Math.sin(gait)) * 1.5;
+  const ascending = air && run.velocity > 0;
+  const stretch = ascending ? run.velocity / 480 : 0;
+  const crouch = !stepping ? 0 : Math.max(0, (1.5 - anchor) / 1.5) * .5;
   return {
-    bob: reduced || !moving || air ? 0 : Math.abs(Math.sin(gait)) * 1.5,
-    scaleX: 1 + landing * .1, scaleY: 1 - landing * .1,
-    legs: [14,24,50,60].map((x, index) => {
-      const phase = gait + (index === 0 || index === 3 ? 0 : Math.PI);
-      return {x: x + (air ? (index < 2 ? -3 : 3) : Math.round(Math.sin(phase) * 4)),
-        length: air ? 6 : 12 - (moving ? Math.round(Math.max(0, Math.cos(phase)) * 6) : 0),
-        foot: air ? (index < 2 ? -3 : 3) : Math.round(Math.sin(phase) * 2)};
-    }),
+    anchor,
+    scaleX: (1 + landing * .1) * (1 - crouch * .06),
+    scaleY: (1 - landing * .1 + stretch * .1) * (1 - crouch * .05),
+    eyes: EYES_OPEN,
   };
 }
 export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {}) {
@@ -185,12 +208,12 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
     }
     ctx.globalAlpha = 1;
     const pose = clawdPose(run, reduced.matches);
-    ctx.save(); ctx.translate(PLAYER_X+32,GROUND-run.y-pose.bob);ctx.scale(.8*pose.scaleX,.8*pose.scaleY);ctx.translate(-40,-50);
+    // One connected silhouette: the body path already ends in four short legs, so there are no
+    // separately drawn feet. Only the whole-body anchor, squash and stretch are applied.
+    ctx.save(); ctx.translate(PLAYER_X+32,GROUND-run.y-pose.anchor);ctx.scale(.8*pose.scaleX,.8*pose.scaleY);ctx.translate(-40,-50);
     ctx.fillStyle = p.accent; ctx.fill(body);
-    for (const leg of pose.legs) {ctx.fillRect(leg.x,38,5,leg.length);ctx.fillRect(leg.x+leg.foot,38+leg.length-3,6,3);}
     ctx.fillStyle = '#252320';
-    if (run.status === 'over') {ctx.fillRect(19,16,8,3);ctx.fillRect(55,16,8,3);}
-    else {ctx.fillRect(21,10,4,10);ctx.fillRect(57,10,4,10);}
+    for (const [x, y, w, h] of pose.eyes) ctx.fillRect(x, y, w, h);
     ctx.restore();
   }
   function tick(now) {
