@@ -14,6 +14,9 @@ export function mountSiteWorld({ toggleTheme }) {
   const scenery = [...document.querySelectorAll('.story-world')];
   const waveLifetime = 2600;
   let paused = false, visible = false, disposed = false, constellation = false;
+  // Refresh the preference at mount/change, keeping animation frames off the live media query.
+  // This also avoids a Chromium emulation race between CSS media updates and MQL notifications.
+  let reducedOn = reduced.matches;
   let width = 0, height = 0, frame = 0, progressFrame = 0, waveTimer = 0, last = 0, time = 0;
   let aim = { x: 0, y: 0 }, look = { x: 0, y: 0 }, ripples = [];
   let keys = '', lastKey = 0, paletteTheme = '', accent = '', ink = '';
@@ -32,7 +35,7 @@ export function mountSiteWorld({ toggleTheme }) {
     target.addEventListener(event, handler, options);
     listeners.push(() => target.removeEventListener(event, handler, options));
   }
-  function moving() { return !paused && !reduced.matches; }
+  function moving() { return !paused && !reducedOn; }
   function active() { return !disposed && moving() && visible && !document.hidden && !!ctx; }
   function react(target, kind) {
     clearTimeout(reactions.get(target));
@@ -85,10 +88,11 @@ export function mountSiteWorld({ toggleTheme }) {
     armWaveExpiry(); paint();
   }
   function refreshMotion() {
-    root.dataset.motion = reduced.matches ? 'reduced' : paused ? 'paused' : 'live';
+    reducedOn = reduced.matches;
+    root.dataset.motion = reducedOn ? 'reduced' : paused ? 'paused' : 'live';
     motion.setAttribute('aria-pressed', String(!moving()));
-    motion.disabled = reduced.matches;
-    const label = reduced.matches ? '系统已减少动效' : paused ? '让山湖动起来' : '停下风景';
+    motion.disabled = reducedOn;
+    const label = reducedOn ? '系统已减少动效' : paused ? '让山湖动起来' : '停下风景';
     motion.setAttribute('aria-label', label); motion.title = label;
     motion.lastElementChild.textContent = label;
     motion.firstElementChild.textContent = moving() ? 'Ⅱ' : '▷';
