@@ -8,6 +8,7 @@ a Release, configure hosting or upload a GitHub social preview.
 | `lintel-banner.svg` / `.png` | Warm-paper README banner, 1600 × 900 |
 | `lintel-banner-night.svg` / `.png` | Night presentation sibling, 1600 × 900 |
 | `lintel-social-preview.svg` / `.png` | Share composition, 1280 × 720 |
+| `film.tsx` / `player.html` | Editable 20-second concept intro and opt-in local player; MP4/audio/bundle outputs stay ignored |
 
 The composition follows the supplied concept's fine character forest, layered
 mountains, moon and reflected lake. The tiny Clawd stays on the shore. Large
@@ -23,6 +24,25 @@ presentation exports keep the integrated base static. The smaller lockup,
 additional sky space and lower landscape match the website's more open composition.
 The [mark](../../apps/desktop/assets/identity/source/lintel-mark.svg) remains native
 vector geometry. Image generation never redraws the identity.
+
+## Concept film
+
+The concept intro uses a continuous camera through a spatial character world,
+file streams into a work package, a Preview/Approve/Verify sequence and a Clawd
+crossing. Its clean vector sprite comes from the shared connected silhouette
+and dark eyes, with deck-following feet, depth-aware rails and attached cargo.
+The orange cursor returns to the exact canonical wordmark foot at the end.
+Music/SFX are originally synthesized with Tone.js; optional English narration
+is generated locally with Kokoro. Music-only and narrated exports share the
+same encoded frames. They are conceptual animation, not a native UI recording.
+
+See the [production guide](../../scripts/preview-film/README.md) for the pinned,
+isolated runtime, audio stems, render command, local player and rights sources.
+The separate 30-second native edit uses actual App screenshots with synthetic
+data and a visible edited label; it does not add a continuous-recording claim.
+Generated movies, WAVs, model cache, browser bundles and QA captures are not
+presentation source assets to commit. Visual owner acceptance remains separate
+from successful encoding and media validation.
 
 ## Sources and rebuilding
 

@@ -1,0 +1,19 @@
+{
+  "name": "lintel-preview-film-tools",
+  "private": true,
+  "type": "module",
+  "description": "Independent local film production tools; not an App or website dependency",
+  "dependencies": {
+    "@react-three/fiber": "9.8.1",
+    "@remotion/bundler": "4.0.534",
+    "@remotion/media": "4.0.534",
+    "@remotion/renderer": "4.0.534",
+    "@remotion/three": "4.0.534",
+    "kokoro-js": "1.2.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.534",
+    "three": "0.186.1",
+    "tone": "15.1.22"
+  }
+}

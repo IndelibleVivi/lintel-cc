@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lintel · Preview film</title>
+<style>
+  :root{color-scheme:dark;background:#20221e;color:#eae5da;font-family:Menlo,monospace}
+  *{box-sizing:border-box}body{margin:0;padding:36px 5vw 24px}main{max-width:1440px;margin:auto}
+  header{display:flex;align-items:center;justify-content:space-between;padding:0 0 24px;font-size:12px;letter-spacing:2px;color:#a6aa9f}
+  video{display:block;width:100%;aspect-ratio:16/9;background:#20221e}
+  footer{display:flex;justify-content:space-between;align-items:center;gap:20px;padding-top:22px;font-size:12px;color:#a6aa9f}
+  nav{display:flex;gap:18px}button{font:inherit;background:none;border:0;border-bottom:1px solid transparent;color:#a6aa9f;padding:9px 0;cursor:pointer}
+  button[aria-pressed=true]{color:#e0a485;border-bottom-color:#e0a485}button:focus-visible{outline:1px solid #e0a485;outline-offset:5px}
+  @media(max-width:600px){body{padding:24px 16px}footer{display:block}nav{margin-top:12px}header{letter-spacing:1px}}
+</style>
+<main>
+  <header><span>LINTEL / PREVIEW</span><span>20 SECONDS</span></header>
+  <video id="film" controls playsinline preload="metadata" poster="poster.png" src="lintel-intro-voice.mp4" aria-label="Lintel concept intro with music and narration"></video>
+  <footer><span>Your work. Your call.</span><nav aria-label="Soundtrack"><button type="button" data-mix="voice" aria-pressed="true">Music + voice</button><button type="button" data-mix="music" aria-pressed="false">Music only</button></nav></footer>
+</main>
+<script>
+  const film=document.querySelector('#film');
+  document.querySelectorAll('[data-mix]').forEach(button=>button.addEventListener('click',()=>{
+    const time=film.currentTime,playing=!film.paused;
+    document.querySelectorAll('[data-mix]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+    film.src=button.dataset.mix==='voice'?'lintel-intro-voice.mp4':'lintel-intro.mp4';
+    film.setAttribute('aria-label',button.dataset.mix==='voice'?'Lintel concept intro with music and narration':'Lintel concept intro with music and sound effects');
+    film.addEventListener('loadedmetadata',()=>{film.currentTime=Math.min(time,film.duration);if(playing)film.play().catch(()=>{});},{once:true});
+  }));
+</script>
+</html>
