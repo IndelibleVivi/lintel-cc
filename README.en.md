@@ -1,6 +1,6 @@
 # Lintel
 
-[中文](README.md) · English
+[中文](README.md) · English · [Website](https://lintel.page/)
 
 ![Lintel Preview: the terracotta l tail above a fine ASCII landscape](assets/preview/lintel-banner.png)
 
@@ -234,10 +234,11 @@ An interactive four-step work-package journey explains the
 flow; scenery can be paused and respects reduced motion. Source-reading examples,
 Chinese and English trial links, and the opt-in Clawd game remain available.
 A quiet link opens the 20-second English concept film with speech, music and sound
-effects; playback starts only on request. The complete static site is available in
-a Cloudflare Pages preview; the production domain is pending activation. It does
-not connect to the local execution core. See the
-[site README](apps/site/README.md) to start it.
+effects; playback starts only on request. The complete static site is live at
+[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages.
+It does not connect to the local execution core or offer a formal app download.
+See the [site README](apps/site/README.md) to start it and the
+[hosting guide](docs/site-hosting.md) to update it.
 
 ```sh
 python3 tests/verify.py

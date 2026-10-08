@@ -1,6 +1,6 @@
 # Lintel
 
-中文 · [English](README.en.md)
+中文 · [English](README.en.md) · [官网](https://lintel.page/)
 
 ![Lintel Preview：末尾橙色 l 字脚与字符山湖](assets/preview/lintel-banner.png)
 
@@ -108,7 +108,7 @@ Linux systemd 服务可在“清理与重建”展开“目标后台服务”，
 
 ## 开发与文档
 
-官网源码在 [`apps/site`](apps/site/README.md)：独立静态页面，以六个任务说明当前能力，用合成保全旅程解释预览、批准执行与原任务核对；首屏在字标与山湖之间留出安静空间，完整橙脚承住末尾 `l`，header 的独立 `_` 慢闪。点湖面会产生扩散、渐隐并自行消失的水纹，三幅画中的 Clawd 藏着短暂回应，夜景以柔和暖灰衬托橙色身体与黑眼睛；彩蛋不显示提示或发现计数；四步工作包旅程可点击探索，提供风景暂停与 reduced motion。原件阅读示例、中英文试用入口与 opt-in Clawd 跳跃小游戏保持可达。现增加按需打开的 20 秒英文概念短片，保留配音、音乐与音效。完整静态站点已上传 Cloudflare Pages preview，正式域名尚待激活；不连接本机执行核心。启动方式见[官网说明](apps/site/README.md)。
+官网源码在 [`apps/site`](apps/site/README.md)：独立静态页面，以六个任务说明当前能力，用合成保全旅程解释预览、批准执行与原任务核对；首屏在字标与山湖之间留出安静空间，完整橙脚承住末尾 `l`，header 的独立 `_` 慢闪。点湖面会产生扩散、渐隐并自行消失的水纹，三幅画中的 Clawd 藏着短暂回应，夜景以柔和暖灰衬托橙色身体与黑眼睛；彩蛋不显示提示或发现计数；四步工作包旅程可点击探索，提供风景暂停与 reduced motion。原件阅读示例、中英文试用入口与 opt-in Clawd 跳跃小游戏保持可达。按需打开的 20 秒英文概念短片保留配音、音乐与音效。完整静态站点已在 [lintel.page](https://lintel.page/) 上线，使用 Cloudflare Pages 同源托管；不连接本机执行核心，不提供正式 App 下载。启动方式见[官网说明](apps/site/README.md)，更新程序见[托管说明](docs/site-hosting.md)。
 
 ```sh
 python3 tests/verify.py

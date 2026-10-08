@@ -47,6 +47,8 @@ WRANGLER_SEND_METRICS=false npx --yes wrangler@4.148.0 pages deploy \
 
 Pages 的 Custom domains 维护 `lintel.page` 关联；Cloudflare 的同名 DNS zone 维护 apex CNAME，目标是实际 project hostname `lintel-aue.pages.dev`，保持代理。先读取已有记录；只处理本域名所需的记录，不覆盖邮件、邻居域或无关设置。现有 Wrangler OAuth 的 DNS 权限可能不足；用已有正常 dashboard 登录完成有限 DNS 配置，不从浏览器提取 cookie/token，也不为此扩大 credential 权限。
 
+同时在该域名的 **速度 → 真实用户监视** 中选择 **完全禁用 → 禁用 RUM**，并保留 Pages project 的 Web Analytics 关闭状态。Cloudflare Free zone 可能默认启用 RUM；仅查看 Pages 的空 analytics 配置不足以证明 apex 没有脚本注入。上线时曾在 apex 观察到自动注入的 `static.cloudflareinsights.com` beacon 被 CSP 拦住，因此实际域名检查必须同时核对 HTML／浏览器请求与 console，而不是放宽 CSP 来容纳它。机制见 [RUM beacon](https://developers.cloudflare.com/speed/observatory/rum-beacon/)。
+
 等待 Pages domain 状态和证书生效，再核对：
 
 - `https://lintel.page/` 返回 200，TLS 正常；canonical、分享图、robots 与 sitemap 指向正式域名；不存在的路径返回真正 404。

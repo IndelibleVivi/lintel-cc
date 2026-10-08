@@ -1,6 +1,6 @@
 # Lintel website
 
-Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个人工具说明环境整理与工作保全。页面是一片**开阔的字符风景**加**简短的产品叙事**：首屏是本地 raster 插画与原生字标；正文以 [六任务映射](../../contracts/task-catalog.json) 对应的六项能力索引开始，通过插画与原生合成阅读示例引出四步流程和边界说明，并保留中英文 quickstart 与文档入口，不嵌入模拟 App。当前完整站点已在 Cloudflare Pages preview 验证，`lintel.page` 生产域名尚未激活；不提供正式 App 下载。准确部署状态见 [current-state](../../docs/current-state.md)，更新程序见[官网托管说明](../../docs/site-hosting.md)。
+Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个人工具说明环境整理与工作保全。页面是一片**开阔的字符风景**加**简短的产品叙事**：首屏是本地 raster 插画与原生字标；正文以 [六任务映射](../../contracts/task-catalog.json) 对应的六项能力索引开始，通过插画与原生合成阅读示例引出四步流程和边界说明，并保留中英文 quickstart 与文档入口，不嵌入模拟 App。完整站点已在 [lintel.page](https://lintel.page/) 上线，由 Cloudflare Pages 同源托管；不提供正式 App 下载。准确部署状态见 [current-state](../../docs/current-state.md)，更新程序见[官网托管说明](../../docs/site-hosting.md)。
 
 ## 本地预览
 
