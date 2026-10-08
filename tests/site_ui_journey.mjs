@@ -665,7 +665,11 @@ try {
   // --- Reduced motion: reveals complete, decorative cursor static. ---
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
-  await page.waitForFunction(() => document.documentElement.dataset.motion === 'reduced');
+  // Poll the reduced-motion contract on a fixed interval. This wait observes the settled state of
+  // static, non-animated behaviour, so it should not hinge on the browser's frame cadence: the
+  // default 'raf' polling only advances when a frame is produced, which is fragile for a state
+  // wait. 50ms is only the observation cadence; the original timeout is unchanged.
+  await page.waitForFunction(() => document.documentElement.dataset.motion === 'reduced', undefined, {polling:50});
   assert.equal(await page.locator('#motion-toggle').isDisabled(), true, 'system reduced motion stays authoritative');
   const reducedPixels = await canvasPixels(); await page.waitForTimeout(180);
   assert.equal(await canvasPixels(), reducedPixels, 'reduced motion freezes actual ambient drawing');
