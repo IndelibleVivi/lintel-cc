@@ -20,6 +20,7 @@ target/
 /.playwright-cli/
 # Canonical CLI candidate packaging output (scripts/package-cli.mjs, --out).
 /candidate-packages/
+/.wrangler/
 /apps/desktop/src-tauri/runner-bundles/*.json
 /apps/desktop/src-tauri/runner-bundles/*/lintel
 /apps/desktop/src-tauri/browser-host-bundle/manifest.json

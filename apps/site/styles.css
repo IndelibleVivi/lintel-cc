@@ -400,3 +400,14 @@
   *,*::before,*::after { animation:none!important; transition:none!important; }
   .scene-motion .story-world { opacity:1; transform:none; }
 }
+
+/* Opt-in short film: a quiet hero link (native no-JS entrance) upgraded to a bare dark <dialog>. */
+.film-open{color:var(--muted)}.film-open:hover{color:var(--accent)}.film-open-note{font:11px var(--mono);letter-spacing:.4px;opacity:.75}.film-open:hover .film-open-note{color:inherit}
+.film-dialog{width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:0;border:0;background:rgba(12,11,10,.93);color:#f4efe7;overflow:hidden}
+.film-dialog[open]{display:grid;place-items:center}
+.film-dialog::backdrop{background:rgba(12,11,10,.86)}
+.film-video{display:block;width:min(100%,calc(100vh * 16 / 9));max-height:100%;aspect-ratio:16/9;background:#000;object-fit:contain;margin:auto}
+.film-video::cue{font:600 clamp(16px,2.6vw,30px)/1.4 var(--serif);color:#f7f2ea;background:rgba(12,11,10,.55);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.film-close{position:absolute;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));z-index:1;display:grid;place-items:center;width:44px;height:44px;font-size:16px;line-height:1;color:#f4efe7;background:rgba(12,11,10,.55);border:1px solid rgba(244,239,231,.34);border-radius:50%}
+.film-close:hover,.film-close:focus-visible{background:rgba(12,11,10,.85);border-color:var(--accent);color:var(--accent)}
+.film-sr-caption{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

@@ -46,23 +46,49 @@ const docBase = 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/';
 // Finite named asset map only: the server never serves arbitrary files.
 const assets = new Map([['/', 'index.html'], ...[
   'index.html','styles.css','site.mjs',
+  'film.mjs','film.vtt',
   'workflow-trail.mjs','site-world.mjs',
   'clawd-game.mjs','clawd-game.css',
   'assets/favicon.svg',
   'assets/lintel-landscape.png','assets/lintel-landscape-night.png',
   'assets/lintel-keep.png','assets/lintel-crossing.png',
 ].map(file => [`/${file}`, file])]);
-const types = { '.html':'text/html; charset=utf-8', '.css':'text/css', '.mjs':'text/javascript', '.svg':'image/svg+xml', '.png':'image/png' };
+// The short film and its poster never enter Git. main builds them into an ignored media dir; when
+// LINTEL_SITE_MEDIA_DIR holds lintel-intro.mp4 + lintel-film-poster.jpg this finite map serves
+// exactly those two names so the actual-media playthrough can run. Without them the page-level
+// markup checks still pass and real playback stays an independent actual-media verification. The
+// synthetic fallback below is explicitly fake bytes; it only lets the request-timing check run and
+// is never used when a real media dir is supplied.
+const mediaDir = process.env.LINTEL_SITE_MEDIA_DIR;
+const mediaAssets = new Map();
+const syntheticMedia = new Map();
+if (mediaDir) for (const name of ['lintel-intro.mp4', 'lintel-film-poster.jpg']) mediaAssets.set(`/media/${name}`, path.join(mediaDir, name));
+else for (const name of ['lintel-intro.mp4', 'lintel-film-poster.jpg']) syntheticMedia.set(`/media/${name}`, name);
+const types = { '.html':'text/html; charset=utf-8', '.css':'text/css', '.mjs':'text/javascript', '.svg':'image/svg+xml', '.png':'image/png', '.vtt':'text/vtt' };
 const server = createServer(async (request, response) => {
-  const file = assets.get(new URL(request.url, 'http://localhost').pathname);
-  if (!file) { response.writeHead(404).end(); return; }
-  try { const data = await readFile(path.join(repo, 'apps/site', file)); response.writeHead(200, {'Content-Type':types[path.extname(file)]}).end(data); }
-  catch { response.writeHead(500).end(); }
+  const pathname = new URL(request.url, 'http://localhost').pathname;
+  const file = assets.get(pathname);
+  const media = mediaAssets.get(pathname);
+  const fake = syntheticMedia.get(pathname);
+  if (!file && !media && !fake) { response.writeHead(404).end(); return; }
+  try {
+    if (media) {
+      const data = await readFile(media);
+      const type = path.extname(media) === '.mp4' ? 'video/mp4' : 'image/jpeg';
+      response.writeHead(200, {'Content-Type':type, 'Content-Length':data.length});
+      response.end(request.method === 'HEAD' ? undefined : data);
+      return;
+    }
+    if (fake) { response.writeHead(200, {'Content-Type': path.extname(fake) === '.mp4' ? 'video/mp4' : 'image/jpeg'}).end('synthetic'); return; }
+    const data = await readFile(path.join(repo, 'apps/site', file));
+    response.writeHead(200, {'Content-Type':types[path.extname(file)]}).end(data);
+  } catch { response.writeHead(500).end(); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 let browser;
 const checks = [], errors = [], external = [];
+const requests = [];
 const check = name => checks.push(name);
 const qa = process.env.LINTEL_SITE_QA_DIR;
 if (qa) await mkdir(qa, {recursive:true});
@@ -196,6 +222,18 @@ try {
     await page.locator('details#sample-pages > summary').click();
     assert.equal(await page.locator('details#sample-pages').evaluate(node => node.open), true, 'native reading opens without JavaScript');
     assert.equal(await page.locator('#sample-pages pre').first().isVisible(), true, 'source text is actually visible without JavaScript');
+    // The short film keeps a plain, clickable entrance without JavaScript: an anchor straight to the
+    // real same-origin media file, with a caption track and no preloaded player, dialog or autoplay.
+    const noJsFilm = page.locator('#film-open');
+    assert.equal(await noJsFilm.count(), 1, 'no-JS: a native film link exists');
+    assert.equal(await noJsFilm.evaluate(node => node.tagName === 'A' && node.isConnected), true, 'no-JS: the film entrance is a real anchor');
+    const noJsFilmHref = await noJsFilm.getAttribute('href');
+    assert.match(noJsFilmHref, /media\/lintel-intro\.mp4$/, 'no-JS: the link points at the same-origin film');
+    assert.equal(await noJsFilm.isVisible(), true, 'no-JS: the film link is visible');
+    assert.equal(await page.locator('#film-dialog[open], dialog#film-dialog[open]').count(), 0, 'no-JS: nothing pre-opens the film dialog');
+    assert.equal(await page.locator('video').first().evaluate(node => node.autoplay), false, 'no-JS: the film never autoplays');
+    assert.match(await page.locator('video source').first().getAttribute('src'), /media\/lintel-intro\.mp4$/, 'no-JS: the video source is the same-origin film');
+    assert.equal(await page.locator('#film-dialog video').count(), 1, 'no-JS: the film dialog markup is server-rendered');
     check('no-JS: capabilities, four steps, reading example and docs all visible; native reading opens without JavaScript');
     await noJs.close();
   }
@@ -203,11 +241,15 @@ try {
   const context = await browser.newContext({viewport:{width:1440,height:900},colorScheme:'light'});
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  page.on('request', request => { if (!request.url().startsWith(base)) external.push(request.url()); });
+  page.on('request', request => { requests.push(request.url()); if (!request.url().startsWith(base)) external.push(request.url()); });
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   await page.goto(base, {waitUntil:'networkidle'});
   assert.match(await page.title(), /Lintel/);
   assert.equal(await page.locator('h1').count(), 1, 'a single page headline');
+  // The film is never requested merely by loading the page: capture the request log now, before any
+  // film interaction, so this is a real "before opening" observation (the log only grows later).
+  const initialRequests = requests.slice();
+  assert.equal(initialRequests.some(url => /lintel-intro\.mp4$/.test(url)), false, 'the film is not requested on initial page load');
 
   // Local visual responses: no coach, discovery count, note or automatic game start.
   const scene = page.locator('.hero-overlay');
@@ -731,7 +773,118 @@ try {
   await assertNightClawdEyes(page, '320px mobile crop');
   check('390px and 320px mobile reflow, six capabilities + four steps retained, no overflow and direct jump/pause controls');
 
+  // --- The opt-in short film: opened only by an explicit action, never before. This runs INSIDE the
+  //     live desktop context (before it closes); the non-persisted pagehide is the last functional
+  //     action, since the shared site.mjs pagehide handler disposes the film player. ---
+  const filmDialog = page.locator('#film-dialog');
+  assert.equal(await filmDialog.count(), 1, 'native <dialog> film surface present');
+  assert.equal(await filmDialog.evaluate(node => node.open), false, 'film dialog starts closed');
+  assert.equal(await page.locator('#film-dialog video').count(), 1, 'one native <video>');
+  for (const attr of ['controls', 'playsinline']) assert.equal(await page.locator('#film-dialog video').evaluate((node, a) => node.hasAttribute(a), attr), true, `film video has ${attr}`);
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.preload), 'none', 'film video uses preload="none"');
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.autoplay), false, 'film video never autoplays');
+  assert.equal(await page.locator('#film-dialog video[autoplay]').count(), 0, 'no autoplay attribute on the film video');
+  assert.equal(await page.locator('#film-dialog track[kind="captions"]').count(), 1, 'native <track> captions present');
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.classList.contains('film-video')), true, 'film video uses the bare cinematic surface');
+  assert.equal(await page.locator('#film-dialog .film-close').count(), 1, 'one close control');
+  assert.ok(((await page.locator('#film-dialog .film-close').getAttribute('aria-label')) || '').trim().length > 0, 'close control is labelled');
+  assert.ok(((await filmDialog.getAttribute('aria-label')) || '').trim().length > 0, 'film dialog has an accessible name');
+  // A closed dialog is explicitly inert for assistive tech; opening must clear that synchronously so
+  // a just-opened dialog is never left hidden in the accessibility tree.
+  assert.equal(await filmDialog.getAttribute('aria-hidden'), 'true', 'closed dialog is aria-hidden');
+  await page.locator('#film-open').scrollIntoViewIfNeeded();
+  await page.locator('#film-open').focus();
+  assert.equal(await page.locator('#film-open').evaluate(node => node === document.activeElement), true, 'film trigger is keyboard focusable');
+  await page.keyboard.press('Enter');
+  assert.equal(await filmDialog.evaluate(node => node.open), true, 'Enter opens the native modal dialog');
+  assert.notEqual(await filmDialog.getAttribute('aria-hidden'), 'true', 'the open dialog is not hidden from assistive tech');
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.paused), true, 'opening never starts playback');
+  assert.equal(requests.some(url => /lintel-intro\.mp4$/.test(url)), false, 'opening the dialog alone requests no film');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => { const d = document.getElementById('film-dialog'); return d && !d.open; }, null, {timeout:2000});
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.paused), true, 'Escape stops and leaves the film paused');
+  assert.equal(await page.locator('#film-open').evaluate(node => node === document.activeElement), true, 'closing restores focus to the trigger');
+  assert.equal(await filmDialog.getAttribute('aria-hidden'), 'true', 'closing restores the inert aria-hidden state');
+  await page.locator('#film-open').click();
+  const blockedClick = await page.locator('#theme-toggle').click({timeout:1200}).then(() => false).catch(() => true);
+  assert.equal(blockedClick, true, 'the obscured page is not clickable while the dialog is open');
+  await page.locator('#film-dialog .film-close').click();
+  await page.waitForFunction(() => { const d = document.getElementById('film-dialog'); return d && !d.open; }, null, {timeout:2000});
+  assert.equal(await filmDialog.evaluate(node => node.open), false, 'the visible close button dismisses the film');
+  assert.equal(await page.locator('#film-open').evaluate(node => node === document.activeElement), true, 'close button restores trigger focus');
+  check('film: opt-in dialog opens by explicit action only, honours Escape/close/focus restore and accessible hidden state');
+  assert.equal(await page.locator('iframe').count(), 0, 'no iframe (no YouTube/CDN embed)');
+  assert.equal(await page.evaluate(() => !/(youtube|vimeo|cdn\.|googleapis)/i.test(document.documentElement.outerHTML)), true, 'no third-party video host referenced in markup');
+
+  // --- Layout: the film surface keeps 16:9 with no overflow at 390/320/1440. ---
+  for (const [w, h] of [[1440, 900], [390, 844], [320, 844]]) {
+    await page.setViewportSize({width: w, height: h});
+    await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `no horizontal overflow at ${w}px`);
+    await page.locator('#film-open').click();
+    const vbox = await page.locator('#film-dialog video').boundingBox();
+    assert.ok(vbox && vbox.width > 0, `${w}px: the video surface is laid out`);
+    assert.ok(Math.abs(vbox.width / vbox.height - 16 / 9) < 0.03, `${w}px: the video keeps a 16:9 box (${(vbox.width / vbox.height).toFixed(3)})`);
+    assert.ok(vbox.width <= w && vbox.height <= h, `${w}px: the video fits the viewport without overflow`);
+    assert.equal(await page.locator('#film-dialog .film-close').isVisible(), true, `${w}px: the close control stays visible`);
+    const closeBox = await page.locator('#film-dialog .film-close').boundingBox();
+    assert.ok(closeBox.x >= 0 && closeBox.x + closeBox.width <= w && closeBox.y >= 0 && closeBox.y + closeBox.height <= h, `${w}px: close control is inside the viewport`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `no horizontal overflow with the film open at ${w}px`);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => { const d = document.getElementById('film-dialog'); return d && !d.open; }, null, {timeout:2000});
+  }
+  await page.setViewportSize({width:1440, height:900});
+  await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
+  check('film layout: 16:9 with a visible close control and no overflow at 1440/390/320');
+
+  // --- The non-persisted pagehide is the LAST functional action in this context. ---
+  await page.locator('#film-open').click();
+  assert.equal(await filmDialog.evaluate(node => node.open), true, 'the film is open before the unload lifecycle');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted:false})));
+  assert.equal(await filmDialog.evaluate(node => node.open), false, 'pagehide lifecycle closes the film');
+  assert.equal(await page.locator('#film-dialog video').evaluate(node => node.paused), true, 'pagehide lifecycle leaves the film paused');
+  check('film: non-persisted pagehide disposes and closes the film');
+
+  assert.deepEqual(errors, []); assert.deepEqual(external, []);
+  // Scripted open/close (and this open) never call play(), so the film is never fetched in this
+  // context; only an explicit play() loads it (covered in the actual-media context below).
+  assert.equal(requests.some(url => /lintel-intro\.mp4$/.test(url)), false, 'scripted open/close never fetches the film; only play does');
   await context.close();
+
+  // --- Actual media (independent): only runs when main supplies the built film + poster via
+  //     LINTEL_SITE_MEDIA_DIR. These are real bytes: opening stays no-autoplay/no-fetch, and only an
+  //     explicit play() loads and advances the film. ---
+  if (mediaDir) {
+    const real = await browser.newContext({viewport:{width:1440,height:900}});
+    const realPage = await real.newPage();
+    realPage.on('pageerror', error => errors.push(error.message));
+    const filmRequests = [];
+    realPage.on('request', request => { if (/lintel-intro\.mp4$/.test(request.url())) filmRequests.push(request.url()); });
+    await realPage.goto(base, {waitUntil:'domcontentloaded'});
+    await realPage.locator('#film-open').scrollIntoViewIfNeeded();
+    const beforeOpen = await realPage.locator('#film-dialog video').evaluate(v => ({readyState:v.readyState, paused:v.paused}));
+    assert.equal(beforeOpen.paused, true, 'actual media: the film never autoplays on load');
+    await realPage.locator('#film-open').click();
+    // Opening asserts the no-autoplay contract without demanding a loaded video.
+    assert.equal(await realPage.locator('#film-dialog video').evaluate(v => v.paused), true, 'actual media: opening does not start playback');
+    assert.deepEqual(filmRequests, [], 'actual media: no film request until the reader presses play');
+    // Explicitly start playback; only then must the real bytes download and the timeline advance.
+    await realPage.locator('#film-dialog video').evaluate(v => v.play());
+    await realPage.waitForFunction(() => { const v = document.querySelector('#film-dialog video'); return v && v.readyState >= 1; }, null, {timeout:20000});
+    await realPage.waitForFunction(() => { const v = document.querySelector('#film-dialog video'); return v.currentTime > 0 && !v.paused; }, null, {timeout:15000});
+    const meta = await realPage.locator('#film-dialog video').evaluate(v => ({w:v.videoWidth, h:v.videoHeight, d:v.duration, t:v.currentTime}));
+    assert.equal(meta.w, 1920, 'actual media is 1920px wide');
+    assert.equal(meta.h, 1080, 'actual media is 1080px tall');
+    assert.ok(meta.d >= 19.9 && meta.d <= 20.3, `actual media duration is ~20s (got ${meta.d.toFixed(3)})`);
+    assert.ok(meta.t > 0, 'actual media timeline advances when explicitly played');
+    assert.ok(filmRequests.length >= 1, 'actual media: play() actually fetched the film (request evidence)');
+    await realPage.locator('#film-dialog video').evaluate(v => v.pause());
+    await realPage.locator('#film-dialog .film-close').click();
+    await realPage.waitForFunction(() => { const d = document.getElementById('film-dialog'); return d && !d.open; }, null, {timeout:3000});
+    assert.equal(await realPage.locator('#film-dialog video').evaluate(v => v.paused && v.currentTime === 0), true, 'closing the film stops and resets actual playback');
+    check('actual media: explicit play() fetches/advances the 1920x1080 ~20s film; opening never autoplays or fetches; close resets');
+    await real.close();
+  }
 
   // --- Blocked local storage: theme/game stay usable, scores temporary. ---
   const blocked = await browser.newContext({viewport:{width:390,height:844},hasTouch:true});

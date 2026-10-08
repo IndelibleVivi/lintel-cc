@@ -1,4 +1,5 @@
 import { mountClawdGame } from './clawd-game.mjs';
+import { mountFilmPlayer } from './film.mjs';
 import { mountSiteWorld } from './site-world.mjs';
 import { mountWorkflowTrail } from './workflow-trail.mjs';
 
@@ -39,7 +40,8 @@ document.querySelector('a[href="#sample-pages"]').addEventListener('click', () =
 const disposeTrail = mountWorkflowTrail(document.querySelector('#workflow-trail'));
 const disposeWorld = mountSiteWorld({ toggleTheme });
 const disposeGame = mountClawdGame(document.querySelector('#clawd-game'));
+const disposeFilm = mountFilmPlayer(document);
 // Preserve live mounts across the browser back/forward cache; ordinary unload disposes them.
 addEventListener('pagehide', event => {
-  if (!event.persisted) { disposeWorld(); disposeTrail(); disposeGame(); }
+  if (!event.persisted) { disposeWorld(); disposeTrail(); disposeGame(); disposeFilm(); }
 });

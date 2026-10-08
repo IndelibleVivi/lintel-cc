@@ -5,9 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Lintel 0.1.0 Preview：简洁的 Claude Code 个人工具。把工作收好，再往前走——审阅配置变化，保全选中的资料，核对操作结果。macOS App 与独立 CLI；可从源码试用，尚无正式下载。">
+  <link rel="canonical" href="https://lintel.page/">
   <meta property="og:title" content="Lintel 0.1.0 Preview — 把工作收好，再往前走。">
   <meta property="og:description" content="简洁的 Claude Code 个人工具：审阅变化，保全选中的指令、记忆与会话，独立阅读工作包并核对原任务。源码开发预览，尚未正式发行。">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lintel.page/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:image:alt" content="Lintel 0.1.0 Preview — 把工作收好，再往前走。">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
   <title>Lintel 0.1.0 Preview — 把工作收好，再往前走。</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
   <link rel="stylesheet" href="./styles.css">
@@ -52,10 +58,20 @@
             <a class="button primary" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md">中文首次试用 <span aria-hidden="true">↗</span></a>
             <a class="quiet-link" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.en.md" lang="en">English quickstart <span aria-hidden="true">↗</span></a>
             <a class="quiet-link" href="#capabilities">看看能做什么 <span aria-hidden="true">↓</span></a>
+            <a class="quiet-link film-open" id="film-open" href="./media/lintel-intro.mp4" aria-describedby="film-caption"><span id="film-open-label">看 20 秒短片</span> <span class="film-open-note">英文</span> <span aria-hidden="true">▷</span></a>
           </div>
           <p class="development-note"><span class="development-symbol" aria-hidden="true">◌</span> 0.1.0 Preview · 无正式下载 · 源码开发预览 <span class="note-divider">/</span> macOS App · 独立 CLI</p>
       </div>
     </section>
+    <dialog class="film-dialog" id="film-dialog" aria-label="Lintel 短片">
+        <button type="button" class="film-close" aria-label="关闭短片">✕</button>
+        <video class="film-video" controls playsinline preload="none" poster="./media/lintel-film-poster.jpg">
+          <source src="./media/lintel-intro.mp4" type="video/mp4">
+          <track kind="captions" srclang="en" label="English captions" src="./film.vtt" default>
+          你的浏览器不支持内嵌视频，可<a href="./media/lintel-intro.mp4" download>下载短片</a>。
+        </video>
+        <p class="film-sr-caption" id="film-caption">20 秒英文短片：从你的工作开始。可用原生控件播放、暂停、开启字幕或全屏。</p>
+    </dialog>
 
     <section id="capabilities" class="capabilities wrap" aria-labelledby="capabilities-title">
       <div class="section-heading">

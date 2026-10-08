@@ -233,9 +233,10 @@ the original orange bodies and dark eyes. A hidden star map remains in the scene
 An interactive four-step work-package journey explains the
 flow; scenery can be paused and respects reduced motion. Source-reading examples,
 Chinese and English trial links, and the opt-in Clawd game remain available.
-It can be previewed locally today;
-it is not bound to a domain or deployed, and does not connect to the local
-execution core. See the
+A quiet link opens the 20-second English concept film with speech, music and sound
+effects; playback starts only on request. The complete static site is available in
+a Cloudflare Pages preview; the production domain is pending activation. It does
+not connect to the local execution core. See the
 [site README](apps/site/README.md) to start it.
 
 ```sh
