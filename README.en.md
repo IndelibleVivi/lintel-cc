@@ -4,9 +4,9 @@
 
 ![Lintel Preview: the terracotta l tail above a fine ASCII landscape](assets/preview/lintel-banner.png)
 
-Lintel is a local tool for managing Claude Code environments: review configuration
-changes, preserve selected instructions, memories and sessions, and check operation
-results. The macOS app and standalone CLI share the same execution core.
+A clean, personal tool for Claude Code users. Review configuration changes,
+preserve selected instructions, memories and sessions, and check operation results.
+The macOS app and standalone CLI share the same execution core.
 
 **Lintel 0.1.0 Preview / development preview. The source is public; you can try
 it from source in an isolated test environment. There is currently no public
