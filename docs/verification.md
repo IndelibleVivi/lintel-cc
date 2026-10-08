@@ -150,6 +150,32 @@ Finder and the browser's load picker remains independent runtime acceptance.
 
 `rust`, `js`, `python`, `desktop`, `journey`, `independent`.
 
+## Linux CI dependency preparation
+
+The `Linux system packages (Tauri)` step runs `apt-get update` then
+`apt-get install -y` inline in [verification workflow](../.github/workflows/verify.yml). It keeps the runner's
+configured repositories and normal metadata authentication; it changes no
+sources, providers, signature rules or network policy.
+
+* `timeout-minutes: 15` limits the whole step. Per the Actions syntax reference
+  ([workflow-syntax · timeout-minutes](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)),
+  `steps[*].timeout-minutes` caps the maximum step minutes and the runner kills
+  the process when it is exceeded.
+* `-o Acquire::http::Timeout=30` / `-o Acquire::https::Timeout=30` bound each
+  request's connection and data inactivity ([apt-transport-http](https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-http.1.html);
+  HTTPS shares these options per [apt-transport-https](https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-https.1.html)).
+* `-o Acquire::Retries=2` is the finite per-file retry count
+  ([apt.conf](https://manpages.ubuntu.com/manpages/noble/man5/apt.conf.5.html));
+  repeated `-o` is the configuration syntax.
+* `--error-on=any` on `update` makes it fail on any error, including a transient
+  one, rather than silently proceeding with stale metadata
+  ([apt-get](https://manpages.ubuntu.com/manpages/noble/man8/apt-get.8.html)).
+* The `install -y` behavior and exact package names are retained. The
+  downstream macOS/Linux/browser/OpenSSH/VM/packaging gates are unchanged.
+
+This bounds dependency preparation; it does not claim to have diagnosed the
+earlier stall. Live Ubuntu behavior is only observable in a fresh CI run.
+
 ## Synthetic-only guarantee
 
 Default checks operate only on synthetic temporary roots that the checks create
@@ -546,6 +572,17 @@ App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
 The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
-The default group includes 23 checks; the CI independent browser/UI group includes
+The default group includes 25 checks; the CI independent browser/UI group includes
 browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, remote-task-ui, site-ui and
 clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.
+
+On 2026-10-08 GitHub Actions run
+[37673477074](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37673477074)
+for clean `8ce301b` passed the macOS job, but the Ubuntu job was cancelled after
+about six hours inside `Linux system packages (Tauri)` before any check ran; its
+log showed repeated `Ign` for the `http://azure.archive.ubuntu.com` indices and no
+output after 19:18:56Z until cancellation at 01:19:05Z. That is an observed
+dependency-preparation stall with an unconfirmed cause — not a source/test failure
+and not a diagnosed platform outage. The step bound above is the response, and only
+a fresh Ubuntu run can confirm it; the passing macOS job does not stand in for the
+missing Ubuntu evidence.
