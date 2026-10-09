@@ -133,7 +133,7 @@ npm run desktop:build
 
 ## 本地 Preview 候选
 
-候选提供方应同时提供准确 source revision、平台和构建说明。当前 App 候选为 macOS Apple Silicon，没有正式 distribution signing／notarization；macOS 下载拦截仍可能阻止打开，不能把本地构建能启动视为普通用户下载验收。解压到一个新的版本目录后打开其中的 `Lintel.app`，不要覆盖旧候选；App 自带所需 native 组件，不需要在试用机器安装 Rust、Node 或开发服务器。首次试用使用自己创建的合成资料，并按 [quickstart](quickstart.md) 的预览、批准和原 ID 查询顺序核对。
+候选提供方应同时提供准确 source revision、平台和构建说明。当前 App 候选为 macOS Apple Silicon，没有正式 distribution signing／notarization；macOS 下载拦截仍可能阻止打开，不能把本地构建能启动视为普通用户下载验收。解压到一个新的版本目录后打开其中的 `Lintel.app`，不要覆盖旧候选；App 自带所需 native 组件，不需要在试用机器安装 Rust、Node 或开发服务器。首次试用使用自己创建的合成资料，并按 [quickstart](quickstart.md) 的预览、批准和原 ID 查询顺序核对。 从脚本或自动化启动后，应将 Lintel 窗口切到前台再操作；本次 macOS 验收观察到后台窗口暂时空白、点击 Dock 中的 Lintel 后恢复。不要因此删除 state 或重新提交已接受的任务；恢复显示后仍查询原 ID。该观察与完整原生矩阵、普通下载后的 Gatekeeper 验收分别记录。
 
 升级时退出旧 App，保留旧版本及 Lintel state，再从新目录启动新 App；不要并行运行两个版本来执行同一任务。移除候选只需退出 App 后删除自己解压的候选目录。App 移除不会自动撤销已批准的配置、更改 Claude、删除工作包或独立安装的 browser host／remote runner；相关恢复应先通过各自批准流程完成，并保留回执与原 ID。
 
