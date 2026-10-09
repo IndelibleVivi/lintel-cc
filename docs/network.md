@@ -1,6 +1,20 @@
-# 受控网络通道
+# IPv4 / IPv6 与受控网络通道
 
 `lintel-egress` 是 Rust loopback HTTP proxy。它已经实现 TCP CONNECT、有限普通 HTTP 转发、每个实例固定的环境与 hostname 规则，以及 HTTP/HTTPS 上游。它只约束实际进入此代理的连接。设置 `HTTP_PROXY` / `HTTPS_PROXY`、启动一个代理或者看到一条代理事件，均不能证明目标进程无法直连。
+
+## IPv4 / IPv6 Leaf：宿主与通道分别实测
+
+App 入口是“环境详情 → 外发与权限”，无 Claude 环境时首页可“查看这台主机的网络”。CLI 使用 `network inspect`、`network probe`、`network ipv6 plan` 和 `network restore plan`。这四个操作共用 `crates/core/src/network.rs`；请求 schema 来自 `crates/operations`，有限 HTTPS 请求只由 `crates/egress/src/probe.rs` 实现。完整目标见 [Leaf](specs/ip-network.md)。
+
+`network_inspect` 离线读取所选主机的服务／接口与地址观察；网络 revision 包含配置、接口 flags、地址与路由／VPN 动态值，用于前测有效性；观察不完整明确列为 limitation，不复用该结果。未关联到配置服务的新增接口（含 VPN/TUN）也独立可见。界面在进入、重新取得焦点及可见期间每 30 秒更新 metadata，不会因此访问公网。配置、观察、实际请求与强约束是分别报告的事实。
+
+点“测试实际出口”才产生四项请求：主机默认网络 × IPv4/IPv6、所选 Lintel 通道 × IPv4/IPv6。主机默认路径保留系统 VPN/TUN 的作用；未选择通道时对应两格为 `not_tested`。回显必须是匹配族的有限 IP，结果包含所选目标、执行进程实际观察的主机名、时间、耗时与失败原因，IP 可复制；主机名不可读时不伪造。`peer_family` 只描述实际 TCP 一跳，不证明上游之后的路由。默认 `https://api.ipify.org` 与 `https://api6.ipify.org`，可显式换成自己的 HTTPS 回显端点；端点会观察本次出口 IP。拒绝 credentials/query/fragment、redirect、自定义 CA 与无界响应。每格 1–15 秒完整 deadline（默认 10），头部／正文分别有上限，DNS、连接、CONNECT、TLS、HTTP 与地址族失败不混成安全结论。
+
+macOS 操作准确的当前 SCNetworkSet／service UUID／接口，不按 Wi-Fi 等显示名猜测。预览冻结完整 IPv6 protocol 配置、协议 enabled、服务自身 enabled、服务身份及前测；关闭禁用该协议，仅链路本地选 LinkLocal。批准后只修改该服务 IPv6，保留 IPv4、DNS、系统代理与其他服务，在系统授权下写入、提交／应用、独立读回，再自动沿用冻结端点和路径复测。它是**宿主共享设置**，影响使用服务的所有应用，不随 Claude 环境切换或 App 退出撤销；IPv6-only／VPN 可能失连。有效前测要求同 revision／端点／通道实例／deadline 且不超过五分钟，否则重新前测；批准前若前测过期或网络变化，原计划拒绝新任务，须重新预览。
+
+完整配置恢复另行预览批准，包含手动地址、前缀与 router；后续外部修改、服务／接口变化拒绝覆盖。App 原通道停止后，可在新恢复预览中把该路径明确列为未测试。原任务 ID 持久保存，响应丢失或中断只查询原任务，不重写或重新复测；intent 或相同可读值不能单独证明完成。读回未确认时保留不确定性，不能据此自动恢复；配置已读回而后测中断或未完成时，任务标为 `partially_completed` 并保留已确认的恢复入口；后测取得有限失败结果则如实列出每格原因。后测失败独立显示，不回滚已确认配置，也不变成“零泄漏”。
+
+Linux 的 `network inspect/probe` 在所选 runner 执行，不用 Mac 的通道代替远端。只接受远端 loopback HTTP 通道；`network serve` 仍由独立前台进程持有。Linux 整机 IPv6 变更不支持，不尝试 sudo 或改变管理连接；namespace／systemd 工作负载强约束仍是独立 SPEC 目标。`LINTEL_TEST_HOME` 和开发 fixture 禁止接触真实宿主网络，本 Leaf 的系统配置验收只使用 cfg(test) adapter 与 synthetic invoke。真实 macOS 授权、系统写入／恢复、VPN 切换、公众回显互通与 Linux native runtime 保持未验证。
 
 ## 启动和停用
 
@@ -58,7 +72,7 @@ Tauri 注册 `network_request` command，调用形式为 `invoke("network_reques
 
 运行中 `address` 是 OS 分配的 `127.0.0.1:port` 字符串；`events` 是上述 typed Event 的数组，部分操作附带解释性 `message`。显式停止后地址和 `active_config` 为 null、事件清空。重新启动通道可能分配不同端口，已启动客户端的代理上下文不会自动更新，需要明确重新启动客户端。`launch` 使用 core 的返回 schema，macOS 的正常响应是 `status: "launch_requested"` 与 `message`；这表示 Terminal 接受了启动请求，不是已观察到目标流量。
 
-运行中的 `active_config` 是 native 校验、规范化后交给 `Proxy::bind` 的完整 Config，包含 `environment_id`、`bind`、`default_action`、`allowed`、`blocked`、`upstream` 和三个资源限制。它不是原始请求的回显：规则主机名转为小写、去掉末尾点，IP 使用规范形式；显式规则端口保留。上游 URL 经过校验但字符串不重写。native 始终把环境 ID 设为当前目标，把 `bind` 设为 `127.0.0.1:0`；OS 实际分配的端口使用单独的 `address`，不能把 Config 的端口 0 当作可连接地址。无效配置不会建立通道，也不会留下 `active_config`。
+运行中的 `active_config` 是 native 校验、规范化后交给 `Proxy::bind` 的完整 Config，包含 `environment_id`、`bind`、`default_action`、`allowed`、`blocked`、`upstream`、`address_family` 和三个资源限制。它不是原始请求的回显：规则主机名转为小写、去掉末尾点，IP 使用规范形式；显式规则端口保留。上游 URL 经过校验但字符串不重写。native 始终把环境 ID 设为当前目标，把 `bind` 设为 `127.0.0.1:0`；OS 实际分配的端口使用单独的 `address`，不能把 Config 的端口 0 当作可连接地址。无效配置不会建立通道，也不会留下 `active_config`。
 
 桌面面板分别展示当前生效配置和下次启动草案。重开面板先查询当前通道；停止后可基于已读回的默认动作、阻止/允许规则与端口、上游继续编辑，重新启动时保留已读回的资源限制。草案仅保留在该 webview 的内存中，按环境区分；切换环境清除旧状态展示，旧环境的延迟回复不能替换当前面板。规则文本每行一个主机，可在空格后用逗号列出端口，例如 `example.invalid 443,8443`；省略端口表示全部端口。原通道任务异常结束时必须先清除旧实例，再重新启动。
 
@@ -93,7 +107,9 @@ Synthetic bridge 测试核对 inspect／启动请求形状，区分 `planned` �
 | IPv6 | 可绑定 `::1`，可解析 IPv6 authority；不代表进程其他 IPv6 出站受控 |
 | UDP / QUIC / DNS / WebRTC / 直接 socket | 不在本代理约束范围；没有自动测试或“零泄漏”结论 |
 
-连接建立（含 DNS 与 HTTPS 上游握手）和请求头有 `connect_timeout_seconds` 上限，默认 10 秒。整个连接默认最多 3600 秒；可显式设置到 86400 秒，长 tunnel 到期会关闭。最大并发默认 64，可设置 1–1024；接入在容量满时受 backpressure。头部最多 32 KiB / 100 fields。没有自动公共网络探针、STUN、出口 IP 查询、analytics、license 请求或在线规则下载。
+连接建立（含 DNS 与 HTTPS 上游握手）和请求头有 `connect_timeout_seconds` 上限，默认 10 秒。整个连接默认最多 3600 秒；可显式设置到 86400 秒，长 tunnel 到期会关闭。最大并发默认 64，可设置 1–1024；接入在容量满时受 backpressure。头部最多 32 KiB / 100 fields。没有后台公共网络探针、STUN、analytics、license 请求或在线规则下载。显式 IP 回显及批准后的自动复测遵循上面的有限目标合同。
+
+`address_family` 为 additive Config 字段：缺少时 `system`；`ipv4_only` 仅允许 Lintel 自己向目标或上游建立 IPv4 socket，DNS 返回的 IPv6 不尝试，不进行 IPv6 或上游失败后的直连回退。IPv4-mapped IPv6 归一为 IPv4。没有可用 IPv4 返回连接失败；它不控制上游的后续连接、客户端绕过、DNS 请求地址族或其他进程。事件的 `peer_family` 来自实际 socket，建立前为 null。
 
 ## 观察语义与隐私
 

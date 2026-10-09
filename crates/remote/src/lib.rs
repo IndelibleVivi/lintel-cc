@@ -893,6 +893,10 @@ const REQUEST_COMMANDS: &[&str] = &[
     "create_environment",
     "inspect",
     "inspect_components",
+    "network_inspect",
+    "network_probe",
+    "plan_network_ipv6",
+    "plan_network_restore",
     "work_preflight",
     "work_inventory",
     "drift",
@@ -1348,6 +1352,26 @@ pub fn control(payload: Value, bundles: PathBuf) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn network_probe_rejects_unsafe_targets_before_ssh() {
+        for patch in [
+            json!({"ipv4_url":"http://echo.invalid"}),
+            json!({"ipv6_url":"https://user:secret@echo.invalid"}),
+            json!({"proxy_url":"http://remote.invalid:55123"}),
+            json!({"timeout_seconds":16}),
+            json!({"extra":"not-supported"}),
+        ] {
+            let mut request = json!({"command":"network_probe","ipv4_url":"https://echo4.invalid","ipv6_url":"https://echo6.invalid"});
+            request
+                .as_object_mut()
+                .unwrap()
+                .extend(patch.as_object().unwrap().clone());
+            assert_eq!(
+                super::validate_request(&request).unwrap_err().code,
+                "invalid_request"
+            );
+        }
+    }
     #[test]
     fn finite_request_allowlist_matches_operation_descriptions() {
         for command in lintel_operations::COMMANDS {
@@ -1915,6 +1939,10 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         let (temp, controller) =
             fixture("printf '%s' '{\"ok\":true,\"data\":'; cat input; printf '}\\n'");
         let requests = [
+            json!({"command":"network_inspect"}),
+            json!({"command":"network_probe","ipv4_url":"https://echo4.example.invalid/ip","ipv6_url":"https://echo6.example.invalid/ip","proxy_url":"http://127.0.0.1:55123","timeout_seconds":2}),
+            json!({"command":"plan_network_ipv6","service_id":"synthetic-set:synthetic-service","mode":"off","probe":{"ipv4_url":"https://echo4.example.invalid/ip","ipv6_url":"https://echo6.example.invalid/ip"}}),
+            json!({"command":"plan_network_restore","job_id":"00000000-0000-4000-8000-000000000002","probe":{"ipv4_url":"https://echo4.example.invalid/ip","ipv6_url":"https://echo6.example.invalid/ip"}}),
             json!({"command":"inspect_components","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/synthetic/project"}),
             json!({"command":"work_inventory","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"offset":100,"expected_digest":"a".repeat(64)}),
             json!({"command":"work_preflight","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),

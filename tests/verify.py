@@ -155,6 +155,12 @@ CHECKS: List[Check] = [
                ROOT / "apps/desktop/node_modules", ROOT / "apps/desktop/dist/index.html"),
            loopback=True, requires="Playwright Chromium; built desktop frontend; Rust; synthetic invoke/clipboard, not native WebKit",
            independent=True, reason="needs Playwright and a built App; real host values and framed native pairing"),
+    _check("network-ui", "built App IPv4/IPv6 cells, shared approval/query/restore and remote readonly path",
+           "independent", *(NODE or "node", "tests/network_ui_journey.mjs"),
+           tools=("node",), paths=(
+               Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
+               ROOT / "apps/desktop/dist/index.html"), loopback=True,
+           independent=True, reason="Chromium + synthetic host configuration/echo/invoke/SSH; not macOS network mutation or native WebKit"),
     _check("service-ui", "built App service inspection/approval/conflict/resume (synthetic manager)",
            "independent", *(NODE or "node", "tests/service_ui_journey.mjs"),
            tools=("node",), paths=(
@@ -188,6 +194,7 @@ CHECKS: List[Check] = [
            independent=True, reason="native bundle + real WebKit runtime; macOS-only"),
 ]
 
+CHECKS.append(_check("journey-network", "finite network CLI admission/defaults and synthetic-home host boundary", "journey", PYTHON, "tests/network_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER))
 CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and target request contracts (synthetic transport)", "python", PYTHON, "tests/shared_remote_journey.py", tools=("cargo",), paths=(ROOT / "tests/shared_remote_journey.py",)))
 
 # Synthetic end-to-end journeys sharing the runner-build prerequisite.

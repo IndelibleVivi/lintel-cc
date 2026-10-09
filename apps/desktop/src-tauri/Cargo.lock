@@ -2332,6 +2332,7 @@ dependencies = [
  "chrono",
  "fs2",
  "libc",
+ "lintel-egress",
  "lintel-operations",
  "serde",
  "serde_json",

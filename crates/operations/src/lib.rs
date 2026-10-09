@@ -22,6 +22,97 @@ fn text() -> Value {
 fn choice(values: &[&str]) -> Value {
     json!({"type":"string","enum":values})
 }
+
+fn network_probe_fields() -> Value {
+    json!({"type":"object","properties":{
+        "ipv4_url":property("ipv4_url"),"ipv6_url":property("ipv6_url"),
+        "proxy_url":property("proxy_url"),"timeout_seconds":property("timeout_seconds"),
+        "proxy_binding":property("proxy_binding")},
+        "required":["ipv4_url","ipv6_url"],"additionalProperties":false})
+}
+
+/// Static URL admission before a finite SSH request; the probe executor also
+/// validates endpoints before connecting. HTTPS only, no credentials or redirects.
+pub fn valid_probe_url(url: &str) -> bool {
+    if url.len() > 2048
+        || !url.bytes().all(|b| b.is_ascii_graphic())
+        || url.contains(['?', '#', '@', '\\'])
+    {
+        return false;
+    }
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    if rest
+        .find('/')
+        .is_some_and(|start| rest.len() - start > 1024)
+    {
+        return false;
+    }
+    let authority = rest.split('/').next().unwrap_or("");
+    let (host, port) = if let Some(tail) = authority.strip_prefix('[') {
+        let Some((ip, suffix)) = tail.split_once(']') else {
+            return false;
+        };
+        if ip.parse::<std::net::Ipv6Addr>().is_err() {
+            return false;
+        }
+        let port = if suffix.is_empty() {
+            None
+        } else {
+            let Some(port) = suffix.strip_prefix(':') else {
+                return false;
+            };
+            Some(port)
+        };
+        (ip, port)
+    } else {
+        let (host, port) = authority
+            .split_once(':')
+            .map_or((authority, None), |(h, p)| (h, Some(p)));
+        // Match egress admission: inet_aton spellings must not be admitted as
+        // DNS names by the CLI/SSH contract only to fail after remote dispatch.
+        if host.parse::<std::net::Ipv4Addr>().is_err()
+            && !host.is_empty()
+            && host.split('.').all(|label| {
+                match label
+                    .strip_prefix("0x")
+                    .or_else(|| label.strip_prefix("0X"))
+                {
+                    Some(hex) => !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()),
+                    None => !label.is_empty() && label.bytes().all(|b| b.is_ascii_digit()),
+                }
+            })
+        {
+            return false;
+        }
+        if host.is_empty()
+            || host.len() > 253
+            || !host.split('.').all(|label| {
+                !label.is_empty()
+                    && label.len() <= 63
+                    && !label.starts_with('-')
+                    && !label.ends_with('-')
+                    && label
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+            })
+        {
+            return false;
+        }
+        (host, port)
+    };
+    !host.is_empty() && port.is_none_or(|p| p.parse::<u16>().is_ok_and(|p| p != 0))
+}
+
+fn valid_probe_proxy(url: &str) -> bool {
+    let Some(authority) = url.strip_prefix("http://") else {
+        return false;
+    };
+    authority
+        .parse::<std::net::SocketAddr>()
+        .is_ok_and(|addr| addr.ip().is_loopback() && addr.port() != 0)
+}
 pub fn plan_hash_schema() -> Value {
     json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64,"writeOnly":true})
 }
@@ -125,9 +216,16 @@ fn is_reference_instructions(relative: &Path) -> bool {
 fn property(name: &str) -> Value {
     match name {
         "approval" => plan_hash_schema(),
-        "environment_id" | "plan_id" | "job_id" => {
+        "environment_id" | "plan_id" | "job_id" | "baseline_id" => {
             json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096})
         }
+        "ipv4_url" | "ipv6_url" => {
+            json!({"type":"string","minLength":1,"maxLength":2048,"description":"显式 HTTPS IP 回显目标；不接受 credentials、query、fragment 或 redirect"})
+        }
+        "timeout_seconds" => json!({"type":"integer","minimum":1,"maximum":15}),
+        "service_id" => json!({"type":"string","minLength":1,"maxLength":128}),
+        "proxy_binding" => json!({"type":"string","minLength":1,"maxLength":128}),
+        "probe" => network_probe_fields(),
         "keep_remote_control" | "writers_confirmed_stopped" | "official_logout" => {
             json!({"type":"boolean"})
         }
@@ -215,6 +313,13 @@ pub fn valid_service_unit(unit: &str) -> bool {
 fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
     Some(match command {
         "discover" | "jobs" | "export_support" => (&[], &[]),
+        "network_inspect" => (&[], &[]),
+        "network_probe" => (
+            &["ipv4_url", "ipv6_url"],
+            &["proxy_url", "timeout_seconds", "proxy_binding"],
+        ),
+        "plan_network_ipv6" => (&["service_id", "mode", "probe"], &["baseline_id"]),
+        "plan_network_restore" => (&["job_id"], &["baseline_id", "probe"]),
         "register" => (&["name", "root"], &[]),
         "create_environment" => (&["name"], &[]),
         "inspect" => (&["environment_id"], &["trusted_devices"]),
@@ -290,6 +395,10 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
 }
 
 pub const COMMANDS: &[&str] = &[
+    "network_inspect",
+    "network_probe",
+    "plan_network_ipv6",
+    "plan_network_restore",
     "discover",
     "register",
     "create_environment",
@@ -339,6 +448,9 @@ pub fn schema(command: &str) -> Option<Value> {
     }
     if command == "plan_reset" {
         properties.insert("recipe".into(), choice(&["rebuild"]));
+    }
+    if command == "plan_network_ipv6" {
+        properties.insert("mode".into(), choice(&["off", "link_local"]));
     }
     if command == "plan_cleanup" {
         properties.insert(
@@ -509,6 +621,27 @@ pub fn validate(request: &Value) -> Result<(), String> {
             );
         }
     }
+    if matches!(command, "network_probe" | "plan_network_ipv6")
+        || (command == "plan_network_restore" && request.get("probe").is_some())
+    {
+        let probe = if command == "network_probe" {
+            request
+        } else {
+            &request["probe"]
+        };
+        for key in ["ipv4_url", "ipv6_url"] {
+            if !probe[key].as_str().is_some_and(valid_probe_url) {
+                return Err(format!(
+                    "{key} 需要有界 HTTPS IP 回显地址，不接受凭据、query 或 fragment"
+                ));
+            }
+        }
+        if let Some(proxy) = probe.get("proxy_url") {
+            if !proxy.as_str().is_some_and(valid_probe_proxy) {
+                return Err("proxy_url 只接受带明确端口的 loopback HTTP 地址".into());
+            }
+        }
+    }
     if let Some(paths) = request["selected_paths"].as_array() {
         for path in paths {
             let category = work_path_category(Path::new(path.as_str().unwrap()))
@@ -588,6 +721,8 @@ pub fn describe(command: &str) -> Option<Value> {
     let s = schema(command)?;
     let planning = command.starts_with("plan_") && command != "plan_show";
     let target = match command {
+        "network_probe" => "explicit_https_ip_echo_requests",
+        "plan_network_ipv6" | "plan_network_restore" => "read_shared_host_network_for_frozen_plan",
         "execute" => "frozen_plan_scope",
         "launch_request" => "start_target_process",
         "resume_request" => "publish_private_running_copy_and_start_target_process",
@@ -607,6 +742,8 @@ pub fn describe(command: &str) -> Option<Value> {
         _ => "inspect_or_no_target_write",
     };
     let state = match command {
+        "network_inspect" => "readonly_host_network_metadata",
+        "network_probe" => "persist_finite_probe_result_for_baseline_reuse",
         "discover" | "register" | "create_environment" | "reactivate_environment" => {
             "update_inventory"
         }
@@ -645,10 +782,10 @@ pub fn describe(command: &str) -> Option<Value> {
     };
     Some(json!({
         "id":command,"protocol":1,"implementation":"implemented","transports":transports,
-        "platforms":if command.contains("service") {vec!["linux"]} else {vec!["macos","linux"]},
-        "target_conditions":if command.contains("service") {vec!["exact_root_bound_systemd_unit","user_manager_or_current_root"]} else {vec!["explicit_registered_environment_or_original_task_where_required"]},
+        "platforms":if command.contains("service") {vec!["linux"]} else if matches!(command,"plan_network_ipv6" | "plan_network_restore") {vec!["macos"]} else {vec!["macos","linux"]},
+        "target_conditions":if command.contains("service") {vec!["exact_root_bound_systemd_unit","user_manager_or_current_root"]} else if command.contains("network") {vec!["explicit_host_shared_network_scope","probe_targets_visible_before_request"]} else {vec!["explicit_registered_environment_or_original_task_where_required"]},
         "applicability":{"status":"not_evaluated","reason":"静态描述不检查个人环境；运行相应 inspect 取得目标事实"},
-        "effects":{"target":target,"lintel_state":state,"external":match command {"auth_probe"=>"official_auth_status_process","launch" | "launch_request" | "resume_request"=>"start_target_process","execute"=>"exact_plan_actions_may_include_official_logout",_=>"none"}},
+        "effects":{"target":target,"lintel_state":state,"external":match command {"network_probe" | "plan_network_ipv6" | "plan_network_restore"=>"explicit_ip_echo_requests","auth_probe"=>"official_auth_status_process","launch" | "launch_request" | "resume_request"=>"start_target_process","execute"=>"exact_plan_actions_may_include_official_logout_or_shared_network_change_and_reprobe",_=>"none"}},
         "requires_plan":matches!(command,"execute" | "launch_request" | "resume_request"),"approval":if matches!(command,"execute" | "launch_request" | "resume_request") {"exact_plan_hash_with_existing_user_authority"} else {"operation_specific_explicit_request"},
         "secret_fields":if s["properties"].get("archive_passphrase").is_some() {vec!["archive_passphrase"]} else {vec![]},
         "request_schema":s,
@@ -681,6 +818,48 @@ pub fn tasks() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn network_requests_freeze_finite_targets_before_transport() {
+        let probe = json!({"ipv4_url":"https://api.ipify.org","ipv6_url":"https://api6.ipify.org","timeout_seconds":10});
+        assert!(validate(&json!({"command":"network_probe","ipv4_url":probe["ipv4_url"],"ipv6_url":probe["ipv6_url"]})).is_ok());
+        assert!(validate(&json!({"command":"plan_network_ipv6","service_id":"synthetic-service","mode":"off","probe":probe})).is_ok());
+        for mode in ["automatic", "disable_all", "interactive"] {
+            assert!(validate(&json!({"command":"plan_network_ipv6","service_id":"synthetic-service","mode":mode,"probe":probe})).is_err());
+        }
+        for url in [
+            "http://example.invalid",
+            "https://user:pass@example.invalid",
+            "https://example.invalid/?secret=x",
+            "https://example.invalid/#x",
+            "https://[::1]junk]",
+            "https://example.invalid:0",
+            "https://example.invalid/ bad",
+            "https://example.invalid/\r\nX:bad",
+        ] {
+            assert!(validate(&json!({"command":"network_probe","ipv4_url":url,"ipv6_url":"https://api6.ipify.org"})).is_err(), "{url}");
+        }
+        for patch in [
+            json!({"timeout_seconds":16}),
+            json!({"proxy_url":"http://example.invalid:7890"}),
+            json!({"extra":"unsupported"}),
+        ] {
+            let mut wrong = probe.clone();
+            wrong
+                .as_object_mut()
+                .unwrap()
+                .extend(patch.as_object().unwrap().clone());
+            assert!(validate(&json!({"command":"plan_network_ipv6","service_id":"synthetic-service","mode":"off","probe":wrong})).is_err());
+        }
+        assert!(validate(&json!({"command":"plan_network_restore","job_id":"00000000-0000-4000-8000-000000000001","probe":probe})).is_ok());
+        assert_eq!(
+            describe("network_probe").unwrap()["effects"]["external"],
+            "explicit_ip_echo_requests"
+        );
+        assert_eq!(
+            describe("plan_network_ipv6").unwrap()["platforms"],
+            json!(["macos"])
+        );
+    }
     #[test]
     fn strict_ids_match_the_published_uuid_format() {
         for (command, field) in [

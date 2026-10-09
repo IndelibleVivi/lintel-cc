@@ -37,6 +37,10 @@ pub const HELP: &str = concat!(
   "  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n",
   "  lintel browser submit | query | control    Finite host control; JSON stdin\n",
   "  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n",
+  "  lintel network inspect                     Read shared host network metadata\n",
+  "  lintel network probe [--ipv4-url URL --ipv6-url URL --proxy-url URL]\n",
+  "  lintel network ipv6 plan --service-id ID --mode off|link_local [--baseline-id ID]\n",
+  "  lintel network restore plan --job ID        Original full IPv6 config; separate approval\n",
   "  lintel remote operations                   Static finite SSH schemas, no state\n",
   "  lintel remote hosts | aliases | inspect ALIAS\n",
   "  lintel remote request ALIAS | submit ALIAS   JSON stdin; submit only execute\n",
@@ -237,13 +241,13 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
         let raw = &args[i + 1];
         request[&key] = if ["categories", "release_settings"].contains(&key.as_str()) {
             json!(raw.split(',').filter(|s| !s.is_empty()).collect::<Vec<_>>())
-        } else if key == "custom_settings" {
+        } else if key == "custom_settings" || key == "probe" {
             serde_json::from_str(raw)
-                .map_err(|_| error("invalid_argument", "custom-settings 需要 JSON object"))?
-        } else if key == "offset" {
+                .map_err(|_| error("invalid_argument", "该字段需要 JSON object"))?
+        } else if key == "offset" || key == "timeout_seconds" {
             json!(raw
                 .parse::<u64>()
-                .map_err(|_| error("invalid_argument", "offset 需要非负整数"))?)
+                .map_err(|_| error("invalid_argument", &format!("{key} 需要非负整数")))?)
         } else {
             json!(raw)
         };
@@ -287,6 +291,30 @@ fn named(command: &str, args: &[String], mut seed: Value, input: bool) -> Value 
         return error("invalid_request", "stdin command 与命名入口不一致");
     }
     request["command"] = json!(command);
+    if command == "plan_network_ipv6" && request.get("probe").is_none() {
+        let mut probe = json!({});
+        for key in ["ipv4_url", "ipv6_url", "proxy_url", "timeout_seconds"] {
+            if let Some(value) = request.as_object_mut().unwrap().remove(key) {
+                probe[key] = value;
+            }
+        }
+        request["probe"] = probe;
+    }
+    if matches!(command, "network_probe" | "plan_network_ipv6") {
+        let probe = if command == "network_probe" {
+            &mut request
+        } else {
+            &mut request["probe"]
+        };
+        if let Some(probe) = probe.as_object_mut() {
+            probe
+                .entry("ipv4_url")
+                .or_insert(json!("https://api.ipify.org"));
+            probe
+                .entry("ipv6_url")
+                .or_insert(json!("https://api6.ipify.org"));
+        }
+    }
     if let Err(e) = lintel_operations::validate(&request) {
         return error("invalid_request", e);
     }
@@ -338,7 +366,7 @@ fn timeout(raw: &str) -> Option<Duration> {
 const GROUP_HELP: &[(&str, &str)] = &[
     ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
     ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
-    ("network", "network serve --config PATH\n  明确前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
+    ("network", "network inspect\n  network probe [--ipv4-url HTTPS_URL --ipv6-url HTTPS_URL --proxy-url LOOPBACK_HTTP --timeout-seconds 10]\n  network ipv6 plan --service-id ID --mode off|link_local [同样的探测 flags] [--baseline-id ID]\n  network restore plan --job ID [--baseline-id ID]\n  network serve --config PATH\n  inspect 离线读取宿主共享状态；probe 显式访问 https://api.ipify.org 与 https://api6.ipify.org，可指定自己的 HTTPS 回显端点。IPv6 plan 会前测，批准后自动沿用同目标复测；macOS 可能申请系统网络配置授权。submit 需精确计划/hash，恢复另外批准。serve 是前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
     ("env", "env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n  list/inspect/components 只读；components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
     ("work", "work inventory --environment ID --categories instructions,memory,sessions [--offset N] [--expected-digest HEX]\n  work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  inventory 返回有界只读原件元数据清单（分页/摘要绑定同一次扫描）；preflight 只读元数据容量预检。archive/preserve plan 可用可重复 --path 精确选择所选类别内的原件，排除未选的大会话而不截断。session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
@@ -541,6 +569,14 @@ pub fn run(args: &[String]) -> Value {
         }
         "remote" => remote(args),
         "browser" => browser(args),
+        "network" if word(1) == "inspect" => named("network_inspect", &args[2..], json!({}), false),
+        "network" if word(1) == "probe" => named("network_probe", &args[2..], json!({}), true),
+        "network" if word(1) == "ipv6" && word(2) == "plan" => {
+            named("plan_network_ipv6", &args[3..], json!({}), true)
+        }
+        "network" if word(1) == "restore" && word(2) == "plan" => {
+            named("plan_network_restore", &args[3..], json!({}), true)
+        }
         "network" if word(1) == "serve" => {
             let r = match flags(&args[2..], json!({})) {
                 Ok(r) => r,

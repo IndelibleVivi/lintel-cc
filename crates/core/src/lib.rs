@@ -8,6 +8,7 @@ mod context;
 mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
+mod network;
 mod package;
 mod policy;
 mod service;
@@ -167,6 +168,16 @@ pub struct Engine {
     // in production.
     #[cfg(test)]
     resume_window_hook: Option<fn(&str)>,
+    // Test-only synthetic host network adapter. When present, unit tests read
+    // and mutate only the in-memory fixture; when absent, a unit-test Engine
+    // refuses host network access rather than touching the real machine.
+    #[cfg(test)]
+    network_fixture: Option<Box<dyn crate::network::HostNetwork>>,
+    // Test-only probe substitution: returns the shaped `lintel.network-probe/1`
+    // value for a frozen spec. Never present in production, where the real
+    // egress probe runs.
+    #[cfg(test)]
+    network_probe_hook: Option<fn(&crate::network::ProbeSpec, &str, &str) -> Result<Value>>,
 }
 impl Engine {
     pub fn new(home: PathBuf, state: PathBuf) -> Result<Self> {
@@ -195,6 +206,10 @@ impl Engine {
             launch_opener: None,
             #[cfg(test)]
             resume_window_hook: None,
+            #[cfg(test)]
+            network_fixture: None,
+            #[cfg(test)]
+            network_probe_hook: None,
         })
     }
     fn executable(&self) -> Option<String> {
@@ -462,7 +477,7 @@ impl Engine {
                 }
                 save(&self.state.join("inventory.json"), &json!(all))?;
                 Ok(
-                    json!({"environments":all,"capabilities":[{"name":"Claude Code 配置","status":"available","reason":"精确字段预览、读回与恢复；运行时效果另行验证"},{"name":"工作内容迁入","status":"available","reason":"加密归档与选择性迁入；不会注销共享凭据"},{"name":"浏览器伴随扩展","status":"separate_module","reason":"需要安装并配对对应 profile"},{"name":"网络强约束","status":"not_delivered","reason":"未安装或验证平台高权限组件"},{"name":"Linux systemd service","status":if cfg!(target_os="linux"){"requires_explicit_target"}else{"linux_runner_only"},"reason":"精确 root 绑定、独立批准暂停/恢复与持久 blocker；user manager/logout 与 reboot 需实时复查"},{"name":"Claude Desktop / IDE","status":"not_delivered","reason":"当前不修改这些入口"}]}),
+                    json!({"environments":all,"capabilities":[{"name":"Claude Code 配置","status":"available","reason":"精确字段预览、读回与恢复；运行时效果另行验证"},{"name":"工作内容迁入","status":"available","reason":"加密归档与选择性迁入；不会注销共享凭据"},{"name":"浏览器伴随扩展","status":"separate_module","reason":"需要安装并配对对应 profile"},{"name":"IPv4 / IPv6 路径","status":"available","reason":"显式四格 HTTPS 出口实测与 Lintel 连接地址族控制"},{"name":"宿主 IPv6 配置","status":if cfg!(target_os="macos"){"requires_explicit_approval"}else{"not_supported"},"reason":"macOS 完整预览、系统授权、读回与原配置恢复；Linux 只读；真实系统验收独立"},{"name":"网络强约束","status":"not_delivered","reason":"未安装或验证平台高权限组件"},{"name":"Linux systemd service","status":if cfg!(target_os="linux"){"requires_explicit_target"}else{"linux_runner_only"},"reason":"精确 root 绑定、独立批准暂停/恢复与持久 blocker；user manager/logout 与 reboot 需实时复查"},{"name":"Claude Desktop / IDE","status":"not_delivered","reason":"当前不修改这些入口"}]}),
                 )
             }
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
@@ -537,6 +552,12 @@ impl Engine {
             "plan_restore" => {
                 let jid = safe_id(r, "job_id")?;
                 let job = self.dispatch(&json!({"command":"job","job_id":jid}))?;
+                // A network task restores host-shared configuration, not
+                // settings; route it to the finite network restore path before
+                // any settings/root assumption.
+                if !job["network_change"].is_null() {
+                    return self.plan_network_restore(r);
+                }
                 if job["restorable"] != true {
                     return Err(err("not_restorable", "此任务没有可恢复的配置改动"));
                 }
@@ -579,6 +600,10 @@ impl Engine {
             "plan_archive" => self.plan_archive(r),
             "plan_preserve" => self.plan_preserve(r),
             "plan_show" => self.plan_show(r),
+            "network_inspect" => self.network_inspect(r),
+            "network_probe" => self.network_probe(r),
+            "plan_network_ipv6" => self.plan_network_ipv6(r),
+            "plan_network_restore" => self.plan_network_restore(r),
             "plan_launch" => self.plan_launch(r),
             "launch_request" => self.launch_request(r),
             "plan_resume" => self.plan_resume(r),
@@ -630,7 +655,9 @@ impl Engine {
                     return Err(err("job_not_found", "任务尚未持久接收；没有执行证据"));
                 }
                 let mut j = load(&p)?;
-                let reconciled = self.reconcile_settings_write(&mut j);
+                let settings_reconciled = self.reconcile_settings_write(&mut j);
+                let network_reconciled = self.reconcile_network_job(&mut j);
+                let reconciled = settings_reconciled || network_reconciled;
                 if ["accepted", "executing", "verifying"]
                     .iter()
                     .any(|s| j["status"] == *s)
@@ -725,6 +752,12 @@ impl Engine {
         let jp = self.path("jobs", &pid);
         if jp.exists() {
             return self.dispatch(&json!({"command":"job","job_id":pid}));
+        }
+        // Host-scoped network plans carry no Claude environment, root or
+        // settings snapshot. Handle them on their own finite path before any
+        // environment/settings assumption, and never weaken unknown kinds.
+        if matches!(p["kind"].as_str(), Some("network_ipv6" | "network_restore")) {
+            return self.execute_network_plan(&p, &pid, &jp);
         }
         // This executor owns only these mutation plans. Launch/resume have
         // separate frozen request/TTY entry points; unknown kinds must never
@@ -1185,6 +1218,24 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
             "detail": "仅覆盖预览列出的 Claude Code 状态；浏览器、Desktop/IDE 与目录外 profile 不在本次范围",
         }));
     }
+    if plan["extra"]["network"].is_object() {
+        // Configuration change and the post-write probe are separate facts. A
+        // completed write never implies a successful probe, and a failed probe
+        // never retroactively un-does a verified configuration write.
+        let configuration_done = step_done("network_write")
+            && receipt["network_change"]["configuration_verified"] == true;
+        let probe_done = step_done("network_reprobe");
+        coverage.push(json!({
+            "scope": "host_shared_network",
+            "state": if configuration_done { "done" } else if receipt["status"] == "needs_reconciliation" { "unverified" } else { "not_checked" },
+            "detail": "配置写入与读回的状态；宿主共享，不随 Claude 环境或 App 退出而撤销",
+        }));
+        coverage.push(json!({
+            "scope": "post_change_probe",
+            "state": if probe_done { "done" } else { "not_checked" },
+            "detail": "读回后用相同目标与路径复测的独立结果；失败不等于配置回滚或出口安全",
+        }));
+    }
     if plan["extra"]["frozen_target"].is_object() {
         // The frozen mapping is a *plan* fact. Only report the target as done
         // when create/import completed. Independent import journals each exact
@@ -1291,6 +1342,22 @@ fn public_plan(mut p: Value) -> Result<Value> {
     if p["extra"]["service"].is_object() {
         p["service"] =
             service::public_service(&p["extra"]["service"], p["kind"] == "service_resume");
+    }
+    // Host-shared network plans publish their frozen allowlist projection. The
+    // private `extra` (raw state paths, internal handles) stays stripped below.
+    if p["extra"]["network"].is_object() {
+        let network = &p["extra"]["network"];
+        p["network"] = json!({
+            "scope": "host_shared",
+            "service_id": network["service_id"],
+            "service_name": network["service_name"],
+            "interface": network["interface"],
+            "service_enabled": network["service_enabled"],
+            "before": network["before"],
+            "after": network["after"],
+            "probe": network["probe"],
+            "before_probe": network["before_probe"],
+        });
     }
     if p["extra"]["policy"].is_object() {
         p["policy"] = p["extra"]["policy"].clone();

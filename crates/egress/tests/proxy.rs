@@ -360,3 +360,62 @@ async fn https_upstream_starts_tls_and_failure_does_not_fall_back_to_plaintext()
         .is_err());
     task.abort();
 }
+
+#[tokio::test]
+async fn ipv4_only_rejects_ipv6_origin_and_upstream_without_fallback() {
+    let origin = TcpListener::bind("[::1]:0").await.unwrap();
+    let port = origin.local_addr().unwrap().port();
+    for upstream in [None, Some(format!("http://[::1]:{port}"))] {
+        let config = Config {
+            address_family: lintel_egress::AddressFamily::Ipv4Only,
+            upstream,
+            ..Config::default()
+        };
+        let (address, events, mut done, task) = proxy(config).await;
+        // Both the direct target and the upstream have only an IPv6 address.
+        let response = request(
+            address,
+            format!("CONNECT [::1]:{port} HTTP/1.1\r\nHost: [::1]:{port}\r\n\r\n").as_bytes(),
+        )
+        .await;
+        assert!(response.starts_with(b"HTTP/1.1 502"));
+        timeout(Duration::from_secs(2), done.recv()).await.unwrap();
+        let event = events.lock().unwrap().last().unwrap().clone();
+        assert_eq!(event.peer_family, None);
+        assert_eq!(event.outcome, "route_connection_failed");
+        assert!(
+            timeout(Duration::from_millis(100), origin.accept())
+                .await
+                .is_err(),
+            "an IPv6 socket was attempted"
+        );
+        task.abort();
+    }
+}
+
+#[tokio::test]
+async fn ipv4_only_accepts_mapped_ipv4_and_records_actual_peer() {
+    let origin = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = origin.local_addr().unwrap().port();
+    let echo = tokio::spawn(async move {
+        let (mut stream, _) = origin.accept().await.unwrap();
+        let mut body = Vec::new();
+        stream.read_to_end(&mut body).await.unwrap();
+        stream.write_all(&body).await.unwrap();
+    });
+    let (address, events, mut done, task) = proxy(Config {
+        address_family: lintel_egress::AddressFamily::Ipv4Only,
+        ..Config::default()
+    })
+    .await;
+    let response = request(address, format!("CONNECT [::ffff:127.0.0.1]:{port} HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:{port}\r\n\r\nsynthetic").as_bytes()).await;
+    assert!(response.starts_with(b"HTTP/1.1 200"));
+    assert!(response.ends_with(b"synthetic"));
+    echo.await.unwrap();
+    timeout(Duration::from_secs(2), done.recv()).await.unwrap();
+    assert_eq!(
+        events.lock().unwrap().last().unwrap().peer_family,
+        Some("ipv4")
+    );
+    task.abort();
+}

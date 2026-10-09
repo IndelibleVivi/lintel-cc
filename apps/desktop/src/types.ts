@@ -1,3 +1,4 @@
+import type { NetworkChange, NetworkInspection, NetworkPlan, NetworkProbe, ProbeOptions } from './networkTypes';
 export interface Environment {
   id: string; name: string; host: string; surface: string; root: string;
   executable: string | null; ownership: string; status: string;
@@ -54,7 +55,8 @@ export interface WorkInventory {
   reason?:string|null;unobserved?:string|null;
 }
 export interface Plan {
-  id: string; hash: string; environment_id: string; title: string;
+  network?: NetworkPlan;
+  id: string; hash: string; environment_id: string | null; title: string;
   changes: { key: string; label: string; before: string | null; after: string | null; path: string }[];
   preserves: string[]; warnings: string[]; actions: { id: string; label: string; reversible: boolean }[];
   created_at: string; status: string; archive_passphrase_required?: boolean; file_count?: number;
@@ -74,7 +76,10 @@ export interface LaunchRecord {
   request_id:string; status:string; mode?:string; environment_id?:string; root?:string; config_root?:string; project_cwd?:string; executable?:string; recorded_at?:string; created_at?:string; message?:string; observed?:string; private_copy_path?:string; alias?:string; runner_digest?:string|null; binding_resolution?:string; error?:{code:string;message:string};
 }
 export interface Receipt {
-  id: string; plan_id: string; environment_id: string; title: string; status: string;
+  network_change?: NetworkChange;
+  before_probe?: NetworkProbe;
+  after_probe?: NetworkProbe;
+  id: string; plan_id: string; environment_id: string | null; title: string; status: string;
   steps: { id: string; label: string; status: string; message: string }[];
   created_at: string; restorable: boolean; warnings: string[];
   policy?: PolicyAssessment;
@@ -115,6 +120,10 @@ export type SessionPage = SessionPageBase & ({content_kind:'messages';records?:S
 export interface InputReference { files:{path:string;digest:string;package_digest?:string;index?:number;offset?:number;block_index?:number}[] }
 export interface ExecutionContext { product:string;version:string;protocol:number;platform:string;architecture:string;user:{uid:number;euid:number;home:string};state:{source:string;path:string;exists:boolean};config_home:{path:string;exists:boolean};executable:string|null;initialized:boolean }
 export interface Api {
+  network_inspect: { request: {}; response: NetworkInspection };
+  network_probe: { request: ProbeOptions; response: NetworkProbe };
+  plan_network_ipv6: { request: { service_id: string; mode: 'off' | 'link_local'; probe: ProbeOptions; baseline_id?: string }; response: Plan };
+  plan_network_restore: { request: { job_id: string; baseline_id?: string; probe?: ProbeOptions }; response: Plan };
   context: {request:{};response:ExecutionContext};
   session_read: { request:{job_id?:string;archive_path?:string;archive_passphrase:string;path:string;offset?:number;expected_digest?:string};response:SessionPage };
   plan_launch: { request:{environment_id:string;project_cwd:string;mode:'interactive';input_reference?:InputReference;proxy_url?:string};response:Plan };

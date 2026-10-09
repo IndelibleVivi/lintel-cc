@@ -1,4 +1,6 @@
 //! An explicit, per-environment TCP proxy. It does not prevent direct connections.
+pub mod probe;
+
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, SocketAddr},
@@ -19,6 +21,16 @@ use tokio_rustls::{
 
 const HEADER_LIMIT: usize = 32 * 1024;
 const BODY_LIMIT: u64 = 64 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AddressFamily {
+    /// Follow the system resolver/host order for the address family.
+    #[default]
+    System,
+    /// Only ever resolve/connect IPv4; an IPv6-only target fails explicitly.
+    Ipv4Only,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -54,6 +66,11 @@ pub struct Config {
     /// HTTP or HTTPS proxy, with no userinfo. SOCKS requires a separate adapter.
     #[serde(default)]
     pub upstream: Option<String>,
+    /// Additive connection-family constraint. `system` keeps the historic
+    /// behaviour; `ipv4_only` restricts every Lintel-established TCP segment
+    /// (destination or HTTP/HTTPS upstream) to IPv4 and never falls back.
+    #[serde(default)]
+    pub address_family: AddressFamily,
     #[serde(default = "default_max_connections")]
     pub max_connections: usize,
     #[serde(default = "default_connect_timeout")]
@@ -85,6 +102,7 @@ impl Default for Config {
             allowed: vec![],
             blocked: vec![],
             upstream: None,
+            address_family: AddressFamily::System,
             max_connections: 64,
             connect_timeout_seconds: 10,
             connection_lifetime_seconds: 3600,
@@ -150,6 +168,10 @@ pub struct Event {
     pub decision: &'static str,
     pub provenance: &'static str,
     pub outcome: &'static str,
+    /// Which address family Lintel's own client-to-endpoint TCP segment used.
+    /// It describes only the segment Lintel created; it never classifies the
+    /// destination's own traffic. Null until a connection is established.
+    pub peer_family: Option<&'static str>,
     pub classification: &'static str,
     pub coverage: &'static str,
     pub direct_connections_enforced: bool,
@@ -171,6 +193,41 @@ impl Destination {
         } else {
             format!("{}:{}", self.host, self.port)
         }
+    }
+    /// Build a destination from an already-separated host and port. Used by the
+    /// probe for a loopback proxy authority after it validated the split.
+    pub(crate) fn raw(host: &str, port: u16) -> Result<Self, &'static str> {
+        if port == 0 {
+            return Err("invalid_port");
+        }
+        Ok(Destination {
+            host: normalize_host(host)?,
+            port,
+        })
+    }
+}
+
+/// Family-aware TCP connect shared with the probe so both the proxy relay and
+/// the probe apply the exact same `address_family` constraint. Returns the
+/// established stream plus the family Lintel actually connected with.
+pub(crate) async fn connect_for_probe(
+    destination: &Destination,
+    family: AddressFamily,
+    ipv6_only: bool,
+) -> Result<(TcpStream, std::net::SocketAddr), &'static str> {
+    let selected = if ipv6_only {
+        Some(true)
+    } else if family == AddressFamily::Ipv4Only {
+        Some(false)
+    } else {
+        None
+    };
+    match connect_ip_family(destination, selected).await {
+        Ok((stream, _)) => {
+            let peer = stream.peer_addr().map_err(|_| "connect_failed")?;
+            Ok((stream, peer))
+        }
+        Err(code) => Err(code),
     }
 }
 fn normalize_host(host: &str) -> Result<String, &'static str> {
@@ -348,6 +405,7 @@ fn event(config: &Config) -> Event {
         decision: "reject",
         provenance: "request_validation",
         outcome: "invalid_request",
+        peer_family: None,
         classification: "unclassified",
         coverage: "proxy_connections_only",
         direct_connections_enforced: false,
@@ -530,11 +588,10 @@ fn forward_head(request: &Request, upstream: bool) -> Result<Vec<u8>, &'static s
 async fn connect_transport(
     dest: &Destination,
     upstream: Option<&Upstream>,
-) -> Result<Stream, &'static str> {
+    family: AddressFamily,
+) -> Result<(Stream, &'static str), &'static str> {
     let endpoint = upstream.map(|u| &u.dest).unwrap_or(dest);
-    let tcp = TcpStream::connect((endpoint.host.as_str(), endpoint.port))
-        .await
-        .map_err(|_| "connect_failed")?;
+    let (tcp, peer_family) = connect_tcp(endpoint, family).await?;
     if upstream.is_some_and(|u| u.tls) {
         let mut roots = rustls::RootCertStore::empty();
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -550,9 +607,118 @@ async fn connect_transport(
             .connect(name, tcp)
             .await
             .map_err(|_| "upstream_tls_failed")?;
-        Ok(Box::new(stream))
+        Ok((Box::new(stream), peer_family))
     } else {
-        Ok(Box::new(tcp))
+        Ok((Box::new(tcp), peer_family))
+    }
+}
+
+/// Establish the TCP segment for a Lintel-created connection.
+///
+/// `system` keeps the historic resolver/`TcpStream::connect` behaviour. In
+/// `ipv4_only` mode we resolve ourselves, keep only IPv4 addresses, map an
+/// IPv4-mapped-IPv6 literal to its embedded IPv4, and refuse an address set
+/// with no IPv4 entry. There is deliberately no IPv6 fallback: an IPv6-only
+/// destination is an explicit `ipv4_unavailable` failure, never a silent
+/// upgrade to IPv6 or a bypass of the configured upstream.
+async fn connect_tcp(
+    endpoint: &Destination,
+    family: AddressFamily,
+) -> Result<(TcpStream, &'static str), &'static str> {
+    connect_ip_family(
+        endpoint,
+        if family == AddressFamily::Ipv4Only {
+            Some(false)
+        } else {
+            None
+        },
+    )
+    .await
+}
+
+async fn connect_ip_family(
+    endpoint: &Destination,
+    ipv6: Option<bool>,
+) -> Result<(TcpStream, &'static str), &'static str> {
+    // Canonicalize mapped IPv6 before family filtering. Do not let the resolver
+    // or connect fallback reintroduce a family explicitly excluded by the caller.
+    let candidates: Vec<IpAddr> = if let Ok(ip) = endpoint.host.parse::<IpAddr>() {
+        vec![match ip {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(ip),
+            _ => ip,
+        }]
+    } else {
+        let mut addresses = Vec::new();
+        for address in tokio::net::lookup_host((endpoint.host.as_str(), endpoint.port))
+            .await
+            .map_err(|_| "dns_failed")?
+        {
+            if addresses.len() == 64 {
+                break;
+            }
+            let ip = match address.ip() {
+                IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(address.ip()),
+                ip => ip,
+            };
+            if !addresses.contains(&ip) {
+                addresses.push(ip);
+            }
+        }
+        addresses
+    };
+    let candidates: Vec<_> = candidates
+        .into_iter()
+        .filter(|ip| ipv6.is_none_or(|v6| ip.is_ipv6() == v6))
+        .collect();
+    if candidates.is_empty() {
+        return Err(if ipv6 == Some(true) {
+            "ipv6_unavailable"
+        } else if ipv6 == Some(false) {
+            "ipv4_unavailable"
+        } else {
+            "no_route"
+        });
+    }
+    let mut last = None;
+    for ip in candidates {
+        match TcpStream::connect(SocketAddr::new(ip, endpoint.port)).await {
+            Ok(tcp) => {
+                let peer = tcp.peer_addr().map_err(|_| "connect_failed")?;
+                // Guard the constraint even if a future platform ever surprised us.
+                if ipv6.is_some_and(|v6| peer.is_ipv6() != v6) {
+                    return Err("family_mismatch");
+                }
+                return Ok((tcp, family_name(peer)));
+            }
+            Err(error) => {
+                // Remember a specific refusal so the probe never reports a
+                // generic failure when the reason is exactly known.
+                last = Some(error);
+            }
+        }
+    }
+    Err(last.map(io_error_code).unwrap_or("no_route"))
+}
+
+fn family_name(addr: SocketAddr) -> &'static str {
+    if addr.is_ipv4() {
+        "ipv4"
+    } else {
+        "ipv6"
+    }
+}
+
+/// Map a std IO error to the finite reason vocabulary the probe and callers
+/// keep. A refused connection is never folded into an unreachable one.
+fn io_error_code(error: std::io::Error) -> &'static str {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => "refused",
+        std::io::ErrorKind::TimedOut => "timed_out",
+        std::io::ErrorKind::NetworkUnreachable
+        | std::io::ErrorKind::HostUnreachable
+        | std::io::ErrorKind::AddrNotAvailable => "no_route",
+        std::io::ErrorKind::PermissionDenied => "permission_denied",
+        _ => "connect_failed",
     }
 }
 async fn handle(
@@ -606,11 +772,15 @@ async fn handle(
         };
         let connect_result = timeout(
             Duration::from_secs(config.connect_timeout_seconds),
-            connect_transport(&request.dest, upstream.as_ref()),
+            connect_transport(&request.dest, upstream.as_ref(), config.address_family),
         )
         .await;
         let mut remote = match connect_result {
-            Ok(Ok(stream)) => stream,
+            Ok(Ok((stream, peer_family))) => {
+                // Only describes the segment Lintel created to the endpoint.
+                record.peer_family = Some(peer_family);
+                stream
+            }
             _ => {
                 reject(&mut client, "502 Bad Gateway").await;
                 return Err("route_connection_failed");

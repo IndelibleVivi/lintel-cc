@@ -262,6 +262,25 @@ lintel network serve --config /absolute/reviewed-channel.json
 
 配置为 [network.md](network.md) 的 Config，包含显式 default_action 和精确规则。stdout 首条 listening 给出 foreground_process owner、PID、实际 loopback address 和规范化 active_config；连接事件是 NDJSON，Ctrl-C 结束进程通道。只覆盖经过代理的连接，不强制所有进程流量。App 的通道由 App 进程持有；CLI 不查询或停止 App 内通道，不声称共享状态。
 
+### Network：有限 IP 测试与共享 IPv6 计划
+
+```sh
+lintel network inspect
+# 显式公网请求；默认两个 ipify HTTPS 回显端点，可覆盖 URL
+lintel network probe --timeout-seconds 10
+# 使用已经运行在同一主机的 CLI 通道；端口是实际读回值
+lintel network probe --proxy-url http://127.0.0.1:49152
+# macOS: ID 从 inspect 返回，不用显示名；预览会前测
+lintel network ipv6 plan --service-id '<SET_ID>:<SERVICE_UUID>' --mode off --baseline-id '<PROBE_ID>'
+lintel job submit --plan '<PLAN_ID>' --approval '<EXACT_PLAN_HASH>'
+lintel job show '<ORIGINAL_JOB_ID>'
+lintel network restore plan --job '<ORIGINAL_JOB_ID>'
+```
+
+这些 ID/hash 是占位，替换成实际结果。`network probe` 以及 `ipv6 plan` 支持 `--ipv4-url`、`--ipv6-url`、`--proxy-url` 和 `--timeout-seconds`；`--probe` JSON 可精确选择 nested spec，恢复同样接受该字段。`baseline_id` 复用仅限五分钟内同网络 revision、端点、通道实例与 deadline。Endpoint 必须有限 HTTPS，代理是同一目标主机的 literal loopback HTTP；strict named/SSH 校验在 transport 前拒绝未知字段与无效目标。schema/effects 可用 `lintel describe network_probe`／`plan_network_ipv6` 查看。raw protocol-1 同样进行网络字段校验。
+
+共享计划／回执的 `environment_id:null`，不依赖 Claude 配置根。预览无系统 mutation，批准包含系统配置写入、完整读回与同目标复测，持久 intent 在尝试前保存；中断按同一个 job 查询。完整恢复另行批准并拒绝外部编辑。App 的 channel instance 由 native owner 绑定；CLI 只选择自己已运行的通道，不伪造 App owner。Linux 支持 inspect/probe 与 serve 的 `address_family:"ipv4_only"`，不支持整机 IPv6 mutation。公共端点看到请求 IP；结果保存在目标主机私有 state，不能未经审阅放入公开支持资料。synthetic home 不允许真实 host 操作。详见 [网络指南](network.md)。
+
 <a id="ssh-controller"></a>
 
 ## SSH：同一个有限 controller

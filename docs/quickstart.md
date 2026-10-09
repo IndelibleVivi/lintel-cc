@@ -15,6 +15,8 @@
 > Chrome/Edge/Firefox/AdsPower、生产 VPS 与签名发行都**未验收**。当前证据与
 > 缺口见 [当前状态](current-state.md)。
 
+本文的合成 home 不开放真实宿主网络观察或修改，也不进行公网出口测试。另行明确选择的网络功能及其隐私边界见 [网络指南](network.md)。
+
 ---
 
 ## 0. 前置条件

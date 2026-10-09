@@ -20,6 +20,8 @@ behavior on their own machine.
 > signed distribution are **not verified**. See
 > [current state](current-state.md) for exact evidence and gaps.
 
+This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the [network guide](network.md).
+
 ---
 
 ## 0. Prerequisites

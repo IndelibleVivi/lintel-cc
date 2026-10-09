@@ -123,10 +123,11 @@ requires a new preview and approval, and old IDs are never redone.
   themes are available. The pocket playroom shares one opt-in runner with the
   website: Clawd keeps its connected short legs, bounces over obstacles, and
   collects stars at different reachable heights. Scores stay local to each client.
+- Explicitly test IPv4/IPv6 from the host-default path and the selected Lintel channel, with echoed IP, elapsed time and specific failures. An absent channel stays untested. macOS supports an approved shared-service IPv6 off/link-local change, automatic comparison against the same targets and complete original-configuration restore. Linux offers readonly inspection and probes. Real macOS configuration round trips remain unverified; see the [IPv4/IPv6 Leaf](docs/specs/ip-network.md).
 - Optionally start a loopback proxy in the desktop environment detail, set a
   default allow/block and exact host/port rules, read back the live config, and
   explicitly request opening Claude through that channel. Only connections
-  through the proxy are covered.
+  through the proxy are covered. The additive `address_family` option selects system routing or strict `ipv4_only` for sockets Lintel creates toward the destination or upstream; it does not prove the upstream’s final public address.
 - From the home screen "Browser" entry, prepare the companion extension,
   install the local connection, pair and view instances. The App ships
   Chromium/Firefox extension and Native Messaging host. The extension still
@@ -202,7 +203,7 @@ No Lintel account, model key or license key is needed. The app sends no
 analytics, crash uploads or remote font requests by default; there is no online
 activation service. The browser host and core each expose only their own
 limited operations, with no arbitrary shell/file interface. Data is previewed
-locally and copied manually; there is no automatic upload.
+locally and copied manually; there is no automatic upload. Explicit IP tests and approved post-change probes contact the frozen HTTPS echo targets (ipify IPv4-only/IPv6-only by default), exposing the request’s public IP to them. No background public probe runs. A host IPv6 change affects every application using that service, persists until explicitly restored and may require macOS system authorization.
 
 Config-directory isolation is not an OS sandbox and does not prove login
 credentials are independent. Proxy environment variables are not OS-level

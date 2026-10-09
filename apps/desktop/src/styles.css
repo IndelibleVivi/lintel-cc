@@ -855,3 +855,39 @@ h1[tabindex="-1"]:focus{outline:none}
 .startup-auth code{overflow-wrap:anywhere}.startup-next-steps{padding-left:20px;margin:18px 0 0}
 .startup-next-steps li+li{margin-top:8px}
 @media(max-width:760px){.startup-source-list>li>div{display:block}.startup-source-list small{display:block}}
+
+/* One network journey: observed requests, shared service changes, and recovery. */
+.ip-network-panel{padding:22px 0 28px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.ip-network-panel .surface-heading{padding:0;align-items:flex-start;gap:16px}
+.ip-network-panel .surface-heading h3{margin:3px 0 0}
+.probe-options{margin:16px 0}
+.probe-options>.field{margin-top:12px}
+.probe-endpoints{overflow-wrap:anywhere}
+.network-results{margin:19px 0}
+.probe-context{font-size:12px;letter-spacing:.15px;color:var(--muted)}
+.probe-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.probe-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
+.probe-table caption{text-align:left;background:var(--soft);padding:11px 14px;font-size:12px;color:var(--muted)}
+.probe-table th,.probe-table td{text-align:left;vertical-align:top;padding:14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.probe-table thead th{font-size:12px;font-weight:500;color:var(--muted)}
+.probe-table th:first-child{width:27%}
+.probe-table tbody th{font-weight:500}
+.probe-table th small{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:7px}
+.probe-table tbody tr:last-child th,.probe-table tbody tr:last-child td{border-bottom:0}
+.probe-table td+td{border-left:1px solid var(--line)}
+.probe-outcome{font-weight:500;margin-bottom:5px}
+.probe-outcome.reachable{color:var(--accent-strong)}
+.probe-ip{display:flex;align-items:center;gap:3px;margin-bottom:3px}
+.probe-ip code{min-width:0;overflow-wrap:anywhere;font-size:12px}
+.probe-before{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:11px;margin-bottom:10px}
+.network-services{margin-top:26px}
+.network-service{padding:16px 0;border-top:1px solid var(--line)}
+.network-service-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.network-service-heading>span{margin-left:auto;color:var(--muted);font-size:12px}
+.network-addresses{display:grid;gap:5px;font-size:12px;color:var(--muted);margin:12px 0;overflow-wrap:anywhere}
+.network-history{margin-top:15px}
+.network-config-review{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.network-config-review>div{min-width:0}
+.network-config-review pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:12px;background:var(--soft);border-radius:7px}
+.network-plan-review>.notice{margin-bottom:16px}
+@media(max-width:850px){.probe-table th,.probe-table td{padding:10px 8px}.network-config-review{grid-template-columns:1fr}.ip-network-panel .surface-heading{flex-wrap:wrap}.network-service .button-row{flex-wrap:wrap}}

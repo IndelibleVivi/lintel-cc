@@ -148,6 +148,7 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install / launch_query 对已移除 alias 仅开放本地仍有持久记录的原任务、安装或启动，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
 
 - `discover`、`inspect`、`inspect_components`、`work_preflight`、`work_inventory`、`register`、`create_environment`；
+- `network_inspect`、`network_probe`、`plan_network_ipv6`、`plan_network_restore`；IPv4／IPv6 probe 在该 runner 执行，loopback 地址属于远端，不映射本机 App 通道。Linux 系统变更明确 unsupported，观察和显式测试可用；
 - `plan_policy`、`plan_reset`、`plan_archive`、`plan_preserve`、`plan_cleanup`、`plan_restore`、`plan_import`、`plan_launch`、`plan_resume`；
 - `cleanup_inspect`、`auth_probe`、`archive_inspect`、`archive_read`、`session_read`、`service_inspect`、`plan_service_quiesce`、`plan_service_resume`；
 - `jobs`、`job`、`drift`、`accept_drift`、`reactivate_environment`、`export_support`。

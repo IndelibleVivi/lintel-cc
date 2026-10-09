@@ -29,6 +29,10 @@
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存 25fdb43 与更早候选的 CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
 
+## 新增 IPv4 / IPv6 Leaf
+
+当前 main 已接通 [IPv4 / IPv6 Leaf](specs/ip-network.md)。四格实测、严格 IPv4 socket、共享 macOS IPv6 计划与完整恢复已通过本机合成／loopback 检查，以及 built App 的独立 `network-ui`；表中已有 App／CLI 候选仍对应各自原版本，不包含该 Leaf。真实 macOS 系统授权与配置往返、VPN/TUN 切换、公众回显互通、Linux native 编译／IP runtime 均未验收（本机 cross-check 缺 musl C compiler），本轮不安装或激活 App，不部署 VPS 或正式发行。
+
 ## 入口与权威
 
 | 读者／任务 | 权威入口 |

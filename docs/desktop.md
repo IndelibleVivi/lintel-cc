@@ -64,6 +64,10 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 本机环境详情的“外发与权限”包含受控代理通道：查看代理实际采用的默认动作、允许／阻止规则与端口、HTTP(S) 上游，启动或停止通道、通过通道打开 Claude、刷新真实连接事件。当前生效配置由 native 读回；下次启动草案按环境保存在 webview 内存中，停止后可基于读回值修改，再明确启动。切换环境不会串用旧请求的响应。它不修改系统代理、不解密 TLS，也不覆盖客户端直接 socket、全部 DNS、UDP 或其他进程。当前 SSH 工作空间不会把本机代理标为远端已受保护。
 
+### IPv4 / IPv6 与共享网络
+
+同一“外发与权限”的 `IpNetworkPanel` 提供四格实测、复制 IP、有限刷新、前测有效性、所选 macOS 服务预览与原任务恢复；`NetworkResults` / `NetworkEvidence` 共用计划与回执展示。没有 Claude 环境时可从首页明确打开同一 panel，不建立第二个 executor。`NetworkState::dispatch_core` 将 probe/preview 绑定到实际 App live 通道实例，执行前同端口的新实例也需重新预览；原任务查询与恢复不依赖旧通道存活。完整配置与 auto-reprobe 进入正常审批 Modal，`Flow.environment:null` 不套用 Claude root，不开放“打开 Claude”。退出 App 停止通道，但不撤销宿主 IPv6。Linux SSH 使用同一 panel 的只读实测，走目标 runner，不调用本机探针。开发 synthetic bridge 禁止真实 host 操作；`network-ui` 的配置、回显和 invoke 均为合成证据，真实 WebKit／OS 写入仍未验收。
+
 ## SSH 工作空间
 
 顶部主机入口或设置中的“主机与 SSH 连接”读取系统 SSH Host alias，保存连接引用，并由用户发起连接。远端连接需要 **Lintel runner**，安装 Claude Code 不等于安装 runner；缺少 runner 的 Linux 主机可先在下述安装卡预览并批准准备。“连接前需要什么？”提供准备说明和 SSH 排障链接。登记或连接本身不安装、更新软件或改 SSH 配置，不收集密码或私钥。严格 host key 核验失败时应先通过系统 SSH 核对主机。

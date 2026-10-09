@@ -11,6 +11,7 @@ const EVENT_LIMIT: usize = 200;
 const COVERAGE: &str = "proxy_connections_only";
 
 struct Channel {
+    binding: String,
     address: String,
     active_config: Config,
     stop: oneshot::Sender<()>,
@@ -48,11 +49,106 @@ impl NetworkState {
     /// New frozen launches retain the same owned-channel guarantee as the
     /// legacy network launcher. Hold the channel lock through the sole attempt
     /// so stop cannot change the reviewed address halfway through dispatch.
-    pub(crate) async fn dispatch_core<F>(&self, payload: Value, core: F) -> Value
+    pub(crate) async fn dispatch_core<F>(&self, mut payload: Value, core: F) -> Value
     where
         F: Fn(Value) -> Value + Send + 'static,
     {
-        let command = payload["command"].as_str().unwrap_or("");
+        let command = payload["command"].as_str().unwrap_or("").to_string();
+        if command == "plan_network_restore" || command == "plan_restore" {
+            let original = core(json!({"command":"job","job_id":payload["job_id"]}));
+            if original["ok"] == true && original["data"]["network_change"].is_object() {
+                let plan =
+                    core(json!({"command":"plan_show","plan_id":original["data"]["plan_id"]}));
+                if plan["ok"] != true {
+                    return plan;
+                }
+                let mut probe = payload
+                    .get("probe")
+                    .cloned()
+                    .unwrap_or_else(|| plan["data"]["network"]["probe"].clone());
+                // Restoration remains available after the original channel stops.
+                // The new approved preview visibly freezes the available paths.
+                let channels = self.channels.lock().await;
+                let active = probe["proxy_url"].as_str().and_then(|proxy| {
+                    channels.values().find(|channel| {
+                        !channel.task.is_finished()
+                            && format!("http://{}", channel.address) == proxy
+                    })
+                });
+                if let Some(channel) = active {
+                    probe["proxy_binding"] = json!(channel.binding);
+                } else if let Some(probe) = probe.as_object_mut() {
+                    probe.remove("proxy_url");
+                    probe.remove("proxy_binding");
+                }
+                payload["command"] = json!("plan_network_restore");
+                payload["probe"] = probe;
+                let result = match tauri::async_runtime::spawn_blocking(move || core(payload)).await
+                {
+                    Ok(result) => result,
+                    Err(_) => error(
+                        "network_preview_failed",
+                        "共享网络恢复预览未完成；没有据此执行",
+                    ),
+                };
+                drop(channels);
+                return result;
+            }
+        }
+        let network_probe = if command == "network_probe" {
+            Some(payload.clone())
+        } else if command == "plan_network_ipv6" {
+            Some(payload["probe"].clone())
+        } else if command == "execute" {
+            // The original accepted job survives stopped channels and App restart.
+            let original = core(json!({"command":"job","job_id":payload["plan_id"]}));
+            if original["ok"] == true {
+                return original;
+            }
+            let plan = core(json!({"command":"plan_show","plan_id":payload["plan_id"]}));
+            if plan["ok"] == true && plan["data"]["network"].is_object() {
+                Some(plan["data"]["network"]["probe"].clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(probe) = network_probe {
+            if let Some(proxy) = probe["proxy_url"].as_str() {
+                let channels = self.channels.lock().await;
+                let Some(channel) = channels.values().find(|channel| {
+                    format!("http://{}", channel.address) == proxy && !channel.task.is_finished()
+                }) else {
+                    return error(
+                        "channel_changed",
+                        "所选通道已停止或被替换；请用当前通道重新预览，原任务仍可查询",
+                    );
+                };
+                if command == "execute" && probe["proxy_binding"] != channel.binding {
+                    return error(
+                        "channel_changed",
+                        "批准后的通道实例已变化；相同端口也需要重新预览",
+                    );
+                }
+                if command == "network_probe" {
+                    payload["proxy_binding"] = json!(channel.binding);
+                }
+                if command == "plan_network_ipv6" {
+                    payload["probe"]["proxy_binding"] = json!(channel.binding);
+                }
+                let result = match tauri::async_runtime::spawn_blocking(move || core(payload)).await
+                {
+                    Ok(result) => result,
+                    Err(_) => error(
+                        "network_request_uncertain",
+                        "网络请求未完成；若已批准写入，请查询原任务",
+                    ),
+                };
+                drop(channels);
+                return result;
+            }
+        }
         let target = if command == "plan_launch" {
             payload.clone()
         } else if command == "launch_request" {
@@ -166,12 +262,21 @@ impl NetworkState {
                     Err(_) => return error("address_unavailable", "无法取得监听地址"),
                 };
                 let (stop, stopped) = oneshot::channel();
+                let binding = format!(
+                    "{}-{}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos()
+                );
                 let task = tokio::spawn(proxy.serve_until(async move {
                     let _ = stopped.await;
                 }));
                 channels.insert(
                     id.to_string(),
                     Channel {
+                        binding: binding.clone(),
                         address: address.clone(),
                         active_config: config.clone(),
                         stop,
@@ -180,7 +285,7 @@ impl NetworkState {
                     },
                 );
                 json!({"ok":true,"data":{
-                    "running":true,"address":address,"active_config":config,"events":[],"coverage":COVERAGE,
+                    "running":true,"address":address,"channel_binding":binding,"active_config":config,"events":[],"coverage":COVERAGE,
                     "direct_connections_enforced":false,
                     "message":"通道已监听；只有明确配置为使用此通道的客户端才经过它。"
                 }})
@@ -205,7 +310,7 @@ impl NetworkState {
                 if let Some(channel) = channels.get(id) {
                     let running = !channel.task.is_finished();
                     json!({"ok":true,"data":{
-                        "running":running,"address":channel.address,
+                        "running":running,"address":channel.address,"channel_binding":channel.binding,
                         "active_config":if running { Some(&channel.active_config) } else { None },
                         "events":events(channel),"coverage":COVERAGE,
                         "direct_connections_enforced":false
@@ -255,6 +360,91 @@ mod tests {
     };
 
     const ENVIRONMENT: &str = "00000000-0000-4000-8000-000000000001";
+    #[tokio::test]
+    async fn network_probe_and_approval_bind_the_instance_and_keep_original_queries() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let state = NetworkState::default();
+        state.dispatch(json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"allow"}}), synthetic_core).await;
+        let status = state
+            .dispatch(
+                json!({"op":"status","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        let proxy = format!("http://{}", status["data"]["address"].as_str().unwrap());
+        let binding = status["data"]["channel_binding"].clone();
+        let probe = json!({"proxy_url":proxy,"ipv4_url":"https://v4.example.invalid","ipv6_url":"https://v6.example.invalid"});
+        let result = state
+            .dispatch_core(
+                json!({"command":"network_probe","proxy_url":proxy,"proxy_binding":"forged"}),
+                |request| json!({"ok":true,"data":request}),
+            )
+            .await;
+        assert_eq!(result["data"]["proxy_binding"], binding);
+        let mut frozen = probe.clone();
+        frozen["proxy_binding"] = binding.clone();
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let callback = |frozen: Value, attempts: Arc<AtomicUsize>| {
+            move |request: Value| match request["command"].as_str().unwrap() {
+                "job" if request["job_id"] == "original" => {
+                    json!({"ok":true,"data":{"status":"completed","id":"original"}})
+                }
+                "job" => json!({"ok":false,"error":{"code":"job_not_found"}}),
+                "plan_show" => json!({"ok":true,"data":{"network":{"probe":frozen}}}),
+                "execute" => {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    json!({"ok":true,"data":{"status":"completed"}})
+                }
+                _ => panic!("unexpected command"),
+            }
+        };
+        // Same address and config, different owned instance: old approval fails.
+        state
+            .channels
+            .lock()
+            .await
+            .get_mut(ENVIRONMENT)
+            .unwrap()
+            .binding = "replacement".into();
+        let changed = state
+            .dispatch_core(
+                json!({"command":"execute","plan_id":"new"}),
+                callback(frozen.clone(), attempts.clone()),
+            )
+            .await;
+        assert_eq!(changed["error"]["code"], "channel_changed");
+        assert_eq!(attempts.load(Ordering::SeqCst), 0);
+        state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        let original = state
+            .dispatch_core(
+                json!({"command":"execute","plan_id":"original"}),
+                callback(frozen, attempts.clone()),
+            )
+            .await;
+        assert_eq!(original["data"]["id"], "original");
+        assert_eq!(attempts.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn network_restore_previews_available_paths_after_original_channel_stops() {
+        let state = NetworkState::default();
+        let result = state.dispatch_core(json!({"command":"plan_network_restore","job_id":"original"}), |request| match request["command"].as_str().unwrap() {
+            "job" => json!({"ok":true,"data":{"plan_id":"original","network_change":{"scope":"host_shared"}}}),
+            "plan_show" => json!({"ok":true,"data":{"network":{"probe":{"ipv4_url":"https://v4.example.invalid","ipv6_url":"https://v6.example.invalid","proxy_url":"http://127.0.0.1:7890","proxy_binding":"retired"}}}}),
+            "plan_network_restore" => { assert!(request["probe"].get("proxy_url").is_none()); assert!(request["probe"].get("proxy_binding").is_none()); json!({"ok":true,"data":request}) },
+            _ => panic!("unexpected command"),
+        }).await;
+        assert_eq!(result["ok"], true);
+        assert_eq!(
+            result["data"]["probe"]["ipv6_url"],
+            "https://v6.example.invalid"
+        );
+    }
     #[tokio::test]
     async fn frozen_proxy_requires_owned_live_address_but_original_query_survives_stop() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -370,6 +560,7 @@ mod tests {
             active_config,
             &json!({
                 "environment_id":ENVIRONMENT,"bind":"127.0.0.1:0",
+                "address_family":"system",
                 "default_action":"deny",
                 "blocked":[{"host":"denied.synthetic.invalid","ports":[443]}],
                 "allowed":[{"host":"localhost","ports":[8080,8443]}],

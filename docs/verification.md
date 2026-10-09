@@ -42,6 +42,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `desktop-build` | desktop | `npm run build` in `apps/desktop` (tsc + Vite) |
 | `shared-remote-journey` | python | shared Rust finite controller public API and schemas, synthetic transport |
 | `journey-product-baseline` | journey | `python3 tests/backend_baseline_journey.py`; readonly context/help, frozen target and bounded session/launch contracts |
+| `journey-network` | journey | finite IP targets/defaults, strict CLI/schema admission and synthetic-home host boundary; no public/host probes |
 | `journey-agent-cli` | journey | static catalog, named CLI, durable original-ID wait, portable archive/import and restore |
 | `journey-agent-adapters` | journey | synthetic SSH registry, browser absent-profile handling and foreground network stream/stop |
 | `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
@@ -193,8 +194,10 @@ redirect managed candidates under the synthetic home and stop ancestor walks at
 the independent temporary fixture, including fixtures with sibling home/project
 directories. Invalid synthetic scope is refused before observation.
 
-Two loopback-only checks (`cargo-workspace-test` via `crates/egress/tests/proxy.rs`
-and `desktop-rust-test` via the desktop network module) bind `127.0.0.1` sockets.
+Two loopback-only checks (`cargo-workspace-test` via egress proxy/HTTPS probe tests
+and `desktop-rust-test` via the desktop network module) bind `127.0.0.1` and, for
+address-family proof, `::1` sockets. IPv6 loopback support is required; these
+fixtures never contact public echo targets or modify host networking.
 On a host that forbids localhost binding these tests surface as failures with
 `Operation not permitted`; that is an environment restriction, not a product
 result, and the entrypoint reports it honestly rather than masking it.
@@ -203,6 +206,16 @@ Browser smoke also accepts an explicit `PLAYWRIGHT_MODULE` module path, matching
 
 `desktop-build` needs `apps/desktop/node_modules` (`npm ci`). If it is missing the
 check is reported as skipped with a reason.
+
+### IPv4 / IPv6 Leaf checks
+
+`cargo-workspace-test` covers finite request admission, the core's synthetic host adapter, constructed CoreFoundation property-list round trips and journal/restore faults, real IPv4/IPv6 loopback HTTPS echoes, CONNECT, TLS hostname/CA rejection, finite framing and whole-request deadlines. `desktop-rust-test` checks live channel-instance binding, query-only originals and restore after channel shutdown. `network-ui` is independently selected after `desktop-build`: built App Day/Night rendering, four cells, IP copy, cancel/approval, lost ACK, full manual restoration, environment changes, empty inventory and readonly remote routing. Its host, echo, invoke and SSH are synthetic; it is not real SystemConfiguration, native WebKit, public endpoint or VPN evidence.
+
+```sh
+python3 tests/verify.py --checks network-ui
+```
+
+Real macOS authorization/configuration round trips, VPN/TUN route changes and Linux native IP networking remain separate, explicitly authorized acceptance; default checks never change real host settings.
 
 ## Independent evidence
 

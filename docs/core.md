@@ -2,6 +2,10 @@
 
 `crates/core` 是本地环境清单、计划、文件操作、任务 journal 与字段恢复的唯一实现。GUI 和 `apps/runner` 通过同一个 `handle_request` 调用它。完整目标仍由 [SPEC](SPEC.md) 定义，本页只描述当前实现。
 
+## 宿主共享 IPv4 / IPv6
+
+`network.rs` owns 离线网络观察、finite probe 的 metadata 与 baseline、macOS 精确 IPv6 配置计划／批准／journal／恢复；实际 HTTPS bytes 只有 egress probe 一份实现。`network_inspect`、`network_probe`、`plan_network_ipv6`、`plan_network_restore` 不需要环境 ID，plan／receipt 明确 `environment_id:null` 和 `scope:host_shared`。generic execute 只加入这两个支持的 mutation kinds，launch/resume/unknown 的独立 admission 不变；generic plan_restore 按原网络 job 路由，绝不当作 settings 恢复。Linux 明确只读；synthetic home 不能触碰真实宿主。完整字段、恢复与不确定性语义见 [网络指南](network.md)。
+
 ## 读取、计划与批准
 
 `lintel request` 从 stdin 读取一个不超过 1 MiB 的 JSON object，返回一个 JSON envelope；错误时 CLI 以非零状态退出。其余命令见 `lintel --help`。先取得环境 ID，再生成计划，最后提交该计划的准确 hash：
