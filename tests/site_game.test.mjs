@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newRun, jump, advance, clawdPose, spawnStar, points, BODY } from '../apps/site/clawd-game.mjs';
+import { newRun, jump, advance, clawdPose, spawnStar, points, BODY, clawdBody } from '../apps/site/clawd-game.mjs';
 
 // Restored original tuning the reachability checks depend on.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
@@ -49,13 +49,12 @@ test('the sprite is one connected body with four continuous legs and no detached
 });
 
 test('the standing pose is the canonical shape; only running, airborne and landing move it', () => {
-  const canonical = { anchor: 0, scaleX: 1, scaleY: 1, eyes: [[20,10,4,10],[56,10,4,10]] };
+  const canonical = { anchor: 0, scaleX: 1, scaleY: 1, legs: [14,24,50,60].map(x => ({x, bottom:50})), eyes: [[20,10,4,10],[56,10,4,10]] };
   for (const status of ['ready', 'paused']) {
     const run = newRun(); run.status = status; run.distance = 100;
     assert.deepEqual(clawdPose(run), canonical, `${status} has no standing scale`);
   }
   const run = newRun(); run.status = 'running';
-  assert.deepEqual(Object.keys(clawdPose(run)).sort(), ['anchor','eyes','scaleX','scaleY'], 'no per-leg or per-foot fields remain');
   for (let i = 0; i < 8; i++) advance(run, 1 / 60, 1000);
   const stepping = clawdPose(run);
   assert.equal(stepping.anchor, 0, 'grounded running keeps the feet anchored on the ground');
@@ -64,7 +63,7 @@ test('the standing pose is the canonical shape; only running, airborne and landi
   assert.equal(air.anchor, 0, 'the airborne anchor is the same anchored ground goal');
   assert.ok(air.scaleY > 1, 'the rising body stretches vertically instead of tucking legs');
   assert.ok(air.scaleY > stepping.scaleY, 'the ascent stretches taller than the grounded stride');
-  assert.deepEqual(clawdPose(run, true), { anchor: 0, scaleX: 1, scaleY: 1, eyes: air.eyes }, 'reduced motion holds the canonical shape static');
+  assert.deepEqual(clawdPose(run, true), canonical, 'reduced motion holds the canonical shape static');
   // Pausing mid-air or just after landing freezes the exact canonical shape, matching the comment.
   const airborne = newRun(); airborne.status = 'paused'; airborne.y = 40; airborne.velocity = 200;
   assert.deepEqual(clawdPose(airborne), canonical, 'a paused mid-air jump holds the canonical shape');
@@ -201,17 +200,15 @@ function flyRun({ fps, speed, seconds = 20 }) {
   const run = newRun(); run.status = 'running';
   run.speed = speed; run.distance = (speed - 210) * 220; // hold the requested speed from the first step
   const wide = 100000; // no obstacle can reach Clawd; this isolates ordinary grounded running
-  let footPeak = 0, footFloor = 0, scalePeak = 1, scaleFloor = 1;
+  let footPeak = 0, footFloor = 0;
   for (let i = 0; i < fps * seconds; i++) {
     advance(run, 1 / fps, wide, () => .5);
     if (run.y > 0 || run.velocity > 0) continue; // only ordinary grounded running
     const pose = clawdPose(run);
     footPeak = Math.max(footPeak, pose.anchor);
     footFloor = Math.min(footFloor, pose.anchor);
-    scalePeak = Math.max(scalePeak, pose.scaleX, pose.scaleY);
-    scaleFloor = Math.min(scaleFloor, pose.scaleX, pose.scaleY);
   }
-  return { run, footPeak, footFloor, scalePeak, scaleFloor };
+  return { run, footPeak, footFloor };
 }
 
 test('ordinary running anchors the feet on the ground and never bobs the body', () => {
@@ -228,28 +225,33 @@ test('ordinary running anchors the feet on the ground and never bobs the body', 
   }
 });
 
-test('the grounded stride is a subtle deformation, not a visible bob, at every speed and frame rate', () => {
-  // With the feet anchored, the only stride signal is a whole-body scale deform: it must stay small
-  // (at most 0.5%) and symmetric, at every accepted speed and frame rate.
-  for (const speed of [210, 280, 350]) {
-    for (const fps of [30, 60, 144]) {
-      const { scalePeak, scaleFloor } = flyRun({ fps, speed });
-      assert.ok(scalePeak - 1 <= .005, `${fps}fps ${speed}px/s never deforms past +0.5% (saw ${(scalePeak - 1).toFixed(4)})`);
-      assert.ok(1 - scaleFloor <= .005, `${fps}fps ${speed}px/s never deforms past -0.5% (saw ${(1 - scaleFloor).toFixed(4)})`);
+test('short straight legs alternate while the chest stays level across frame rates', () => {
+  for (const speed of [210, 280, 350]) for (const fps of [30, 60, 144]) {
+    const run = newRun(); run.status = 'running'; run.distance = (speed - 210) * 220; run.speed = speed;
+    const tips = [], positions = [];
+    for (let i = 0; i < fps * 2; i++) {
+      advance(run, 1 / fps, 100000, () => .5);
+      const pose = clawdPose(run);
+      assert.equal(pose.scaleX, 1, 'ordinary steps never pulse the whole body');
+      assert.equal(pose.scaleY, 1, 'the chest has a stable height');
+      assert.equal(pose.legs.length, 4);
+      assert.ok(pose.legs.filter(l => l.bottom === 50).length >= 2, 'one pair supports each step');
+      assert.ok(pose.legs.every(l => l.bottom >= 46 && l.bottom <= 50), 'legs stay short');
+      assert.equal(pose.legs[0].bottom, pose.legs[3].bottom, 'outer legs share a step');
+      assert.equal(pose.legs[1].bottom, pose.legs[2].bottom, 'inner legs share the opposite step');
+      for (let j = 1; j < 4; j++) assert.ok(pose.legs[j].x > pose.legs[j-1].x + 6, 'legs remain distinct');
+      const shape = clawdBody(pose.legs);
+      assert.equal((shape.match(/M/g) ?? []).length, 1, 'moving legs remain in the connected silhouette');
+      assert.doesNotMatch(shape, /[LCQSA]/, 'all edges stay straight and orthogonal');
+      tips.push(pose.legs[0].bottom); positions.push(pose.legs[0].x);
     }
+    assert.ok(Math.max(...tips) - Math.min(...tips) > 3, 'legs visibly lift, rather than slide motionless');
+    assert.ok(Math.max(...positions) - Math.min(...positions) > 2, 'a stride includes forward/back travel');
+    let lifts = 0;
+    for (let i = 1; i < tips.length; i++) if (tips[i] < 49.9 && tips[i-1] >= 49.9) lifts++;
+    assert.ok(lifts >= 3 && lifts <= 8, `the ${fps}fps ${speed}px/s gait has a calm cadence (${lifts} steps)`);
   }
-  // The stride period is a calm fraction of a second, never a high-frequency shake: one travel
-  // period must span a visible stretch of ground, so the deformation cannot alias into vibration.
-  const samples = [];
-  for (let d = 0; d < 1000; d += 0.5) {
-    const r = newRun(); r.status = 'running'; r.distance = d;
-    samples.push(clawdPose(r).scaleX);
-  }
-  let turnarounds = 0;
-  for (let i = 1; i < samples.length - 1; i++) {
-    if (samples[i] > samples[i - 1] && samples[i] > samples[i + 1]) turnarounds++;
-  }
-  assert.ok(turnarounds <= 12, `a ~100px travel period holds few extrema over 1000px (saw ${turnarounds})`);
+  assert.equal(clawdBody(clawdPose(newRun()).legs), BODY, 'standing and film keep the canonical silhouette');
 });
 
 test('ordinary grounded running arms no landing squash; only a real landing settles, and it is finite', () => {

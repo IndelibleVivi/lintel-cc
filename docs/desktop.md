@@ -94,11 +94,11 @@ Day / Night / System 直接切换外观，并在当前 webview 记住选择。�
 
 “去看月亮”打开四幅自行绘制的字符点阵风景：月下山湖、雨夜小屋、海边灯塔、星野营火。深浅字符绘制云、山、水和建筑；Clawd 用独立的橙色块面、两只眼睛及四只脚保持清楚轮廓。整幅画按比例缩放，不压扁角色。画中 Clawd 可收集小星星，风景册独立切换暖纸／夜色。风景参考了 [Claude Code 整幅夜景截图](https://miro.medium.com/v2/resize%3Afit%3A1358/format%3Awebp/1%2AgcjPv1ITZ6YpPwlMmveADA.png) 的负空间、点阵层次和角色关系；图形由本地代码绘制，不分发该截图。下拉菜单依据产品要求自行实现，未声称逐帧复刻官方移动端动效。
 
-“Clawd 跳一跳”与官网共用一个游戏实现。Clawd 是一整块连续的像素剪影——一个方正的横身体下面直接伸出四条又短又直的腿，不再单独画脚；移动时只是整只轻轻弹跳、起跳伸展、落地压低，不出现分开动画的腿脚。星星不再挂在一个固定高度：相邻的星星明显有高有低，整场有约 50 像素的高低差，每个都在一次跳跃够得着的范围内，所以要看清再跳。跳过石头／书本并收集星星（每颗 +25 分）。空格／上方向键／点击跳跃，P 或按钮暂停，碰撞可重开，速度渐增；落地前的短暂输入可接续下一跳。离开游戏、切换窗口或跑道离屏会暂停；切去风景册、关闭面板会释放动画与监听，再次打开只启动一个实例。Day／Night／System 跟随 App；减少动态效果时停用背景移动、尘点、整体弹跳／伸展与落地缩放，玩家主动按下的跳跃仍然保留。最高分沿用本机 webview 的 `lintel.clawd.runner.best`，官网在各自浏览器保存独立成绩。它不依赖网络、模型或外部服务。
+“Clawd 跳一跳”与官网共用一个游戏实现。Clawd 是一整块连续的像素剪影——一个方正的横身体下面直接伸出四条又短又直的腿，不再单独画脚；普通跑动时身体保持水平，四条短直腿分两组交替迈动，始终连着身体，没有横向小脚；起跳伸展、落地短暂压低。星星不再挂在一个固定高度：相邻的星星明显有高有低，整场有约 50 像素的高低差，每个都在一次跳跃够得着的范围内，所以要看清再跳。跳过石头／书本并收集星星（每颗 +25 分）。空格／上方向键／点击跳跃，P 或按钮暂停，碰撞可重开，速度渐增；落地前的短暂输入可接续下一跳。离开游戏、切换窗口或跑道离屏会暂停；切去风景册、关闭面板会释放动画与监听，再次打开只启动一个实例。Day／Night／System 跟随 App；减少动态效果时停用背景移动、尘点、迈腿／伸展与落地缩放，玩家主动按下的跳跃仍然保留。最高分沿用本机 webview 的 `lintel.clawd.runner.best`，官网在各自浏览器保存独立成绩。它不依赖网络、模型或外部服务。
 
 首页 Clawd 采用固定 SVG 像素几何，小游戏复用该轮廓，风景册用固定字符网格避免字体改变角色比例。形状对照 [Clawd 形象参考](https://pbs.twimg.com/tweet_video_thumb/G2C8pCLaMAAy2P1.jpg) 与 [Claude Code TUI 实际截图](https://zenn.dev/tutupizizizi/articles/claude-code-clawd-mascot)，自行编写渲染与场景，不下载参考图作为产品资源。Clawd 形象属于 Anthropic；Lintel 是独立工具。
 
-`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册与小游戏的 React 挂载／卸载，`src/clawd-landscapes.ts` 负责四幅字符画。小游戏的唯一实现是 [`apps/site/clawd-game.mjs`](../apps/site/clawd-game.mjs) 与同名 CSS，由官网直接加载、App 通过 Vite 打包；旧 React runner 已移除。普通跑动保持脚底贴地，只作轻微整体形变；起跳保持弹道，真正落地后短暂收势。暂停与 reduced motion 使用静态轮廓，玩法、星星高度与本地成绩保留。角色互动与风景册样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
+`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册与小游戏的 React 挂载／卸载，`src/clawd-landscapes.ts` 负责四幅字符画。小游戏的唯一实现是 [`apps/site/clawd-game.mjs`](../apps/site/clawd-game.mjs) 与同名 CSS，由官网直接加载、App 通过 Vite 打包；旧 React runner 已移除。普通跑动胸口保持水平，两组短直腿交替抬起与前后移动，支撑腿保持贴地；起跳保持弹道，真正落地后短暂收势。暂停与 reduced motion 使用静态轮廓，玩法、星星高度与本地成绩保留。角色互动与风景册样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
 
 ```sh
 cd apps/desktop

@@ -2,12 +2,17 @@
 // apps/desktop/src/Clawd.tsx (hand-drawn from the Clawd silhouette and its terminal appearance).
 // The four legs already descend from the body path, so the game never draws detached feet.
 // Clawd belongs to Anthropic. This game never calls the native App or a remote service.
-export const BODY = 'M10 0H70V20H80V30H70V40H66V50H60V40H56V50H50V40H30V50H24V40H20V50H14V40H10V30H0V20H10Z';
+const STANDING_LEGS = [14, 24, 50, 60].map(x => ({ x, bottom: 50 }));
+export function clawdBody(legs = STANDING_LEGS) {
+  return 'M10 0H70V20H80V30H70V40' + [...legs].reverse()
+    .map(({ x, bottom }) => `H${x + 6}V${bottom}H${x}V40`).join('') + 'H10V30H0V20H10Z';
+}
+export const BODY = clawdBody();
 const GROUND = 188, PLAYER_X = 48, HEIGHT = 40, GRAVITY = 1450;
 const EYES_OPEN = [[20, 10, 4, 10], [56, 10, 4, 10]];
 const EYES_SHUT = [[19, 18, 8, 3], [55, 18, 8, 3]];
 const STAR_HIT_X = 30, STAR_HIT_Y = 24;
-// One subtle weight shift per 100px of travel; grounded feet never lift with the stride.
+// Two opposing pairs of short straight legs step once per 100px of travel.
 const STRIDE_TRAVEL = 100;
 // Three visible star rows. The row advances every spawn, so successive stars sit at clearly
 // different heights; a small deterministic jitter keeps them from looking printed. All three rows
@@ -90,19 +95,23 @@ export function clawdPose(run, reduced = false) {
   const air = run.y > 0 || run.velocity > 0;
   // A paused run (including the pause-on-blur mid-jump and just-after-landing cases) freezes the
   // canonical shape exactly; only an actively running run deforms, stretches or squashes.
-  if (reduced || run.status !== 'running') return { anchor: 0, scaleX: 1, scaleY: 1, eyes: run.status === 'over' ? EYES_SHUT : EYES_OPEN };
+  if (reduced || run.status !== 'running') return { anchor: 0, scaleX: 1, scaleY: 1, legs: STANDING_LEGS, eyes: run.status === 'over' ? EYES_SHUT : EYES_OPEN };
   const pace = run.distance / STRIDE_TRAVEL * 2 * Math.PI;
   const anchored = !air && run.distance > 0;
   // Only a real landing arms this finite settle; buffered takeoff clears it.
   const landing = run.landing / .14;
   const ascending = air && run.velocity > 0;
   const stretch = ascending ? run.velocity / 480 : 0;
-  // Distance sets the phase across frame rates; ±0.4% scale avoids a repeated vertical bounce.
-  const stride = anchored ? Math.sin(pace) : 0;
+  // Move only the continuous leg edges: the chest stays level and a supporting pair stays planted.
+  const legs = anchored ? STANDING_LEGS.map(({ x }, i) => {
+    const phase = pace + (i === 0 || i === 3 ? 0 : Math.PI);
+    return { x: x - Math.cos(phase) * 1.5, bottom: 50 - Math.max(0, Math.sin(phase)) * 4 };
+  }) : STANDING_LEGS;
   return {
     anchor: 0,
-    scaleX: (1 + landing * .1) * (1 + stride * .004),
-    scaleY: (1 - landing * .1 + stretch * .1) * (1 - stride * .004),
+    scaleX: 1 + landing * .1,
+    scaleY: 1 - landing * .1 + stretch * .1,
+    legs,
     eyes: EYES_OPEN,
   };
 }
@@ -120,7 +129,6 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const darkScheme = matchMedia('(prefers-color-scheme: dark)');
   let palette;
-  const body = new Path2D(BODY);
   function setPalette() {
     const style = getComputedStyle(root); const value = name => style.getPropertyValue(name).trim();
     const theme = document.documentElement.dataset.theme;
@@ -211,7 +219,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
     // One connected silhouette: the body path already ends in four short legs, so there are no
     // separately drawn feet. Scaling around the feet keeps ordinary running anchored on GROUND.
     ctx.save(); ctx.translate(PLAYER_X+32,GROUND-run.y-pose.anchor);ctx.scale(.8*pose.scaleX,.8*pose.scaleY);ctx.translate(-40,-50);
-    ctx.fillStyle = p.accent; ctx.fill(body);
+    ctx.fillStyle = p.accent; ctx.fill(new Path2D(clawdBody(pose.legs)));
     ctx.fillStyle = '#252320';
     for (const [x, y, w, h] of pose.eyes) ctx.fillRect(x, y, w, h);
     ctx.restore();
