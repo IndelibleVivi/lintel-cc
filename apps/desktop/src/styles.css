@@ -478,7 +478,7 @@ button.inspector-toggle{margin-left:auto;flex-shrink:0}
 .remote-prerequisites{margin:4px 0 20px;font-size:12px;line-height:1.8}.remote-prerequisites>summary{cursor:pointer;color:var(--text);padding-block:8px}.remote-prerequisites ol{padding-left:20px;color:var(--muted);margin:8px 0 12px}.remote-prerequisites li+li{margin-top:7px}
 .remote-removed{display:flex;align-items:center;gap:12px;padding:12px;background:var(--soft);border-radius:8px;font-size:12px;margin:12px 0}.remote-removed>span{flex:1;overflow-wrap:anywhere}.remote-removed button{font-size:12px;flex-shrink:0}.remote-task small{display:block;font-size:11px;color:var(--muted);margin-top:5px}
 .request-failure{min-width:0;margin-block:12px}.request-failure .notice small{display:block;margin-top:6px;font:11px/1.7 var(--mono);overflow-wrap:anywhere}.request-failure .notice p{margin-top:5px}.failure-guidance{padding:14px 16px;border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;font-size:12px;line-height:1.8}.failure-guidance h4{font-size:12px}.failure-guidance ol{padding-left:19px;margin:8px 0}.failure-guidance li+li{margin-top:7px}.failure-guidance details{margin-top:12px}.failure-guidance summary{cursor:pointer}.failure-guidance pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 var(--mono);max-height:200px;overflow:auto;background:var(--soft);padding:12px;border-radius:6px;margin-top:8px}.failure-guidance .button-row{margin-top:12px;flex-wrap:wrap}.failure-guidance .button-row>span{font-size:11px;color:var(--muted)}.failure-guidance .text-button{font-size:12px}.diagnostic-command{padding:10px;background:var(--soft);border-radius:6px;margin-top:12px}.diagnostic-command>span{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}.diagnostic-command code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}.failure-uncertain{margin-top:12px;color:var(--accent-strong)}
-.resource-links{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:12px;font-size:12px}.resource-link a{color:var(--accent-strong);text-decoration:underline;text-underline-offset:3px}.resource-link a:focus-visible{outline:1px solid var(--focus);outline-offset:3px}.resource-error{display:block;color:var(--muted);font-size:11px}.resource-error code{display:block;font-size:11px;overflow-wrap:anywhere}.developer-resources p{font-size:12px;line-height:1.8;margin-top:8px;color:var(--muted)}.developer-resources h4{font-size:13px;margin-top:22px}.developer-resources .small-print{font-size:11px}
+.resource-links{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:12px;font-size:12px}.resource-link a{color:var(--accent-strong);text-decoration:underline;text-underline-offset:3px}.resource-link a:focus-visible{outline:none;box-shadow:inset 0 -2px var(--focus);border-radius:3px}.resource-error{display:block;color:var(--muted);font-size:11px}.resource-error code{display:block;font-size:11px;overflow-wrap:anywhere}.developer-resources p{font-size:12px;line-height:1.8;margin-top:8px;color:var(--muted)}.developer-resources h4{font-size:13px;margin-top:22px}.developer-resources .small-print{font-size:11px}
 @media(max-width:760px){.host-row{flex-wrap:wrap}.host-row>.host-actions{margin-left:auto}.remote-task{flex-wrap:wrap}.remote-task>div{flex-basis:100%}.remote-task>button{margin-left:auto}.remote-removed{flex-wrap:wrap}}
 
 /* Warm-light pass: morning paper by day, quiet moonlight by night. */
@@ -616,7 +616,7 @@ button.inspector-toggle{margin-left:auto;flex-shrink:0}
 .fixture-banner{position:static;align-self:stretch;justify-content:center;padding:5px 12px;background:var(--soft);border-bottom:1px solid var(--line);font-size:12px}
 .notice,.small-print,.request-failure .notice small,.failure-guidance,.failure-guidance h4{font-size:13px}
 .main-content h1{scroll-margin-top:16px}
-button:focus-visible,a:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:3px;box-shadow:none}
+a:focus-visible{outline:none;box-shadow:inset 0 -2px var(--focus);border-radius:3px}
 button:disabled{opacity:.6}
 .resource-version{display:inline-block;color:var(--muted);font-size:12px;margin-left:7px}
 .help-revision{padding-top:16px;overflow-wrap:anywhere}
@@ -795,7 +795,7 @@ button:disabled{opacity:.6}
 
 .current-goal details{font-size:12px;margin-top:5px;color:var(--muted);}
 .current-goal summary{cursor:pointer;width:fit-content;}
-.current-goal summary:focus-visible{outline:1px solid var(--focus);outline-offset:3px;}
+.current-goal summary:focus-visible{outline:none;box-shadow:inset 0 -2px var(--focus);}
 
 /* Routed headings receive focus for announcement, without a control ring. */
 h1[tabindex="-1"]:focus{outline:none}
@@ -928,3 +928,25 @@ button.primary:disabled{box-shadow:none}
 .modal[open]{animation:modal-in .22s ease-out}
 .modal::backdrop{animation:backdrop-in .22s ease-out}
 .toast{animation:toast-in .2s ease-out}
+
+/* Dialog rhythm: settings/help share one calm 8px-based cadence. */
+.settings-body>h3{margin-bottom:13px}
+.settings-body>p{margin-bottom:0}
+.settings-body>.small-print{margin-top:10px}
+.settings-links{display:grid;gap:8px;margin-top:24px}
+.settings-body .section-action{width:100%;justify-content:space-between;padding-block:11px}
+.settings-links>.section-action{margin-top:0}
+.settings-body>h3.separated{margin-top:28px;padding-top:20px}
+.settings-body>p.muted{margin-top:7px;font-size:13px}
+.settings-body>.capability-list{margin-top:12px}
+.settings-body>.capability-list+.section-action{margin-top:12px}
+.settings-body>.notice{margin-top:20px}
+.settings-body>.fact-row{margin-top:20px;min-height:0;padding:13px 0 2px;align-items:flex-start}
+.help-content>.offline-help{margin-top:26px;padding-top:20px}
+.help-content>.offline-help>h3{margin-bottom:10px}
+.offline-help h4{margin:22px 0 6px}
+.offline-help p{line-height:1.85}
+.help-content>.notice{margin-top:22px}
+.help-content>h3{margin:26px 0 8px}
+.help-content>.inline-route{margin-top:14px}
+.help-revision{margin-top:22px;border-top:1px solid var(--line);padding-top:13px;font:11px var(--mono);color:var(--muted)}
