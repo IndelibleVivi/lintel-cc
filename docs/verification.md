@@ -157,14 +157,108 @@ Finder and the browser's load picker remains independent runtime acceptance.
 
 `rust`, `js`, `python`, `desktop`, `journey`, `independent`.
 
-## Linux CI dependency preparation
+## CI workflow (GitHub Actions)
 
-The `Linux system packages (Tauri)` step runs `apt-get update` then
-`apt-get install -y` inline in [verification workflow](../.github/workflows/verify.yml). It keeps the runner's
-configured repositories and normal metadata authentication; it changes no
-sources, providers, signature rules or network policy.
+GitHub Actions is the **only primary CI owner**. `python3 tests/verify.py` stays
+the single provider-neutral entrypoint with its unchanged implicit default group;
+CI selects subsets of it. There is no Cloudflare Worker for CI, no third-party
+paths-filter action, no deployment and no production dependency. Local implicit
+defaults are unchanged: `python3 tests/verify.py` still runs the same default
+group it always did.
 
-* `timeout-minutes: 15` limits the whole step. Per the Actions syntax reference
+`.github/workflows/verify.yml` computes a finite plan with
+`tests/ci_plan.py` and runs these jobs:
+
+| job | owns | runs on |
+| --- | --- | --- |
+| `plan` | changed-path classification and profile selection | ubuntu |
+| `control` | strict `verify.py --self-test` (registry, planner and workflow tests) | ubuntu |
+| `frontend` | light JS/Python/frontend checks | plan platforms |
+| `native` | native Rust workspace + standalone crates + general CLI journeys | plan platforms |
+| `heavy` | heavy work archive/capacity/preserve/plan journeys | plan platforms |
+| `browser` | built-App and browser/UI Chromium checks | plan platforms |
+| `runner` | static runner build, Linux OpenSSH runtime, CLI candidate | plan platforms |
+| `vm` | disposable Linux VM acceptance (independent, never behind UI/default) | ubuntu |
+| `aggregate` | stable required final gate | ubuntu |
+
+### Profiles and path filtering
+
+`tests/ci_plan.py` maps changed paths to `docs`, `site`, `app-ui`,
+`extensions`, `core` or `unknown`, and combines those into one finite profile:
+
+* `docs` -> only the controller self-tests.
+* `site` -> shared game physics and the website Chromium journey (Linux first).
+* `app-ui` -> frontend build plus every applicable built-App/browser check
+  (Linux first). Known App UI journey tests use the same profile. Shared
+  `clawd-game.mjs`/`.css` and game-test changes combine `site` and `app-ui`,
+  covering both website and App consumers without heavy/VM checks.
+* `browser-ext` -> native-host tests plus browser/UI checks.
+* `core` -> full synthetic matrix, heavy work and the Linux VM, on both
+  platforms.
+* `full` -> everything routine CI may run, both platforms plus the VM.
+
+Pure UI/website/docs changes therefore no longer wait on the heavy work-package
+journeys or the VM. Any change to the CI controller itself, an unknown path, a
+missing/zero base, or a scheduled/manually dispatched run fails closed to `full`.
+Push diffs use the pushed `before`..`head`; pull requests diff from
+`git merge-base base head` (the fork point) to `head`, so a PR is not blamed for
+unrelated commits that landed on the base branch. Selection records the branch
+head separately from the tested checkout: PR evidence must match the actual
+merge commit, while push evidence matches the pushed commit. Deleted and renamed paths are
+classified on both sides. `work-scale` (release-capacity, >=16 GiB temp)
+and the native macOS Tauri bundle are deliberately excluded from routine CI and
+stay manual; see `EXCLUDED_FROM_CI` in `tests/ci_plan.py`.
+
+`native` installs the GTK/WebKit/AppIndicator development packages because
+`desktop-rust-test` builds the standalone Tauri crate; no other Linux job needs
+them. Cargo caches cover the root `target` plus the standalone
+`apps/desktop/src-tauri/target` and `extensions/browser/native-host/target`;
+only the official signed Ubuntu base image is cached for the VM and every run
+still re-verifies its gpgv signature and checksums. Caches never replace the
+source rebuild/test. Ordinary pushes and PRs cancel a superseded run on the same
+ref; scheduled and manually dispatched runs get their own run-scoped group and
+are never cancelled or queued behind one another. Permissions stay
+`contents: read`.
+
+### Strict CI: skip is never a pass
+
+The control job installs the pinned verification-only PyYAML dependency from
+`tests/requirements-ci.txt`; its strict self-test refuses to skip workflow tests
+when that dependency is unavailable. Local self-tests can run without it and
+label those optional workflow checks skipped.
+
+Every CI `verify.py` invocation uses `--require-passed`: a *selected* check that
+reports `skipped` or `deferred` fails the run. Local default semantics (skip is
+allowed, exit 0) are unchanged; only CI opts into this. The `aggregate` job then
+calls `tests/ci_plan.py --aggregate`, the production gate, which fails on:
+
+* `plan` or `control` not succeeding;
+* a job the plan **scheduled** not succeeding (failure/cancelled/unexpected skip)
+  or missing from `needs`;
+* a job the plan did **not** schedule not being exactly `skipped` (a planned
+  skip passes);
+* a missing canonical evidence file, a check that is not `passed`, an unreadable
+  or wrong-schema JSON document, a `git.head` that is not this run's head, or a
+  `platform.system` that does not match the platform.
+
+Evidence is written beside and outside the checkout (`../lintel-verify`), matching the
+"evidence stays outside Git" contract, and uploaded per job/platform. `aggregate`
+reads each job/platform's canonical `verify.py` record only; helper sidecar
+reports (per-UI reports, `browser-smoke.json`, the VM runtime sidecar) are never
+read as canonical records, and a duplicate basename across artifacts is rejected
+so one platform's report cannot impersonate another's. A `docs`-only run
+schedules no `verify.py` check and legitimately passes with no evidence.
+
+### Linux CI dependency preparation
+
+Each Linux job installs only the packages it needs with an inline
+`apt-get update` then `apt-get install -y` in the [verification workflow](../.github/workflows/verify.yml).
+It keeps the runner's configured repositories and normal metadata
+authentication; it changes no sources, providers, signature rules or network
+policy.
+
+* `timeout-minutes: 15` limits each dependency step. Per the Actions syntax
+  reference
   ([workflow-syntax · timeout-minutes](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)),
   `steps[*].timeout-minutes` caps the maximum step minutes and the runner kills
   the process when it is exceeded.
@@ -182,6 +276,18 @@ sources, providers, signature rules or network policy.
 
 This bounds dependency preparation; it does not claim to have diagnosed the
 earlier stall. Live Ubuntu behavior is only observable in a fresh CI run.
+
+### Platform runtime evidence boundary
+
+Routine UI/website/docs profiles give feedback on Linux Chromium first. The
+two-platform guarantees remain whenever the corresponding code changes, and on
+every scheduled or manually dispatched run: the default matrix plus heavy work
+run on both macOS and Linux, the browser/UI group runs on both, and the Linux
+VM runs on a Linux host. `linux-ssh-runtime` and the disposable VM are
+Linux-only checks; macOS runs only `cli-candidate` in the `runner` job, and the
+aggregate gate requires each only on the platform where it actually runs. These
+are synthetic fixtures on disposable runners — not production VPS, native
+WebKit, real authentication or another architecture's runtime.
 
 ## Synthetic-only guarantee
 
@@ -591,9 +697,10 @@ App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
 The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
-The default group includes 26 checks; the CI independent browser/UI group includes
-browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, archive-wait-ui, drift-ui, remote-task-ui, site-ui and
-clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.
+The default group includes 28 checks; the CI independent browser/UI group includes
+browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, archive-wait-ui, drift-ui, remote-task-ui, network-ui, telemetry-ui, app-update-ui, site-ui and
+clawd-app-ui (14 checks). Linux OpenSSH and the disposable VM remain separate
+checks within the same CI workflow; see [CI workflow](#ci-workflow-github-actions).
 
 On 2026-10-08 GitHub Actions run
 [37673477074](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37673477074)

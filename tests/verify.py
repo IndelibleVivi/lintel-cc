@@ -413,14 +413,15 @@ def build_evidence(records: Sequence[Dict[str, object]], args: argparse.Namespac
                           "python3": version(PYTHON, "--version")},
         "git": git_state(),
         "selection": {"all": args.all, "checks": getattr(args, "checks", None),
-                      "category": getattr(args, "category", None)},
+                      "category": getattr(args, "category", None),
+                      "require_passed": bool(getattr(args, "require_passed", False))},
         "started_at": started.isoformat(), "finished_at": finished.isoformat(),
         "duration_seconds": round((finished - started).total_seconds(), 3),
         "results": list(records),
     }
 
 
-def run_self_test() -> int:
+def run_self_test(require_passed: bool = False) -> int:
     """Exercise this entrypoint's own behavior with throwaway commands only."""
     failures: List[str] = []
 
@@ -515,6 +516,19 @@ def run_self_test() -> int:
         print_list(CHECKS)
     expect(buffer.getvalue().count("\n") >= len(CHECKS), "--list renders at least one line per check")
 
+    # The CI planner owns check *selection*; its own tests and self-check must
+    # stay green so a plan cannot silently drop or add coverage. Run it as a
+    # subprocess so it cannot re-enter this entrypoint's process state.
+    planner = ROOT / "tests" / "ci_plan.py"
+    planner_test = ROOT / "tests" / "ci_plan_test.py"
+    if planner.is_file():
+        for label, argv in (("ci plan self-check", [sys.executable, str(planner), "--self-check"]),
+                            ("ci planner tests", [sys.executable, str(planner_test)] + (["--require-workflow"] if require_passed else []))):
+            result = subprocess.run(argv, cwd=str(ROOT), capture_output=True, text=True, timeout=300)
+            expect(result.returncode == 0, f"{label} pass ({result.returncode})")
+    else:
+        print("skip - tests/ci_plan.py not present (planner tests not run)")
+
     print()
     if failures:
         print(f"self-test: {len(failures)} failure(s)", file=sys.stderr)
@@ -536,10 +550,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--no-build", dest="build", action="store_false",
                         help="skip prerequisite builds")
     parser.add_argument("--timeout", type=float, default=1800.0, help="per-check timeout seconds")
+    parser.add_argument("--require-passed", dest="require_passed", action="store_true",
+                        help="treat any selected check that skipped/deferred as a failure "
+                             "(CI mode); default local semantics are unchanged")
     args = parser.parse_args(argv)
 
     if args.self_test:
-        return run_self_test()
+        return run_self_test(args.require_passed)
     if args.list:
         print_list(CHECKS)
         return 0
@@ -589,6 +606,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     deferred = sum(1 for record in records if record["status"] == DEFER)
     if deferred:
         print(f"\nnote: {deferred} independent check(s) not run; see docs/verification.md", file=sys.stderr)
+    if getattr(args, "require_passed", False):
+        # CI require-passed mode: a selected check that skipped (missing tool or
+        # prerequisite) or deferred is a failure, never a pass. `skipped`/`deferred`
+        # never count as passes locally either; this only makes that explicit.
+        not_passed = [(str(record["id"]), str(record["status"]), str(record.get("reason", "")))
+                      for record in records if record["status"] in (SKIP, DEFER)]
+        if not_passed:
+            details = "; ".join(f"{cid}={status} ({reason})" for cid, status, reason in not_passed)
+            print(f"\n--require-passed: {len(not_passed)} selected check(s) did not run to a pass: {details}",
+                  file=sys.stderr)
+            return 1
     return 0
 
 

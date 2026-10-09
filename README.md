@@ -119,6 +119,8 @@ python3 tests/verify.py --list
 python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 ```
 
+日常 GitHub CI 按改动范围选择 frontend／UI、native／CLI、工作包重检查与 Linux VM，完整跨平台验收保留每周与手动入口；本地不带参数的验证仍运行完整 synthetic 默认组。分组、依赖与证据边界见[验证指南](docs/verification.md)。Cloudflare Pages 官网更新仍是独立操作，CI 不执行部署或 App 发行。
+
 - [产品目标](docs/SPEC.md)、[本轮产品基线与 18 项行为验收](docs/specs/product-baseline-status.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
 - [统一验证与独立 runtime 关口](docs/verification.md)
 - [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)、[视觉身份与源资产](docs/visual-language.md)

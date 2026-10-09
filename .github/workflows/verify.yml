@@ -1,34 +1,133 @@
 name: verify
 
-# Synthetic defaults plus isolated browser/Linux runtime verification. This
-# workflow uses `python3 tests/verify.py` on macOS and Linux. It never performs release,
-# publish, deploy, or account operations, and it does not run real
-# auth acceptance. Independent browser checks run real headless Chromium with
-# temporary profiles/local fixtures. Linux additionally runs isolated OpenSSH
-# with inert Claude fixtures (see docs/verification.md).
+# Canonical synthetic + isolated runtime verification, split into finite CI
+# profiles (tests/ci_plan.py). `python3 tests/verify.py` remains the single
+# provider-neutral entrypoint; the `plan` job only *selects* which of its checks
+# each job runs, based on the changed paths.
+#
+# CI owner: GitHub Actions is the only CI owner here. The workflow never
+# deploys, publishes, signs or touches accounts, and it never runs the
+# local-only `work-scale` capacity acceptance or the native macOS Tauri bundle.
+# A missing base, an unknown path or any CI-controller change fails closed to the
+# complete cross-platform matrix; schedule and workflow_dispatch are always full.
 on:
   push:
     branches: ["**"]
   pull_request:
+  schedule:
+    # Weekly complete cross-platform acceptance on the default branch (no
+    # production action). Monday 03:17 UTC avoids the top-of-hour crunch.
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Cancel a superseded push/PR run on the same ref, but never cancel an
+# independent scheduled or manually dispatched acceptance run. Scheduled and
+# manual runs get their own group keyed by run id, so they never queue behind or
+# replace one another; only push/PR runs cancel (per ref).
+concurrency:
+  group: verify-${{ github.ref }}-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('acceptance-{0}', github.run_id) || 'change' }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+env:
+  # Evidence lives beside and outside the checkout, matching the existing
+  # "evidence stays outside Git" contract. It is never written into the repo, so
+  # the working tree stays clean and no generated-file .gitignore is needed.
+  EVIDENCE_DIR: ${{ github.workspace }}/../lintel-verify
+
 jobs:
-  synthetic:
-    name: synthetic (${{ matrix.os }})
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.compute.outputs.profile }}
+      reason: ${{ steps.compute.outputs.reason }}
+      platforms: ${{ steps.compute.outputs.platforms }}
+      control_checks: ${{ steps.compute.outputs.control_checks }}
+      control_enabled: ${{ steps.compute.outputs.control_enabled }}
+      frontend_checks: ${{ steps.compute.outputs.frontend_checks }}
+      frontend_enabled: ${{ steps.compute.outputs.frontend_enabled }}
+      native_checks: ${{ steps.compute.outputs.native_checks }}
+      native_enabled: ${{ steps.compute.outputs.native_enabled }}
+      heavy_checks: ${{ steps.compute.outputs.heavy_checks }}
+      heavy_enabled: ${{ steps.compute.outputs.heavy_enabled }}
+      browser_checks: ${{ steps.compute.outputs.browser_checks }}
+      browser_enabled: ${{ steps.compute.outputs.browser_enabled }}
+      runner_checks: ${{ steps.compute.outputs.runner_checks }}
+      runner_enabled: ${{ steps.compute.outputs.runner_enabled }}
+      vm_checks: ${{ steps.compute.outputs.vm_checks }}
+      vm_enabled: ${{ steps.compute.outputs.vm_enabled }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so push(base=before)/PR(merge base) diffs resolve; an
+          # unresolvable base still fails the plan closed to full.
+          fetch-depth: 0
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compute CI plan
+        id: compute
+        env:
+          EVENT: ${{ github.event_name }}
+          # push: before..head; pull_request: base.sha/head.sha, whose diff base
+          # is resolved by ci_plan.py through `git merge-base`.
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          CHECKOUT_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/lintel-plan"
+          python3 tests/ci_plan.py \
+            --event "$EVENT" \
+            --base "$BASE" \
+            --head "$HEAD" \
+            --checkout-head "$CHECKOUT_HEAD" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary-file "$GITHUB_STEP_SUMMARY" \
+            --json "$RUNNER_TEMP/lintel-plan/plan.json"
+
+      - name: Publish plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-plan
+          path: ${{ runner.temp }}/lintel-plan/plan.json
+
+  control:
+    name: control (self-tests)
+    needs: plan
+    if: needs.plan.outputs.control_enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Controller test dependency
+        timeout-minutes: 5
+        run: python3 -m pip install --disable-pip-version-check -r tests/requirements-ci.txt
+      - name: Verification control self-tests
+        run: python3 tests/verify.py --self-test --require-passed
+
+  frontend:
+    name: frontend (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.frontend_enabled == 'true'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Node.js
         uses: actions/setup-node@v4
         with:
@@ -37,13 +136,54 @@ jobs:
           cache-dependency-path: |
             apps/desktop/package-lock.json
             extensions/browser/package-lock.json
-
       - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Desktop dependencies
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Light JS/Python/frontend checks
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed \
+            --checks '${{ needs.plan.outputs.frontend_checks }}' \
+            --json "$EVIDENCE_DIR/frontend-${{ matrix.os }}.json"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-frontend-${{ matrix.os }}
+          path: ${{ env.EVIDENCE_DIR }}/frontend-*.json
+          if-no-files-found: warn
 
-      - name: Linux system packages (Tauri)
+  native:
+    name: native rust (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.native_enabled == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux system packages (Tauri desktop-rust-test)
+        # `desktop-rust-test` builds the standalone Tauri crate, whose Linux
+        # build needs the GTK/WebKit/AppIndicator development headers. Only this
+        # job needs them; the other Linux jobs stay lean.
         if: runner.os == 'Linux'
         timeout-minutes: 15
         run: |
@@ -54,75 +194,342 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            openssh-server openssh-client musl-tools \
-            qemu-system-x86 qemu-utils cloud-image-utils gpgv ubuntu-keyring
+            libjavascriptcoregtk-4.1-dev
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            apps/desktop/src-tauri/target
+            extensions/browser/native-host/target
+          key: cargo-native-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain*', 'Cargo.toml', 'crates/**/Cargo.toml', 'apps/**/Cargo.toml', 'extensions/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-native-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-
+      - name: Native Rust and general CLI journeys
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed \
+            --checks '${{ needs.plan.outputs.native_checks }}' \
+            --json "$EVIDENCE_DIR/native-${{ matrix.os }}.json"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-native-${{ matrix.os }}
+          path: ${{ env.EVIDENCE_DIR }}/native-*.json
+          if-no-files-found: warn
 
-      - name: Desktop dependencies
+  heavy:
+    name: heavy work (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.heavy_enabled == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-heavy-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain*', 'Cargo.toml', 'crates/**/Cargo.toml', 'apps/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-heavy-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-
+      - name: Heavy work archive/capacity/preserve journeys
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed \
+            --checks '${{ needs.plan.outputs.heavy_checks }}' \
+            --json "$EVIDENCE_DIR/heavy-${{ matrix.os }}.json"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-heavy-${{ matrix.os }}
+          path: ${{ env.EVIDENCE_DIR }}/heavy-*.json
+          if-no-files-found: warn
+
+  browser:
+    name: browser/UI (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.browser_enabled == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
+    env:
+      LINTEL_PAIRING_UI_REPORT: ${{ github.workspace }}/../lintel-verify/browser-pairing-ui.json
+      LINTEL_SERVICE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/service-ui.json
+      LINTEL_REMOTE_TASK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/remote-task-ui.json
+      LINTEL_WORK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/work-ui.json
+      LINTEL_COMPONENTS_UI_REPORT: ${{ github.workspace }}/../lintel-verify/components-ui.json
+      LINTEL_TELEMETRY_UI_REPORT: ${{ github.workspace }}/../lintel-verify/telemetry-ui.json
+      LINTEL_UPDATE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/app-update-ui.json
+      LINTEL_NETWORK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/network-ui.json
+      LINTEL_DRIFT_UI_REPORT: ${{ github.workspace }}/../lintel-verify/drift-ui.json
+      LINTEL_BASELINE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/baseline-ui.json
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            extensions/browser/package-lock.json
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            extensions/browser/native-host/target
+          key: cargo-browser-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain*', 'Cargo.toml', 'crates/**/Cargo.toml', 'apps/**/Cargo.toml', 'extensions/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-browser-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-
+      - name: Desktop dependencies and frontend build
         working-directory: apps/desktop
-        run: npm ci
-
+        run: |
+          npm ci
+          npm run build
       - name: Browser test dependencies
+        timeout-minutes: 15
         working-directory: extensions/browser
         run: |
           npm ci
           npx playwright install --with-deps chromium
-
-      - name: Verification control self-tests
+      - name: Browser/UI checks
         run: |
-          python3 tests/verify.py --self-test
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed \
+            --checks '${{ needs.plan.outputs.browser_checks }}' \
+            --json "$EVIDENCE_DIR/browser-${{ matrix.os }}.json"
+      - name: Collect browser startup evidence
+        if: always()
+        run: |
+          if [ -f extensions/browser/artifacts/browser-smoke.json ]; then
+            cp extensions/browser/artifacts/browser-smoke.json "$EVIDENCE_DIR/browser-smoke.json"
+          fi
+          if [ -f extensions/browser/artifacts/browser-smoke-failure.json ]; then
+            cp extensions/browser/artifacts/browser-smoke-failure.json "$EVIDENCE_DIR/browser-smoke-failure.json"
+          fi
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-browser-${{ matrix.os }}
+          path: ${{ env.EVIDENCE_DIR }}/*.json
+          if-no-files-found: warn
 
-      - name: Synthetic verification
-        run: python3 tests/verify.py --json "$RUNNER_TEMP/lintel-verify/evidence.json"
-
+  runner:
+    name: runner/CLI (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.runner_enabled == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.platforms) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux system packages (static runner + OpenSSH)
+        if: runner.os == 'Linux'
+        timeout-minutes: 15
+        run: |
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 --error-on=any update
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 install -y \
+            openssh-server openssh-client musl-tools
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-runner-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain*', 'Cargo.toml', 'crates/**/Cargo.toml', 'apps/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-runner-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-
       - name: Build static Linux runner
         if: runner.os == 'Linux'
         run: |
           rustup target add x86_64-unknown-linux-musl
           cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
-
+      - name: Build native macOS CLI binary
+        # `cli-candidate` executes `target/debug/lintel`. The package is
+        # `lintel-runner` (apps/runner) and its binary target is named `lintel`;
+        # build the package here now that the default cargo group no longer
+        # shares this runner.
+        if: runner.os == 'macOS'
+        run: cargo build --locked -p lintel-runner
       - name: Linux OpenSSH runtime acceptance
         if: runner.os == 'Linux'
-        run: python3 tests/verify.py --checks linux-ssh-runtime --json "$RUNNER_TEMP/lintel-verify/linux-ssh-runtime.json"
-
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed --checks linux-ssh-runtime \
+            --json "$EVIDENCE_DIR/linux-ssh-runtime.json"
       - name: Independent CLI candidate packaging and upgrade
-        run: python3 tests/verify.py --checks cli-candidate --json "$RUNNER_TEMP/lintel-verify/cli-candidate.json"
-
-      - name: Independent browser runtime and App pairing
-        env:
-          LINTEL_PAIRING_UI_REPORT: ${{ runner.temp }}/lintel-verify/browser-pairing-ui.json
-          LINTEL_SERVICE_UI_REPORT: ${{ runner.temp }}/lintel-verify/service-ui.json
-          LINTEL_REMOTE_TASK_UI_REPORT: ${{ runner.temp }}/lintel-verify/remote-task-ui.json
-          LINTEL_WORK_UI_REPORT: ${{ runner.temp }}/lintel-verify/work-ui.json
-          LINTEL_COMPONENTS_UI_REPORT: ${{ runner.temp }}/lintel-verify/components-ui.json
-          LINTEL_TELEMETRY_UI_REPORT: ${{ runner.temp }}/lintel-verify/telemetry-ui.json
-          LINTEL_UPDATE_UI_REPORT: ${{ runner.temp }}/lintel-verify/app-update-ui.json
-          LINTEL_NETWORK_UI_REPORT: ${{ runner.temp }}/lintel-verify/network-ui.json
-          LINTEL_DRIFT_UI_REPORT: ${{ runner.temp }}/lintel-verify/drift-ui.json
-          LINTEL_BASELINE_UI_REPORT: ${{ runner.temp }}/lintel-verify/baseline-ui.json
         run: |
-          python3 tests/verify.py --checks browser-smoke,browser-pairing-ui,service-ui,remote-task-ui,work-ui,components-ui,baseline-ui,archive-wait-ui,drift-ui,network-ui,telemetry-ui,app-update-ui,site-ui,clawd-app-ui --json "$RUNNER_TEMP/lintel-verify/browser-runtime.json"
-
-      - name: Disposable Linux VM lifecycle acceptance
-        if: runner.os == 'Linux'
-        env:
-          LINTEL_VM_REPORT: ${{ runner.temp }}/lintel-verify/linux-vm-runtime.json
-        run: python3 tests/verify.py --checks linux-vm-runtime --json "$RUNNER_TEMP/lintel-verify/linux-vm-entry.json"
-
-      - name: Collect browser startup evidence
-        if: always()
-        run: |
-          if [ -f extensions/browser/artifacts/browser-smoke.json ]; then
-            cp extensions/browser/artifacts/browser-smoke.json "$RUNNER_TEMP/lintel-verify/browser-smoke.json"
-          fi
-          if [ -f extensions/browser/artifacts/browser-smoke-failure.json ]; then
-            cp extensions/browser/artifacts/browser-smoke-failure.json "$RUNNER_TEMP/lintel-verify/browser-smoke-failure.json"
-          fi
-
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed --checks cli-candidate \
+            --json "$EVIDENCE_DIR/cli-candidate-${{ matrix.os }}.json"
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lintel-verify-${{ matrix.os }}
-          path: ${{ runner.temp }}/lintel-verify/*.json
+          name: evidence-runner-${{ matrix.os }}
+          path: ${{ env.EVIDENCE_DIR }}/cli-candidate-*.json
           if-no-files-found: warn
+      - name: Upload Linux evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-runner-linux-extra
+          path: ${{ env.EVIDENCE_DIR }}/linux-ssh-runtime.json
+          if-no-files-found: warn
+
+  vm:
+    name: linux vm
+    needs: plan
+    if: needs.plan.outputs.vm_enabled == 'true'
+    # Single Linux-only job: the disposable VM needs a Linux x86_64 host. It is
+    # an independent job, never queued behind the default/UI jobs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      LINTEL_VM_REPORT: ${{ github.workspace }}/../lintel-verify/linux-vm-runtime.json
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Linux system packages (QEMU + static runner)
+        timeout-minutes: 15
+        run: |
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 --error-on=any update
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 install -y \
+            musl-tools qemu-system-x86 qemu-utils cloud-image-utils gpgv ubuntu-keyring openssh-client
+      - name: Cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-vm-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain*', 'Cargo.toml', 'crates/**/Cargo.toml', 'apps/**/Cargo.toml') }}
+          restore-keys: |
+            cargo-vm-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust.outputs.cachekey }}-
+      - name: Cache official Ubuntu base image only
+        # Official signed base image only; every run still re-verifies the gpgv
+        # signature and checksums. Never cache a writable guest, overlay,
+        # cloud-init state or account data (those stay ephemeral per run).
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/lintel-vm-images
+          key: lintel-vm-images-20260801
+      - name: Build static Linux runner
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
+      - name: Disposable Linux VM lifecycle acceptance
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python3 tests/verify.py --require-passed --checks linux-vm-runtime \
+            --json "$EVIDENCE_DIR/linux-vm-entry.json"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-vm
+          path: |
+            ${{ env.EVIDENCE_DIR }}/linux-vm-entry.json
+            ${{ env.EVIDENCE_DIR }}/linux-vm-runtime.json
+          if-no-files-found: warn
+
+  aggregate:
+    name: aggregate
+    needs: [plan, control, frontend, native, heavy, browser, runner, vm]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download plan
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-plan
+          path: plan
+      - name: Download evidence
+        # One directory per artifact (no merge), so the gate can identify each
+        # job/platform's canonical evidence file and reject a cross-platform
+        # sidecar merge. A docs-only run legitimately produces no evidence; an
+        # empty download must not itself fail the gate.
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: evidence-*
+          path: evidence
+      - name: Evaluate job results and canonical evidence
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS" > results.json
+          python3 tests/ci_plan.py --aggregate \
+            --plan plan/plan.json \
+            --results results.json \
+            --evidence-dir evidence
+      - name: Aggregate summary
+        if: always()
+        run: |
+          echo "## verify aggregate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f plan/plan.json ]; then
+            python3 -c "import json;p=json.load(open('plan/plan.json'));print('profile:',p['profile']);print('platforms:',','.join(p['platforms']));print('reason:',p['reason'])" >> "$GITHUB_STEP_SUMMARY"
+          fi

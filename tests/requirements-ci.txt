@@ -1,0 +1,2 @@
+# YAML workflow contracts; verification-only, no production dependency.
+PyYAML==6.0.3

@@ -249,6 +249,8 @@ python3 tests/verify.py --list
 python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 ```
 
+Daily GitHub CI selects frontend/UI, native/CLI, heavy work-package and Linux VM checks by changed paths; weekly and manual runs retain full cross-platform integration coverage. The local verifier without selection arguments still runs the complete synthetic default group. See the [verification guide](docs/verification.md) for groups, dependencies and evidence boundaries. Cloudflare Pages website updates remain separate; CI does not deploy or release the App.
+
 - [Product target](docs/SPEC.md), [this round's product baseline and 18 behavior checks](docs/specs/product-baseline-status.md), [86 full acceptance checks](docs/ACCEPTANCE.md)
 - [Unified verification and independent runtime gates](docs/verification.md)
 - [Current implementation state](docs/current-state.md), [desktop usage and visual conventions](docs/desktop.md), [visual identity and source assets](docs/visual-language.md)
