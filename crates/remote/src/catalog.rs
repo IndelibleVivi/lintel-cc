@@ -417,6 +417,20 @@ mod tests {
             "@\\.service$"
         );
         assert!(validate_request(&json!({"command":"service_inspect","environment_id":"00000000-0000-4000-8000-000000000001","manager":"user","unit":"synthetic@.service"})).is_err());
+        // The static telemetry catalog is a readonly remote request: it never
+        // creates a task record, needs no runner field and accepts no other key.
+        assert!(REQUEST_COMMANDS.contains(&"telemetry_catalog"));
+        assert!(validate_request(&json!({"command":"telemetry_catalog"})).is_ok());
+        assert!(validate_request(&json!({"command":"telemetry_catalog","host":"api.anthropic.com"})).is_err());
+        let telemetry = branches
+            .iter()
+            .find(|branch| branch["title"] == "telemetry_catalog")
+            .unwrap();
+        assert_eq!(
+            telemetry["properties"]["command"]["const"],
+            "telemetry_catalog"
+        );
+        assert_eq!(telemetry["required"], json!(["command"]));
     }
 
     #[test]

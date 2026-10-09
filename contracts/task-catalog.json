@@ -6,7 +6,7 @@
     {
       "id": "reduce_egress",
       "label": "减少外发，保留需要的功能",
-      "summary": "环境设置先选定主机与环境，预览版本条件及变更，批准后写入并读回。共享网络观察与 IPv4／IPv6 测试可独立使用。已有会话不会自动重启。",
+      "summary": "环境设置先选定主机与环境，预览版本条件及变更，批准后写入并读回。可选遥测目标可合入受控通道并单独测试；共享 IPv4／IPv6 观察可独立使用。已有会话不会自动重启。",
       "route": "#/protect",
       "help_anchor": "protect",
       "operations": [
@@ -19,14 +19,16 @@
         "network_inspect",
         "network_probe",
         "plan_network_ipv6",
-        "plan_network_restore"
+        "plan_network_restore",
+        "telemetry_catalog"
       ],
       "cli_examples": [
         "lintel env list",
         "lintel policy plan --environment <ENVIRONMENT_ID> --preset reduce --keep-remote-control",
         "lintel job submit --plan <PLAN_ID> --approval <PLAN_HASH>",
         "lintel network inspect",
-        "lintel network probe"
+        "lintel network probe",
+        "lintel telemetry catalog"
       ],
       "preconditions": [
         "exact_registered_environment_for_settings",

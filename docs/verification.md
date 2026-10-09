@@ -36,6 +36,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared runner connected silhouette/whole-body pose/jump/varied reachable stars/collision/pause physics, no dependencies) |
 | `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
+| `app-release-test` | js | strict SemVer, actual disposable Ed25519 artifact/comment/version verification, synthetic App identity/architecture and finite website metadata packaging |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |
@@ -44,7 +45,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-product-baseline` | journey | `python3 tests/backend_baseline_journey.py`; readonly context/help, frozen target and bounded session/launch contracts |
 | `journey-network` | journey | finite IP targets/defaults, strict CLI/schema admission and synthetic-home host boundary; no public/host probes |
 | `journey-agent-cli` | journey | static catalog, named CLI, durable original-ID wait, portable archive/import and restore |
-| `journey-agent-adapters` | journey | synthetic SSH registry, browser absent-profile handling and foreground network stream/stop |
+| `journey-agent-adapters` | journey | static telemetry without state, real controlled CONNECT/original event, finite refusal, synthetic SSH registry, browser absent-profile and foreground stream/stop |
 | `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
@@ -604,3 +605,16 @@ dependency-preparation stall with an unconfirmed cause — not a source/test fai
 and not a diagnosed platform outage. The step bound above is the response, and only
 a fresh Ubuntu run can confirm it; the passing macOS job does not stand in for the
 missing Ubuntu evidence.
+
+## 遥测与 App updater
+
+`telemetry-ui` 与 `app-update-ui` 是独立 built-App Chromium selections：分别检查目录／设置／草案／受控来源，以及未配置／离线／坏签名显示、安装批准、原 ID、显式重启与默认关闭／取消的后台 timer。CI 通过 canonical entrypoint 显式选择这两项；invoke 与发行回复显式合成，不能当成 native WebKit、公网 feed 或实际 App 安装证据。
+
+实际受控 CONNECT、已完成事件的一致性、伪造 header 拒绝、误放行 fail-closed、取消与实例替换由 egress loopback tests 验证；`journey-agent-adapters` 在真实 CLI 边界核对无 state 的共享目录、非法测试拒绝和原事件匹配。standalone `desktop-rust-test` 覆盖 native activity gate、更新记录的中断／外部冲突，并在 macOS 用官方 updater 和 disposable signed-format fixture 做 HTTP 解析、版本／签名拒绝、下载不安装及临时 App 替换；只作用于临时目录与 loopback。Rust tests 需要 Node/Python 提供一次性签名 fixture。Tauri 拒绝 symlink 内的测试 executable 时，用同一物理 target directory 执行检查，不放宽 production current-executable 检查。
+
+```sh
+python3 tests/verify.py --checks cargo-workspace-test,desktop-rust-test,app-release-test,desktop-build
+python3 tests/verify.py --checks telemetry-ui,app-update-ui
+```
+
+正式 Developer ID／公证、公开 Release／feed、旧实际 App 升级与 native WebKit 仍需独立验收；没有真实更新或生产系统网络 mutation。

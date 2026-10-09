@@ -67,3 +67,7 @@ python3 tests/verify.py --checks clawd-app-ui
 本地 browser journey 证明隔离 Chromium 中的布局与交互，不代表 Safari 或真实手机验收。托管后的 HTTP／CSP／真实播放另行检查，具体结果见 current-state；owner 的视觉接受独立于这些 checks。每次生产更新仍需当前部署授权。
 
 `index.html` 的 `<head>` 声明 canonical／`og:url` `https://lintel.page/`、同源分享图 `https://lintel.page/assets/lintel-social-preview.png` 与 `twitter:summary_large_image`；分享图由打包入口供应。`robots.txt`／`sitemap.xml` 使用正式域名，`404.html` 为未知路径提供独立错误页面，`_headers` 维护托管 CSP 与响应 headers。
+
+## 未来 App 下载与更新资料
+
+[`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。本次只是源码准备，未创建正式下载或更改线上站点。

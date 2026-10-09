@@ -1,0 +1,10 @@
+.update-version { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.update-version h3 { font-size:2rem; margin:8px 0 16px; }
+.update-preference { display:flex; align-items:flex-start; gap:12px; padding:18px 0; }
+.update-preference input { margin-top:4px; }
+.update-preference small { display:block; color:var(--muted); margin-top:5px; }
+.update-candidate { border-top:1px solid var(--line); margin-top:24px; padding-top:18px; }
+.update-notes { white-space:pre-wrap; overflow-wrap:anywhere; }
+.app-updates code { overflow-wrap:anywhere; }
+.app-updates progress { width:100%; accent-color:var(--accent); }
+.update-record { display:grid; gap:8px; border-top:1px solid var(--line); margin-top:24px; padding-top:18px; font-size:13px; }

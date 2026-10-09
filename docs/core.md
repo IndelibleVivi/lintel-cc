@@ -4,6 +4,8 @@
 
 ## 宿主共享 IPv4 / IPv6
 
+`telemetry_catalog` 在 runtime paths/state 初始化前返回编译期嵌入的 [确切目标目录](../contracts/telemetry-destinations.json)，只接受 command 字段；named CLI 与有限 SSH 同用 operations 的静态字段合同。它不产生计划或任务，也不做网络请求。core policy 记录非必要流量总开关的更新／feature flag 附带影响；实际受控测试由 egress 的原 Proxy owner 完成。[遥测指南](telemetry.md) 定义观察边界。App 自身更新由独立 native `app_updates.rs` 管理，不进入 Claude 文件 mutation plan；原更新 intent 保存在 App data，详情见 [App 更新](app-updates.md)。
+
 `network.rs` owns 离线网络观察、finite probe 的 metadata 与 baseline、macOS 精确 IPv6 配置计划／批准／journal／恢复；实际 HTTPS bytes 只有 egress probe 一份实现。`network_inspect`、`network_probe`、`plan_network_ipv6`、`plan_network_restore` 不需要环境 ID，plan／receipt 明确 `environment_id:null` 和 `scope:host_shared`。generic execute 只加入这两个支持的 mutation kinds，launch/resume/unknown 的独立 admission 不变；generic plan_restore 按原网络 job 路由，绝不当作 settings 恢复。Linux 明确只读；synthetic home 不能触碰真实宿主。完整字段、恢复与不确定性语义见 [网络指南](network.md)。
 
 ## 读取、计划与批准

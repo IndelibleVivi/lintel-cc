@@ -312,7 +312,7 @@ pub fn valid_service_unit(unit: &str) -> bool {
 /// Each row is an existing public operation, not an arbitrary RPC namespace.
 fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
     Some(match command {
-        "discover" | "jobs" | "export_support" => (&[], &[]),
+        "discover" | "jobs" | "export_support" | "telemetry_catalog" => (&[], &[]),
         "network_inspect" => (&[], &[]),
         "network_probe" => (
             &["ipv4_url", "ipv6_url"],
@@ -399,6 +399,7 @@ pub const COMMANDS: &[&str] = &[
     "network_probe",
     "plan_network_ipv6",
     "plan_network_restore",
+    "telemetry_catalog",
     "discover",
     "register",
     "create_environment",
@@ -721,6 +722,7 @@ pub fn describe(command: &str) -> Option<Value> {
     let s = schema(command)?;
     let planning = command.starts_with("plan_") && command != "plan_show";
     let target = match command {
+        "telemetry_catalog" => "no_target_readonly_static_catalog",
         "network_probe" => "explicit_https_ip_echo_requests",
         "plan_network_ipv6" | "plan_network_restore" => "read_shared_host_network_for_frozen_plan",
         "execute" => "frozen_plan_scope",
@@ -742,6 +744,7 @@ pub fn describe(command: &str) -> Option<Value> {
         _ => "inspect_or_no_target_write",
     };
     let state = match command {
+        "telemetry_catalog" => "readonly_static_catalog_no_state_no_network",
         "network_inspect" => "readonly_host_network_metadata",
         "network_probe" => "persist_finite_probe_result_for_baseline_reuse",
         "discover" | "register" | "create_environment" | "reactivate_environment" => {
@@ -818,6 +821,35 @@ pub fn tasks() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn telemetry_catalog_is_static_and_rejects_all_fields() {
+        assert!(COMMANDS.contains(&"telemetry_catalog"));
+        assert!(validate(&json!({"command":"telemetry_catalog"})).is_ok());
+        // No field is accepted: unknown actors cannot smuggle a host or path.
+        for extra in [
+            json!({"command":"telemetry_catalog","path":"/etc/hosts"}),
+            json!({"command":"telemetry_catalog","host":"api.anthropic.com"}),
+            json!({"command":"telemetry_catalog","ids":["datadog_logs_intake"]}),
+            json!({"command":"telemetry_catalog","environment_id":"00000000-0000-4000-8000-000000000001"}),
+        ] {
+            assert!(validate(&extra).is_err(), "{extra}");
+        }
+        let describe = describe("telemetry_catalog").unwrap();
+        assert_eq!(describe["requires_plan"], false);
+        assert_eq!(describe["effects"]["external"], "none");
+        assert_eq!(
+            describe["effects"]["lintel_state"],
+            "readonly_static_catalog_no_state_no_network"
+        );
+        assert_eq!(
+            describe["effects"]["target"],
+            "no_target_readonly_static_catalog"
+        );
+        // The static catalog must never claim SSH execution.
+        let transports = describe["transports"].as_array().unwrap();
+        assert!(transports.contains(&json!("named_cli")));
+    }
+
     #[test]
     fn network_requests_freeze_finite_targets_before_transport() {
         let probe = json!({"ipv4_url":"https://api.ipify.org","ipv6_url":"https://api6.ipify.org","timeout_seconds":10});

@@ -1,0 +1,20 @@
+/* Telemetry destination catalog inside the stopped-channel draft. The panel is
+   presentation only; selection merges exact hosts into the existing draft. */
+.telemetry-panel{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}
+.telemetry-panel .surface-heading{align-items:center;display:flex;gap:10px;justify-content:space-between}
+.telemetry-panel h3{font-size:14px}
+.telemetry-panel h4{font-size:12px;margin-top:16px;color:var(--muted)}
+.telemetry-panel .padded>p{font-size:12px;line-height:1.8}
+.telemetry-row{align-items:flex-start;border-top:1px solid var(--line);display:flex;gap:10px;padding:10px 0}
+.telemetry-row input{margin-top:3px}
+.telemetry-row>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.telemetry-row strong{font-size:12px}
+.telemetry-detail{font-size:11px;color:var(--muted);line-height:1.7;overflow-wrap:anywhere}
+.telemetry-impact{color:var(--accent-strong)}
+.telemetry-info li{font-size:11px;line-height:1.7;overflow-wrap:anywhere}
+.telemetry-info .telemetry-detail{display:block}
+@media (prefers-reduced-motion:reduce){.telemetry-panel *{transition:none!important;animation:none!important}}
+.telemetry-test{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.telemetry-test h4{font-size:12px;margin-bottom:6px}
+.telemetry-test-row{align-items:center;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;padding:8px 0}
+.telemetry-test-result{flex-wrap:wrap;gap:4px}

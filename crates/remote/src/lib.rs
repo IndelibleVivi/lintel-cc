@@ -888,6 +888,7 @@ fn load(path: &Path) -> Result<Value> {
 // These runner operations may cross the JSON request transport. Execution and
 // interactive launch retain their separate controller operations and safeguards.
 const REQUEST_COMMANDS: &[&str] = &[
+    "telemetry_catalog",
     "discover",
     "register",
     "create_environment",

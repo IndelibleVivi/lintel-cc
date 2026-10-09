@@ -81,6 +81,8 @@ requires a new preview and approval, and old IDs are never redone.
 
 ## What you can do today
 
+- Select exact optional telemetry destinations from a static official-source catalog in the existing controlled-channel draft. Claude settings, active rules, controlled rule tests and observed requests remain separate. Mixed model/authentication/download hosts are informational; the NONESSENTIAL switch also disables Claude Code updates. See [telemetry control](docs/telemetry.md).
+- Open Settings → Lintel version and updates for the App version and manual checking. Background checks default off; download/signature verification, approved installation and explicit restart are separate. Source builds without a release key/feed show an explicit limitation. There is no formal Release or activated feed. [App updates and release preparation](docs/app-updates.md) describes the common version record for future builds, website DMGs and updater archives.
 - Register a Claude Code config directory, or create a dedicated environment.
   Select the environment at the top, open the protect plan, preview the exact
   changes, then approve execution.

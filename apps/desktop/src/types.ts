@@ -119,7 +119,18 @@ interface SessionPageBase { path:string;offset?:number;raw_text?:string;next_off
 export type SessionPage = SessionPageBase & ({content_kind:'messages';records?:SessionRecord[]} | {content_kind:'text';records?:never});
 export interface InputReference { files:{path:string;digest:string;package_digest?:string;index?:number;offset?:number;block_index?:number}[] }
 export interface ExecutionContext { product:string;version:string;protocol:number;platform:string;architecture:string;user:{uid:number;euid:number;home:string};state:{source:string;path:string;exists:boolean};config_home:{path:string;exists:boolean};executable:string|null;initialized:boolean }
+// Static telemetry-destination catalog shared by App/CLI (contracts/telemetry-destinations.json).
+export interface TelemetryDestination {
+  id: string; purpose: string; provider: string; clients: string[]; applicability: string;
+  version_applicability: string; source_url: string; checked_date: string;
+  collateral_impact: string; host: string; port: number; blockable: boolean;
+}
+export interface TelemetryCatalog {
+  schema: string; version: number; notes?: string; source: string; checked_date: string;
+  destinations: TelemetryDestination[];
+}
 export interface Api {
+  telemetry_catalog: { request: {}; response: TelemetryCatalog };
   network_inspect: { request: {}; response: NetworkInspection };
   network_probe: { request: ProbeOptions; response: NetworkProbe };
   plan_network_ipv6: { request: { service_id: string; mode: 'off' | 'link_local'; probe: ProbeOptions; baseline_id?: string }; response: Plan };

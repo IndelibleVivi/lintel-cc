@@ -2,8 +2,11 @@
 use serde_json::{json, Value};
 use std::path::PathBuf;
 
-#[tauri::command]
-pub async fn remote_request(app: tauri::AppHandle, payload: Value) -> Value {
+pub async fn remote_request(
+    app: tauri::AppHandle,
+    payload: Value,
+    permit: tokio::sync::OwnedRwLockReadGuard<()>,
+) -> Value {
     use tauri::Manager;
     let bundles = if cfg!(debug_assertions) {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("runner-bundles")
@@ -15,8 +18,11 @@ pub async fn remote_request(app: tauri::AppHandle, payload: Value) -> Value {
             }
         }
     };
-    match tauri::async_runtime::spawn_blocking(move || lintel_remote::control(payload, bundles))
-        .await
+    match tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        lintel_remote::control(payload, bundles)
+    })
+    .await
     {
         Ok(response) => response,
         Err(_) => {

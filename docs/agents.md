@@ -262,6 +262,20 @@ lintel network serve --config /absolute/reviewed-channel.json
 
 配置为 [network.md](network.md) 的 Config，包含显式 default_action 和精确规则。stdout 首条 listening 给出 foreground_process owner、PID、实际 loopback address 和规范化 active_config；连接事件是 NDJSON，Ctrl-C 结束进程通道。只覆盖经过代理的连接，不强制所有进程流量。App 的通道由 App 进程持有；CLI 不查询或停止 App 内通道，不声称共享状态。
 
+### Telemetry：静态目录与当前代理核验
+
+```sh
+lintel telemetry catalog
+lintel network catalog
+lintel describe telemetry_catalog
+# reviewed-channel.json 必须已经显式阻止所选目录 host:443；只测试自己的 loopback 代理。
+lintel network serve --config /absolute/reviewed-channel.json --test-telemetry datadog_logs_intake
+```
+
+`telemetry_catalog` 是无参数、无 state、无网络的静态 core 操作，可由 `lintel request` 或有限 `remote request` 读取。目录区分 direct Anthropic API 的可选 Datadog 入口和混合模型／认证／下载主机，版本适用性和来源日期不能当作运行证据。受控测试使用原 Proxy 实例：启动前要求 explicit block，启动后必须匹配真实拒绝与完成事件；不会解析或连接公网遥测目标。CLI 与 App 各持有自己的代理，App 测试还绑定当前 channel instance。普通客户端和受控测试来源分别记录。
+
+细粒度保护预设继续保留 Claude Code 更新路径；`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 的任意非空值（包括 `0`／`false`）同时关闭自动更新、release notes 与 feature flags。配置读回不能证明外部进程已加载。详见 [遥测指南](telemetry.md)。Lintel App 自身更新由 [App 更新指南](app-updates.md) 的独立 native 入口处理，不由 CLI 自动升级 App、浏览器组件或远端 runner。
+
 ### Network：有限 IP 测试与共享 IPv6 计划
 
 ```sh

@@ -14,7 +14,10 @@ struct Channel {
     binding: String,
     address: String,
     active_config: Config,
-    stop: oneshot::Sender<()>,
+    // The same Proxy instance that owns the listener; used only for controlled
+    // rule tests so provenance comes from this exact channel.
+    proxy: Arc<Proxy>,
+    stop: Option<oneshot::Sender<()>>,
     task: tokio::task::JoinHandle<std::io::Result<()>>,
     events: Arc<Mutex<VecDeque<Event>>>,
 }
@@ -46,6 +49,18 @@ fn stopped_status() -> Value {
 // The production command always selects the shared core. The private function
 // boundary lets synthetic tests observe launch payloads without starting Claude.
 impl NetworkState {
+    /// Readonly gate for the coordinator's updater install decision. True when
+    /// any environment still owns an unfinished proxy task (a live channel or a
+    /// channel that has not yet been stopped/cleared). This never mutates state
+    /// and never inspects a destination.
+    pub(crate) async fn has_active_channels(&self) -> bool {
+        self.channels
+            .lock()
+            .await
+            .values()
+            .any(|channel| !channel.task.is_finished())
+    }
+
     /// New frozen launches retain the same owned-channel guarantee as the
     /// legacy network launcher. Hold the channel lock through the sole attempt
     /// so stop cannot change the reviewed address halfway through dispatch.
@@ -201,7 +216,10 @@ impl NetworkState {
             }
         }
     }
-    async fn dispatch(&self, payload: Value, core: fn(Value) -> Value) -> Value {
+    async fn dispatch<F>(&self, payload: Value, core: F) -> Value
+    where
+        F: Fn(Value) -> Value + Send + 'static,
+    {
         let Some(id) = payload["environment_id"]
             .as_str()
             .filter(|id| !id.is_empty())
@@ -261,6 +279,7 @@ impl NetworkState {
                     Ok(address) => address.to_string(),
                     Err(_) => return error("address_unavailable", "无法取得监听地址"),
                 };
+                let proxy = Arc::new(proxy);
                 let (stop, stopped) = oneshot::channel();
                 let binding = format!(
                     "{}-{}",
@@ -270,16 +289,22 @@ impl NetworkState {
                         .unwrap_or_default()
                         .as_nanos()
                 );
-                let task = tokio::spawn(proxy.serve_until(async move {
-                    let _ = stopped.await;
-                }));
+                let serving = proxy.clone();
+                let task = tokio::spawn(async move {
+                    serving
+                        .serve_until_shared(async move {
+                            let _ = stopped.await;
+                        })
+                        .await
+                });
                 channels.insert(
                     id.to_string(),
                     Channel {
                         binding: binding.clone(),
                         address: address.clone(),
                         active_config: config.clone(),
-                        stop,
+                        proxy: proxy.clone(),
+                        stop: Some(stop),
                         task,
                         events: event_buffer,
                     },
@@ -291,11 +316,18 @@ impl NetworkState {
                 }})
             }
             "stop" => {
-                let Some(channel) = channels.remove(id) else {
+                let Some(channel) = channels.get_mut(id) else {
                     return stopped_status();
                 };
-                let _ = channel.stop.send(());
-                if !matches!(channel.task.await, Ok(Ok(()))) {
+                if let Some(stop) = channel.stop.take() {
+                    let _ = stop.send(());
+                }
+                // Keep the unfinished channel visible to the updater even if
+                // this IPC future is cancelled while awaiting shutdown. A later
+                // explicit stop can finish querying this same task.
+                let stopped = (&mut channel.task).await;
+                channels.remove(id);
+                if !matches!(stopped, Ok(Ok(()))) {
                     return error(
                         "channel_stop_failed",
                         "通道任务已结束，但停止返回异常，请检查结果",
@@ -317,6 +349,67 @@ impl NetworkState {
                     }})
                 } else {
                     stopped_status()
+                }
+            }
+            // Native controlled rule test. Accepts only a catalog id and proves
+            // the exact target is currently explicitly blocked by this channel's
+            // canonical handle. It never connects the destination, never resolves
+            // public DNS, and never touches an upstream. The returned kind/test ID
+            // mark it as an owner-origin request; ordinary Claude/proxy traffic
+            // never carries this marker.
+            "rule_test" => {
+                // Validate the finite fields and catalog id FIRST, before any
+                // channel lookup, so a malformed request is never masked by a
+                // missing/replaced channel.
+                let extra = payload
+                    .as_object()
+                    .map(|object| {
+                        object.keys().any(|key| {
+                            !["op", "environment_id", "telemetry_id", "channel_binding"]
+                                .contains(&key.as_str())
+                        })
+                    })
+                    .unwrap_or(true);
+                if extra {
+                    return error("invalid_request", "rule_test 不接受其他字段");
+                }
+                let Some(telemetry_id) = payload["telemetry_id"]
+                    .as_str()
+                    .filter(|value| !value.is_empty())
+                else {
+                    return error("invalid_request", "rule_test 需要 telemetry_id");
+                };
+                if lintel_egress::telemetry::host_for(telemetry_id).is_none() {
+                    return error("rule_test_failed", "unknown_telemetry_destination");
+                }
+                let Some(binding) = payload["channel_binding"]
+                    .as_str()
+                    .filter(|value| !value.is_empty() && value.len() <= 128)
+                else {
+                    return error("invalid_request", "rule_test 需要原通道的 channel_binding");
+                };
+                let Some(channel) = channels.get(id) else {
+                    return error("channel_missing", "请先启动当前环境的通道再进行受控测试");
+                };
+                if channel.task.is_finished() {
+                    return error(
+                        "channel_stopped",
+                        "通道已停止或被替换；请用当前通道重新测试",
+                    );
+                }
+                if binding != channel.binding {
+                    return error("channel_changed", "通道实例已改变；请刷新后重新测试");
+                }
+                // The verified outcome comes only from this exact channel's own
+                // serving Proxy; a failure is never reported as a pass.
+                match channel.proxy.rule_test(telemetry_id).await {
+                    Ok(outcome) => json!({"ok":true,"data":{
+                        "kind":"rule_test","test_id":outcome.test_id,
+                        "owner_origin":"lintel_app_proxy","telemetry_id":telemetry_id,
+                        "environment_id":id,"channel_binding":channel.binding,
+                        "outcome":outcome
+                    }}),
+                    Err(reason) => error("rule_test_failed", reason),
                 }
             }
             "launch" => {
@@ -342,12 +435,22 @@ impl NetworkState {
     }
 }
 
-#[tauri::command]
+// The root app owns the single `network_request` IPC command (guarded by the
+// ActivityGate). This module keeps the callable bridge function so the guard
+// wrapper can invoke it after acquiring its permit.
 pub async fn network_request(
     state: State<'_, NetworkState>,
     payload: Value,
+    permit: tokio::sync::OwnedRwLockReadGuard<()>,
 ) -> Result<Value, String> {
-    Ok(state.dispatch(payload, lintel_core::handle_request).await)
+    Ok(state
+        .dispatch(payload, move |payload| {
+            // A blocking core call retains admission after cancellation of its
+            // parent IPC future, just like the core/browser/remote adapters.
+            let _permit = &permit;
+            lintel_core::handle_request(payload)
+        })
+        .await)
 }
 
 #[cfg(test)]
@@ -360,6 +463,110 @@ mod tests {
     };
 
     const ENVIRONMENT: &str = "00000000-0000-4000-8000-000000000001";
+
+    #[tokio::test]
+    async fn cancelled_stop_keeps_unfinished_channel_visible_to_updater() {
+        let state = Arc::new(NetworkState::default());
+        let proxy = Arc::new(
+            Proxy::bind(Config::default(), Arc::new(|_| {}))
+                .await
+                .unwrap(),
+        );
+        let (stop, stopped) = oneshot::channel();
+        let (finish, finished) = oneshot::channel();
+        let stopping = Arc::new(tokio::sync::Notify::new());
+        let observed = stopping.clone();
+        let task = tokio::spawn(async move {
+            let _ = stopped.await;
+            observed.notify_one();
+            let _ = finished.await;
+            Ok(())
+        });
+        state.channels.lock().await.insert(
+            ENVIRONMENT.into(),
+            Channel {
+                binding: "synthetic-cancelled-stop".into(),
+                address: proxy.local_addr().unwrap().to_string(),
+                active_config: Config::default(),
+                proxy,
+                stop: Some(stop),
+                task,
+                events: Arc::new(Mutex::new(VecDeque::new())),
+            },
+        );
+        let owner = state.clone();
+        let request = tokio::spawn(async move {
+            owner
+                .dispatch(
+                    json!({"op":"stop","environment_id":ENVIRONMENT}),
+                    synthetic_core,
+                )
+                .await
+        });
+        timeout(Duration::from_secs(5), stopping.notified())
+            .await
+            .unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        assert!(
+            state.has_active_channels().await,
+            "unfinished shutdown blocks installation"
+        );
+        let _ = finish.send(());
+        let result = state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(result["ok"], true, "{result}");
+        assert!(!state.has_active_channels().await);
+    }
+
+    #[tokio::test]
+    async fn cancelled_network_inspection_retains_its_blocking_activity_permit() {
+        let state = Arc::new(NetworkState::default());
+        let gate = Arc::new(crate::activity::ActivityGate::default());
+        let permit = gate.operation().unwrap();
+        let entered = Arc::new(tokio::sync::Notify::new());
+        let observed = entered.clone();
+        let (finish, finished) = std::sync::mpsc::channel();
+        let owner = state.clone();
+        let request = tokio::spawn(async move {
+            owner
+                .dispatch(
+                    json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"allow"}}),
+                    move |payload| {
+                        let _permit = &permit;
+                        observed.notify_one();
+                        let _ = finished.recv_timeout(Duration::from_secs(5));
+                        synthetic_core(payload)
+                    },
+                )
+                .await
+        });
+        timeout(Duration::from_secs(5), entered.notified())
+            .await
+            .unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        assert!(
+            gate.installation().is_err(),
+            "cancelled IPC does not cancel a blocking call"
+        );
+        finish.send(()).unwrap();
+        timeout(Duration::from_secs(5), async {
+            while gate.installation().is_err() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(
+            !state.has_active_channels().await,
+            "cancelled start never publishes a channel"
+        );
+    }
     #[tokio::test]
     async fn network_probe_and_approval_bind_the_instance_and_keep_original_queries() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -534,6 +741,68 @@ mod tests {
     }
     fn unavailable_core(_: Value) -> Value {
         error("environment_missing", "synthetic missing environment")
+    }
+
+    // The native controlled rule test refuses without an active channel and
+    // validates its finite fields before touching a Proxy. No loopback needed.
+    #[tokio::test]
+    async fn rule_test_requires_an_active_channel_and_catalog_id() {
+        let state = NetworkState::default();
+        let no_channel = state
+            .dispatch(
+                json!({"op":"rule_test","environment_id":ENVIRONMENT,"telemetry_id":"datadog_logs_intake","channel_binding":"synthetic-binding"}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(no_channel["ok"], false);
+        assert_eq!(no_channel["error"]["code"], "channel_missing");
+        // An explicit extra field is rejected before any channel check.
+        for bad in [
+            json!({"op":"rule_test","environment_id":ENVIRONMENT,"telemetry_id":"datadog_logs_intake","host":"api.anthropic.com"}),
+            json!({"op":"rule_test","environment_id":ENVIRONMENT,"telemetry_id":"datadog_logs_intake","approval":"x"}),
+        ] {
+            let result = state.dispatch(bad, synthetic_core).await;
+            assert_eq!(result["ok"], false, "{result}");
+            assert_eq!(result["error"]["code"], "invalid_request");
+        }
+    }
+
+    #[tokio::test]
+    async fn controlled_test_freezes_live_binding_and_reads_completed_proxy_event() {
+        let state = NetworkState::default();
+        let started = state.dispatch(json!({"op":"start","environment_id":ENVIRONMENT,"config":{
+            "default_action":"allow","blocked":[{"host":"http-intake.logs.us5.datadoghq.com","ports":[443]}]
+        }}), synthetic_core).await;
+        assert_eq!(started["ok"], true, "{started}");
+        assert!(state.has_active_channels().await);
+        let binding = started["data"]["channel_binding"].clone();
+        let stale = state.dispatch(json!({"op":"rule_test","environment_id":ENVIRONMENT,"telemetry_id":"datadog_logs_intake","channel_binding":"old-instance"}), synthetic_core).await;
+        assert_eq!(stale["error"]["code"], "channel_changed");
+        let tested = state.dispatch(json!({"op":"rule_test","environment_id":ENVIRONMENT,"telemetry_id":"datadog_logs_intake","channel_binding":binding}), synthetic_core).await;
+        assert_eq!(tested["ok"], true, "{tested}");
+        assert_eq!(tested["data"]["outcome"]["result"], "blocked_explicit");
+        assert_eq!(
+            tested["data"]["test_id"],
+            tested["data"]["outcome"]["test_id"]
+        );
+        let status = state
+            .dispatch(
+                json!({"op":"status","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(status["data"]["events"].as_array().unwrap().len(), 1);
+        let event = &status["data"]["events"][0];
+        assert_eq!(event["origin"], "rule_test");
+        assert_eq!(event["test_id"], tested["data"]["test_id"]);
+        assert_eq!(event["outcome"], "blocked");
+        state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert!(!state.has_active_channels().await);
     }
 
     #[tokio::test]

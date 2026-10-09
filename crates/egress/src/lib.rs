@@ -1,5 +1,6 @@
 //! An explicit, per-environment TCP proxy. It does not prevent direct connections.
 pub mod probe;
+pub mod telemetry;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -178,11 +179,16 @@ pub struct Event {
     pub byte_counts_complete: bool,
     pub bytes_to_destination: u64,
     pub bytes_to_client: u64,
+    /// Additive, finite origin marker. `Some("rule_test")` marks a controlled
+    /// owner-origin test request; ordinary client traffic leaves it `None`.
+    pub origin: Option<&'static str>,
+    /// The one-use controlled-test id, present only for controlled requests.
+    pub test_id: Option<String>,
 }
 pub type Observer = Arc<dyn Fn(Event) + Send + Sync>;
 
 #[derive(Clone, Debug)]
-struct Destination {
+pub struct Destination {
     host: String,
     port: u16,
 }
@@ -339,6 +345,10 @@ pub struct Proxy {
     listener: TcpListener,
     config: Arc<Config>,
     observer: Observer,
+    // Owned controlled-test registry for this exact Proxy instance. Provenance
+    // comes only from a registration matched to a private loopback peer and the
+    // exact target; a client header cannot manufacture a rule_test origin.
+    rule_tests: Arc<telemetry::RuleTestRegistry>,
 }
 impl Proxy {
     pub async fn bind(mut config: Config, observer: Observer) -> Result<Self, String> {
@@ -350,22 +360,127 @@ impl Proxy {
             listener,
             config: Arc::new(config),
             observer,
+            rule_tests: Arc::new(telemetry::RuleTestRegistry::default()),
         })
     }
+
+    /// Run one real controlled rule test against this exact serving instance.
+    ///
+    /// The `id` must be a catalog id; no arbitrary host/port/wildcard is
+    /// accepted. Admission requires the exact target to be *explicitly blocked*
+    /// by this instance's frozen config BEFORE any request; otherwise the call
+    /// refuses without any network activity. On admission a private loopback
+    /// client socket is bound (its local endpoint becomes the owner origin),
+    /// registered with the exact host/443 and a one-use test id, then a real
+    /// CONNECT `host:443` is sent to this Proxy's own listener. Success requires
+    /// the proxy's own parser/decision path to refuse it with 403 and the
+    /// observer event to carry the controlled origin. No public DNS, upstream,
+    /// or destination socket is ever used; an unexpected allow is refused closed
+    /// and reported `failed`, never `blocked_explicit`.
+    pub async fn rule_test(&self, id: &str) -> Result<telemetry::RuleTestOutcome, &'static str> {
+        let host = telemetry::host_for(id).ok_or("unknown_telemetry_destination")?;
+        let destination = Destination::raw(host, 443)?;
+        let (_, reason) = self.config.decide(&destination);
+        if reason != "explicit_block" {
+            return Err("telemetry_target_not_explicitly_blocked");
+        }
+        let address = self
+            .listener
+            .local_addr()
+            .map_err(|_| "address_unavailable")?;
+        // Bind a private loopback client socket first so its local endpoint is
+        // the origin the handler can match; no other process can own this peer.
+        let socket = if address.is_ipv4() {
+            tokio::net::TcpSocket::new_v4()
+        } else {
+            tokio::net::TcpSocket::new_v6()
+        }
+        .map_err(|_| "rule_test_socket_failed")?;
+        let loopback = if address.is_ipv4() {
+            "127.0.0.1:0"
+        } else {
+            "[::1]:0"
+        };
+        socket
+            .bind(loopback.parse().unwrap())
+            .map_err(|_| "rule_test_bind_failed")?;
+        let local = socket.local_addr().map_err(|_| "rule_test_bind_failed")?;
+        let mut lease = self
+            .rule_tests
+            .register(local, host, 443, Duration::from_secs(5))?;
+        let exchange = async {
+            let mut stream = socket
+                .connect(address)
+                .await
+                .map_err(|_| "rule_test_connect_failed")?;
+            let request = format!("CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\n\r\n");
+            stream
+                .write_all(request.as_bytes())
+                .await
+                .map_err(|_| "rule_test_write_failed")?;
+            stream.flush().await.map_err(|_| "rule_test_write_failed")?;
+            let (response, _) = read_head(&mut stream).await?;
+            let record = (&mut lease.completion)
+                .await
+                .map_err(|_| "rule_test_missing_event")?;
+            Ok::<_, &'static str>((response, record))
+        };
+        let (response, record) = timeout(Duration::from_secs(5), exchange)
+            .await
+            .map_err(|_| "rule_test_timeout")??;
+        // The response and the completed canonical event must agree. A fail-
+        // closed fallback, a partial reply or a cancelled handler cannot pass.
+        let refused = response.starts_with(b"HTTP/1.1 403 Forbidden\r\n")
+            && record.origin == Some("rule_test")
+            && record.test_id.as_deref() == Some(lease.test_id.as_str())
+            && record.destination_host.as_deref() == Some(host)
+            && record.destination_port == Some(443)
+            && record.decision == "deny"
+            && record.provenance == "explicit_block"
+            && record.outcome == "blocked"
+            && record.peer_family.is_none();
+        Ok(telemetry::RuleTestOutcome {
+            kind: "rule_test",
+            timestamp_unix_ms: record.timestamp_unix_ms,
+            environment_id: record.environment_id,
+            destination_host: host.to_string(),
+            destination_port: 443,
+            provenance: "rule_test",
+            result: if refused {
+                "blocked_explicit"
+            } else {
+                "failed"
+            },
+            decision: record.decision,
+            reason: if refused {
+                "explicit_block"
+            } else {
+                "unexpected_rule_result"
+            },
+            explicit_block: refused,
+            connection_attempted: false,
+            test_id: lease.test_id.clone(),
+            origin: "rule_test",
+            coverage: "proxy_connections_only",
+        })
+    }
+
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
         self.listener.local_addr()
     }
     pub async fn serve(self) -> std::io::Result<()> {
         self.serve_until(std::future::pending()).await
     }
-    /// Resolve shutdown to stop accepting and close all active connections.
-    /// Await completion before showing a stopped state or replacing the rules.
-    pub async fn serve_until(
-        self,
+    /// Shared-handle variant of [`Proxy::serve_until`] so a caller (the App)
+    /// can keep the same instance reachable for controlled rule tests while it
+    /// serves. The listener is still owned by this one Proxy.
+    pub async fn serve_until_shared(
+        self: std::sync::Arc<Self>,
         shutdown: impl std::future::Future<Output = ()>,
     ) -> std::io::Result<()> {
         let permits = Arc::new(Semaphore::new(self.config.max_connections));
         let (stop, _) = watch::channel(false);
+        let rule_tests = self.rule_tests.clone();
         let mut tasks = JoinSet::new();
         tokio::pin!(shutdown);
         let result = loop {
@@ -382,14 +497,23 @@ impl Proxy {
                 accepted = accept => {
                     let (client, permit) = match accepted { Ok(value) => value, Err(error) => break Err(error) };
                     let config = self.config.clone(); let observer = self.observer.clone();
+                    let rule_tests = rule_tests.clone();
                     let stopped = stop.subscribe();
-                    tasks.spawn(async move { let _permit = permit; handle(client, config, observer, stopped).await; });
+                    tasks.spawn(async move { let _permit = permit; handle(client, config, observer, stopped, rule_tests).await; });
                 }
             }
         };
         let _ = stop.send(true);
         while tasks.join_next().await.is_some() {}
         result
+    }
+    /// Resolve shutdown to stop accepting and close all active connections.
+    /// Await completion before showing a stopped state or replacing the rules.
+    pub async fn serve_until(
+        self,
+        shutdown: impl std::future::Future<Output = ()>,
+    ) -> std::io::Result<()> {
+        Arc::new(self).serve_until_shared(shutdown).await
     }
 }
 fn event(config: &Config) -> Event {
@@ -412,6 +536,8 @@ fn event(config: &Config) -> Event {
         byte_counts_complete: false,
         bytes_to_destination: 0,
         bytes_to_client: 0,
+        origin: None,
+        test_id: None,
     }
 }
 async fn reject(client: &mut TcpStream, status: &str) {
@@ -726,8 +852,13 @@ async fn handle(
     config: Arc<Config>,
     observer: Observer,
     mut stopped: watch::Receiver<bool>,
+    rule_tests: Arc<telemetry::RuleTestRegistry>,
 ) {
     let mut record = event(&config);
+    // The private peer that this accept came from. Only a registration bound to
+    // this exact peer + target can make the request a controlled origin.
+    let peer = client.peer_addr().ok();
+    let mut test_completion = None;
     let transfer = async {
         let (buf, head_length) = timeout(
             Duration::from_secs(config.connect_timeout_seconds),
@@ -759,9 +890,27 @@ async fn handle(
             "http_content_not_inspected"
         };
         (record.decision, record.provenance) = config.decide(&request.dest);
+        // Controlled-test origin: consume the one-use registration only for the
+        // exact owned peer and exact target. A header can never create this.
+        if let Some(peer) = peer {
+            if let Some(completion) =
+                rule_tests.consume(peer, &request.dest.host, request.dest.port)
+            {
+                record.origin = Some("rule_test");
+                record.test_id = Some(completion.test_id.clone());
+                test_completion = Some(completion);
+            }
+        }
         if record.decision == "deny" {
             reject(&mut client, "403 Forbidden").await;
             return Err("blocked");
+        }
+        // Defense in depth: a registered controlled request must never reach a
+        // destination. If a misconfiguration let it past an explicit block, fail
+        // it closed here rather than connecting.
+        if record.origin == Some("rule_test") {
+            reject(&mut client, "503 Service Unavailable").await;
+            return Err("rule_test_not_blocked");
         }
         let upstream = config.upstream.as_deref().map(parse_upstream).transpose()?;
         // Construct/validate HTTP framing before connecting to the destination.
@@ -871,12 +1020,59 @@ async fn handle(
         _ = stopped.changed() => "proxy_stopped",
     };
     record.byte_counts_complete = record.outcome == "completed";
-    observer(record);
+    observer(record.clone());
+    if let Some(completion) = test_completion {
+        let _ = completion.sender.send(record);
+    }
 }
 
 #[cfg(test)]
 mod unit_tests {
     use super::*;
+    #[tokio::test]
+    async fn controlled_unexpected_allow_fails_closed_with_completed_event() {
+        let proxy = Arc::new(
+            Proxy::bind(Config::default(), Arc::new(|_| {}))
+                .await
+                .unwrap(),
+        );
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let host = telemetry::host_for("datadog_logs_intake").unwrap();
+        let mut lease = proxy
+            .rule_tests
+            .register(
+                socket.local_addr().unwrap(),
+                host,
+                443,
+                Duration::from_secs(5),
+            )
+            .unwrap();
+        let serving = proxy.clone();
+        let task = tokio::spawn(serving.serve_until_shared(std::future::pending()));
+        let mut stream = socket.connect(proxy.local_addr().unwrap()).await.unwrap();
+        stream
+            .write_all(
+                format!("CONNECT {host}:443 HTTP/1.1\r\nHost: {host}:443\r\n\r\n").as_bytes(),
+            )
+            .await
+            .unwrap();
+        let (response, _) = read_head(&mut stream).await.unwrap();
+        let event = (&mut lease.completion).await.unwrap();
+        assert!(
+            response.starts_with(b"HTTP/1.1 503 "),
+            "fallback must not claim the block's 403"
+        );
+        assert_eq!(event.origin, Some("rule_test"));
+        assert_eq!(event.test_id.as_deref(), Some(lease.test_id.as_str()));
+        assert_eq!(event.provenance, "default_allow");
+        assert_eq!(event.outcome, "rule_test_not_blocked");
+        assert!(
+            event.peer_family.is_none(),
+            "never connect public target or upstream"
+        );
+        task.abort();
+    }
     #[test]
     fn mixed_api_is_not_telemetry_or_implicitly_blocked() {
         let config = Config::default();
@@ -966,22 +1162,93 @@ mod unit_tests {
 
 /// One foreground channel owner for both CLI executables. Stdout is NDJSON.
 pub async fn serve_config(path: &std::path::Path) -> Result<(), String> {
+    serve_config_with_tests(path, &[]).await
+}
+
+/// Foreground channel owner with an optional finite `--test-telemetry` id list.
+/// Each requested catalog host is proven explicitly blocked by the frozen draft
+/// *before* any public connection: an id that is not explicitly blocked is a
+/// startup refusal, never a silent success. No telemetry body is ever sent.
+pub async fn serve_config_with_tests(
+    path: &std::path::Path,
+    test_telemetry: &[String],
+) -> Result<(), String> {
     let bytes = std::fs::read(path).map_err(|_| "config_read_failed".to_string())?;
-    let config: Config =
+    let mut config: Config =
         serde_json::from_slice(&bytes).map_err(|_| "invalid_config_json".to_string())?;
+    config.validate().map_err(str::to_owned)?;
+    // Refuse an invalid or non-explicitly-blocked selection BEFORE binding or
+    // connecting anything, so a bad `--test-telemetry` never opens a listener.
+    if !telemetry::valid_telemetry_ids(test_telemetry) && !test_telemetry.is_empty() {
+        return Err("invalid_telemetry_test_ids".to_string());
+    }
+    for id in test_telemetry {
+        let host = telemetry::host_for(id).ok_or("unknown_telemetry_destination")?;
+        let destination = Destination::raw(host, 443)?;
+        let (_, reason) = config.decide(&destination);
+        if reason != "explicit_block" {
+            return Err(format!("telemetry_target_not_explicitly_blocked:{host}"));
+        }
+    }
     let proxy = Proxy::bind(
         config,
         Arc::new(|event| println!("{}", serde_json::to_string(&event).unwrap())),
     )
     .await?;
+    let address = proxy
+        .local_addr()
+        .map_err(|_| "listen_failed".to_string())?;
     println!(
         "{}",
-        serde_json::json!({"event":"listening","owner":"foreground_process","pid":std::process::id(),"address":proxy.local_addr().map_err(|_|"listen_failed".to_string())?,"active_config":*proxy.config,"coverage":"proxy_connections_only","direct_connections_enforced":false})
+        serde_json::json!({"event":"listening","owner":"foreground_process","pid":std::process::id(),"address":address,"active_config":*proxy.config,"coverage":"proxy_connections_only","direct_connections_enforced":false})
     );
-    proxy
-        .serve_until(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
-        .await
+    let proxy = Arc::new(proxy);
+    // The proxy must actually be serving before the controlled loopback request,
+    // so start it, run the finite tests, then keep serving until Ctrl-C.
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let serving = proxy.clone();
+    let server = tokio::spawn(async move {
+        serving
+            .serve_until_shared(async move {
+                let _ = stopped.await;
+            })
+            .await
+    });
+    // Controlled rule tests go through the same serving Proxy instance. A target
+    // that is not explicitly blocked refuses the whole start; no destination
+    // connection is ever attempted. Owner origin arises from the registration,
+    // not from any header.
+    for id in test_telemetry {
+        let outcome = match proxy.rule_test(id).await {
+            Ok(outcome) => outcome,
+            Err(reason) => {
+                let _ = stop.send(());
+                let _ = server.await;
+                return Err(reason.to_string());
+            }
+        };
+        println!(
+            "{}",
+            serde_json::json!({"event":"rule_test","owner_origin":"lintel_egress_foreground","telemetry_id":id,"outcome":outcome})
+        );
+        if outcome.result != "blocked_explicit" {
+            let _ = stop.send(());
+            let _ = server.await;
+            return Err(format!(
+                "telemetry_target_not_explicitly_blocked:{}",
+                outcome.destination_host
+            ));
+        }
+    }
+    let mut server = server;
+    let result = tokio::select! {
+        response = &mut server => response,
+        _ = tokio::signal::ctrl_c() => {
+            let _ = stop.send(());
+            server.await
+        }
+    };
+    result
+        .map_err(|_| "accept_failed".to_string())?
         .map_err(|_| "accept_failed".to_string())
 }

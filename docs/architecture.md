@@ -28,5 +28,7 @@ flowchart TB
 浏览器 host 负责配对和任务协调，扩展负责 profile 的权限、原生操作与执行 journal；真正 browser startup 和另行批准才允许完成 clear。macOS CLI 包含 host control，Linux runner 明确返回组件不可用。App 与 CLI 分别持有自己的网络通道，代理只证明经过它的连接，不能证明进程直接出站被强制阻止。
 
 portable work 的密文文件可通过用户明确选定的系统传输工具交接；目标 core 可独立检查与迁入，不依赖源 inventory/job。文件传输本身不属于 SSH controller 的隐式任务。
+图中的执行路径针对环境／浏览器／runner。App 自身更新由 native `app_updates.rs` 与官方 Tauri updater 拥有：固定 feed → 冻结候选 → 下载验签 → 原更新 intent → 安装／读回结果 → 显式重启；`activity.rs` 在安装与重启时排除当前 App 操作，活跃代理另行阻止。这份 App data 记录独立于 core job，uncertainty 不重放。当前源码未配发行公钥／feed，实际 Release／网站激活仍独立，见 [App 更新指南](app-updates.md)。
+
 官网没有通向 core、host、SSH controller 或代理的执行路径；它只展示本地插画、合成阅读示例与共享 Clawd 游戏；阅读示例不构成真实操作或任务回执。
 关键状态为 `planned → accepted → executing → verifying → completed / partially_completed / failed / needs_reconciliation`。`accepted` 只在 journal 可持久查询后成立。不确定的副作用查询原任务，不重放破坏性动作；恢复以字段归属与当前值为依据。

@@ -326,6 +326,8 @@ service）。见 [Agent CLI 指南](agents.md#用户安装候选包) 与
 
 ## 相关文档
 
+当前源码另有 [遥测控制](telemetry.md) 和 [App 更新与发行准备](app-updates.md)。首次合成试用不访问更新 feed，也不发送遥测测试到公网；App 后台检查默认关闭，正式公钥／feed 未配置，旧安装候选不因此升级。
+
 - [当前状态](current-state.md)：候选／资源／证据表与未交付目标。
 - [人类操作指南](operator-guide.md)：GUI 里按目标选入口。
 - [Agent CLI 指南](agents.md)：接口发现、计划／批准／查询、portable work 与候选安装。

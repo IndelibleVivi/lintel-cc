@@ -37,6 +37,10 @@ pub const HELP: &str = concat!(
   "  lintel browser instances | pair create | pair pending | pair approve --challenge ID\n",
   "  lintel browser submit | query | control    Finite host control; JSON stdin\n",
   "  lintel network serve --config PATH          Foreground owner, NDJSON, Ctrl-C stops\n",
+  "  lintel network catalog                      Static telemetry-destination catalog; no state\n",
+  "  lintel telemetry catalog                    Same static telemetry catalog; no state or network\n",
+  "  lintel network serve --config PATH [--test-telemetry ID,...]\n",
+  "                                              Optional: refuse start unless each exact host is blocked\n",
   "  lintel network inspect                     Read shared host network metadata\n",
   "  lintel network probe [--ipv4-url URL --ipv6-url URL --proxy-url URL]\n",
   "  lintel network ipv6 plan --service-id ID --mode off|link_local [--baseline-id ID]\n",
@@ -366,7 +370,7 @@ fn timeout(raw: &str) -> Option<Duration> {
 const GROUP_HELP: &[(&str, &str)] = &[
     ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
     ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
-    ("network", "network inspect\n  network probe [--ipv4-url HTTPS_URL --ipv6-url HTTPS_URL --proxy-url LOOPBACK_HTTP --timeout-seconds 10]\n  network ipv6 plan --service-id ID --mode off|link_local [同样的探测 flags] [--baseline-id ID]\n  network restore plan --job ID [--baseline-id ID]\n  network serve --config PATH\n  inspect 离线读取宿主共享状态；probe 显式访问 https://api.ipify.org 与 https://api6.ipify.org，可指定自己的 HTTPS 回显端点。IPv6 plan 会前测，批准后自动沿用同目标复测；macOS 可能申请系统网络配置授权。submit 需精确计划/hash，恢复另外批准。serve 是前台 NDJSON owner；Ctrl-C 只关闭自己的通道。"),
+    ("network", "network inspect\n  network catalog\n  network probe [--ipv4-url HTTPS_URL --ipv6-url HTTPS_URL --proxy-url LOOPBACK_HTTP --timeout-seconds 10]\n  network ipv6 plan --service-id ID --mode off|link_local [同样的探测 flags] [--baseline-id ID]\n  network restore plan --job ID [--baseline-id ID]\n  network serve --config PATH [--test-telemetry ID,...]\n  inspect 离线读取宿主共享状态；catalog 只读静态 telemetry 目标；probe 显式访问 https://api.ipify.org 与 https://api6.ipify.org，可指定自己的 HTTPS 回显端点。IPv6 plan 会前测，批准后自动沿用同目标复测；macOS 可能申请系统网络配置授权。submit 需精确计划/hash，恢复另外批准。serve 是前台 NDJSON owner；Ctrl-C 只关闭自己的通道；--test-telemetry 要求冻结草案已显式阻止每个目录目标，否则拒绝启动，且从不连接目标。"),
     ("env", "env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n  list/inspect/components 只读；components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
     ("work", "work inventory --environment ID --categories instructions,memory,sessions [--offset N] [--expected-digest HEX]\n  work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  inventory 返回有界只读原件元数据清单（分页/摘要绑定同一次扫描）；preflight 只读元数据容量预检。archive/preserve plan 可用可重复 --path 精确选择所选类别内的原件，排除未选的大会话而不截断。session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
@@ -375,6 +379,7 @@ const GROUP_HELP: &[(&str, &str)] = &[
     ("remote", "remote hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID | control\n  remote launch request|resume ALIAS REQUEST_ID APPROVAL；remote launch query ALIAS REQUEST_ID | remote launch list ALIAS。有限 OpenSSH controller；execute 只走 submit，恢复只查询原任务。"),
     ("launch", "launch ENVIRONMENT_ID\n  launch request REQUEST_ID APPROVAL | launch resume REQUEST_ID APPROVAL\n  launch query REQUEST_ID | launch list\n  真实 TTY 直接交互、无 prompt；旧入口以 root 为 cwd，新请求冻结独立 cwd。resume 的口令在该 TTY 无回显输入；请求以不可变 request ID 解析，重复只查询。"),
     ("session", "session read\n  work session read 的别名：需要 --job ID 或 --archive-path PATH、--path PATH 与 stdin 口令。"),
+    ("telemetry", "telemetry catalog\n  只读静态 telemetry 目标目录：稳定 ID、用途、客户端、精确 host/port、可否选择阻止、官方来源与核对日期；不打开 state，也不访问真实网络。"),
 ];
 
 fn group_help(group: &str) -> Value {
@@ -570,6 +575,14 @@ pub fn run(args: &[String]) -> Value {
         "remote" => remote(args),
         "browser" => browser(args),
         "network" if word(1) == "inspect" => named("network_inspect", &args[2..], json!({}), false),
+        // Static, state-free telemetry catalog served by the shared egress
+        // crate; never opens state or the host network.
+        "network" if word(1) == "catalog" && args.len() == 2 => {
+            lintel_egress::telemetry::catalog_envelope()
+        }
+        "telemetry" if word(1) == "catalog" && args.len() == 2 => {
+            lintel_egress::telemetry::catalog_envelope()
+        }
         "network" if word(1) == "probe" => named("network_probe", &args[2..], json!({}), true),
         "network" if word(1) == "ipv6" && word(2) == "plan" => {
             named("plan_network_ipv6", &args[3..], json!({}), true)
@@ -582,16 +595,32 @@ pub fn run(args: &[String]) -> Value {
                 Ok(r) => r,
                 Err(e) => return e,
             };
-            if r.as_object().unwrap().len() != 1 || !r["config"].is_string() {
-                return error("invalid_argument", "network serve --config PATH");
+            let keys: Vec<&str> = r.as_object().unwrap().keys().map(String::as_str).collect();
+            if !r["config"].is_string()
+                || keys
+                    .iter()
+                    .any(|key| !["config", "test_telemetry"].contains(key))
+            {
+                return error("invalid_argument", "network serve --config PATH [--test-telemetry ID,...]");
             }
+            let ids: Vec<String> = r
+                .get("test_telemetry")
+                .and_then(Value::as_str)
+                .map(|raw| {
+                    raw.split(',')
+                        .map(str::trim)
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default();
             let runtime = match tokio::runtime::Runtime::new() {
                 Ok(r) => r,
                 Err(_) => return error("runtime_unavailable", "无法启动前台通道"),
             };
-            match runtime.block_on(lintel_egress::serve_config(std::path::Path::new(
-                r["config"].as_str().unwrap(),
-            ))) {
+            match runtime.block_on(lintel_egress::serve_config_with_tests(
+                std::path::Path::new(r["config"].as_str().unwrap()),
+                &ids,
+            )) {
                 Ok(()) => {
                     json!({"ok":true,"data":{"event":"stopped","owner":"foreground_process"}})
                 }
@@ -697,6 +726,59 @@ fn remote_pinned(payload: Value) -> Value {
                 .join("remote-runners")
         });
     lintel_remote::control(payload, bundles)
+}
+
+#[cfg(test)]
+mod telemetry_cli_tests {
+    use super::*;
+
+    #[test]
+    fn static_catalog_commands_are_state_free_and_field_free() {
+        for args in [
+            vec!["telemetry".to_string(), "catalog".to_string()],
+            vec!["network".to_string(), "catalog".to_string()],
+        ] {
+            let response = run(&args);
+            assert_eq!(response["ok"], true, "{args:?}");
+            assert_eq!(
+                response["data"]["schema"],
+                "lintel.telemetry-destinations/1"
+            );
+            assert_eq!(
+                response["data"]["destinations"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|entry| entry["blockable"] == true)
+                    .count(),
+                2
+            );
+        }
+        // Unknown trailing arguments are rejected, not silently ignored.
+        let response = run(&["network".into(), "catalog".into(), "extra".into()]);
+        assert_ne!(response["ok"], true);
+    }
+
+    #[test]
+    fn catalog_request_operation_is_readonly_and_field_free() {
+        let response = dispatch(json!({"command":"telemetry_catalog"}));
+        assert_eq!(response["ok"], true);
+        assert_eq!(
+            response["data"]["destinations"]
+                .as_array()
+                .unwrap()
+                .len(),
+            7
+        );
+    }
+
+    #[test]
+    fn telemetry_group_help_is_static() {
+        let help = run(&["telemetry".into(), "help".into()]);
+        assert_eq!(help["ok"], true);
+        assert_eq!(help["data"]["static"], true);
+        assert!(help["data"]["help"].as_str().unwrap().contains("catalog"));
+    }
 }
 
 fn remote(args: &[String]) -> Value {

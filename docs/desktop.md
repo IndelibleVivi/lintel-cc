@@ -152,3 +152,7 @@ npm run desktop:build
 六任务的用户名称、说明、操作与帮助锚点由 `contracts/task-catalog.json` 维护；App 首页／帮助与 CLI 直接消费。`ArchivePanel.tsx` 是唯一资料阅读器，索引、阅读和交接稿按窗口排列；`LaunchPanel.tsx` 承担独立 cwd、审阅快照、复制和启动结果；`AgentPanel.tsx` 只投影有限操作元数据；`PlanReview.tsx` 展示冻结落点；`TaskOutcome.tsx` 分开所选结果与覆盖，兼容原始回执。`ComponentPanel.tsx` 读取 core 的有限组件投影，`WorkCapacity.tsx` 读取元数据容量预检；二者均按精确目标处理结果。`taskDrafts.ts` 保存按主机／环境隔离的非秘密草案。`homeGreetings.ts` 维护 56 句原创时段问候和日期／整分钟／稀有彩蛋；`main.tsx` 在 React mount 前选择本次问候，特殊日期只在当天首次打开出现，localStorage 仅记最后显示的特殊日期。`ui.tsx` 的 `WorkspaceActions` 将保护、保全和清理操作挂载到正文之外的唯一底栏，随内容滚动位置不变；侧栏帮助和设置不参与环境列表滚动。
 
 图形／颜色／字型身份继续由[视觉语言](visual-language.md)管理。Selen 可继续精修光学间距、字型、细线、阴影与动效；按钮接线、完整状态、窗口适配和键盘语义是已经接入的产品合同，不能退回示意页。实际 Chromium、native WebKit、Terminal 与真实客户端各层证据见[本轮 18 项验收](specs/product-baseline-status.md)。
+
+## 遥测与 App 更新
+
+环境的“外发与权限”保留 IPv4／IPv6 与受控通道；通道草案中的 [遥测目录](telemetry.md) 只提供确切可选目标，设置读回、测试请求与实际流量分别显示。App 自身更新位于“设置与模块 → Lintel 版本与更新”，当前源码默认未配置发行，后台检查默认关闭。下载核验／批准安装／显式重启由 `AppUpdates.tsx` 与 native `app_updates.rs` 接线；`activity.rs` 和活跃通道检查阻止事务中安装或重启。浏览器／VPS runner 沿用各自的审阅安装入口。操作及发行准备见 [app-updates](app-updates.md)，源码与实际安装状态见 [current-state](current-state.md)。

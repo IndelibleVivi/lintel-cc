@@ -7,7 +7,7 @@ const effects: Record<string, string> = {
   CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY: '关闭质量调查提示。',
   DO_NOT_TRACK: '跨工具遥测开关；此处只写当前 Claude 配置根，不设置全局 shell。',
   DISABLE_GROWTHBOOK: '关闭 feature-flag 获取，会与 Remote Control 冲突。',
-  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '同时关闭多类非必要流量与 feature flags，会与 Remote Control 冲突。',
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '非空即关闭（0/false 也生效）：同时关闭遥测、错误回报、自动更新、release notes 与 feature flags，会与 Remote Control 冲突。',
 };
 
 export default function CustomPolicy({ policy, settings, choices, onChange }: {

@@ -126,3 +126,7 @@ cargo test -p lintel-egress
 真实 synthetic localhost sockets 验证 CONNECT allow/deny、HTTP 请求与正文、上游 absolute-form HTTP、上游 CONNECT、上游失败无直连回退、pipeline 不穿透、显式停止关闭现有 tunnel、日志不包含 synthetic secrets。另有配置 / framing 拒绝测试。测试无需公网代理、真实 Claude 数据或管理员权限。HTTPS 上游使用维护中的 [tokio-rustls](https://docs.rs/tokio-rustls/latest/tokio_rustls/) 和 [webpki-roots](https://docs.rs/webpki-roots/latest/webpki_roots/)；目前没有真实部署上游的互通验收记录。
 
 macOS 强约束需要签名、entitlement、用户批准与真实 Network Extension runtime；此 crate 不提供这些能力。Linux namespace 强约束尚未实现或验证，见 [Linux 状态](../platform/linux/README.md)。任何平台都不能据此显示“强约束已生效”。完整验收仍须执行 [ACCEPTANCE.md 网络用例](ACCEPTANCE.md#d-网络与真实覆盖)。
+
+## 精确遥测目的地
+
+静态目录、设置观察与受控规则测试由 [telemetry](telemetry.md) 说明。选择只合入下次启动的 blocked 草案，保留上游／地址族和其它规则；模型、登录和下载的混合域名不推荐一键阻断。受控测试只走当前 proxy 的 loopback 请求，不连接公网遥测目标，结果与 Claude 实际流量分别标记。App updater 与它独立，活跃代理会阻止 App 安装／重启；见 [app-updates](app-updates.md)。

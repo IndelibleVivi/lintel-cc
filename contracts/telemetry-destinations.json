@@ -1,0 +1,121 @@
+{
+  "schema": "lintel.telemetry-destinations/1",
+  "version": 1,
+  "notes": "Static, inspectable catalog of Claude Code telemetry destinations. Exact hosts only: no wildcard expansion, no historical blacklist imported at runtime, no online rules. Served for inspection by lintel-egress, the desktop egress module and every CLI (root and runner); it never opens a home, state directory, executable or real host network. `blockable` means the host is eligible for optional selection into an existing blocked configuration draft; `informational` entries are mixed or necessary purposes that must never be offered as one-click telemetry blocks. Recheck provider/enablement conditions before changing an entry.",
+  "source": "https://code.claude.com/docs/en/network-config",
+  "checked_date": "2026-10-09",
+  "destinations": [
+    {
+      "id": "datadog_logs_intake",
+      "purpose": "Claude Code 运营指标（Datadog log intake）",
+      "provider": "Datadog 接收端；模型 provider 为 direct Anthropic API",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "仅 direct Anthropic API 的 Claude Code 可选启用；Bedrock、Google Agent Platform 与 Foundry 不使用此入口",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止后无法送达该可选运营指标；不阻止模型请求或认证",
+      "host": "http-intake.logs.us5.datadoghq.com",
+      "port": 443,
+      "blockable": true
+    },
+    {
+      "id": "datadog_browser_intake",
+      "purpose": "Claude Code 运营错误回报（Datadog browser intake）",
+      "provider": "Datadog 接收端；模型 provider 为 direct Anthropic API",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "direct Anthropic API 的可选错误回报，另有 Anthropic 服务端 rollout gate；DISABLE_ERROR_REPORTING 或 DISABLE_TELEMETRY 会关闭它",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止后无法送达该可选错误回报；不阻止模型请求或认证",
+      "host": "browser-intake-us5-datadoghq.com",
+      "port": 443,
+      "blockable": true
+    },
+    {
+      "id": "anthropic_api",
+      "purpose": "模型请求、安全预检查、feature flags 与混合外发",
+      "provider": "Anthropic",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "必要及混合用途；模型请求和 feature flag／telemetry 可能共用该 host",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止可能破坏模型请求与 feature flags，不提供一键遥测阻止",
+      "host": "api.anthropic.com",
+      "port": 443,
+      "blockable": false
+    },
+    {
+      "id": "claude_web",
+      "purpose": "认证、账号与混合产品用途",
+      "provider": "Anthropic",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "混合用途；认证或其它必要功能，不是纯遥测目标",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止可能破坏认证或账号功能，不提供一键遥测阻止",
+      "host": "claude.ai",
+      "port": 443,
+      "blockable": false
+    },
+    {
+      "id": "claude_com",
+      "purpose": "认证、账号与混合产品用途",
+      "provider": "Anthropic",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "混合用途；认证或其它必要功能，不是纯遥测目标",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止可能破坏认证或账号功能，不提供一键遥测阻止",
+      "host": "claude.com",
+      "port": 443,
+      "blockable": false
+    },
+    {
+      "id": "platform_claude",
+      "purpose": "认证、账号与混合产品用途",
+      "provider": "Anthropic",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "混合用途；认证或其它必要功能，不是纯遥测目标",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止可能破坏认证或账号功能，不提供一键遥测阻止",
+      "host": "platform.claude.com",
+      "port": 443,
+      "blockable": false
+    },
+    {
+      "id": "claude_downloads",
+      "purpose": "安装器、更新、版本检查与插件可执行文件",
+      "provider": "Anthropic",
+      "clients": [
+        "claude-code"
+      ],
+      "applicability": "下载和更新流程需要；不是纯遥测目标",
+      "version_applicability": "适用于当前官方文档描述的 Claude Code；未断言最低版本",
+      "source_url": "https://code.claude.com/docs/en/network-config",
+      "checked_date": "2026-10-09",
+      "collateral_impact": "阻止可能中断安装、自动更新、版本检查与插件下载，不提供一键遥测阻止",
+      "host": "downloads.claude.ai",
+      "port": 443,
+      "blockable": false
+    }
+  ]
+}

@@ -167,7 +167,20 @@ pub(crate) fn assessment(doc: &Value, product: &Value, trusted: &str) -> Value {
         } else {
             "产品版本或组织 Trusted Devices 条件未确认，不能保证保留 Remote Control"
         };
-        blockers.push(json!({"key":key,"value":doc["env"][key],"status":status,"reason":reason,"source":"user_settings"}));
+        // `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is nonempty (even "0" or
+        // "false" disables) and, per the official env-vars doc, also disables
+        // auto-updates, release notes and feature flags. Record that collateral
+        // impact on the plan/assessment without changing settings semantics.
+        let collateral = if key == "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC" {
+            json!([{
+                "effect":"additional_impacts",
+                "detail":"官方 env-vars 记载此变量为非空即生效（0/false 也会关闭），并同时关闭自动更新、release notes 与 feature flag 获取；关闭语义按 nonempty 解释，不改变 Remote Control 保证。",
+                "source":"https://code.claude.com/docs/en/env-vars"
+            }])
+        } else {
+            json!([])
+        };
+        blockers.push(json!({"key":key,"value":doc["env"][key],"status":status,"reason":reason,"source":"user_settings","collateral":collateral}));
     }
     let status = if blockers.iter().any(|b| b["status"] == "blocked") {
         "blocked"
@@ -351,6 +364,40 @@ pub(crate) fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nonessential_traffic_records_documented_collateral_impact() {
+        // The total switch reports the official extra impacts; it stays
+        // semver-nonempty (0/false disables) and does not change settings
+        // semantics or Remote Control guarantees.
+        for spelling in ["1", "0", "false", "true", "disable"] {
+            let doc = json!({"env":{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":spelling}});
+            let a = assessment(&doc, &json!({"version":"2.1.283"}), "not_required");
+            let rule = a["remote_control"]["blockers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|b| b["key"] == "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC")
+                .unwrap();
+            assert_eq!(rule["collateral"].as_array().unwrap().len(), 1, "{spelling}");
+            assert_eq!(rule["collateral"][0]["effect"], "additional_impacts");
+            assert_eq!(
+                disabled("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", &json!(spelling)),
+                Some(true),
+                "{spelling}"
+            );
+        }
+        // Other keys, including granular FLAGS, never inherit that collateral.
+        let doc = json!({"env":{"DISABLE_TELEMETRY":"1","DISABLE_GROWTHBOOK":"1"}});
+        let a = assessment(&doc, &json!({"version":"2.1.283"}), "not_required");
+        for blocker in a["remote_control"]["blockers"].as_array().unwrap() {
+            assert!(
+                blocker["collateral"].as_array().unwrap().is_empty(),
+                "{}",
+                blocker["key"]
+            );
+        }
+    }
+
     #[test]
     fn values_follow_each_rule() {
         for (key, _) in fields() {

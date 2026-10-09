@@ -117,6 +117,8 @@ CHECKS: List[Check] = [
            *(NODE or "node", "--test", "tests/site_game.test.mjs"), tools=("node",)),
     _check("home-greetings-test", "Clawd greeting pools, local date dedup and egg priorities", "js",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/home_greetings.test.mjs"), tools=("node",)),
+    _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
+           *(NODE or "node", "--test", "tests/app_release.test.mjs"), tools=("node", "python3")),
     _check("site-ui", "static website responsive story, native reading, theme and Clawd journey", "independent",
            *(NODE or "node", "tests/site_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),
@@ -161,6 +163,14 @@ CHECKS: List[Check] = [
                Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",
                ROOT / "apps/desktop/dist/index.html"), loopback=True,
            independent=True, reason="Chromium + synthetic host configuration/echo/invoke/SSH; not macOS network mutation or native WebKit"),
+    _check("telemetry-ui", "built App optional catalog, settings readback, draft composition and controlled test provenance", "independent",
+           *(NODE or "node", "tests/telemetry_ui_journey.mjs"), tools=("node",), paths=(
+               Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
+           loopback=True, independent=True, reason="Chromium + synthetic invoke/channel; actual CONNECT denial covered independently by Rust loopback tests"),
+    _check("app-update-ui", "built App update checking/error/approval and opt-in timer lifecycle", "independent",
+           *(NODE or "node", "tests/app_update_ui_journey.mjs"), tools=("node",), paths=(
+               Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
+           loopback=True, independent=True, reason="Chromium + synthetic updater invoke; official updater signature/install uses a separate synthetic Rust fixture"),
     _check("service-ui", "built App service inspection/approval/conflict/resume (synthetic manager)",
            "independent", *(NODE or "node", "tests/service_ui_journey.mjs"),
            tools=("node",), paths=(
@@ -201,7 +211,7 @@ CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and 
 for _id, _desc, _file in (
     ("journey-agent-cli", "agent CLI contract, portable work, independent import and original-job wait", "agent_cli_journey.py"),
     ("journey-product-baseline", "readonly context/help, frozen targets, bounded session and immutable startup contracts", "backend_baseline_journey.py"),
-    ("journey-agent-adapters", "finite CLI adapters and foreground network lifecycle", "agent_adapters_journey.py"),
+    ("journey-agent-adapters", "static telemetry/no state, controlled CONNECT provenance and finite foreground adapters", "agent_adapters_journey.py"),
     ("journey-portable-work", "portable archive in independent state and persisted failure codes", "portable_work_journey.py"),
     ("journey-cli", "CLI journey (register/preview/approve/apply/restore)", "cli_journey.py"),
     ("journey-submission", "detached submission journey (durable ACK, replay dedup)",

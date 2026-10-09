@@ -3,14 +3,15 @@ import react from '@vitejs/plugin-react';
 import { spawn, execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { existsSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync, realpathSync, readFileSync } from 'node:fs';
 
 function buildInfo() {
+  const version = process.env.LINTEL_APP_VERSION ?? JSON.parse(readFileSync(new URL('./src-tauri/tauri.conf.json', import.meta.url), 'utf8')).version;
   try {
     const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
     const dirty = !!execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { encoding: 'utf8' }).trim();
-    return { version: '0.1.0', docs_revision: dirty ? 'unknown' : revision, source_dirty: dirty };
-  } catch { return { version: '0.1.0', docs_revision: 'unknown', source_dirty: true }; }
+    return { version, docs_revision: dirty ? 'unknown' : revision, source_dirty: dirty };
+  } catch { return { version, docs_revision: 'unknown', source_dirty: true }; }
 }
 const fixturePort = Number(process.env.LINTEL_FIXTURE_PORT ?? '1420');
 function fixtureBridge(): Plugin {
@@ -19,7 +20,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'work_preflight', 'work_inventory', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'telemetry_catalog', 'work_preflight', 'work_inventory', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {

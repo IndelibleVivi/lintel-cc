@@ -459,3 +459,9 @@ lintel restore plan --job <original-job-id>
 完整目标仍包括更多认证与入口适配、系统级网络约束、浏览器持久安装与专用启动、服务迁移闭环、定时漂移、菜单栏、升级卸载与正式签名分发。这些继续属于 Lintel 的范围，不能通过从使用指南中删掉它们就视为整版完成。
 
 路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。
+
+## 遥测目标与 App 自身更新
+
+环境详情“外发与权限”的受控通道草案可以选择官方目录中的精确遥测目标；合入现有 blocked 后仍须显式启动。测试结果标明是 Lintel 受控请求，未观察到 Claude 请求不等于全局零遥测。fine-grained 设置与 NONESSENTIAL 总开关的自动更新／feature flags 影响分别核对，详见 [telemetry](telemetry.md)。
+
+“设置与模块 → Lintel 版本与更新”管理本 App。后台检查默认关闭；检查错误不能证明最新；下载签名与版本核验通过后审阅安装，最后保存工作并显式重启。native 层拒绝正在执行操作或有活跃代理时安装／重启。原安装中断保留原记录，不重放；旧无 updater 的 App 需要手动升级一次。当前源码没有正式公钥／feed 或 Release 激活；未来准备与精确发布顺序见 [app-updates](app-updates.md)。独立 CLI、浏览器组件与远端 runner 不由 App updater 自动安装。

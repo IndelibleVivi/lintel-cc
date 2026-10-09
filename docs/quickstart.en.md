@@ -365,6 +365,8 @@ PATH / shell rc / App / service). See
 
 ## Related documentation
 
+Current source also includes [telemetry control](telemetry.md) and [App update preparation](app-updates.md). This synthetic first trial does not contact an update feed or a public telemetry endpoint. Background checks default off; a formal release key/feed is unconfigured and existing installed candidates are not upgraded.
+
 - [Current state](current-state.md): candidate / resource / evidence table and undelivered goals.
 - [Human operator guide](operator-guide.md): pick an entry by goal in the GUI (Chinese).
 - [Agent CLI guide](agents.md): interface discovery, plan / approval / query, portable work and candidate install.

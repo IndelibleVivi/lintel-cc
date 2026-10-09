@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / 'target/debug/lintel'
@@ -33,6 +34,16 @@ def run():
             data = json.loads(proc.stdout)
             assert data['ok'] is good and (proc.returncode == 0) is good, (args, data, proc.stderr)
             return data.get('data') if good else data['error']
+
+        # Static telemetry works before any state exists; all public adapters
+        # share the maintained contract and refuse arbitrary extra fields.
+        static = call('telemetry', 'catalog')
+        assert static == call('network', 'catalog')
+        assert static == call('request', payload={'command': 'telemetry_catalog'})
+        assert not (base / 'state').exists(), 'Catalog initialized state'
+        call('request', payload={'command': 'telemetry_catalog', 'host': 'api.anthropic.com'}, good=False)
+        assert not (base / 'state').exists()
+        assert call('describe', 'telemetry_catalog')['effects']['external'] == 'none'
 
         aliases = call('remote', 'aliases')['aliases']
         assert 'synthetic-alias' in aliases
@@ -131,7 +142,47 @@ def run():
             if child.poll() is None:
                 child.kill()
                 child.communicate()
-        print('PASS: CLI synthetic SSH registry, browser static/absent-profile behavior, foreground NDJSON network owner/rules/stop')
+        telemetry_config = base / 'telemetry.json'
+        telemetry_config.write_text(json.dumps({'environment_id': 'synthetic-telemetry', 'default_action': 'allow',
+            'blocked': [{'host': 'HTTP-INTAKE.LOGS.US5.DATADOGHQ.COM.', 'ports': [443]}]}))
+        for invalid in ['', 'bogus', 'datadog_logs_intake,', 'datadog_logs_intake,datadog_logs_intake', 'datadog_browser_intake']:
+            rejected = subprocess.run([str(BINARY), 'network', 'serve', '--config', str(telemetry_config),
+                '--test-telemetry', invalid], capture_output=True, text=True, env=env, timeout=10)
+            assert rejected.returncode != 0 and 'listening' not in rejected.stdout, (invalid, rejected.stdout)
+        child = subprocess.Popen([str(BINARY), 'network', 'serve', '--config', str(telemetry_config),
+            '--test-telemetry', 'datadog_logs_intake'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, bufsize=0)
+        try:
+            ready = selectors.DefaultSelector()
+            ready.register(child.stdout, selectors.EVENT_READ)
+            pending, records, deadline = b'', [], time.monotonic() + 10
+            while not any(r.get('event') == 'rule_test' for r in records):
+                assert time.monotonic() < deadline, 'Controlled foreground test did not complete'
+                if not ready.select(timeout=0.1):
+                    continue
+                block = os.read(child.stdout.fileno(), 16384)
+                assert block, 'Controlled foreground owner exited before a result'
+                pending += block
+                while b'\n' in pending:
+                    line, pending = pending.split(b'\n', 1)
+                    records.append(json.loads(line))
+            listening = records[0]
+            assert listening['event'] == 'listening'
+            outcome = next(r['outcome'] for r in records if r.get('event') == 'rule_test')
+            assert outcome['result'] == 'blocked_explicit' and outcome['connection_attempted'] is False
+            event = next(r for r in records if r.get('origin') == 'rule_test')
+            assert event['test_id'] == outcome['test_id'] and event['provenance'] == 'explicit_block' and event['outcome'] == 'blocked'
+            assert all(r.get('peer_family') is None for r in records), 'Controlled test created a destination socket'
+            child.send_signal(signal.SIGINT)
+            tail, errors = child.communicate(timeout=10)
+            assert child.returncode == 0, errors.decode()
+            assert json.loads(tail.splitlines()[-1])['data']['event'] == 'stopped'
+            ready.close()
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.communicate()
+        print('PASS: CLI static telemetry/no state, real controlled CONNECT/original event, finite refusal, SSH registry, browser absent-profile and foreground owner lifecycle')
+
 
 
 if __name__ == '__main__':

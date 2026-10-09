@@ -65,3 +65,7 @@ Pages 的 Custom domains 维护 `lintel.page` 关联；Cloudflare 的同名 DNS 
 若生产更新出现已验证问题，可在当前授权范围内把保留的上一份已验收 payload 重新部署到 `main`，如实使用其原 source revision／dirty 状态，再按上面的线上检查核对。保留旧目录和 deployment 证据；不删除域名、项目、旧资源或改写 Git 历史来回退。
 
 平台机制参考 [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)、[Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) 与 [Headers](https://developers.cloudflare.com/pages/configuration/headers/)。
+
+## 未来 App 下载与更新 feed
+
+只有按 [App 发行准备](app-updates.md) 逐字节核对公开 Release 后，才给 `prepare-site.mjs` 传入 `--app-release PUBLIC_RELEASE_RECORD`。该入口生成同源的有限 feed 与无需 JavaScript 的首次 DMG 下载区，二进制留在 GitHub。未传入记录时保持源码预览。两个已激活通道必须同次传入两个记录，避免整站更新丢失另一个 feed；先上传并核对二进制，再激活 feed。这里只增加本地 payload 准备能力，不改变现有生产网站或授予 Release／部署权限。

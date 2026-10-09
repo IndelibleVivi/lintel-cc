@@ -24,6 +24,9 @@
       "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'"
     }
   },
+  "plugins": {
+    "updater": { "pubkey": "", "endpoints": [], "requireSignedVersion": true }
+  },
   "bundle": {
     "active": true,
     "targets": [

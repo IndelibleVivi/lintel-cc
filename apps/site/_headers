@@ -5,5 +5,11 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'
   Cache-Control: public, max-age=0, must-revalidate
+
+/updates/*
+  Cache-Control: no-cache
+
+/app-downloads.json
+  Cache-Control: no-cache
 /media/*
   Cache-Control: public, max-age=3600

@@ -1452,6 +1452,37 @@ fn runtime_paths() -> Result<(PathBuf, PathBuf)> {
 pub fn handle_request(request: Value) -> Value {
     handle_request_inner(request, None, None)
 }
+
+#[cfg(test)]
+mod telemetry_catalog_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn telemetry_catalog_is_static_state_free_and_rejects_unknown_fields() {
+        let response = handle_request(json!({"command":"telemetry_catalog"}));
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["data"]["schema"], "lintel.telemetry-destinations/1");
+        assert_eq!(
+            response["data"]["destinations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry["blockable"] == true)
+                .count(),
+            2
+        );
+        for request in [
+            json!({"command":"telemetry_catalog","host":"api.anthropic.com"}),
+            json!({"command":"telemetry_catalog","path":"/etc/hosts"}),
+            json!({"command":"telemetry_catalog","ids":["datadog_logs_intake"]}),
+        ] {
+            let response = handle_request(request);
+            assert_eq!(response["ok"], false, "{response}");
+            assert_eq!(response["error"]["code"], "invalid_request");
+        }
+    }
+}
 /// Runner-only entry point that carries the runner's factual selected execution
 /// context into the accepted receipt. `context` is trusted internal data chosen
 /// by the runner (never request JSON), so a caller cannot forge a survival claim;
@@ -1470,6 +1501,15 @@ fn handle_request_inner(request: Value, context: Option<Value>, hook: Option<fn(
         match command {
             "context" => return json!({"ok":true,"data":context::context_value()}),
             "tasks" => return json!({"ok":true,"data":lintel_operations::tasks()}),
+            // The static telemetry-destination catalog is served by the shared
+            // egress crate (one embedded contract file). It must be answerable
+            // without creating a state directory or touching any target.
+            "telemetry_catalog" => {
+                if lintel_operations::validate(&request).is_err() {
+                    return json!({"ok":false,"error":{"code":"invalid_request","message":"telemetry_catalog 不接受其他字段"}});
+                }
+                return lintel_egress::telemetry::catalog_envelope();
+            }
             _ => {}
         }
     }
