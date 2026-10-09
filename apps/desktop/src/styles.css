@@ -8,7 +8,7 @@
 *{box-sizing:border-box}
 body{margin:0;color:var(--text);background:var(--bg)}
 button,input,select,textarea{font:inherit}
-button{color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:9px;min-height:38px;padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .12s}
+button{color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:9px;min-height:38px;padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;transition:box-shadow .16s,transform .12s}
 button:hover:not(:disabled){background:var(--soft);border-color:var(--muted)}
 button:active:not(:disabled){transform:translateY(1px)}
 button:disabled{cursor:default;opacity:.48}
@@ -892,12 +892,11 @@ h1[tabindex="-1"]:focus{outline:none}
 .network-plan-review>.notice{margin-bottom:16px}
 @media(max-width:850px){.probe-table th,.probe-table td{padding:10px 8px}.network-config-review{grid-template-columns:1fr}.ip-network-panel .surface-heading{flex-wrap:wrap}.network-service .button-row{flex-wrap:wrap}}
 
-/* Gentle-polish pass: quiet motion, tinted feature chips and warmer chosen states. */
-.nav-item,.sidebar-environment,.new-space,.profile-settings{transition:background-color .16s,color .16s}
-.tabs button,.segmented button,.theme-switch button{transition:color .16s,background-color .16s,border-color .16s,box-shadow .16s}
-.overview-item{transition:background-color .16s}
+/* Gentle-polish pass: quiet motion, tinted feature chips and warmer chosen states.
+   Theme/selection colors update immediately, including when native animations pause. */
+.tabs button,.segmented button,.theme-switch button{transition:box-shadow .16s}
 .overview-item:hover:not(:disabled){background:color-mix(in srgb,var(--text) 4%,transparent)}
-.preset,.recipe,.task-home .help-tasks>section{transition:border-color .18s,background-color .18s,box-shadow .18s}
+.preset,.recipe,.task-home .help-tasks>section{transition:box-shadow .18s}
 .preset:not(.unavailable):hover{border-color:color-mix(in srgb,var(--accent) 38%,var(--line))}
 .recipe:not(.chosen):hover{border-color:color-mix(in srgb,var(--accent) 38%,var(--line))}
 .sidebar-environment.chosen{color:var(--accent-strong);font-weight:500}
@@ -917,11 +916,10 @@ button.primary:disabled{box-shadow:none}
 :root:not([data-theme=light]) .feature-icon.amber{color:#D3B579;background:#D3B5791f}
 }
 
-.home-composer{transition:border-color .18s,box-shadow .18s}
+.home-composer{transition:box-shadow .18s}
 .home-composer:hover,.home-composer:focus-within{border-color:color-mix(in srgb,var(--accent) 32%,var(--line));box-shadow:var(--shadow-lift)}
-.home-continue,.home-pending{transition:background-color .16s,color .16s}
 .home-continue:hover:not(:disabled),.home-pending:hover:not(:disabled){background:color-mix(in srgb,var(--text) 4%,transparent);border-radius:8px}
-.task-home .help-tasks>section{transition:border-color .18s,background-color .18s,box-shadow .18s}
+.task-home .help-tasks>section{transition:box-shadow .18s}
 .task-home .help-tasks>section:hover{box-shadow:var(--shadow-soft)}
 
 @keyframes modal-in{from{opacity:0;transform:translateY(12px)}}
