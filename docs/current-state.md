@@ -45,7 +45,9 @@ App 自身使用官方 Tauri updater：本轮源码默认没有发行公钥／fe
 
 GitHub Actions 仍是主要 CI owner；`tests/ci_plan.py` 按改动选择 `docs`／`site`／`app-ui`／`browser-ext`／`core`／`full`，由 canonical `tests/verify.py --checks` 执行。纯 UI／官网／文档不等待工作包重检查和 VM；核心、未知路径、CI 控制器、缺失 diff 基线与每周／手动 full 保留跨平台完整验收。各组在 plan 后独立执行，aggregate 核对必需 job 与每个平台的原始报告，选中检查 skipped 不算通过。Cargo／官方基础 VM 镜像缓存不替代源码构建和签名核对；没有接入 Cloudflare Builds 或自动部署。
 
-本机严格控制器 self-test、73 项 planner／生产 aggregate／workflow regression 与 actionlint 通过；新的 GitHub 接线结果和耗时仍需独立核对。原先 `4d3706f` 全量 run 的 macOS／Ubuntu 耗时为 24m32s／54m25s，不能作为分组后耗时。操作和准确边界见[验证说明](verification.md#ci-workflow-github-actions)。
+2026-10-10 核对：本机严格控制器 self-test、73 项 planner／生产 aggregate／workflow regression 与 actionlint 通过。`3d09911` 的首轮分组 [full run 37953451500](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37953451500) 中，两平台 frontend／native／工作包／CLI 与 Linux OpenSSH／VM 均通过；工作包 macOS 16m26s、Ubuntu 22m11s，VM 18m44s，三者独立并行。该 run 的两平台 `baseline-ui` 抓到新增颜色 transition 在暂停动画时保留旧主题文字的回归，aggregate 正确拒绝，所以该 full run 是 failure，不能标绿。
+
+`fe7f136` 恢复已有即时主题配色合同，保留阴影、位移、弹窗／toast 与其余美化；本机同断言先失败、修正后通过，完整 13 项 App UI 通过。对应纯 [app-ui run 37956385539](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37956385539) completed/success：frontend 三项与 App UI 十三项全部通过，native／工作包／CLI／VM 按计划 skipped，aggregate 通过；从首个 job 开始到 aggregate 完成为 **3m33s**。这是一次日常 UI run 的观察，不是每次耗时保证或 native WebKit／正式发行验收；该 CSS 修正未重跑未改变的 core／VM。原先 `4d3706f` 全量 run 的 macOS／Ubuntu 耗时为 24m32s／54m25s，属于旧串行流程。操作和准确边界见[验证说明](verification.md#ci-workflow-github-actions)。
 
 ## 入口与权威
 

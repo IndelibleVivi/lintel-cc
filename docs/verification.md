@@ -162,8 +162,9 @@ Finder and the browser's load picker remains independent runtime acceptance.
 GitHub Actions is the **only primary CI owner**. `python3 tests/verify.py` stays
 the single provider-neutral entrypoint with its unchanged implicit default group;
 CI selects subsets of it. Linux jobs use the explicit `ubuntu-24.04` image;
-changes to the hosted image are a separate verification decision. There is no Cloudflare Worker for CI, no third-party
-paths-filter action, no deployment and no production dependency. Local implicit
+changes to the hosted image are a separate verification decision. There is no
+Cloudflare Worker for CI, no third-party paths-filter action, no deployment and
+no production dependency. Local implicit
 defaults are unchanged: `python3 tests/verify.py` still runs the same default
 group it always did.
 
