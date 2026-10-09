@@ -39,6 +39,8 @@ shasum -a 256 -c SHA256SUMS      # macOS
 
 升级时把**另一个**身份归档解到另一个目录，重跑上面的校验与 `version`/`capabilities`，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。candidate 不是签名发行：Linux 归档在 macOS 上只做格式与字节检查，没有 Linux 运行时证据；只有本机架构匹配时才在本机执行所选 executable。
 
+卸载某个 CLI 版本时，先停止使用该路径，确认没有该版本正在执行的任务，再删除自己解包的那个候选目录。保留 Lintel state、工作包与原 job ID；移除 executable 不会恢复已经批准的配置，也不会卸载独立安装的浏览器 host 或远端 runner。配置恢复与这些组件各自的管理入口仍是独立操作，不要通过删除 state 代替恢复。
+
 
 ## 从源码独立安装
 
@@ -120,6 +122,8 @@ lintel job wait <restore-plan-id> --timeout 30s
 
 计划生成会保存冻结计划；不会修改目标 settings。`plan show` 不刷新旧计划，而是读回其公共范围。批准必须匹配该计划的 hash，并来自当前任务对这些动作的既有用户授权；没有通用 `--yes`。后续外部编辑会拒绝恢复；不要把冲突当作强制覆盖理由。
 
+通用 `execute`／`job submit` 只接受其支持的配置、保全、归档、清理、迁入、恢复与服务 mutation 计划；launch、resume 或未知 kind 返回 `invalid_plan_kind`，在新 job／durable ACK 前拒绝。已有原 job ID 仍只查询，不因类型被拒绝而删除原记录或重试提交；启动／续聊改用各自的准确批准入口。
+
 `job submit` 返回 durable ACK，通常 status 为 accepted。ACK 后任务仍可能失败；另一独立进程使用同一个 HOME/state 和原 plan ID 可以查询。`job wait` 在轮询前按共同 schema 校验原 plan ID；无效 UUID 返回非零、`invalid_request`，不会初始化 state。默认等待 30s，支持 0–3600s 或毫秒值；超时返回非零、`error.code=wait_timeout`、原 `plan_id` 和最新 `data`，**不会重新提交**。needs_reconciliation/interrupted 是需要核对的终态，wait 不替你执行恢复。
 
 接受后的失败在持久回执 `error` 中记录 code/message/phase/recovery；已完成步骤和 archive/new_root 等产物保留。查询原记录，不从 warnings 中文文本猜 code、不自动再 execute。还要检查实际托管 `execution`：SSH 断线、父进程退出、logout、reboot 是不同事件，ACK 不保证 reboot survival。当前 runner 不 sudo、不启用 linger、不改变登录策略。
@@ -183,11 +187,11 @@ inspect/read/import 必须恰好一个 source：`--job ID`（本安装记录）�
 
 工作保全、归档、迁入、旧重建及 cleanup 的 reset_client/retire 在 named/finite 请求中必须至少选择一种类别；空 JSON 数组和 `--categories ''` 拒绝。repair_login 不处理工作内容，categories 可省略或为空，schema 按 recipe 条件表达同一规则。protocol-1 raw request 保留历史兼容默认。
 
-`plan_import` 与 `plan show` 的 `import_manifest` 是批准时应核对的最终清单：`package:{format,generator,sha256}`、`files:[{source,destination,category,size,sha256}]`。旧 `import_manifest` 的 source／destination 保持相对路径兼容；新增 `planned_target` 展示批准中的完整配置 root、准确文件落点、用途与启用选择。App 和 CLI 读回相同计划，含重名分配；摘要对应实际冻结字节。它不含文件正文或归档口令。
+`plan_import` 与 `plan show` 的 `import_manifest` 是批准时应核对的最终清单：`package:{format,generator,sha256}`、`files:[{source,destination,category,size,sha256}]`。旧 `import_manifest` 的 source／destination 保持相对路径兼容；新增 `planned_target` 展示批准中的完整配置 root、准确文件落点、用途与启用选择。App 和 CLI 读回相同计划，含重名分配；摘要对应实际冻结字节。它不含文件正文或归档口令。独立 import 的 `task_result.coverage` 中，`planned_target: done` 需要冻结 manifest 的每个文件都有发布、目的地父目录同步及摘要读回之后的完成记录；冻结清单、现有可读字节或总 status 本身都不是这个完成证据。同步结果不确定时保留原 ID／落点查询，不标 done、不重发迁入。
 
 ## 分开配置目录、项目目录与会话输入
 
-`CLAUDE_CONFIG_DIR` 指向已登记配置 root；`project_cwd` 是目标主机上已存在、当前用户可用的项目目录。它们可以不同，Lintel 不代为创建或改变项目权限。新启动先预览实际目录、程序和静态版本，再批准这一份不可变请求：
+`CLAUDE_CONFIG_DIR` 指向已登记配置 root；`project_cwd` 是目标主机上已存在、当前用户可用的项目目录。它们可以不同，Lintel 不代为创建或改变项目权限。新启动先预览实际目录、程序和静态版本，再批准这一份不可变请求。`plan_launch`／`plan_resume` 只读取目标与资料并保存冻结计划，不启动外部程序、不需要 TTY，可通过 runner JSON、named CLI 或有限 SSH request 预览。`launch_request`／`resume_request` 则需要准确的原计划与 hash，使用真实 TTY 专用入口，或由 macOS core 原生 adapter 请求 Terminal；runner JSON 和有限 SSH request 不执行它们。远端交互使用独立 remote launch control，绑定原请求和 runner。resume 的批准动作另会发布私有运行副本后启动，不能按只读预览处理：
 
 新 launch／resume 计划的 `startup` 投影列出有限配置候选来源、声明和只查看元数据的认证位置；不返回命令、token 或指令正文，actual_loaded 与认证仍是未核验。候选变化需要重新预览；未尝试的旧计划缺少 private startup binding 也需要新预览，已记录原 ID 仍优先查询。新 Terminal 的 shell 环境、Keychain、组织策略和工作目录外指令 imports 另行核对；`/status` 与 `/mcp` 是用户在目标终端确认的步骤。
 
@@ -206,7 +210,7 @@ lintel launch list
 
 原 `lintel launch ID` 保留旧默认 cwd=config root；新请求使用明确的项目 cwd。App 的“复制上下文并打开新会话”先复制已审阅的这一稿，再请求 Terminal／PTY；复制失败不会启动。粘贴、发送与模型接收另行确认，正文不写入普通任务记录。
 
-工作包中的会话按需只读、有界分页，`offset` 是响应给出的字节继续位置；来源变化时重新解锁，不把旧片段选择映射到新内容：
+工作包中的会话按需只读、有界分页；请求 `offset` 使用上一响应的 `next_offset`，来源变化时重新解锁，不把旧片段选择映射到新内容。`session_read` 的 `content_kind: text` 提供 `raw_text`，不含 `records`；messages 页提供结构化数组，旧 runner 缺少数组时 App 显示阅读限制，原始文本仍可查看：
 
 ```sh
 python3 -c 'import getpass,json; print(json.dumps({"archive_passphrase":getpass.getpass("Archive passphrase: ")}))' |
@@ -214,6 +218,8 @@ python3 -c 'import getpass,json; print(json.dumps({"archive_passphrase":getpass.
 ```
 
 需要继续时，从上一页的 `next_offset` 传入 `--offset`，可用 `--expected-digest` 核对原文件。未知记录、非 ASCII 与特殊换行保留原字节；原始文本显示与结构化解析都是阅读视图，不改写 transcript。thinking／signature 按不透明块处理，不进入自动生成的交接稿。
+
+结构化记录的 `index` 是页内序号；`offset` 是返回记录／片段在原文件中的起始字节，`block_index` 是已解析原行 content 数组的零基块序号，opaque／unknown 块也占据原位置。单内容或 unknown fragment 的块序号为 0；超长行的有界片段不证明完整原行已解析。新交接稿与 `plan_launch.input_reference.files` 保留 path、file／package digest、offset 与 block；元数据不含正文。引用的 `offset` 可选、限整数 0–268435456，`block_index` 可选、限整数 0–1000000 且须同时有 offset；旧缺位置引用继续接受，不补造精度，App 明示缺少字节或块位置。
 
 原生续聊是独立、有限任务，目前只完整评估不超过 8 MiB 的 transcript；大文件仍可完整保全和分页阅读，超过这个 resume 范围明确标为不支持。通过 `call plan_resume` 的一次性 JSON stdin 提交准确的 archive source、path、环境与项目，口令用 `getpass` 获取。先 `describe plan_resume`／`schema plan_resume` 核对当前版本合同；批准后使用真正终端的 `resume_request REQUEST_ID HASH`。支持范围、私有运行副本、认证／原会话未核对状态都在预览中显示。入口使用绝对 transcript 副本与固定 `--resume`／`--fork-session`；不改写 session ID、signature 或索引。读回运行副本与 inert 参数验证不能证明真实 Claude 已恢复成功。
 
@@ -244,7 +250,7 @@ lintel browser query <<'JSON'
 JSON
 ```
 
-profile 未配对、离线、等待浏览器批准、awaiting-browser-restart、uncertain/rejected/completed 分别处理。clear 先隔离准备；真正关闭整个浏览器并观察原生 runtime.onStartup 后，另行批准 finishClear。不能重启扩展 worker 或制造世代来替代真实 browser restart。不得自动重发 uncertain 的删除。
+profile 未配对、离线、等待浏览器批准、awaiting-browser-restart、uncertain/rejected/completed 分别处理。clear 先隔离准备；真正关闭整个浏览器并观察原生 runtime.onStartup 后，另行批准 finishClear。不能重启扩展 worker 或制造世代来替代真实 browser restart。不得自动重发 uncertain 的删除。网络规则暂停到期／startup 恢复与批准 mutation 共用扩展的串行队列；只消费本次读取并匹配的暂停记录，包括 operation ID，不会让旧恢复擦掉新的暂停。旧无 operation ID 记录按完整记录匹配兼容；规则已有外部改变时保留当前规则与记录；恢复读回不确定时也保留原记录继续核对。
 
 browser schema 的 instance/operation/challenge/receipt ID 与 runtime 一致：8–80 个 ASCII 字母、数字、`-` 或 `_`。Chrome/Edge 扩展 ID 为 32 个 `a`–`p` 字符，Firefox 为固定 `lintel@lintel.local`，安装 schema 按 browser 约束对应身份。manifest helper 的 `chromium` 名称不代表已有 Chromium 注册路径；当前 installer 只接受 Chrome/Edge/Firefox。
 

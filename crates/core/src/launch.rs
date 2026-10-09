@@ -206,13 +206,20 @@ fn normalize_input_reference(value: Option<&Value>) -> Result<Value> {
         let object = entry
             .as_object()
             .ok_or_else(|| err("invalid_reference", "files 条目必须是对象"))?;
-        if object
-            .keys()
-            .any(|key| !["path", "digest", "package_digest", "index"].contains(&key.as_str()))
-        {
+        if object.keys().any(|key| {
+            ![
+                "path",
+                "digest",
+                "package_digest",
+                "index",
+                "offset",
+                "block_index",
+            ]
+            .contains(&key.as_str())
+        }) {
             return Err(err(
                 "invalid_reference",
-                "files 条目只接受 path、digest、package_digest、index",
+                "files 条目只接受 path、digest、package_digest、index、offset、block_index",
             ));
         }
         let path = string(entry, "path")?;
@@ -242,12 +249,30 @@ fn normalize_input_reference(value: Option<&Value>) -> Result<Value> {
                 .filter(|n| *n <= 1_000_000)
                 .ok_or_else(|| err("invalid_reference", "index 必须是 0 到 1000000 的整数"))?,
         };
-        out.push(json!({
+        let mut reference = json!({
             "path": path,
             "digest": digest,
             "package_digest": package_digest,
             "index": index,
-        }));
+        });
+        // Old references only identify a page-local record. Do not fabricate
+        // an absolute position for them; new readers supply the byte offset and
+        // the original zero-based content block position independently.
+        for (field, max) in [("offset", 268_435_456), ("block_index", 1_000_000)] {
+            if let Some(value) = entry.get(field) {
+                let value = value.as_u64().filter(|n| *n <= max).ok_or_else(|| {
+                    err(
+                        "invalid_reference",
+                        &format!("{field} 必须是 0 到 {max} 的整数"),
+                    )
+                })?;
+                reference[field] = json!(value);
+            }
+        }
+        if entry.get("block_index").is_some() && entry.get("offset").is_none() {
+            return Err(err("invalid_reference", "block_index 需要绝对 offset"));
+        }
+        out.push(reference);
     }
     Ok(json!({"files": out}))
 }
@@ -1155,6 +1180,17 @@ mod tests {
         let normalized = normalize_input_reference(Some(&ok)).unwrap();
         assert_eq!(normalized["files"][0]["index"], 3);
         assert_eq!(normalized["files"][0]["package_digest"], "b".repeat(64));
+        assert!(normalized["files"][0].get("offset").is_none());
+        assert!(normalized["files"][0].get("block_index").is_none());
+        let precise = json!({"files":[
+            {"path":"p","digest":"a".repeat(64),"index":0,"offset":0,"block_index":0},
+            {"path":"p","digest":"a".repeat(64),"index":0,"offset":230054,"block_index":0},
+            {"path":"p","digest":"a".repeat(64),"index":0,"offset":230054,"block_index":1}
+        ]});
+        let normalized = normalize_input_reference(Some(&precise)).unwrap();
+        assert_eq!(normalized["files"][0]["offset"], 0);
+        assert_eq!(normalized["files"][1]["offset"], 230054);
+        assert_eq!(normalized["files"][2]["block_index"], 1);
         assert!(
             normalize_input_reference(Some(&json!({"files":[{"path":"p","digest":"short"}]})))
                 .is_err()
@@ -1171,6 +1207,12 @@ mod tests {
             json!({"path":"p","digest":"a".repeat(64),"index":-1}),
             json!({"path":"p","digest":"a".repeat(64),"index":1000001}),
             json!({"path":"p\nbody","digest":"a".repeat(64)}),
+            json!({"path":"p","digest":"a".repeat(64),"offset":-1}),
+            json!({"path":"p","digest":"a".repeat(64),"offset":268435457}),
+            json!({"path":"p","digest":"a".repeat(64),"offset":"230054"}),
+            json!({"path":"p","digest":"a".repeat(64),"offset":0,"block_index":1.5}),
+            json!({"path":"p","digest":"a".repeat(64),"offset":0,"block_index":1000001}),
+            json!({"path":"p","digest":"a".repeat(64),"block_index":0}),
         ] {
             assert!(normalize_input_reference(Some(&json!({"files":[entry]}))).is_err());
         }

@@ -7,6 +7,8 @@ const GROUND = 188, PLAYER_X = 48, HEIGHT = 40, GRAVITY = 1450;
 const EYES_OPEN = [[20, 10, 4, 10], [56, 10, 4, 10]];
 const EYES_SHUT = [[19, 18, 8, 3], [55, 18, 8, 3]];
 const STAR_HIT_X = 30, STAR_HIT_Y = 24;
+// One subtle weight shift per 100px of travel; grounded feet never lift with the stride.
+const STRIDE_TRAVEL = 100;
 // Three visible star rows. The row advances every spawn, so successive stars sit at clearly
 // different heights; a small deterministic jitter keeps them from looking printed. All three rows
 // (and their jitter) stay inside one jump's reach at every speed, and none is collectible from the
@@ -87,22 +89,20 @@ export function advance(run, dt, width, random = Math.random) {
 export function clawdPose(run, reduced = false) {
   const air = run.y > 0 || run.velocity > 0;
   // A paused run (including the pause-on-blur mid-jump and just-after-landing cases) freezes the
-  // canonical shape exactly; only an actively running run bounces, stretches or squashes.
+  // canonical shape exactly; only an actively running run deforms, stretches or squashes.
   if (reduced || run.status !== 'running') return { anchor: 0, scaleX: 1, scaleY: 1, eyes: run.status === 'over' ? EYES_SHUT : EYES_OPEN };
-  const gait = air ? 0 : run.distance / 13;
+  const pace = run.distance / STRIDE_TRAVEL * 2 * Math.PI;
+  const anchored = !air && run.distance > 0;
+  // Only a real landing arms this finite settle; buffered takeoff clears it.
   const landing = run.landing / .14;
-  // A restrained whole-body bounce while the run is actually progressing, a stretch on the way up,
-  // and a squash on landing. The connected legs ride with the body instead of animating on their
-  // own. A ready, paused or just-restarted pose is exactly the canonical shape (scale 1, no lift).
-  const stepping = !air && run.distance > 0;
-  const anchor = !stepping ? 0 : Math.abs(Math.sin(gait)) * 1.5;
   const ascending = air && run.velocity > 0;
   const stretch = ascending ? run.velocity / 480 : 0;
-  const crouch = !stepping ? 0 : Math.max(0, (1.5 - anchor) / 1.5) * .5;
+  // Distance sets the phase across frame rates; ±0.4% scale avoids a repeated vertical bounce.
+  const stride = anchored ? Math.sin(pace) : 0;
   return {
-    anchor,
-    scaleX: (1 + landing * .1) * (1 - crouch * .06),
-    scaleY: (1 - landing * .1 + stretch * .1) * (1 - crouch * .05),
+    anchor: 0,
+    scaleX: (1 + landing * .1) * (1 + stride * .004),
+    scaleY: (1 - landing * .1 + stretch * .1) * (1 - stride * .004),
     eyes: EYES_OPEN,
   };
 }
@@ -209,7 +209,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
     ctx.globalAlpha = 1;
     const pose = clawdPose(run, reduced.matches);
     // One connected silhouette: the body path already ends in four short legs, so there are no
-    // separately drawn feet. Only the whole-body anchor, squash and stretch are applied.
+    // separately drawn feet. Scaling around the feet keeps ordinary running anchored on GROUND.
     ctx.save(); ctx.translate(PLAYER_X+32,GROUND-run.y-pose.anchor);ctx.scale(.8*pose.scaleX,.8*pose.scaleY);ctx.translate(-40,-50);
     ctx.fillStyle = p.accent; ctx.fill(body);
     ctx.fillStyle = '#252320';

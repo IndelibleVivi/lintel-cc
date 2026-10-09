@@ -237,6 +237,14 @@ fn imported_publication_sync_failure_keeps_original_job_query_only() {
     assert_eq!(result["data"]["status"], "needs_reconciliation", "{result}");
     assert_eq!(result["data"]["error"]["code"], "io_error");
     assert_eq!(
+        result["data"]["task_result"]["coverage"][0]["scope"],
+        "planned_target"
+    );
+    assert_eq!(
+        result["data"]["task_result"]["coverage"][0]["state"],
+        "unverified"
+    );
+    assert_eq!(
         fs::read(destination.join("CLAUDE.md")).unwrap(),
         b"synthetic exact instruction"
     );
@@ -248,10 +256,44 @@ fn imported_publication_sync_failure_keeps_original_job_query_only() {
         "approval":plan["hash"],"archive_passphrase":PASS}),
     );
     assert_eq!(repeated["status"], "needs_reconciliation");
+    assert_eq!(
+        repeated["task_result"]["coverage"][0]["state"],
+        "unverified"
+    );
     assert_eq!(fs::read_dir(&destination).unwrap().count(), 1);
     assert_eq!(
         fs::read(root.join("CLAUDE.md")).unwrap(),
         b"synthetic exact instruction"
+    );
+}
+
+#[test]
+fn import_target_coverage_requires_every_frozen_file_completion() {
+    let plan = json!({"kind":"import","extra":{"frozen_target":{"new_root":"synthetic"},"manifest":[{"path":"CLAUDE.md"},{"path":"projects/p/s.jsonl"}]}});
+    let state = |receipt: Value| task_result(&plan, &receipt)["coverage"][0]["state"].clone();
+    assert_eq!(
+        state(json!({"status":"completed","steps":[]})),
+        "not_checked"
+    );
+    assert_eq!(
+        state(json!({"status":"completed","steps":[{"id":"CLAUDE.md","status":"completed"}]})),
+        "not_checked"
+    );
+    assert_eq!(
+        state(json!({"status":"completed","steps":[{"id":"import","status":"completed"}]})),
+        "not_checked"
+    );
+    assert_eq!(
+        state(
+            json!({"status":"needs_reconciliation","steps":[{"id":"CLAUDE.md","status":"completed"},{"id":"projects/p/s.jsonl","status":"executing"}]})
+        ),
+        "unverified"
+    );
+    assert_eq!(
+        state(
+            json!({"status":"executing","steps":[{"id":"CLAUDE.md","status":"completed"},{"id":"projects/p/s.jsonl","status":"completed"}]})
+        ),
+        "done"
     );
 }
 
@@ -299,6 +341,10 @@ fn encrypted_package_travels_to_independent_install() {
         json!({"command":"execute","plan_id":import["id"],"approval":import["hash"],"archive_passphrase":PASS}),
     );
     assert_eq!(j["status"], "completed");
+    assert_eq!(j["task_result"]["coverage"][0]["scope"], "planned_target");
+    assert_eq!(j["task_result"]["coverage"][0]["state"], "done");
+    let queried = ok(&other, json!({"command":"job","job_id":import["id"]}));
+    assert_eq!(queried["task_result"]["coverage"][0]["state"], "done");
     assert_eq!(
         fs::read_to_string(dest_root.join("CLAUDE.md")).unwrap(),
         "Synthetic instruction only."

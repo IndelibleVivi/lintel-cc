@@ -15,7 +15,7 @@ const fixture = await mkdtemp(path.join(os.tmpdir(), 'lintel-archive-wait-ui-'))
 const environment = { id: 'synthetic-environment', name: '合成阅读环境', root: '/synthetic/config', executable: null, status: 'active' };
 const context = { user: { home: '/synthetic/home', uid: 501, euid: 501 }, state: { path: '/synthetic/state', source: 'synthetic', exists: true } };
 const manifest = { schema: 'lintel.work/1', files: [{ path: 'projects/demo/session.jsonl', category: 'sessions', digest: 'a'.repeat(64), bytes: 524288 }], notes: '合成工作包，用于等待状态验收。' };
-const calls = []; let pendingRead, pendingUnlock, unlockFailure = false;
+const calls = []; let pendingRead, pendingUnlock, unlockFailure = false, legacyMissingRecords = false;
 function gate(set) { return new Promise(resolve => set(resolve)); }
 const preview = spawn(process.execPath, [path.join(desktop, 'node_modules/vite/bin/vite.js'), 'preview', '--host', '127.0.0.1', '--port', '0', '--strictPort'], { cwd: desktop, stdio: ['ignore', 'pipe', 'pipe'] });
 const report = { fixture, runtime: 'built App + delayed synthetic invoke; not real package performance or native WebKit', checks: [], passed: false };
@@ -49,7 +49,7 @@ try {
       case 'session_read': {
         await gate(resolve => { pendingRead = resolve; });
         const at = payload.offset ?? 0;
-        data = { path: payload.path, digest: manifest.files[0].digest, source: { package_digest: 'b'.repeat(64) }, content_kind: 'text', raw_text: at ? 'SYNTHETIC_NEXT_PAGE' : 'SYNTHETIC_FIRST_PAGE', records: [], total_bytes: 524288, page_bytes: 262144, next_offset: at ? null : 262144, done: !!at };
+        data = { path: payload.path, digest: manifest.files[0].digest, source: { package_digest: 'b'.repeat(64) }, content_kind: legacyMissingRecords ? 'messages' : 'text', raw_text: at ? 'SYNTHETIC_NEXT_PAGE' : 'SYNTHETIC_FIRST_PAGE', offset: at, total_bytes: 524288, page_bytes: 262144, next_offset: at ? null : 262144, done: !!at };
         break;
       }
       default: throw new Error('unexpected synthetic command: ' + payload.command);
@@ -75,6 +75,20 @@ try {
   await page.screenshot({ path: path.join(fixture, 'first-read-1120-day.png') });
   pendingRead(); await page.getByText('SYNTHETIC_FIRST_PAGE', { exact: true }).waitFor();
   assert.equal(await page.locator('.session-reader').getAttribute('aria-busy'), 'false');
+  assert.equal(await page.getByRole('button', { name: '结构化阅读', exact: true }).isDisabled(), true, 'a real text-shaped response does not provide records');
+  await page.getByRole('button', { name: '原始文本', exact: true }).click();
+  assert.equal(await page.getByText('SYNTHETIC_FIRST_PAGE', { exact: true }).isVisible(), true);
+  // An older messages response may omit records too. Its structured view must
+  // show the finite limitation and permit returning to the original bytes.
+  legacyMissingRecords = true;
+  await page.locator('.archive-files button').click();
+  await page.locator('.reader-pending').waitFor(); pendingRead();
+  await page.getByText('识别到消息记录', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '结构化阅读', exact: true }).click();
+  await page.getByText('本页没有识别出的正文；使用原始文本查看格式限制。', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '原始文本', exact: true }).click();
+  await page.getByText('SYNTHETIC_FIRST_PAGE', { exact: true }).waitFor(); legacyMissingRecords = false;
+  report.checks.push('text pages omit records and expose only raw view; legacy messages without records show a bounded limitation and return to raw text without a render error');
   await page.getByRole('button', { name: '下一页', exact: true }).focus(); await page.keyboard.press('Enter');
   await page.locator('.reader-pending').getByText(/下方仍显示上一页/).waitFor();
   assert.equal(await page.getByText('SYNTHETIC_FIRST_PAGE', { exact: true }).isVisible(), true);

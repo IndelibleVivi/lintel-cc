@@ -9,6 +9,92 @@ use tempfile::TempDir;
 const PASS: &str = "synthetic-baseline-passphrase";
 
 #[test]
+fn generic_execute_rejects_launch_resume_and_unknown_before_acceptance() {
+    use std::os::unix::fs::MetadataExt;
+    let (_t, mut engine, registered, root) = setup();
+    engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());
+    let e = with_inert_claude(&engine, &registered, &root);
+    let marker = engine.home.join("client-was-executed");
+    fs::write(
+        engine.home.join(".local/bin/claude"),
+        format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
+    )
+    .unwrap();
+    let project = engine.home.join("project");
+    fs::create_dir(&project).unwrap();
+    let settings = root.join("settings.json");
+    let original = b"{\"env\":{\"KEEP_SYNTHETIC\":\"exact bytes\"}}\n";
+    fs::write(&settings, original).unwrap();
+    fs::write(root.join("CLAUDE.md"), "unsupported synthetic transcript").unwrap();
+    let archive = data(
+        &engine,
+        json!({"command":"plan_archive","environment_id":e["id"],"categories":["instructions"]}),
+    );
+    let archived = data(
+        &engine,
+        json!({"command":"execute","plan_id":archive["id"],"approval":archive["hash"],"archive_passphrase":PASS}),
+    );
+    let launch = data(
+        &engine,
+        json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
+    );
+    let resume = data(
+        &engine,
+        json!({"command":"plan_resume","environment_id":e["id"],"project_cwd":project,"job_id":archived["id"],"archive_passphrase":PASS,"path":"CLAUDE.md"}),
+    );
+    assert_eq!(resume["resume"]["supported"], false);
+    let mut unknown = load(&engine.path("plans", launch["id"].as_str().unwrap())).unwrap();
+    unknown["id"] = json!(id());
+    unknown["kind"] = json!("unknown_future_kind");
+    unknown.as_object_mut().unwrap().remove("hash");
+    unknown["hash"] = json!(digest(&serde_json::to_vec(&unknown).unwrap()));
+    save(
+        &engine.path("plans", unknown["id"].as_str().unwrap()),
+        &unknown,
+    )
+    .unwrap();
+    engine.accept_hook = Some(|_| panic!("rejected plan reached durable ACK"));
+    let before = fs::metadata(&settings).unwrap();
+    for plan in [&launch, &resume, &unknown] {
+        let response = engine.request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS}));
+        assert_eq!(response["error"]["code"], "invalid_plan_kind", "{response}");
+        assert!(!engine.path("jobs", plan["id"].as_str().unwrap()).exists());
+        assert!(!engine
+            .path("launches", plan["id"].as_str().unwrap())
+            .exists());
+        assert_eq!(fs::read(&settings).unwrap(), original);
+        let after = fs::metadata(&settings).unwrap();
+        assert_eq!((after.dev(), after.ino()), (before.dev(), before.ino()));
+        assert!(!marker.exists());
+    }
+    // Existing original receipts remain query-only even for an obsolete kind.
+    let receipt = json!({"id":unknown["id"],"plan_id":unknown["id"],"status":"completed","steps":[],"warnings":[]});
+    save(
+        &engine.path("jobs", unknown["id"].as_str().unwrap()),
+        &receipt,
+    )
+    .unwrap();
+    let replay = data(
+        &engine,
+        json!({"command":"execute","plan_id":unknown["id"],"approval":unknown["hash"]}),
+    );
+    assert_eq!(replay["id"], unknown["id"]);
+    assert_eq!(fs::read(&settings).unwrap(), original);
+    engine.accept_hook = None;
+    let allowed = data(
+        &engine,
+        json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce","keep_remote_control":false}),
+    );
+    assert_eq!(
+        data(
+            &engine,
+            json!({"command":"execute","plan_id":allowed["id"],"approval":allowed["hash"]})
+        )["status"],
+        "completed"
+    );
+}
+
+#[test]
 fn startup_sources_are_frozen_before_intent_and_original_records_stay_query_only() {
     let (_t, mut engine, e, root) = setup();
     engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());

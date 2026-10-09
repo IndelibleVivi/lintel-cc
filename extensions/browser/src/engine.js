@@ -160,7 +160,7 @@ export class Engine {
       const rules=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
       if (!rules.length) fail('no_active_rules');
       const resumeAt=Date.now()+a.minutes*60000;
-      await this.set('pausedRules',{rules,resumeAt});
+      await this.set('pausedRules',{rules,resumeAt,operationId:r.id});
       await this.api.alarms.create('resume-rules',{when:resumeAt});
       await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:rules.map(v=>v.id)});
       return {result:{verification:'effective-readback',resumeAt}};
@@ -307,14 +307,23 @@ export class Engine {
     prior.restoredBy=r.id;await this.set(`operation:${prior.id}`,prior);
     return {result:{verification:'effective-readback',restored:r.action.receiptId,effective,...(u.type==='content'?{controller:'not-exposed-by-contentSettings-api'}:{})}};
   }
-  async resumeRules() {
+  // Alarms/startup share the mutation queue with an approved pause. Consume
+  // only the record read by this reconciliation, never a newer pause generation.
+  resumeRules() {return this.serial(async()=>{
     const paused=await this.get('pausedRules');
     if (!paused || paused.resumeAt>Date.now()) return;
     const current=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
-    if (current.length) {await this.set('ruleConflict','暂停期间规则已变化；未覆盖。');return;}
-    await this.api.declarativeNetRequest.updateDynamicRules({addRules:paused.rules});
-    await this.api.storage.local.remove('pausedRules');
-  }
+    // A prior DNR call may have applied before its Promise/storage failed.
+    // Exact readback completes that same restoration without adding twice.
+    if (current.length && !equalRules(current,paused.rules)) {await this.set('ruleConflict','暂停期间规则已变化；未覆盖。');return;}
+    if (!current.length) {
+      await this.api.declarativeNetRequest.updateDynamicRules({addRules:paused.rules});
+      const effective=(await this.api.declarativeNetRequest.getDynamicRules()).filter(v=>v.id>=NETWORK_RULE_START && v.id<NETWORK_RULE_START+100);
+      if (!equalRules(effective,paused.rules)) fail('resume_rules_not_effective');
+    }
+    // Snapshot matching also supports legacy records without operationId.
+    if (equal(await this.get('pausedRules'),paused)) await this.api.storage.local.remove('pausedRules');
+  });}
   async status() {
     await this.expirePreviews();
     const all=await this.api.storage.local.get(null);

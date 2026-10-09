@@ -558,6 +558,8 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
       '       "$dest/bin/lintel" capabilities --json',
       '',
       'Upgrade by selecting another candidate identity directory; never replace this one in place.',
+      'To remove this version, stop using it and wait for its running tasks, then remove only this extracted candidate directory.',
+      'Keep Lintel state, work packages and original job IDs. Removing the CLI does not restore approved changes or uninstall separate browser hosts or remote runners.',
       'This archive changes no PATH, shell rc, App, service, Claude, credentials or browser registration.',
       'Both canonical Linux remote runners ship at bin/remote-runners, resolved next to bin/lintel.',
       '',

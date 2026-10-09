@@ -74,7 +74,6 @@ export default function App({ greeting }: { greeting: string }) {
   const [name, setName] = useState('');
   const [root, setRoot] = useState('');
   const [formError, setFormError] = useState('');
-  const [drift, setDrift] = useState<Drift | null>(null);
   const [archiveJobId, setArchiveJobId] = useState<string | undefined>();
   const [support, setSupport] = useState('');
   const [theme, setTheme] = useState<Theme>((localStorage.getItem('lintel.theme') as Theme) ?? 'system');
@@ -113,7 +112,7 @@ export default function App({ greeting }: { greeting: string }) {
   }, [request, hostAlias]);
   useEffect(() => { let active = true; setLoading(true); setInspection(null); setEnvironments([]); setJobs([]); refresh().catch(error => { if (active) setError(asError(error)); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [refresh]);
   useEffect(() => {
-    let active = true; setInspection(null); setDrift(null);
+    let active = true; setInspection(null);
     if (selected) request('inspect', { environment_id: selected.id, trusted_devices: draft.trustedDevices ?? 'unknown' }).then(data => { if (active) setInspection(data); }).catch(error => { if (active) setError(asError(error)); });
     return () => { active = false; };
   }, [selected?.id, selected?.root, lastCheck, request, draft.trustedDevices]);
@@ -159,7 +158,6 @@ export default function App({ greeting }: { greeting: string }) {
     void perform('restore-service', async () => { const plan = await request('plan_service_resume', { job_id: receipt.id }); if (activeHost.current === hostAlias) setFlow(value => value === source ? { environment: target, plan } : value); });
   }
   function launch(environment: Environment, sourceHost=hostAlias,proxyUrl?:string) { setLaunchTarget({ environment: {...environment}, hostAlias: sourceHost,proxyUrl }); }
-  function checkDrift() { if (selected) void perform('drift', async () => { setDrift(await request('drift', { environment_id: selected.id })); }); }
   function downloadSupport() { const url = URL.createObjectURL(new Blob([support], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'lintel-support-redacted.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); setNotification('已请求保存脱敏资料。请核对文件后再分享。'); }
   function queryOriginalJob() { void perform('query', async () => { const receipt = await request('job', { job_id: queryId.trim() }); if (activeHost.current !== hostAlias) return; const target = environments.find(env => env.id === receipt.environment_id); if (!target) throw new Error('任务存在，但对应环境不在当前清单。请刷新环境后再查看。'); setFlow({ environment: target, receipt }); }); }
   function supportPreview() { void perform('support', async () => { setSupport(JSON.stringify(await request('export_support', {}), null, 2)); setDialog('support'); }); }
@@ -205,7 +203,7 @@ export default function App({ greeting }: { greeting: string }) {
                   {tab === 'launch' && <><div className="fact-row"><span>启动程序</span>{selected.executable ? <Path value={selected.executable}/> : <span>尚未定位；不会擅自安装 Claude</span>}</div><div className="fact-row"><span>配置根</span><Path value={selected.root}/></div><div className="fact-row"><span>已有会话</span><span>不会自动退出或重启</span></div><Notice>新启动使用此环境的准确程序与配置根。其他终端、IDE 与服务入口的生效状态需独立确认。</Notice><div className="button-row"><button className="primary" disabled={!!busy || !selected.executable || selected.status === 'retired'} onClick={() => launch(selected)}>打开 Claude<Icon name="arrow" size={15}/></button>{hostAlias && <span className="muted">在 Terminal 连接此主机</span>}</div></>}
                 </>}
               </div></section>}
-              {selected && showInspector && <div className="drift-block"><div><h3>上次之后，有什么变化？</h3><p>检查已管理的设置，由你决定是否接受。</p></div><button disabled={!!busy} onClick={checkDrift}><Icon name="refresh" size={15}/>检查变化</button>{drift && <div className="drift-result"><Status value={drift.status}/>{drift.changes.length > 0 ? <><SettingsRows settings={drift.changes}/><div className="button-row"><button onClick={() => setPage('policy')}>重新应用方案</button><button disabled={!!busy} onClick={() => void perform('accept', async () => { await request('accept_drift', { environment_id: selected.id }); setDrift(await request('drift', { environment_id: selected.id })); setNotification('已将当前值记为此环境的基线'); })}>接受当前值</button></div></> : <span>当前检查范围内没有待处理差异。</span>}</div>}</div>}
+              {selected && showInspector && <DriftCheck key={JSON.stringify([hostAlias, selected.id, selected.root, lastCheck?.getTime(), draft.trustedDevices])} send={request} environmentId={selected.id} disabled={!!busy} onPolicy={() => setPage('policy')}/>}
             </>}
             </section>
           </>}
@@ -256,3 +254,43 @@ function categoryLabel(value: string) { return ({ instructions: '个人指令', 
 function SelectTarget({ onAdd }: { onAdd: () => void }) { return <div className="empty-state bordered"><Icon name="environments" size={32}/><h2>先选择一个具体环境</h2><p>每份方案绑定其主机和配置目录。</p><button onClick={onAdd}>添加现有环境</button></div>; }
 
 function ThemeSwitch({ theme, onChange }: { theme: Theme; onChange: (theme: Theme) => void }) { return <div className="theme-switch" role="group" aria-label="外观主题">{([['light','Day','sun'],['dark','Night','moon'],['system','System','environments']] as const).map(([value,title,icon]) => <button key={value} title={value === 'light' ? '浅色 Day' : value === 'dark' ? '深色 Night' : '跟随系统 System'} aria-label={value === 'light' ? '浅色 Day' : value === 'dark' ? '深色 Night' : '跟随系统 System'} aria-pressed={theme === value} onClick={() => onChange(value)}><Icon name={icon} size={13}/><span>{title}</span></button>)}</div>; }
+
+// A mounted check owns one exact host/environment generation. Leaving that
+// target (including A -> B -> A) disposes its results, errors and accept action.
+function DriftCheck({ send, environmentId, disabled, onPolicy }: {
+  send: ReturnType<typeof requester>; environmentId: string; disabled: boolean; onPolicy: () => void;
+}) {
+  const [result, setResult] = useState<Drift | null>(null);
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState<Error | null>(null);
+  const [message, setMessage] = useState('');
+  const generation = useRef(0);
+  useEffect(() => () => { generation.current += 1; }, []);
+  async function run(accept = false) {
+    if (disabled || pending || (accept && !result?.changes.length)) return;
+    const current = ++generation.current;
+    setPending(true); setFailure(null); setMessage('');
+    try {
+      if (accept) await send('accept_drift', { environment_id: environmentId });
+      if (current !== generation.current) return;
+      const data = await send('drift', { environment_id: environmentId });
+      if (current !== generation.current) return;
+      setResult(data);
+      if (accept) setMessage('已将当前值记为此环境的基线');
+    } catch (error) {
+      if (current === generation.current) setFailure(asError(error));
+    } finally {
+      if (current === generation.current) setPending(false);
+    }
+  }
+  return <div className="drift-block" aria-busy={pending}>
+    <div><h3>上次之后，有什么变化？</h3><p>检查已管理的设置，由你决定是否接受。</p></div>
+    <button disabled={disabled || pending} onClick={() => void run()}><Icon name="refresh" size={15}/>{pending ? '正在核对…' : '检查变化'}</button>
+    {failure && <RequestFailure error={failure}/>}
+    {message && <span role="status">{message}</span>}
+    {result && <div className="drift-result"><Status value={result.status}/>{result.changes.length > 0 ? <>
+      <SettingsRows settings={result.changes}/><div className="button-row"><button onClick={onPolicy}>重新应用方案</button>
+      <button disabled={disabled || pending} onClick={() => void run(true)}>接受当前值</button></div>
+    </> : <span>当前检查范围内没有待处理差异。</span>}</div>}
+  </div>;
+}

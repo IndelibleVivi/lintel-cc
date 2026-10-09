@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { requester } from './api';
-import type { Environment, Plan, LaunchRecord } from './types';
+import type { Environment, Plan, LaunchRecord, InputReference } from './types';
 import RequestFailure, { asError } from './RequestFailure';
 import { Icon, Notice, Status } from './ui';
 import StartupSources from './StartupSources';
 export type ResumeSource={job_id?:string;archive_path?:string;archive_passphrase:string;path:string};
-export default function LaunchPanel({environment,hostAlias,continuationText,source,reference,proxyUrl,initialMode='interactive'}:{environment:Environment;hostAlias:string|null;continuationText?:string;source?:ResumeSource;reference?:unknown;proxyUrl?:string;initialMode?:'interactive'|'resume'}) {
+export default function LaunchPanel({environment,hostAlias,continuationText,source,reference,proxyUrl,initialMode='interactive'}:{environment:Environment;hostAlias:string|null;continuationText?:string;source?:ResumeSource;reference?:InputReference;proxyUrl?:string;initialMode?:'interactive'|'resume'}) {
   const key=`lintel.project-cwd:${hostAlias ?? 'local'}:${environment.id}`;
   const [cwd,setCwd]=useState(localStorage.getItem(key) ?? '');
   const [mode,setMode]=useState<'interactive'|'resume'>(initialMode);

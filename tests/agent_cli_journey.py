@@ -42,6 +42,19 @@ def run():
         operations = {operation['id']: operation for operation in catalog['operations']}
         assert operations['discover']['effects']['lintel_state'] == 'update_inventory'
         assert operations['archive_read']['secret_fields'] == ['archive_passphrase']
+        for name in ['plan_launch', 'plan_resume']:
+            description = command('describe', name)
+            assert description['launch_conditions'] is None
+            assert not description['requires_plan'] and description['effects']['external'] == 'none'
+            assert {'runner_json', 'finite_ssh_request'} <= set(description['transports'])
+        for name in ['launch_request', 'resume_request']:
+            description = command('describe', name)
+            assert description['requires_plan'] and description['effects']['external'] == 'start_target_process'
+            assert description['approval'] == 'exact_plan_hash_with_existing_user_authority'
+            assert 'runner_json' not in description['transports'] and 'finite_ssh_request' not in description['transports']
+            rejected = command('call', name, payload={'request_id': '00000000-0000-4000-8000-000000000001', 'approval': 'a' * 64}, good=False)
+            assert rejected['error']['code'] == 'terminal_required', rejected
+            assert not state.exists(), 'Unavailable launch transport initialized state'
         for identity in ['plan-secret', '00000000000040008000000000000001']:
             master, slave = pty.openpty()
             try:

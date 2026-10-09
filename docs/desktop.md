@@ -74,6 +74,8 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 连接后，环境、计划、清理、归档和记录均来自该主机，使用同一套界面。执行调用固定 `lintel submit`，接受回执与最终完成分别呈现；“查询最新结果”和主机面板的持久提交记录查询原 job。桌面重开后在持久提交记录“查询原任务”，再选“查看完整回执与恢复”：只读核对原环境并进入该 alias 的完整结果与记录；配置恢复或服务恢复仍需单独预览和批准。已移除 alias 只允许原任务查询，先重新登记才能准备恢复。关闭面板或切换主机后，迟到回执不恢复已关闭流程或串入另一主机。SSH 中断后不自动重新提交 mutation。接收回执显示实际后台托管方式：满足条件的 Linux 主机使用 system／user transient service；`setsid` 明确显示断线续跑限制，unit 详情可展开。审批前说明这些条件，旧回执不补造托管事实。后台 worker 的实际存活仍受远端 OS/manager 生命周期影响；真实主机验收与 synthetic/fake-SSH 证据分开，见 [远程指南](remote.md)。
 
+环境详情的“检查变化”将读取结果、错误、等待状态和“接受当前值”绑定到当次主机／环境。切换目标后迟到响应丢弃，切回同一环境也不复活旧检查；接受只作用于当前展示的检查目标。
+
 浏览器配对与本机通道属于这台桌面主机，不随 SSH 目标转移。环境详情的“启动与来源”和已完成任务回执都有“打开 Claude”。远端先通过 `plan_launch` 冻结配置 root、独立项目 cwd 与程序，批准后请求 macOS Terminal 通过同一严格 SSH alias、原 runner 和真实 PTY 调用 `launch_request ID HASH`。原生续聊走独立 `plan_resume`／`resume_request`，口令在 SSH Terminal 再次无回显输入。controller 先保存一次尝试，回复丢失只查询原启动 ID；旧 CLI `launch ENV_ID` 保留 root-as-cwd 默认。远端 core 复查准确身份，App 不注入 prompt；SSH 断开会结束交互会话，与持久后台任务不同。`launch_requested` 仅表示 Terminal 接受请求，实际登录和运行状态在终端确认。远端回执处于 accepted/executing/verifying 时，启动按钮保持不可用；先查询原任务到结束状态，再打开新会话。失败信息会滚入可见范围。
 
 ## 帮助与开发者说明
@@ -96,7 +98,7 @@ Day / Night / System 直接切换外观，并在当前 webview 记住选择。�
 
 首页 Clawd 采用固定 SVG 像素几何，小游戏复用该轮廓，风景册用固定字符网格避免字体改变角色比例。形状对照 [Clawd 形象参考](https://pbs.twimg.com/tweet_video_thumb/G2C8pCLaMAAy2P1.jpg) 与 [Claude Code TUI 实际截图](https://zenn.dev/tutupizizizi/articles/claude-code-clawd-mascot)，自行编写渲染与场景，不下载参考图作为产品资源。Clawd 形象属于 Anthropic；Lintel 是独立工具。
 
-`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册与小游戏的 React 挂载／卸载，`src/clawd-landscapes.ts` 负责四幅字符画。小游戏的唯一实现是 [`apps/site/clawd-game.mjs`](../apps/site/clawd-game.mjs) 与同名 CSS，由官网直接加载、App 通过 Vite 打包；旧 React runner 已移除。角色互动与风景册样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
+`src/styles.css` 负责颜色、布局与交互样式；`src/Clawd.tsx` 负责角色与情绪，`src/ClawdFlightMenu.tsx` 负责下拉菜单，`src/ClawdPlayroom.tsx` 负责风景册与小游戏的 React 挂载／卸载，`src/clawd-landscapes.ts` 负责四幅字符画。小游戏的唯一实现是 [`apps/site/clawd-game.mjs`](../apps/site/clawd-game.mjs) 与同名 CSS，由官网直接加载、App 通过 Vite 打包；旧 React runner 已移除。普通跑动保持脚底贴地，只作轻微整体形变；起跳保持弹道，真正落地后短暂收势。暂停与 reduced motion 使用静态轮廓，玩法、星星高度与本地成绩保留。角色互动与风景册样式各在同名前缀 CSS 中。字体优先使用可选的本地 Anthropic Sans / Serif / Mono，并提供系统 fallback，无远程字体请求。字体文件没有确立再分发许可，因此只放在忽略的 `public/local-fonts/`，不进入 Git。显式本地准备命令：
 
 ```sh
 cd apps/desktop
@@ -128,6 +130,12 @@ npm run desktop:build
 同时开发时可用 `LINTEL_FIXTURE_PORT=1422 npm run dev:synthetic`，默认仍是 1420。fixture bridge 的端口、Origin 与 Host 校验使用同一配置。合成模式所有 core 状态与发现都位于临时目录，界面持续标明测试空间；原生浏览器、SSH、认证命令与网络模块不会在网页中伪造成功。新增请求必须进入明确 allowlist；登记路径不能逃出合成 home。
 
 主要桌面尺寸为 1120×760，最低 900×640，可收起侧栏。浏览器渲染不能代替 WebKit/native runtime、真实主机或正式浏览器验收。未完成的安装、发行和全产品能力以 [当前状态](current-state.md) 为准；本文件描述源码接入，不将它等同于正式发布。
+
+## 本地 Preview 候选
+
+候选提供方应同时提供准确 source revision、平台和构建说明。当前 App 候选为 macOS Apple Silicon，没有正式 distribution signing／notarization；macOS 下载拦截仍可能阻止打开，不能把本地构建能启动视为普通用户下载验收。解压到一个新的版本目录后打开其中的 `Lintel.app`，不要覆盖旧候选；App 自带所需 native 组件，不需要在试用机器安装 Rust、Node 或开发服务器。首次试用使用自己创建的合成资料，并按 [quickstart](quickstart.md) 的预览、批准和原 ID 查询顺序核对。
+
+升级时退出旧 App，保留旧版本及 Lintel state，再从新目录启动新 App；不要并行运行两个版本来执行同一任务。移除候选只需退出 App 后删除自己解压的候选目录。App 移除不会自动撤销已批准的配置、更改 Claude、删除工作包或独立安装的 browser host／remote runner；相关恢复应先通过各自批准流程完成，并保留回执与原 ID。
 
 ## 审批与结果接续
 

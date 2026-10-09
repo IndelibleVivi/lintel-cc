@@ -63,7 +63,7 @@ export interface Plan {
   service?: ServicePlan;
   plan_revision?: string;
   planned_target?: { new_environment_id: string|null; new_root: string; create: boolean; files: {source:string;destination:string;category:string;size:number;sha256:string}[]; purposes: Record<string,string>; activation: Record<string,boolean> };
-  launch_request?: { id:string;environment_id:string;project_cwd:string;config_root:string;executable:string;client_version:string|null;mode:string;input_reference?:unknown;created_at:string;startup?:StartupInspection };
+  launch_request?: { id:string;environment_id:string;project_cwd:string;config_root:string;executable:string;client_version:string|null;mode:string;input_reference?:InputReference|null;created_at:string;startup?:StartupInspection };
   resume?: { supported:boolean;reason:string|null;mode:string;source:unknown;transcript_path:string;private_copy_path:string;config_root:string;project_cwd:string;executable?:string;client_version:string|null;client_support:unknown;archive_unmodified:boolean;auth_unverified:boolean;attach_risk:string;startup?:StartupInspection;write_scope?:{config_root:string;project_cwd?:string;note:string} };
   import_manifest?: {
     package: { format: string; generator: string | null; sha256: string };
@@ -105,13 +105,19 @@ export interface ServiceInspection {
   bound: boolean; quiesced: boolean; quiesce_job_id: string | null;
   hold: { path: string; persistent: true } | null; limitations: string[];
 }
-export interface SessionRecord { index:number; kind:string; text?:unknown;tool?:unknown;record?:unknown;block?:unknown;raw?:string;timestamp?:string;name?:string;opaque?:boolean;unknown?:boolean }
-export interface SessionPage { path:string;content_kind:string;records:SessionRecord[];raw_text?:string;next_offset:number|null;done:boolean;total_bytes:number;digest:string;source:{archive_path:string;job_id?:string;package_digest:string} }
+// index is page-local; offset is the returned record/fragment byte start and
+// block_index is the original zero-based content block (including opaque blocks).
+export interface SessionRecord { index:number; offset?:number; block_index?:number; kind:string; text?:unknown;tool?:unknown;record?:unknown;block?:unknown;raw?:string;timestamp?:string;name?:string;opaque?:boolean;unknown?:boolean }
+interface SessionPageBase { path:string;offset?:number;raw_text?:string;next_offset:number|null;done:boolean;total_bytes:number;digest:string;source:{archive_path:string;job_id?:string|null;package_digest:string} }
+// Text pages have no records. Older runners may omit records even on a
+// messages page; the reader exposes that limitation rather than assuming it.
+export type SessionPage = SessionPageBase & ({content_kind:'messages';records?:SessionRecord[]} | {content_kind:'text';records?:never});
+export interface InputReference { files:{path:string;digest:string;package_digest?:string;index?:number;offset?:number;block_index?:number}[] }
 export interface ExecutionContext { product:string;version:string;protocol:number;platform:string;architecture:string;user:{uid:number;euid:number;home:string};state:{source:string;path:string;exists:boolean};config_home:{path:string;exists:boolean};executable:string|null;initialized:boolean }
 export interface Api {
   context: {request:{};response:ExecutionContext};
   session_read: { request:{job_id?:string;archive_path?:string;archive_passphrase:string;path:string;offset?:number;expected_digest?:string};response:SessionPage };
-  plan_launch: { request:{environment_id:string;project_cwd:string;mode:'interactive';input_reference?:unknown;proxy_url?:string};response:Plan };
+  plan_launch: { request:{environment_id:string;project_cwd:string;mode:'interactive';input_reference?:InputReference;proxy_url?:string};response:Plan };
   plan_resume: { request:{environment_id:string;project_cwd:string;job_id?:string;archive_path?:string;archive_passphrase:string;path:string};response:Plan };
   launch_query: { request:{request_id:string};response:LaunchRecord };
   launches: { request:{};response:{launches:LaunchRecord[]} };

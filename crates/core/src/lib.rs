@@ -726,6 +726,22 @@ impl Engine {
         if jp.exists() {
             return self.dispatch(&json!({"command":"job","job_id":pid}));
         }
+        // This executor owns only these mutation plans. Launch/resume have
+        // separate frozen request/TTY entry points; unknown kinds must never
+        // fall through to settings or acquire a durable job/runner ACK. Keep
+        // existing original jobs query-only above this new-intent admission.
+        match p["kind"].as_str() {
+            Some(
+                "policy" | "restore" | "rebuild" | "preserve" | "archive" | "cleanup" | "import"
+                | "service_quiesce" | "service_resume",
+            ) => {}
+            _ => {
+                return Err(err(
+                    "invalid_plan_kind",
+                    "此计划不能通过通用 execute 执行；启动/续聊须使用各自的批准请求入口",
+                ))
+            }
+        }
         let e = self.env(&json!({"environment_id":p["environment_id"]}))?;
         if e["root"] != p["root"] {
             return Err(err("stale_plan", "环境目标已经变化"));
@@ -750,7 +766,13 @@ impl Engine {
                 let snap = snapshot(&path)?;
                 (path, Value::Null, snap)
             }
-            _ => self.settings(&e)?,
+            Some("policy" | "restore") => self.settings(&e)?,
+            _ => {
+                return Err(err(
+                    "invalid_plan_kind",
+                    "此计划不属于配置写入或通用执行范围",
+                ))
+            }
         };
         if snap != p["snapshot"] {
             return Err(err("stale_plan", "预览后配置被修改，请重新预览"));
@@ -859,6 +881,9 @@ impl Engine {
             }
             if p["kind"] == "import" {
                 return self.import_work(&e, &p, r, &mut j, &jp);
+            }
+            if !matches!(p["kind"].as_str(), Some("policy" | "restore")) {
+                return Err(err("invalid_plan_kind", "此计划不属于配置写入范围"));
             }
             if p["kind"] == "policy"
                 && p["extra"]["policy"]["preset"] == "custom"
@@ -1162,9 +1187,32 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
     }
     if plan["extra"]["frozen_target"].is_object() {
         // The frozen mapping is a *plan* fact. Only report the target as done
-        // when the create/import step actually completed; otherwise it stays
-        // not_checked (accepted but not executed) or unverified (uncertain).
-        let target_state = if step_done("create") || step_done("import") {
+        // when create/import completed. Independent import journals each exact
+        // frozen file only after no-replace publication, parent sync and digest
+        // readback; all manifest entries must have that completed fact. Neither
+        // receipt status nor a currently readable destination proves completion.
+        let imported_files_done = kind == "import" && {
+            let completed_files: std::collections::BTreeSet<&str> = steps_array
+                .into_iter()
+                .flatten()
+                .filter(|step| step["status"] == "completed")
+                .filter_map(|step| step["id"].as_str())
+                .collect();
+            plan["extra"]["manifest"].as_array().is_some_and(|files| {
+                !files.is_empty()
+                    && files.iter().all(|file| {
+                        file["path"]
+                            .as_str()
+                            .is_some_and(|path| completed_files.contains(path))
+                    })
+            })
+        };
+        let target_done = if kind == "import" {
+            imported_files_done
+        } else {
+            step_done("create") || step_done("import")
+        };
+        let target_state = if target_done {
             "done"
         } else if receipt["status"] == "needs_reconciliation" {
             "unverified"

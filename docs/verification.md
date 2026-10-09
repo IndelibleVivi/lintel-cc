@@ -47,6 +47,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |
 | `journey-submission` | journey | `python3 tests/submission_journey.py` (detached durable ACK, replay dedup) |
+| `journey-execution-admission` | journey | actual named submit rejects launch/resume before durable ACK, preserves settings bytes/identity, and still admits ordinary policy |
 | `journey-components` | journey | named CLI finite metadata/config sources, original-ID scope, no auth/body disclosure or journal reconciliation |
 | `journey-large-work` | journey | `python3 tests/large_work_journey.py`; >8 MiB files / >32 MiB total archive, independent state import and preserve, full hashes, metadata blockers and isolated per-process RSS |
 | `journey-work-capacity` | journey | metadata-only byte/file bounds, incomplete scans, strict schema and unchanged full archive admission |
@@ -67,6 +68,10 @@ Toolchains (`cargo`, `node`, `npm`, `python3`) are resolved from the caller's
 another user's home, and does not rewrite `CARGO_HOME`/`RUSTUP_HOME`; a host
 where a tool cannot run for environment reasons simply shows the check failing
 or skipped, which is that host's environment, not a change to the check.
+
+The macOS arm64 `desktop-rust-test` also feeds an archive produced by the canonical CLI packager into the native inspector. It uses the existing `cc`, `python3`, `node` and `tar` tools, an inert native executable and synthetic cross-architecture ELF fixtures; it does not execute a Linux runner.
+
+Independent `drift-ui` checks the built App with controlled synthetic request timing: A → B, A → B → A, the same environment ID across hosts, late errors, acceptance in flight, and exact-target acceptance/readback. CI calls it through this entrypoint. This is Chromium evidence, not native WebKit or personal settings mutation.
 
 The default desktop build already runs TypeScript checking; `desktop-typecheck` remains separately selectable.
 

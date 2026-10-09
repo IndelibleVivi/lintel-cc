@@ -132,3 +132,110 @@ test('status sweeps expired previews without requiring a failed execution',async
   f.db[`operation:${p.id}`].expiresAt=Date.now()-1;
   assert.equal((await e.status()).receipts[0].phase,'expired');assert.equal(f.calls.length,0);
 });
+
+function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
+async function pausedFixture(){
+  const f=fake(),e=new Engine(f.api,chromium);
+  const block=await e.preview({kind:'blockSites',origins:['https://claude.ai']});await e.commit(block.id);
+  const rules=structuredClone(f.rules);
+  // Legacy persisted pause, already due. Only browser boundaries are mocked;
+  // preview, commit, reconciliation and all journal handling use real Engine.
+  f.rules.length=0;f.db.pausedRules={rules,resumeAt:Date.now()-1};
+  return {f,e,rules};
+}
+test('an in-flight old resume cannot erase a newly approved pause recovery plan',async()=>{
+  const {f,e,rules}=await pausedFixture();
+  const next=await e.preview({kind:'pauseRules',minutes:10});
+  const added=deferred(),release=deferred(),base=f.api.declarativeNetRequest.updateDynamicRules;
+  let held=false;
+  f.api.declarativeNetRequest.updateDynamicRules=async update=>{
+    await base(update);
+    // The old restore is effective, but its DNR Promise has not returned.
+    if(update.addRules?.length && !held){held=true;added.resolve();await release.promise;}
+  };
+  const restoring=e.resumeRules();await added.promise;
+  const pausing=e.commit(next.id);
+  // Drain runnable work while the DNR callback is held; no timing sleep.
+  await new Promise(resolve=>setImmediate(resolve));
+  const whileHeld=f.db[`operation:${next.id}`].phase;
+  release.resolve();await restoring;const done=await pausing;
+  assert.equal(done.phase,'completed');assert.equal(f.rules.length,0);
+  assert.deepEqual(f.db.pausedRules?.rules,rules,'completed new pause must retain its durable restore rules');
+  assert.equal(f.db.pausedRules.resumeAt,done.result.resumeAt);
+  assert.equal(f.db.pausedRules.operationId,next.id);
+  assert.equal(whileHeld,'preview','new pause waits until old reconciliation has finished');
+  const saved=structuredClone(f.db.pausedRules);await e.resumeRules();
+  assert.deepEqual(f.db.pausedRules,saved,'late duplicate alarm must not consume the new future pause');
+});
+test('normal pause restores on expiry once and leaves cleanup isolation owned',async()=>{
+  const f=fake(),e=new Engine(f.api,chromium);
+  const prep=await e.preview(clear);await e.commit(prep.id);
+  const isolation=structuredClone(f.db.cleanupIsolation);
+  const block=await e.preview({kind:'blockSites',origins:['https://claude.ai']});await e.commit(block.id);
+  const network=structuredClone(f.rules.filter(rule=>rule.id>=20000));
+  const alarms=[];f.api.alarms.create=async(name,info)=>alarms.push({name,...info});
+  const p=await e.preview({kind:'pauseRules',minutes:1});const done=await e.commit(p.id);
+  assert.equal(done.phase,'completed');assert.equal(f.db.pausedRules.operationId,p.id);
+  assert.deepEqual(alarms,[{name:'resume-rules',when:done.result.resumeAt}]);
+  assert.deepEqual(f.rules.map(rule=>rule.id),[10000]);
+  const record=structuredClone(f.db.pausedRules);await e.resumeRules();assert.deepEqual(f.db.pausedRules,record);
+  f.db.pausedRules.resumeAt=Date.now()-1;
+  await Promise.all([e.resumeRules(),e.resumeRules()]);
+  assert.equal(f.db.pausedRules,undefined);assert.deepEqual(f.rules.filter(rule=>rule.id>=20000),network);
+  assert.deepEqual(f.db.cleanupIsolation,isolation);assert.equal(f.rules.filter(rule=>rule.id===10000).length,1);
+  await e.resumeRules();assert.equal(f.rules.length,2,'missing/duplicate resume never adds rules twice');
+  const original=await e.commit(p.id);assert.equal(original.phase,'completed');assert.equal(f.db.pausedRules,undefined,'original pause ID remains query-only');
+  // Pause reconciliation does not substitute for the clear startup/approval gate.
+  await assert.rejects(e.preview({kind:'finishClear',receiptId:prep.id}),/请完整退出/);
+  const finished=await finish(e,prep);assert.equal(finished.phase,'completed');
+  await assert.rejects(e.preview({kind:'finishClear',receiptId:prep.id}),/cleanup_preparation_not_active/);
+});
+test('startup reconciliation restores a legacy persisted pause without another approval',async()=>{
+  const {f,rules}=await pausedFixture();const restarted=new Engine(f.api,chromium);
+  await restarted.recover();await restarted.resumeRules();
+  assert.equal(f.db.pausedRules,undefined);assert.deepEqual(f.rules,rules);
+  assert.equal(f.db.browserStartupGeneration,undefined,'worker reconciliation never manufactures a browser startup event');
+});
+test('DNR failures retain the pause and recover whether rules applied before rejection or not',async()=>{
+  for(const applied of [false,true]){
+    const {f,e,rules}=await pausedFixture();const paused=structuredClone(f.db.pausedRules);
+    const base=f.api.declarativeNetRequest.updateDynamicRules;let updates=0;
+    f.api.declarativeNetRequest.updateDynamicRules=async update=>{
+      updates++;if(applied)await base(update);throw new Error('synthetic DNR failure');
+    };
+    await assert.rejects(e.resumeRules(),/synthetic DNR failure/);
+    assert.deepEqual(f.db.pausedRules,paused);
+    f.api.declarativeNetRequest.updateDynamicRules=async update=>{updates++;await base(update);};
+    const restarted=new Engine(f.api,chromium);await restarted.recover();await restarted.resumeRules();
+    assert.equal(f.db.pausedRules,undefined);assert.deepEqual(f.rules,rules);
+    assert.equal(updates,applied?1:2,'effective prior restoration is consumed without another DNR add');
+  }
+});
+test('unconfirmed DNR readback and changed network rules preserve the recovery record',async()=>{
+  const {f,e,rules}=await pausedFixture();const paused=structuredClone(f.db.pausedRules);
+  const base=f.api.declarativeNetRequest.updateDynamicRules;
+  f.api.declarativeNetRequest.updateDynamicRules=async()=>{};
+  await assert.rejects(e.resumeRules(),/resume_rules_not_effective/);assert.deepEqual(f.db.pausedRules,paused);
+  f.rules.push({...rules[0],condition:{...rules[0].condition,urlFilter:'||synthetic.example^'}});
+  let writes=0;f.api.declarativeNetRequest.updateDynamicRules=async update=>{writes++;await base(update);};
+  const changed=structuredClone(f.rules);await e.resumeRules();
+  assert.equal(writes,0);assert.deepEqual(f.rules,changed);assert.deepEqual(f.db.pausedRules,paused);assert.match(f.db.ruleConflict,/未覆盖/);
+});
+test('failed recovery-record removal retains a retryable exact restoration',async()=>{
+  const {f,e,rules}=await pausedFixture();const paused=structuredClone(f.db.pausedRules);
+  const remove=f.api.storage.local.remove;f.api.storage.local.remove=async()=>{throw new Error('synthetic storage failure');};
+  await assert.rejects(e.resumeRules(),/synthetic storage failure/);
+  assert.deepEqual(f.rules,rules);assert.deepEqual(f.db.pausedRules,paused);
+  f.api.storage.local.remove=remove;
+  f.api.declarativeNetRequest.updateDynamicRules=async()=>{assert.fail('confirmed restoration must not add twice');};
+  await e.resumeRules();assert.equal(f.db.pausedRules,undefined);assert.deepEqual(f.rules,rules);
+});
+test('a late reconciliation consumes only its own persisted pause generation',async()=>{
+  const {f,e,rules}=await pausedFixture();f.db.pausedRules.operationId='pause-generation-old';
+  const newer={rules,resumeAt:f.db.pausedRules.resumeAt,operationId:'pause-generation-new'};
+  const added=deferred(),release=deferred(),base=f.api.declarativeNetRequest.updateDynamicRules;
+  f.api.declarativeNetRequest.updateDynamicRules=async update=>{await base(update);added.resolve();await release.promise;};
+  const restoring=e.resumeRules();await added.promise;
+  await f.api.storage.local.set({pausedRules:newer});release.resolve();await restoring;
+  assert.deepEqual(f.db.pausedRules,newer,'stale callback never removes a different record, even with equal rules/deadline');
+});

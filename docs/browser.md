@@ -176,6 +176,8 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 `sitePermission.setting` 允许 `location/camera/microphone/notifications`；`webrtc.setting` 允许 `default/default_public_interface_only/disable_non_proxied_udp`。暂停 1–60 分钟，浏览器 alarm 恢复本扩展自己的持久阻断规则；不会解除清理隔离。到期时浏览器不运行则在下次启动 reconciliation 恢复，不承诺离线时刻准时触发。
 
+到期恢复与批准的新暂停共享 Engine 的串行 mutation 队列。恢复读取持久计划、确认 DNR 有效规则后，只消费自己读到的那份恢复记录；迟到的旧回调不会删除新暂停的记录。旧版未带操作 ID 的暂停记录仍可恢复。DNR／storage 失败保留恢复记录供后续 alarm 或启动 reconciliation；若规则已按原计划恢复，则确认后只消费记录，不重复添加。暂停期间规则已变成另一组时保留计划并报告冲突，不覆盖当前规则。
+
 ### Native 管道与信任边界
 
 浏览器通过 `connectNative("app.lintel.browser")` 发起连接。host 只接受 manifest 中精确扩展 origin/ID、host allowlist 和已配对本地实例 token。每帧是 native-endian 32 位长度加 UTF-8 JSON，上限 64 KiB。host 没有 exec/read_file/delete/export、URL fetch 或任意 path 操作。

@@ -45,6 +45,9 @@ fn message_records(record: &Value, index: usize) -> Vec<Value> {
     let push = |out: &mut Vec<Value>, value: Value| {
         let mut value = value;
         value["timestamp"] = timestamp.clone();
+        // Every source block emits one entry, including opaque/unknown blocks,
+        // so hidden content never renumbers the original array positions.
+        value["block_index"] = json!(out.len());
         out.push(value);
     };
     match raw_content {
@@ -230,6 +233,7 @@ impl Engine {
                     Err(_) => records.push(json!({
                         "index": i,
                         "offset": current_offset,
+                        "block_index": 0,
                         "kind": "unknown",
                         "unknown": true,
                         "raw": line,
@@ -294,8 +298,73 @@ mod tests {
             .filter_map(|r| r.get("text").and_then(Value::as_str))
             .collect();
         assert_eq!(text, vec!["visible answer"]);
+        assert_eq!(records[0]["block_index"], 0);
+        assert_eq!(records[1]["block_index"], 1);
         assert!(records.iter().any(|r| r["opaque"] == true));
         assert!(!records.iter().any(|r| r["text"] == "secret chain"));
+    }
+
+    #[test]
+    fn real_package_pages_keep_absolute_positions_and_text_shape() {
+        use std::fs;
+        let fixture = tempfile::tempdir().unwrap();
+        let home = fixture.path().canonicalize().unwrap();
+        let root = home.join("config");
+        fs::create_dir_all(root.join("projects/p/memory")).unwrap();
+        let first = format!(
+            "{}\n",
+            json!({"type":"user","message":{"content":"x".repeat(230000)}})
+        );
+        let second = format!(
+            "{}\n",
+            json!({"type":"assistant","message":{"content":[
+                {"type":"thinking","thinking":"opaque private","signature":"sig"},
+                {"type":"text","text":"y".repeat(50000)},
+                {"type":"text","text":"visible block two"}
+            ]}})
+        );
+        let original = format!("{first}{second}");
+        fs::write(root.join("projects/p/s.jsonl"), &original).unwrap();
+        fs::write(root.join("projects/p/memory/MEMORY.md"), "reference text\n").unwrap();
+        let engine = Engine::new(home.clone(), home.join("state")).unwrap();
+        let request = |r: Value| {
+            let result = engine.request(r);
+            assert_eq!(result["ok"], true, "{result}");
+            result["data"].clone()
+        };
+        let environment = request(json!({"command":"register","root":root,"name":"synthetic"}));
+        let plan = request(
+            json!({"command":"plan_archive","environment_id":environment["id"],"categories":["memory","sessions"]}),
+        );
+        let receipt = request(
+            json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":"synthetic-reader-passphrase"}),
+        );
+        let read = |path: &str, offset: usize| {
+            request(
+                json!({"command":"session_read","job_id":receipt["id"],"archive_passphrase":"synthetic-reader-passphrase","path":path,"offset":offset}),
+            )
+        };
+        let text = read("projects/p/memory/MEMORY.md", 0);
+        assert_eq!(text["content_kind"], "text");
+        assert!(text.get("records").is_none());
+        assert_eq!(text["raw_text"], "reference text\n");
+        let one = read("projects/p/s.jsonl", 0);
+        assert_eq!(one["next_offset"], first.len());
+        assert_eq!(one["records"][0]["index"], 0);
+        assert_eq!(one["records"][0]["offset"], 0);
+        assert_eq!(one["records"][0]["block_index"], 0);
+        let two = read("projects/p/s.jsonl", first.len());
+        assert_eq!(two["records"][1]["index"], 0);
+        assert_eq!(two["records"][1]["offset"], first.len());
+        assert_eq!(two["records"][1]["block_index"], 1);
+        assert_eq!(two["records"][2]["block_index"], 2);
+        assert_eq!(two["records"][0]["opaque"], true);
+        assert!(two["records"][0]["text"].is_null());
+        assert_eq!(two["done"], true);
+        assert_eq!(
+            fs::read_to_string(root.join("projects/p/s.jsonl")).unwrap(),
+            original
+        );
     }
 
     #[test]

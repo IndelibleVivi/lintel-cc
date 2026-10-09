@@ -1348,6 +1348,24 @@ pub fn control(payload: Value, bundles: PathBuf) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn finite_request_allowlist_matches_operation_descriptions() {
+        for command in lintel_operations::COMMANDS {
+            let described = lintel_operations::describe(command).unwrap()["transports"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("finite_ssh_request"));
+            assert_eq!(
+                described,
+                super::REQUEST_COMMANDS.contains(command),
+                "{command}"
+            );
+        }
+        for command in ["launch_request", "resume_request"] {
+            let error = super::validate_request(&serde_json::json!({"command":command,"request_id":"00000000-0000-4000-8000-000000000001","approval":"a".repeat(64)})).unwrap_err();
+            assert_eq!(error.code, "unsupported_command");
+        }
+    }
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;

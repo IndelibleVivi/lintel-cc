@@ -20,7 +20,28 @@ const {symlink}=await import('node:fs/promises');await symlink(inert,path.join(h
 const actor={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:path.join(home,'.local/bin')};
 const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],copied=[],resources=[];
 let queue=Promise.resolve(),clipboardFail=false,launchFailure=false,legacyStartup=false;
-function processCall(args,payload,env=actor){return new Promise((resolve,reject)=>{const child=spawn(runner,args,{env,stdio:['pipe','pipe','pipe']});let out='',err='';const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout'))},55000);child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);child.once('error',reject);child.once('close',()=>{clearTimeout(timeout);assert.ok(!out.includes(password)&&!err.includes(password));try{resolve(JSON.parse(out))}catch{reject(new Error('invalid envelope: '+err))}});child.stdin.end(payload?JSON.stringify(payload):'')})}
+function processCall(args,payload,env=actor,executable=runner){return new Promise((resolve,reject)=>{
+ const child=spawn(executable,args,{env,stdio:['pipe','pipe','pipe']});let out='',err='',inputError;
+ const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout'))},55000);
+ child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);
+ // stdin can fail before close (for example EPIPE when the runner exits early).
+ // Retain the error and reject on close with exit evidence; never leave an
+ // unhandled stream error or accept a valid-looking envelope from a failed child.
+ child.stdin.once('error',error=>{inputError=error});
+ child.once('error',error=>{clearTimeout(timeout);reject(error)});
+ child.once('close',(code,signal)=>{clearTimeout(timeout);try{
+  assert.ok(!out.includes(password)&&!err.includes(password));
+  if(code!==0 || signal)throw new Error(`core exited ${code ?? signal}: ${err}`);
+  if(inputError)throw new Error(`core stdin failed: ${inputError.code}`);
+  try{resolve(JSON.parse(out))}catch{throw new Error('invalid envelope: '+err)}
+ }catch(error){reject(error)}});
+ child.stdin.end(payload?JSON.stringify(payload):'');
+})}
+// Exercise the lifecycle independently of a healthy core: child failures must
+// reject even if stdout resembles a successful envelope or stdin closes early.
+await assert.rejects(processCall(['-e','console.log(JSON.stringify({ok:true,data:{}}));process.exit(17)'],null,actor,process.execPath),/core exited 17/);
+await assert.rejects(processCall(['-e','process.exit(19)'],{synthetic:'x'.repeat(8*1024*1024)},actor,process.execPath),/core exited 19|core stdin failed/);
+await assert.rejects(processCall([],null,actor,path.join(fixture,'absent-runner')),/ENOENT/);
 function core(payload){calls.push(payload);const result=queue.then(()=>processCall(['request'],payload));queue=result.catch(()=>{});return result}
 async function data(payload){const result=await core(payload);assert.ok(result.ok,result.error?.message);return result.data}
 const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/vite.js'),'preview','--host','127.0.0.1','--port','0','--strictPort'],{cwd:desktop,stdio:['ignore','pipe','pipe']});
@@ -95,6 +116,10 @@ try{
   {future_record:true,custom:'未知字段必须保留'},
  ];
  const raw=transcript.map(x=>JSON.stringify(x)).join('\r\n')+'\r\n{malformed record\r\n'+Array.from({length:900},(_,i)=>JSON.stringify({type:'user',message:{role:'user',content:'long record '+i+' '+('正文'.repeat(90))}})).join('\n')+'\n';
+ const positionPath='projects/synthetic/position.jsonl';
+ const positionLines=[JSON.stringify({type:'user',message:{content:'FIRST_BYTE_POSITION '+('x'.repeat(230000))}})+'\n',JSON.stringify({type:'assistant',message:{content:[{type:'thinking',thinking:'POSITION_OPAQUE_MUST_STAY_OUT',signature:'POSITION_SIGNATURE'},{type:'text',text:'SECOND_BYTE_POSITION '+('y'.repeat(50000))},{type:'text',text:'SECOND_LINE_BLOCK_2'}]}})+'\n'];
+ const secondPosition=Buffer.byteLength(positionLines[0]);
+ await writeFile(path.join(root,positionPath),positionLines.join(''));
  await writeFile(path.join(root,'CLAUDE.md'),'# Synthetic instructions\n');await writeFile(path.join(root,'projects/synthetic/session.jsonl'),raw);await writeFile(path.join(root,'projects/synthetic/memory/MEMORY.md'),'Synthetic reference memory\n');
  const original=await readFile(path.join(root,'projects/synthetic/session.jsonl'));
  const source=await data({command:'register',root,name:'同名环境 / 同名环境 A very long mixed English 中文工作名称'});
@@ -122,10 +147,30 @@ try{
  const receipt=await data({command:'execute',plan_id:archive.id,approval:archive.hash,archive_passphrase:password});
  await page.getByRole('button',{name:'重新检查环境',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[aria-label="重新检查环境"]').disabled);await page.getByRole('button',{name:'会话与资料',exact:true}).click();
  const reader=page.locator('.archive-panel');await reader.getByLabel('归档口令',{exact:true}).fill(password);await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();
+ // Real core text response has no records: the built reader exposes only its
+ // usable raw view, remains navigable, and can continue to another file.
+ const textPage=await data({command:'session_read',job_id:receipt.id,archive_passphrase:password,path:'projects/synthetic/memory/MEMORY.md'});
+ assert.equal(textPage.content_kind,'text');assert.equal('records' in textPage,false);
+ await reader.getByRole('button',{name:/MEMORY.md/}).click();await reader.getByText('Synthetic reference memory',{exact:true}).waitFor();
+ assert.equal(await reader.getByRole('button',{name:'结构化阅读',exact:true}).isDisabled(),true);
+ await reader.getByRole('button',{name:'原始文本',exact:true}).click();await reader.getByRole('button',{name:'结构化阅读',exact:true}).evaluate(el=>el.click());
+ assert.equal(await reader.getByText('Synthetic reference memory',{exact:true}).isVisible(),true);assert.equal(await reader.getByRole('button',{name:'下一页',exact:true}).isDisabled(),true);
+ report.checks.push('R2: unmodified real core text response without records enters built App; only raw view is enabled, attempted disabled click stays readable, navigation continues');
+ // Two lines deliberately exceed one page. Both pages begin at index 0;
+ // absolute offsets distinguish them, and opaque block 0 does not renumber
+ // visible blocks 1/2 in the second line.
+ await reader.getByRole('button',{name:/position.jsonl/}).click();await reader.locator('.record-meta input[type=checkbox]').first().check();
+ await reader.getByRole('button',{name:'下一页',exact:true}).click();await reader.getByText('SECOND_LINE_BLOCK_2',{exact:true}).waitFor();
+ const positionChecks=reader.locator('.record-meta input[type=checkbox]');assert.equal(await positionChecks.count(),2);await positionChecks.nth(0).check();await positionChecks.nth(1).check();
+ await reader.getByRole('button',{name:'用选定片段生成交接稿',exact:true}).click();
+ const positionDraft=await reader.getByLabel('工作交接稿',{exact:true}).inputValue();
+ for(const location of ['字节位置 0 · 内容块 0',`字节位置 ${secondPosition} · 内容块 1`,`字节位置 ${secondPosition} · 内容块 2`])assert.ok(positionDraft.includes(location));
+ assert.ok(!positionDraft.includes('POSITION_OPAQUE_MUST_STAY_OUT')&&!positionDraft.includes('POSITION_SIGNATURE'));
+ await reader.getByRole('button',{name:'回到文件开头',exact:true}).click();assert.equal(await reader.locator('.record-meta input[type=checkbox]').first().isChecked(),true);
  await reader.getByRole('button',{name:/session.jsonl/}).click();await reader.getByText('已决定配置 root 与项目 cwd 分开。',{exact:true}).waitFor();await reader.getByText(/不透明 thinking/).waitFor();
  await reader.getByText(/未知字段必须保留/).waitFor();await reader.getByText(/malformed record/).waitFor();
  assert.equal(await reader.locator('.record-meta input[type=checkbox]').count()>0,true);
- const checks=reader.locator('.record-meta input[type=checkbox]');await checks.first().check();await checks.nth(1).check();await reader.getByRole('button',{name:'用选定片段生成交接稿',exact:true}).click();
+ const checks=reader.locator('.record-meta input[type=checkbox]');await checks.first().check();await checks.nth(1).check();await reader.getByRole('button',{name:'用当前选择重新生成（覆盖编辑稿）',exact:true}).click();
  const draft=await reader.getByLabel('工作交接稿',{exact:true}).inputValue();assert.ok(draft.includes(secret));assert.ok(!draft.includes('opaque content')&&!draft.includes('SYNTHETIC_SIGNATURE_BYTES'));
  await reader.getByLabel('工作交接稿',{exact:true}).fill(draft+'\n下一步：在正确的项目里接着做。');
  await reader.getByRole('button',{name:'审阅稿件与继续目标',exact:true}).click();const launch=reader.locator('.session-continuation');
@@ -134,6 +179,13 @@ try{
  await writeFile(path.join(project,'.mcp.json'),JSON.stringify({mcpServers:{synthetic:{command:'SYNTHETIC_MCP_COMMAND_MUST_STAY_PRIVATE'}}}));
  await launch.getByLabel('项目工作目录',{exact:true}).fill(project);await launch.getByRole('button',{name:'核对启动目标',exact:true}).click();
  await launch.locator('.launch-review').getByText(project,{exact:true}).waitFor();
+ const positionReferences=calls.findLast(c=>c.command==='plan_launch').input_reference.files.filter(f=>f.path===positionPath);
+ assert.deepEqual(positionReferences.map(({index,offset,block_index})=>({index,offset,block_index})),[{index:0,offset:0,block_index:0},{index:0,offset:secondPosition,block_index:1},{index:0,offset:secondPosition,block_index:2}]);
+ const positionPlanId=await launch.locator('.launch-original-id code').innerText();
+ const persistedPositionPlan=JSON.parse(await readFile(path.join(state,'plans',positionPlanId+'.json'),'utf8'));
+ assert.deepEqual(persistedPositionPlan.extra.launch_request.input_reference.files.filter(f=>f.path===positionPath),positionReferences);
+ for(const body of [secret,'FIRST_BYTE_POSITION','SECOND_BYTE_POSITION','POSITION_OPAQUE_MUST_STAY_OUT','POSITION_SIGNATURE'])assert.ok(!JSON.stringify(persistedPositionPlan).includes(body));
+ report.checks.push('R8: real core JSONL pages each start index 0; selections/draft retain distinct absolute offsets and original block 1/2, back navigation preserves selection, plan_launch and persisted finite metadata agree without source bodies');
  const sources=launch.getByRole('region',{name:'启动来源核对',exact:true});await sources.getByRole('heading',{name:'启动前，再看一眼来源',exact:true}).waitFor();
  assert.ok((await sources.innerText()).includes('有声明：hooks') && (await sources.innerText()).includes('有声明：MCP'));
  for(const privateValue of ['SYNTHETIC_HOOK_COMMAND_MUST_STAY_PRIVATE','SYNTHETIC_AUTH_VALUE_MUST_STAY_PRIVATE','SYNTHETIC_MCP_COMMAND_MUST_STAY_PRIVATE'])assert.ok(!(await sources.innerText()).includes(privateValue));

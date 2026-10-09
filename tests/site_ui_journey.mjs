@@ -375,12 +375,24 @@ try {
     const id = hash.slice(1);
     assert.equal(new URL(page.url()).hash, hash, `click navigates to ${hash}`);
     // Bounded wait: the section reaches its normal scroll position (top near scroll-padding-top).
-    await page.waitForFunction(([sel, pad]) => {
-      const node = document.getElementById(sel);
-      if (!node) return false;
-      const top = node.getBoundingClientRect().top;
-      return top >= -1 && top <= pad + 4;
-    }, [id, scrollPaddingTop], {timeout:4000});
+    try {
+      await page.waitForFunction(([sel, pad]) => {
+        const node = document.getElementById(sel);
+        if (!node) return false;
+        const top = node.getBoundingClientRect().top;
+        return top >= -1 && top <= pad + 4;
+      }, [id, scrollPaddingTop], {timeout:4000});
+    } catch (error) {
+      const observed = await page.evaluate(sel => {
+        const rect = document.getElementById(sel)?.getBoundingClientRect();
+        return {hash:location.hash,scrollY,viewport:innerHeight,documentHeight:document.documentElement.scrollHeight,
+          target:rect?{top:rect.top,bottom:rect.bottom}:null,focus:document.activeElement?.getAttribute('href'),
+          scrollPadding:getComputedStyle(document.documentElement).scrollPaddingTop,
+          scrollBehavior:getComputedStyle(document.documentElement).scrollBehavior,
+          visibility:document.visibilityState};
+      }, id);
+      throw new Error(`navigation did not settle: ${JSON.stringify(observed)}`, {cause:error});
+    }
     // Confirm it really is the targeted section at a normal resting position (not mid-animation
     // far past it), and that it is actually visible in the viewport.
     const settled = await page.evaluate(([sel, pad]) => {

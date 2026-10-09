@@ -58,11 +58,12 @@ test('the standing pose is the canonical shape; only running, airborne and landi
   assert.deepEqual(Object.keys(clawdPose(run)).sort(), ['anchor','eyes','scaleX','scaleY'], 'no per-leg or per-foot fields remain');
   for (let i = 0; i < 8; i++) advance(run, 1 / 60, 1000);
   const stepping = clawdPose(run);
-  assert.ok(stepping.anchor > 0, 'the body bounces while the run progresses');
+  assert.equal(stepping.anchor, 0, 'grounded running keeps the feet anchored on the ground');
   jump(run); advance(run, 1 / 60, 1000, () => 0);
   const air = clawdPose(run);
-  assert.equal(air.anchor, 0, 'the ground beat stops while airborne');
+  assert.equal(air.anchor, 0, 'the airborne anchor is the same anchored ground goal');
   assert.ok(air.scaleY > 1, 'the rising body stretches vertically instead of tucking legs');
+  assert.ok(air.scaleY > stepping.scaleY, 'the ascent stretches taller than the grounded stride');
   assert.deepEqual(clawdPose(run, true), { anchor: 0, scaleX: 1, scaleY: 1, eyes: air.eyes }, 'reduced motion holds the canonical shape static');
   // Pausing mid-air or just after landing freezes the exact canonical shape, matching the comment.
   const airborne = newRun(); airborne.status = 'paused'; airborne.y = 40; airborne.velocity = 200;
@@ -191,4 +192,96 @@ test('jump height stays consistent at 30 and 144 frames per second', () => {
     heights.push(height);assert.equal(run.y,0);
   }
   assert.ok(Math.abs(heights[0]-heights[1])<1);
+});
+
+// Fly a real ordinary run at a given frame rate and a requested speed, no input, and report the
+// grounded pose bounds plus whether the ballistics/scoring still behave. `advance` is the only thing
+// driving the game, so these are outcome checks over real gameplay rather than pose formulas.
+function flyRun({ fps, speed, seconds = 20 }) {
+  const run = newRun(); run.status = 'running';
+  run.speed = speed; run.distance = (speed - 210) * 220; // hold the requested speed from the first step
+  const wide = 100000; // no obstacle can reach Clawd; this isolates ordinary grounded running
+  let footPeak = 0, footFloor = 0, scalePeak = 1, scaleFloor = 1;
+  for (let i = 0; i < fps * seconds; i++) {
+    advance(run, 1 / fps, wide, () => .5);
+    if (run.y > 0 || run.velocity > 0) continue; // only ordinary grounded running
+    const pose = clawdPose(run);
+    footPeak = Math.max(footPeak, pose.anchor);
+    footFloor = Math.min(footFloor, pose.anchor);
+    scalePeak = Math.max(scalePeak, pose.scaleX, pose.scaleY);
+    scaleFloor = Math.min(scaleFloor, pose.scaleX, pose.scaleY);
+  }
+  return { run, footPeak, footFloor, scalePeak, scaleFloor };
+}
+
+test('ordinary running anchors the feet on the ground and never bobs the body', () => {
+  // The repeated ground jolt came from a whole-body lift keyed to travelled distance. The repair
+  // keeps grounded feet exactly on GROUND: over a real run the pose anchor must hold at 0, never
+  // lifting or dropping the body, so no vertical ground beat can exist to jolt it.
+  for (const speed of [210, 280, 350]) {
+    for (const fps of [30, 60, 144]) {
+      const { run, footPeak, footFloor } = flyRun({ fps, speed });
+      assert.ok(run.distance > 0, `the ${fps}fps ${speed}px/s run really travelled`);
+      assert.equal(footPeak, 0, `${fps}fps ${speed}px/s never lifts the grounded body`);
+      assert.equal(footFloor, 0, `${fps}fps ${speed}px/s never drops the grounded body`);
+    }
+  }
+});
+
+test('the grounded stride is a subtle deformation, not a visible bob, at every speed and frame rate', () => {
+  // With the feet anchored, the only stride signal is a whole-body scale deform: it must stay small
+  // (at most 0.5%) and symmetric, at every accepted speed and frame rate.
+  for (const speed of [210, 280, 350]) {
+    for (const fps of [30, 60, 144]) {
+      const { scalePeak, scaleFloor } = flyRun({ fps, speed });
+      assert.ok(scalePeak - 1 <= .005, `${fps}fps ${speed}px/s never deforms past +0.5% (saw ${(scalePeak - 1).toFixed(4)})`);
+      assert.ok(1 - scaleFloor <= .005, `${fps}fps ${speed}px/s never deforms past -0.5% (saw ${(1 - scaleFloor).toFixed(4)})`);
+    }
+  }
+  // The stride period is a calm fraction of a second, never a high-frequency shake: one travel
+  // period must span a visible stretch of ground, so the deformation cannot alias into vibration.
+  const samples = [];
+  for (let d = 0; d < 1000; d += 0.5) {
+    const r = newRun(); r.status = 'running'; r.distance = d;
+    samples.push(clawdPose(r).scaleX);
+  }
+  let turnarounds = 0;
+  for (let i = 1; i < samples.length - 1; i++) {
+    if (samples[i] > samples[i - 1] && samples[i] > samples[i + 1]) turnarounds++;
+  }
+  assert.ok(turnarounds <= 12, `a ~100px travel period holds few extrema over 1000px (saw ${turnarounds})`);
+});
+
+test('ordinary grounded running arms no landing squash; only a real landing settles, and it is finite', () => {
+  const ground = flyRun({ fps: 60, speed: 280 });
+  assert.equal(ground.run.landing, 0, 'ordinary running never arms a landing squash');
+  const landed = newRun(); landed.status = 'running';
+  jump(landed);
+  // Advance until it actually touches down, using the physics' own single-frame granularity.
+  let landedPose = null;
+  for (let i = 0; i < 480; i++) {
+    const wasAirborne = landed.y > 0 || landed.velocity > 0;
+    advance(landed, 1 / 240, 1200, () => .5);
+    if (wasAirborne && landed.y === 0) { landedPose = clawdPose(landed); break; }
+  }
+  assert.equal(landed.y, 0, 'the airborne body really landed');
+  assert.ok(landedPose.scaleX > landedPose.scaleY, 'a real landing squashes the body wider than it is tall');
+  for (let i = 0; i < 60; i++) advance(landed, 1 / 60, 1200, () => .5);
+  assert.equal(landed.landing, 0, 'the landing settle runs out within its finite window');
+  // The settled body returns to anchored feet; no leftover lift or repeated bounce remains.
+  assert.equal(clawdPose(landed).anchor, 0, 'the settled body is anchored again');
+});
+
+test('a real jump keeps the accepted flight stretch and scoring', () => {
+  // The grounded carrying motion changed; the jump itself must not. A rising body still stretches
+  // vertically, and the points formula is untouched.
+  const run = newRun(); run.status = 'running'; jump(run);
+  let sawStretch = false;
+  for (let i = 0; i < 60; i++) {
+    advance(run, 1 / 60, 1200);
+    if (run.velocity > 0 && clawdPose(run).scaleY > 1) sawStretch = true;
+  }
+  assert.ok(sawStretch, 'the rising body stretches vertically while airborne');
+  assert.equal(clawdPose(run).anchor, 0, 'the landed body is anchored on the ground again');
+  assert.equal(points({ distance: 1234, collected: 5 }), Math.floor(1234 / 10) + 5 * 25, 'scoring formula is unchanged');
 });
