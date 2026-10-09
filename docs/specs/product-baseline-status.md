@@ -2,7 +2,7 @@
 
 接受合同：[产品基线 v1.0](product-baseline.md)，2026-10-05；施工起点为最新 `main@2f29b59`（起初 checkout 的 `b667851` 已 fast-forward 同步）。原完整产品 SPEC 的 G01–G04 与未交付事项继续保留。此前恢复、审批、浏览器接续和 runner binding 修复属于保留基础。
 
-实施顺序为 A 共享合同 → B 人类操作／C 会话工作流／D CLI 与帮助 → E 集成交付。A01–A18 均已接入源码与相应验证；真实认证和生产操作仍受独立授权限制。用户同日修订首页观感：安静的 Clawd／原创时段问候，明确点击后展开六任务，保持原任务目标；固定操作栏不随正文滚动。未缩小完整 SPEC。本轮修复仍是源码与分层回归状态，未据此重打 App／CLI 候选；当前构建、安装与部署事实由 [current-state](../current-state.md) 维护，既有 native 观察不扩大到新源码。
+实施顺序为 A 共享合同 → B 人类操作／C 会话工作流／D CLI 与帮助 → E 集成交付。A01–A18 均已接入源码与相应验证；真实认证和生产操作仍受独立授权限制。用户同日修订首页观感：安静的 Clawd／原创时段问候，明确点击后展开六任务，保持原任务目标；固定操作栏不随正文滚动。未缩小完整 SPEC。本轮修复已从 clean `bb9fa824` 重打 App／三平台 CLI；实际解包的 macOS CLI 首用通过，新 App native 窗口因锁屏仍未验证；当前构建、安装与部署事实由 [current-state](../current-state.md) 维护，既有 native 观察不扩大到新源码。
 
 | 验收 | 责任与依赖 | 状态 | 证据或待完成条件 |
 | --- | --- | --- | --- |
@@ -23,7 +23,7 @@
 | A15 | A/B 结果与覆盖 | core／UI 通过 | task_result 与 coverage 分开，旧 status 保留；本地清理、部分失败、unknown 和恢复冲突分别展示，下一步沿原任务；独立 import 只有全部冻结文件的完成记录才把 planned_target 标为 done；parent-sync 不确定仍 unverified，原 ID 不重放。 |
 | A16 | B/E 成品与原生视觉 | UI 通过；native 部分通过 | Chromium 成品检查 1120×760／900×640／1440×900、Day／Night、长路径、侧栏、reduced motion、键盘焦点返回；默认首页无滚动、固定底栏坐标不随正文改变。native WebKit 已检查默认窗口首页／批准／结果／底栏及 900×640 首页／任务入口／长路径审批／滚动后的固定底栏，Night→Day 换色与 Escape 关闭面板实际通过；宽窗口受当前屏幕限制，原生全部窗口矩阵未逐一完成 |
 | A17 | A/C/D 旧合同兼容 | core／既有旅程通过 | protocol-1、lintel.work/1、旧 import 指令目的地、旧 launch cwd、旧回执与 runner binding 保留。旧未接收的新 root／缺启动绑定计划需重新预览，已接收旧任务先返回原回执；相同 v1 格式不扩大旧 reader 限额。浏览器 pause 到期／startup 恢复复用 mutation 串行队列，按原 operation／完整 record 匹配消费，不擦除新暂停；旧无 operation ID 记录兼容，36 项 engine tests 通过 |
-| A18 | D/E 版本帮助／官网 | 源码／build／官网 live 通过 | 固定 13 个文档资源共享表；clean revision 只固定 Lintel 自己的 docs，dirty／unknown 标为最新开发说明，独立指南保留自己的 main／最新版标识。官网保持 illustrative static demo，无第三方资源请求。[lintel.page](https://lintel.page/) 已由 clean producer `6c4e5df` 的 Pages payload 上线；部署与 HTTPS／播放证据见 [current-state](../current-state.md)，无正式 App 下载。官网上线不等于本轮 App／CLI 修复已打包或发行 |
+| A18 | D/E 版本帮助／官网 | 源码／build／官网 live 通过 | 固定 13 个文档资源共享表；clean revision 只固定 Lintel 自己的 docs，dirty／unknown 标为最新开发说明，独立指南保留自己的 main／最新版标识。官网保持 illustrative static demo，无第三方资源请求。[lintel.page](https://lintel.page/) 已由 clean producer `6c4e5df` 的 Pages payload 上线；部署与 HTTPS／播放证据见 [current-state](../current-state.md)，无正式 App 下载。官网上线与本轮 App／CLI 候选构建仍不等于正式发行 |
 
 源码、合成 transport、候选构建、native WebKit、真实浏览器、Linux runtime 和真实 Claude resume 分别验收。不得用某一层通过替代其他层。
 

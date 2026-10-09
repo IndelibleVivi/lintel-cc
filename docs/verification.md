@@ -577,8 +577,8 @@ App-clear journey uses a locally fulfilled synthetic HTTPS page, a real Chromium
 process exit and production runtime.onStartup, popup continuation, original-ID
 query, and unexecuted-preview cancellation. It never visits the Claude service.
 The default `home-greetings-test` checks both greeting sets, hour boundaries, date→time→rare→ordinary priorities and local date persistence/failure. Core lifecycle regressions use only synthetic auth status and credential files, including A→B without local credential changes, post-preservation drift, file token updates/fallback and no replay of accepted jobs; they do not inspect the operator’s Keychain.
-The default group includes 25 checks; the CI independent browser/UI group includes
-browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, remote-task-ui, site-ui and
+The default group includes 26 checks; the CI independent browser/UI group includes
+browser-smoke, browser-pairing-ui, service-ui, work-ui, components-ui, baseline-ui, archive-wait-ui, drift-ui, remote-task-ui, site-ui and
 clawd-app-ui. Linux OpenSSH and VM remain separate checks within the same CI workflow.
 
 On 2026-10-08 GitHub Actions run

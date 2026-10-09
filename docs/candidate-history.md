@@ -6,6 +6,15 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## Preview 视觉与本地首次试用（8e6448c，2026-10-08）
+
+以下两行保存被 `bb9fa824` 候选替代之前的资源与验证身份；不代表新候选验收。该 App 的合成 native WebKit 首次归档／阅读、锁定清空与独立读回通过，三份原件 572 bytes，六份原件／控制文件保持不变。30 秒界面视频为八张 native 截图剪辑，明确标注 synthetic／edited，不是连续录屏。
+
+| 对象 | 历史证据 |
+| --- | --- |
+| CLI 与分层验证 | 最终默认 synthetic suite 25/25 通过（RUST_TEST_THREADS=4），包括深路径计划预算、真正 PTY cleanup、共享 workspace 与两个独立 Rust crates；补充原密文逐字节不变断言后的 PTY journey 再次通过。built App 的 work／components／baseline／archive-wait／remote-task 五条相关 UI 旅程通过。扩充的 native `cli-candidate` 通过解包后保全、独立 state inspect／import、原字节核对及升级后原任务查询，PATH 仅系统工具；真实三平台输入包装 smoke 通过。2026-10-07 直接核对 GitHub：producer `57e8eb9` 的 [CI run 37523781020](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37523781020) 与记录源码 `3afaa7b` 的 [CI run 37524901927](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37524901927) 均为 completed / success；对应 SHA 已核对。CI 不替代真实认证或生产 runtime 验收 |
+| 资源与包装 | clean `8e6448c` 的 macOS arm64 App 构建通过，约 24.66 MiB；候选复制件与 build output 全部文件字节一致。内置 x86_64／aarch64 runner 5,279,664／4,614,728 bytes 与 canonical static outputs 一致，host 789,392 bytes，非 fixture Chromium／Firefox 各 8 文件（52,522／52,684 bytes）与生成 manifest／canonical resources 一致；ICNS 供应图标一致、无 woff2。编译 docs revision 已核对为该 clean source。仅 linker ad-hoc executable signature，无 distribution Team ID、资源签封或公证；产物不进 Git。三平台 CLI archives 保留 `57e8eb9` 的独立解包／checksums／macOS 静态调用证据，未借此声称 Linux archives 本机执行 |
+
 ## 流式工作包与有限启动来源（7e23371，2026-10-07）
 
 该源码阶段默认 23/23 synthetic checks（`RUST_TEST_THREADS=4`）通过，built work／components／baseline／remote-task UI 及后续 startup/components 相关旅程有分层证据。macOS／Ubuntu [CI run 37507737481](https://github.com/IndelibleVivi/lintel-cc/actions/runs/37507737481) 已完成成功；这个结论只属于 `7e2337160d77969935d6ed0e07a8307613179e18`。
