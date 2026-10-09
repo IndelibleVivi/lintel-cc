@@ -31,16 +31,10 @@ concurrency:
   group: verify-${{ github.ref }}-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('acceptance-{0}', github.run_id) || 'change' }}
   cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
-env:
-  # Evidence lives beside and outside the checkout, matching the existing
-  # "evidence stays outside Git" contract. It is never written into the repo, so
-  # the working tree stays clean and no generated-file .gitignore is needed.
-  EVIDENCE_DIR: ${{ github.workspace }}/../lintel-verify
-
 jobs:
   plan:
     name: plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       profile: ${{ steps.compute.outputs.profile }}
       reason: ${{ steps.compute.outputs.reason }}
@@ -102,7 +96,7 @@ jobs:
     name: control (self-tests)
     needs: plan
     if: needs.plan.outputs.control_enabled == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -128,6 +122,10 @@ jobs:
         os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Node.js
         uses: actions/setup-node@v4
         with:
@@ -169,6 +167,10 @@ jobs:
         os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Rust toolchain
         id: rust
         uses: dtolnay/rust-toolchain@stable
@@ -233,6 +235,10 @@ jobs:
         os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Rust toolchain
         id: rust
         uses: dtolnay/rust-toolchain@stable
@@ -274,19 +280,12 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ fromJSON(needs.plan.outputs.platforms) }}
-    env:
-      LINTEL_PAIRING_UI_REPORT: ${{ github.workspace }}/../lintel-verify/browser-pairing-ui.json
-      LINTEL_SERVICE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/service-ui.json
-      LINTEL_REMOTE_TASK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/remote-task-ui.json
-      LINTEL_WORK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/work-ui.json
-      LINTEL_COMPONENTS_UI_REPORT: ${{ github.workspace }}/../lintel-verify/components-ui.json
-      LINTEL_TELEMETRY_UI_REPORT: ${{ github.workspace }}/../lintel-verify/telemetry-ui.json
-      LINTEL_UPDATE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/app-update-ui.json
-      LINTEL_NETWORK_UI_REPORT: ${{ github.workspace }}/../lintel-verify/network-ui.json
-      LINTEL_DRIFT_UI_REPORT: ${{ github.workspace }}/../lintel-verify/drift-ui.json
-      LINTEL_BASELINE_UI_REPORT: ${{ github.workspace }}/../lintel-verify/baseline-ui.json
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Rust toolchain
         id: rust
         uses: dtolnay/rust-toolchain@stable
@@ -325,6 +324,17 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
       - name: Browser/UI checks
+        env:
+          LINTEL_PAIRING_UI_REPORT: ${{ runner.temp }}/lintel-verify/browser-pairing-ui.json
+          LINTEL_SERVICE_UI_REPORT: ${{ runner.temp }}/lintel-verify/service-ui.json
+          LINTEL_REMOTE_TASK_UI_REPORT: ${{ runner.temp }}/lintel-verify/remote-task-ui.json
+          LINTEL_WORK_UI_REPORT: ${{ runner.temp }}/lintel-verify/work-ui.json
+          LINTEL_COMPONENTS_UI_REPORT: ${{ runner.temp }}/lintel-verify/components-ui.json
+          LINTEL_TELEMETRY_UI_REPORT: ${{ runner.temp }}/lintel-verify/telemetry-ui.json
+          LINTEL_UPDATE_UI_REPORT: ${{ runner.temp }}/lintel-verify/app-update-ui.json
+          LINTEL_NETWORK_UI_REPORT: ${{ runner.temp }}/lintel-verify/network-ui.json
+          LINTEL_DRIFT_UI_REPORT: ${{ runner.temp }}/lintel-verify/drift-ui.json
+          LINTEL_BASELINE_UI_REPORT: ${{ runner.temp }}/lintel-verify/baseline-ui.json
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python3 tests/verify.py --require-passed \
@@ -359,6 +369,10 @@ jobs:
         os: ${{ fromJSON(needs.plan.outputs.platforms) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Rust toolchain
         id: rust
         uses: dtolnay/rust-toolchain@stable
@@ -433,12 +447,14 @@ jobs:
     if: needs.plan.outputs.vm_enabled == 'true'
     # Single Linux-only job: the disposable VM needs a Linux x86_64 host. It is
     # an independent job, never queued behind the default/UI jobs.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
-    env:
-      LINTEL_VM_REPORT: ${{ github.workspace }}/../lintel-verify/linux-vm-runtime.json
     steps:
       - uses: actions/checkout@v4
+      - name: Initialize evidence directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/lintel-verify"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify" >> "$GITHUB_ENV"
       - name: Rust toolchain
         id: rust
         uses: dtolnay/rust-toolchain@stable
@@ -475,6 +491,8 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
           cargo build --locked -p lintel-runner --release --target x86_64-unknown-linux-musl
       - name: Disposable Linux VM lifecycle acceptance
+        env:
+          LINTEL_VM_REPORT: ${{ runner.temp }}/lintel-verify/linux-vm-runtime.json
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python3 tests/verify.py --require-passed --checks linux-vm-runtime \
@@ -493,7 +511,7 @@ jobs:
     name: aggregate
     needs: [plan, control, frontend, native, heavy, browser, runner, vm]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Python

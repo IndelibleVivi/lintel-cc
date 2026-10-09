@@ -200,7 +200,7 @@ EXCLUDED_FROM_CI: Dict[str, str] = {
     "desktop-tauri-bundle": "native macOS Tauri bundle + real WebKit build; needs macOS/Xcode and stays out of the synthetic Linux-first matrix",
 }
 
-LINUX = "ubuntu-latest"
+LINUX = "ubuntu-24.04"
 MACOS = "macos-latest"
 BOTH: Tuple[str, ...] = (MACOS, LINUX)
 LINUX_ONLY: Tuple[str, ...] = (LINUX,)

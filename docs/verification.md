@@ -161,7 +161,8 @@ Finder and the browser's load picker remains independent runtime acceptance.
 
 GitHub Actions is the **only primary CI owner**. `python3 tests/verify.py` stays
 the single provider-neutral entrypoint with its unchanged implicit default group;
-CI selects subsets of it. There is no Cloudflare Worker for CI, no third-party
+CI selects subsets of it. Linux jobs use the explicit `ubuntu-24.04` image;
+changes to the hosted image are a separate verification decision. There is no Cloudflare Worker for CI, no third-party
 paths-filter action, no deployment and no production dependency. Local implicit
 defaults are unchanged: `python3 tests/verify.py` still runs the same default
 group it always did.
@@ -241,7 +242,7 @@ calls `tests/ci_plan.py --aggregate`, the production gate, which fails on:
   or wrong-schema JSON document, a `git.head` that is not this run's head, or a
   `platform.system` that does not match the platform.
 
-Evidence is written beside and outside the checkout (`../lintel-verify`), matching the
+Evidence is written to `$RUNNER_TEMP/lintel-verify` outside the checkout, matching the
 "evidence stays outside Git" contract, and uploaded per job/platform. `aggregate`
 reads each job/platform's canonical `verify.py` record only; helper sidecar
 reports (per-UI reports, `browser-smoke.json`, the VM runtime sidecar) are never

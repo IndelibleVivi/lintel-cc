@@ -333,7 +333,7 @@ class GithubOutputTests(unittest.TestCase):
         self.assertEqual(outputs["browser_enabled"], "true")
         self.assertEqual(outputs["heavy_enabled"], "false")
         self.assertEqual(outputs["heavy_checks"], "")
-        self.assertEqual(outputs["platforms"], '["ubuntu-latest"]')
+        self.assertEqual(outputs["platforms"], '["ubuntu-24.04"]')
         # `changed_paths` must not be exported (a newline in a filename would
         # corrupt GITHUB_OUTPUT); the plan JSON artifact carries it instead.
         self.assertNotIn("changed_paths", outputs)
@@ -657,8 +657,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("github.event_name == 'push'", concurrency["cancel-in-progress"])
 
     def test_evidence_dir_is_outside_the_repo(self):
-        self.assertIn("github.workspace }}/../", self.doc["env"]["EVIDENCE_DIR"])
-        self.assertNotIn("runner.temp", self.doc["env"]["EVIDENCE_DIR"])
+        self.assertNotIn("EVIDENCE_DIR", self.doc.get("env", {}))
+        for jobid in ("frontend", "native", "heavy", "browser", "runner", "vm"):
+            init = next(step for step in self.doc["jobs"][jobid]["steps"]
+                        if step.get("name") == "Initialize evidence directory")
+            self.assertIn('EVIDENCE_DIR=$RUNNER_TEMP/lintel-verify', init["run"])
+            self.assertIn('"$GITHUB_ENV"', init["run"])
         self.assertNotIn(".ci-evidence", self.raw)
         # A generated-evidence path must not be hidden in .gitignore.
         gitignore = (ROOT / ".gitignore")
@@ -752,7 +756,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(vm.get("needs"), "plan")
         self.assertNotIn("browser", str(vm.get("needs")))
         # VM only runs on a Linux host.
-        self.assertEqual(vm["runs-on"], "ubuntu-latest")
+        self.assertEqual(vm["runs-on"], "ubuntu-24.04")
 
     def test_no_third_party_paths_filter(self):
         self.assertNotIn("paths-filter", self.raw)
@@ -798,7 +802,7 @@ class CIIntegrationTests(unittest.TestCase):
         control_runs = "\n".join(step.get("run", "") for step in workflow["jobs"]["control"]["steps"])
         self.assertIn("-r tests/requirements-ci.txt", control_runs)
         self.assertIn("verify.py --self-test --require-passed", control_runs)
-        self.assertNotIn("runner.temp", workflow["env"]["EVIDENCE_DIR"])
+        self.assertNotIn("EVIDENCE_DIR", workflow.get("env", {}))
         for job in workflow["jobs"].values():
             for value in job.get("env", {}).values():
                 self.assertNotIn("runner.temp", str(value))
