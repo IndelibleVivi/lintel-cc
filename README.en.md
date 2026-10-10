@@ -122,7 +122,8 @@ requires a new preview and approval, and old IDs are never redone.
   approved finite entry using a byte-identical private transcript copy.
 - The default home screen is a quiet Clawd companion, with original time-of-day
   greetings; an explicit action opens six task choices. Day / Night / System
-  themes are available. The pocket playroom shares one opt-in runner with the
+  themes are available. Clawd has moon and snack surprises, and the
+  pocket menu includes a moon-picking action. The pocket playroom shares one opt-in runner with the
   website: Clawd keeps its connected short legs, bounces over obstacles, and
   collects stars at different reachable heights. Scores stay local to each client.
 - Explicitly test IPv4/IPv6 from the host-default path and the selected Lintel channel, with echoed IP, elapsed time and specific failures. An absent channel stays untested. macOS supports an approved shared-service IPv6 off/link-local change, automatic comparison against the same targets and complete original-configuration restore. Linux offers readonly inspection and probes. Real macOS configuration round trips remain unverified; see the [IPv4/IPv6 Leaf](docs/specs/ip-network.md).

@@ -128,6 +128,20 @@ try{
  await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
  const dock=page.locator('.workspace-actions .action-bar');
  await dock.getByRole('button',{name:'预览变更',exact:true}).waitFor();
+ // Filled primary actions must expose keyboard focus in both palettes. A later
+ // decorative shadow must not erase the only focus indicator.
+ for(const theme of ['light','dark']) {
+  await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  const action=dock.getByRole('button',{name:'预览变更',exact:true});
+  await page.mouse.move(1,1);
+  await action.focus();await page.keyboard.press('Shift+Tab');
+  const resting=await action.evaluate(el=>{const s=getComputedStyle(el);return {decoration:s.textDecorationLine,shadow:s.boxShadow,outline:s.outlineStyle}});
+  await page.keyboard.press('Tab');
+  const focused=await action.evaluate(el=>{const s=getComputedStyle(el);return {visible:el.matches(':focus-visible'),decoration:s.textDecorationLine,shadow:s.boxShadow,outline:s.outlineStyle}});
+  assert.equal(focused.visible,true,'primary action receives real keyboard focus');
+  assert.ok(focused.decoration!==resting.decoration||focused.shadow!==resting.shadow||focused.outline!==resting.outline,'primary action visibly distinguishes keyboard focus');
+ }
+ report.checks.push('primary-keyboard-focus-day-night');
  assert.equal(await page.locator('main .action-bar').count(),0);
  for (const [width,height] of [[1120,760],[900,640],[1440,900]]) {
   await page.setViewportSize({width,height});
