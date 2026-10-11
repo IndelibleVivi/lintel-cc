@@ -97,6 +97,17 @@ try{
   assert.equal(palette.nav,palette.body,'paused theme transitions must not leave navigation in the previous palette');
   assert.equal(palette.prompt,palette.body,'paused theme transitions must not leave the task prompt in the previous palette');
  }
+ // Selection and keyboard focus are distinct states on theme toggles too.
+ for(const name of ['浅色 Day','深色 Night']) {
+  const toggle=page.getByRole('button',{name,exact:true}).first();await toggle.click();
+  assert.equal(await toggle.getAttribute('aria-pressed'),'true');await page.mouse.move(1,1);
+  await toggle.focus();await page.keyboard.press('Shift+Tab');
+  const before=await toggle.evaluate(el=>{const s=getComputedStyle(el);return [s.textDecorationLine,s.boxShadow,s.outlineStyle,s.backgroundColor]});
+  await page.keyboard.press('Tab');
+  const after=await toggle.evaluate(el=>{const s=getComputedStyle(el);return {visible:el.matches(':focus-visible'),styles:[s.textDecorationLine,s.boxShadow,s.outlineStyle,s.backgroundColor]}});
+  assert.equal(after.visible,true);assert.notDeepEqual(after.styles,before,'selected theme retains a distinct keyboard focus indicator');
+ }
+ report.checks.push('selected-theme-keyboard-focus-day-night');
  await page.getByRole('button',{name:'开始一项任务',exact:true}).click();assert.equal(await page.locator('.task-home [data-task-id]').count(),6);
  await page.keyboard.press('Escape');await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor({state:'visible'});
  assert.equal(await page.locator('.home-title').innerText(),visitGreeting,'navigation keeps this visit greeting stable');

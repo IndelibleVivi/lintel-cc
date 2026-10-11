@@ -903,9 +903,9 @@ h1[tabindex="-1"]:focus{outline:none}
 button.primary{box-shadow:0 1px 2px #40301B14,0 5px 16px color-mix(in srgb,var(--accent) 22%,transparent)}
 button.primary:hover:not(:disabled){box-shadow:0 2px 3px #40301B17,0 7px 20px color-mix(in srgb,var(--accent) 30%,transparent)}
 button.primary:disabled{box-shadow:none}
-/* Filled actions retain their shadow; the text-colored underline stays visible
+/* Filled and selected controls retain their shadow; the text-colored underline stays visible
    against both the Day and Night accent fills. */
-button.primary:focus-visible{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+button.primary:focus-visible,.theme-switch button[aria-pressed=true]:focus-visible,.segmented button[aria-pressed=true]:focus-visible{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
 
 .feature-icon{border-radius:9px;color:var(--muted);background:color-mix(in srgb,currentColor 8%,transparent)}
 .feature-icon.blue{color:#5C739F;background:#5C739F14}
