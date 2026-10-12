@@ -255,9 +255,14 @@ try {
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://lintel.page/en/');
     assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/no formal download/);
     assert.equal(await page.locator('.language-links [data-site-language="en"]').getAttribute('aria-current'),'page');
-    assert.match(await page.locator('#capabilities').innerText(),/Six illustrative scenes/);
-    assert.equal(await page.locator('#capabilities figure svg[role="img"]').count(),6);
-    for (const node of await page.locator('#capabilities figure svg').all()) assert.ok((await node.getAttribute('aria-label')).length > 10);
+    assert.equal(await page.locator('#capabilities article > svg.capability-icon').count(),6);
+    assert.equal(await page.locator('#capabilities figure').count(),0,'retired large capability figures stay absent');
+    for (const icon of await page.locator('#capabilities article > svg.capability-icon').all()) {
+      assert.equal(await icon.getAttribute('viewBox'),'0 0 32 32');
+      assert.equal(await icon.getAttribute('aria-hidden'),'true','the real title names the task; its small icon is decorative');
+      assert.equal(await icon.getAttribute('focusable'),'false');
+      assert.equal(await icon.evaluate(node=>node.tabIndex),-1,'decorative icons do not enter keyboard tab order');
+    }
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="primary"]').getAttribute('href'),docBase+'quickstart.en.md');
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="alternate"]').getAttribute('href'),docBase+'quickstart.md');
     assert.match(await page.locator('#try .reading-links').innerText(),/Current capabilities and limits \(Chinese\)/);
@@ -411,20 +416,34 @@ try {
   // --- Real header navigation: an actual click and a real keyboard Enter take the browser to the
   //     section (hash changes, target scrolls to its normal position). No evaluate/mock clicking. ---
   // scroll-padding-top is 28px at desktop width; the section top should settle just below the
-  // viewport top once smooth scrolling has finished. Wait for an observable settled position
-  // rather than a fixed sleep.
+  // viewport top once smooth scrolling has finished. Entering the tolerance band alone is still
+  // mid-animation: resetting immediately can race a pending compositor scroll and cancel the
+  // following native fragment scroll. Observe three unchanged RAF samples at each boundary.
+  // This is fixture sequencing; href/Enter, smooth scrolling and the 4s landing gate stay real.
   const scrollPaddingTop = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0);
+  const resetNavigationOrigin = async () => {
+    await page.evaluate(() => scrollTo({top:0, left:0, behavior:'instant'}));
+    await page.waitForFunction(state => {
+      const x = scrollX, y = scrollY;
+      state.frames = state.x === x && state.y === y ? state.frames + 1 : 1;
+      state.x = x; state.y = y;
+      return x === 0 && y === 0 && state.frames >= 3;
+    }, {x:null,y:null,frames:0}, {timeout:4000});
+  };
   const assertNavigated = async (hash) => {
     const id = hash.slice(1);
     assert.equal(new URL(page.url()).hash, hash, `click navigates to ${hash}`);
     // Bounded wait: the section reaches its normal scroll position (top near scroll-padding-top).
     try {
-      await page.waitForFunction(([sel, pad]) => {
+      await page.waitForFunction(([sel, pad, state]) => {
         const node = document.getElementById(sel);
         if (!node) return false;
         const top = node.getBoundingClientRect().top;
-        return top >= -1 && top <= pad + 4;
-      }, [id, scrollPaddingTop], {timeout:4000});
+        const y = scrollY;
+        state.frames = state.y === y && state.top === top ? state.frames + 1 : 1;
+        state.y = y; state.top = top;
+        return top >= -1 && top <= pad + 4 && state.frames >= 3;
+      }, [id, scrollPaddingTop, {y:null,top:null,frames:0}], {timeout:4000});
     } catch (error) {
       const observed = await page.evaluate(sel => {
         const rect = document.getElementById(sel)?.getBoundingClientRect();
@@ -447,13 +466,14 @@ try {
     assert.equal(settled.visible, true, `${hash} section is in the viewport after navigation`);
   };
   // Click the #capabilities nav link.
-  await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
+  await resetNavigationOrigin();
   await page.locator('header nav a[href="#capabilities"]').click();
   await assertNavigated('#capabilities');
   // Keyboard: focus the #how-it-works nav link and press Enter.
-  await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
+  await resetNavigationOrigin();
   const hiwNav = page.locator('header nav a[href="#how-it-works"]');
   await hiwNav.focus();
+  assert.equal(await hiwNav.evaluate(node => node === document.activeElement),true,'Enter begins on the real focused navigation link');
   await page.keyboard.press('Enter');
   await assertNavigated('#how-it-works');
   check('real header nav click and keyboard Enter navigate to #capabilities/#how-it-works at their normal scroll position');
@@ -509,6 +529,12 @@ try {
   for (const id of catalogIds) {
     const card = page.locator(`#capabilities article[data-capability="${id}"]`);
     assert.equal(await card.count(), 1, `card ${id} present`);
+    const icon = card.locator(':scope > svg.capability-icon');
+    assert.equal(await icon.count(),1,`card ${id} has one small title icon`);
+    assert.equal(await icon.getAttribute('aria-hidden'),'true');
+    assert.equal(await icon.getAttribute('viewBox'),'0 0 32 32');
+    assert.equal(await icon.evaluate(node=>node.tabIndex),-1);
+    assert.equal(await card.getByRole('img').count(),0,'the decorative icon does not duplicate the accessible title');
     const link = card.locator('h3 a');
     assert.equal(await link.count(), 1, `card ${id} has one title link`);
     const href = await link.getAttribute('href');
@@ -951,18 +977,34 @@ try {
     await live.keyboard.press('Escape');
     assert.equal(await live.locator('#film-open').evaluate(node=>node===document.activeElement),true);
     check('live locale + back/forward: same DOM/game/video; selected step, open reading, score, scenery/theme, query/hash and modal focus preserved');
-    // English visual acceptance includes all six SVG labels, alternating desktop placement,
-    // stacked mobile placement, both themes and system reduced motion.
+    // English visual acceptance includes six small decorative title icons in the compact 2x3
+    // desktop grid / one mobile column, with readable titles, both themes and reduced motion.
     for (const width of [1440,390,320]) {
       await live.setViewportSize({width,height:900});
       assert.equal(await live.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`English ${width}px has no page overflow`);
       assert.match(await live.locator('#play-title').innerText(), /Stay here\s+a little longer\./, 'responsive line break preserves English word spacing');
       await assertProductCopyVisible(live,`English ${width}px`);
-      const labels = await live.locator('.capability-visual svg text').evaluateAll(nodes=>nodes.map(node=>{
-        const box=node.getBBox(), viewport=node.ownerSVGElement.viewBox.baseVal;
-        return {text:node.textContent,x:box.x,y:box.y,right:box.x+box.width,bottom:box.y+box.height,width:viewport.width,height:viewport.height};
+      const entries = await live.locator('#capabilities article').evaluateAll(nodes=>nodes.map(node=>{
+        const box=node.getBoundingClientRect(), icon=node.querySelector(':scope > svg.capability-icon')?.getBoundingClientRect(), title=node.querySelector('h3')?.getBoundingClientRect();
+        return {id:node.dataset.capability,x:box.x,y:box.y,right:box.right,bottom:box.bottom,
+          icon:icon?{x:icon.x,y:icon.y,right:icon.right,width:icon.width,height:icon.height}:null,title:title?{x:title.x,y:title.y}:null};
       }));
-      for (const label of labels) assert.ok(label.x>=0 && label.y>=0 && label.right<=label.width && label.bottom<=label.height,`English ${width}px SVG label fits: ${label.text}`);
+      assert.equal(entries.length,6);
+      for (const entry of entries) {
+        assert.ok(entry.icon && entry.title,`English ${width}px ${entry.id} retains the icon and real title`);
+        assert.equal(entry.icon.width,32); assert.equal(entry.icon.height,32,'icons remain small at every width');
+        assert.ok(entry.icon.x>=entry.x && entry.icon.right<entry.title.x && Math.abs(entry.icon.y-entry.title.y)<=8,`English ${width}px ${entry.id}: icon sits beside the title without overlap`);
+      }
+      if(width===1440){
+        for (let row=0;row<3;row++) {
+          const [left,right]=entries.slice(row*2,row*2+2);
+          assert.equal(left.y,right.y,`desktop capability row ${row+1} aligns`);
+          assert.ok(left.right<right.x,'desktop uses two compact columns');
+        }
+      }else for(let index=1;index<entries.length;index++) {
+        assert.equal(entries[index].x,entries[0].x,'mobile retains one capability column');
+        assert.ok(entries[index].y>entries[index-1].bottom,'mobile capability entries remain separate');
+      }
       for (const theme of ['dark','light']) {
         if(await live.locator('html').getAttribute('data-theme')!==theme)await live.locator('#theme-toggle').click();
         assert.equal(await live.locator('html').getAttribute('data-theme'),theme);
@@ -982,7 +1024,7 @@ try {
     assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN','explicit locale URL survives reload');
     await live.goto(base+'/en/');
     assert.equal(await live.locator('html').getAttribute('lang'),'en','direct English URL mounts in English');
-    check('English 1440/390/320 day/night: all scene labels fit, readable copy, no overflow and reduced-motion locale changes');
+    check('English 1440/390/320 day/night: six small title icons, compact 2x3/one-column layout, readable copy, no overflow and reduced-motion locale changes');
     await bilingual.close();
   }
 

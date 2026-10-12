@@ -21,7 +21,8 @@ test('paired copy generates exactly the tracked no-JS English page', async () =>
     assert.ok(html.includes(`property="og:url" content="${url}"`));
     for (const language of ['zh-CN','en','x-default']) assert.ok(html.includes(`hreflang="${language}"`));
     assert.equal([...html.matchAll(/<article data-capability=/g)].length,6);
-    assert.equal([...html.matchAll(/<figure class="capability-visual">/g)].length,6);
+    assert.equal([...html.matchAll(/<svg class="capability-icon"[^>]*aria-hidden="true"/g)].length,6);
+    assert.ok(!html.includes('class="capability-visual"'), 'retired large scenes do not return');
     assert.ok(html.includes('preload="none"')); assert.ok(!html.includes('autoplay'));
     assert.ok(!/(?:href|src|poster)="\.\//.test(html),'shared asset paths resolve at both locale URLs');
   }

@@ -26,8 +26,8 @@
 .section-introduction > p:first-child { font:17px/1.85 var(--serif); }
 .section-status { font:12px/1.85 var(--sans); color:var(--muted); margin-top:15px; }
 .section-introduction > .text-link { margin-top:13px; }
-.capability-index { display:flex; flex-direction:column; margin-top:25px; }
-.capability-index article { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:70px; border-top:1px solid var(--line); padding:34px 0; }
+.capability-index { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:26px 70px; margin-top:49px; }
+.capability-index article { display:grid; grid-template-columns:32px minmax(0,1fr); align-items:start; gap:20px; border-top:1px solid var(--line); padding-top:23px; }
 .capability-number { display:flex; align-items:center; gap:16px; font:9px/1.7 var(--mono); letter-spacing:1.3px; color:var(--muted); }
 .capability-number > span { color:var(--accent); }
 .capability-index h3 { font:400 25px/1.5 var(--serif); margin-top:10px; }
@@ -248,7 +248,7 @@
   .story-review .scene-inner { padding-top:82px; }
   .section-heading { gap:45px; }
   .section-introduction > p:first-child { font-size:16px; }
-  .capability-index article { gap:42px; }
+  .capability-index { column-gap:42px; }
   .capability-index h3 { font-size:23px; }
   .workflow { grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px 45px; }
   .execution-heading { display:block; }
@@ -288,9 +288,8 @@
   .section-introduction > p:first-child { font-size:16px; }
   .section-status { font-size:11px; margin-top:12px; max-width:none; }
   .section-introduction > .text-link { margin-top:10px; }
-  .capability-index { margin-top:22px; }
-  .capability-index article { grid-template-columns:1fr; gap:18px; padding:28px 0; }
-  .capability-index article:nth-child(even) .capability-copy,.capability-index article:nth-child(even) .capability-visual {grid-column:auto;grid-row:auto;}
+  .capability-index { grid-template-columns:1fr; gap:25px; margin-top:31px; }
+  .capability-index article { gap:16px; padding-top:21px; }
   .capability-index h3 { font-size:24px; margin-top:8px; }
   .capability-index h3 + p { font-size:13px; margin-top:7px; max-width:none; }
   .capability-boundary { max-width:none; font-size:10.5px; margin-top:9px; }
@@ -415,19 +414,11 @@
 .film-close:hover,.film-close:focus-visible{background:rgba(12,11,10,.85);border-color:var(--accent);color:var(--accent)}
 .film-sr-caption{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
-/* Six editorial scenes carry the action, while each precise boundary stays beside it. */
-.capability-illustration-note{font:10px/1.7 var(--mono);color:var(--muted);margin-top:30px;letter-spacing:.3px}
-.capability-copy{max-width:520px}.capability-visual{min-width:0;margin:0;display:flex;flex-direction:column;align-items:center;gap:9px}
-.capability-visual svg{display:block;width:100%;max-width:420px;height:auto;overflow:visible;color:var(--text)}
-.capability-visual svg path,.capability-visual svg rect,.capability-visual svg circle{fill:none;stroke:currentColor;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
-.capability-visual .scene-sheet{fill:var(--bg)}.capability-visual .scene-sheet rect{fill:var(--bg)}
-.capability-visual .scene-soft{stroke:var(--line)}.capability-visual .scene-route{stroke:var(--muted);stroke-dasharray:2 4}
-.capability-visual .scene-change{color:var(--accent);stroke:var(--accent);stroke-width:1.5}
-.capability-visual text{font:13px var(--mono);fill:var(--text);stroke:none;letter-spacing:.15px}.capability-visual .scene-note{fill:var(--muted);font-size:12px}
-.capability-visual figcaption{font:11px/1.7 var(--sans);color:var(--muted);text-align:center}
-.capability-index article:nth-child(even) .capability-copy{grid-column:2;grid-row:1}
-.capability-index article:nth-child(even) .capability-visual{grid-column:1;grid-row:1}
-@media(max-width:700px){.capability-visual svg{max-width:360px}.capability-visual{align-items:flex-start}.capability-visual figcaption{text-align:left}.capability-index article:nth-child(even) .capability-copy,.capability-index article:nth-child(even) .capability-visual{grid-column:auto;grid-row:auto}}
+/* Small task symbols anchor the title and copy without becoming another panel. */
+.capability-copy{min-width:0}
+.capability-icon{width:32px;height:32px;margin-top:27px;color:var(--text);fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.capability-icon .icon-accent{stroke:var(--accent)}
+.capability-icon circle{fill:var(--bg)}
 
 /* The language entrance is a pair of ordinary links, beside the existing theme control. */
 .site-tools{display:flex;align-items:center;gap:18px;flex-shrink:0}
