@@ -13,7 +13,7 @@ Lintel 的图形由承重横梁、两根支撑和右下方的光标构成。横�
 | App 内小标记 | [`Brand()`](../apps/desktop/src/ui.tsx) | 32-unit 无底色图形；横梁／光标跟随 accent，支撑跟随 text，适配 Day / Night |
 | 左上角字标 | [`App.tsx`](../apps/desktop/src/App.tsx)、[`styles.css`](../apps/desktop/src/styles.css) | 保留现有 serif `lintel_`、分割线与 2.6 秒慢闪光标；reduced motion 下静止 |
 | 可编辑展示资产 | [`assets/identity`](../apps/desktop/assets/identity/README.md) | 透明、单色、outlined 字标、横向组合、16/24/32 optical 与可选 dark 图标 |
-| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；六能力索引、湖岸书页／过桥插画、四步保全流程与继续工作寄语；favicon 复用 32 px optical；页尾 Clawd 与 App 共用连续短腿轮廓／整体弹跳／高低星星 runner，仅主动开始后运动 |
+| 官网 | [`apps/site`](../apps/site/README.md) | 暖纸／夜色、原生 outlined 字标与细密字符山湖；六能力索引、湖岸书页／过桥插画、四步保全流程与继续工作寄语；favicon 复用 32 px optical；页尾 Clawd 与 App 共用连续短腿轮廓／水平身体与交替迈腿／高低星星 runner，仅主动开始后运动 |
 | Preview 展示 | [`assets/preview`](../assets/preview/README.md)、[`prepare-preview-art.mjs`](../scripts/prepare-preview-art.mjs) | 从 canonical SVG 字标／标记与所提供概念图的本地插画背景组合暖纸／夜色 banner 和 1280×720 分享图；SVG 引用仓库背景，PNG 是便携导出；未上传社交设置 |
 
 文字中的产品名为 **Lintel**，展示字标为 **`lintel_`**，CLI 为 **`lintel`**。outlined 字标用于官网与导出材料，App 侧栏保留自己的 serif 字体。展示字标的橙脚完整覆盖最后一个 `l` 的底部，并向右保留短截；底边与原字脚共线，圆角保持细小。canonical SVG 用局部 mask 去掉下面的原色字脚，避免圆角处露出黑／白边；原始 glyph path 不变。首屏与静态导出使用这个完整橙脚，header／footer 则用同一字形配独立、较细的 `_`，只让它按 App 的 2.6 秒节奏慢闪。字尾的小眼睛只在主动点击后短暂出现，默认形状仍然 minimal。静态梁柱标记不闪烁，App 侧栏字体与图标保持原有权威源。

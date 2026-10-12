@@ -6,6 +6,19 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## Selen 美化与本地 App（25a8649，2026-10-11）
+
+以下保留被双语候选 `47158cd` 替代的 App／资源观察，以及更新之前的官网部署；各行的“本轮”仅指当时检查。旧包仍保留，未覆盖安装。`25a8649fb313eeac159503801a392ee6cb969e12` 包含 IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 美化，没有后来的 App 简中／English。新候选和实际官网以 [当前状态](current-state.md) 为准。
+
+| 对象 | 历史证据 |
+| --- | --- |
+| CLI 与分层验证 | 已包装 App 候选源码 `25a8649` 的分组 CI 与 aggregate 已通过；本机 fresh frontend build、选中主题／主按钮的真实 Tab 与旧样式反例、moon／snack、reduced motion、Escape／卸载和短脚风景检查通过（built Chromium／合成 invoke）。独立 CLI 发行候选仍是 `bb9fa824`，其历史解包／首次试用证据见候选历史；本轮没有重发 CLI 包。App 内两架构 Linux runner 已从 clean `f611911` 重建，与最新 App 的相关 Rust source 一致；格式与包内字节一致不等于其它架构 runtime |
+| 最新 CI 观察 | Selen 三条源码 `7a1f975`／`7b3e0a8`／`f611911` 的 runs 37961931825／37962431346／37967621633 已核对 success。主按钮焦点修复 `759a9a0` 的 [run 38104607685](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38104607685) completed/success；最终选中态修复 `25a8649` 的 [run 38110577397](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38110577397) completed/success，触发至完成约 2m55s。这是分组 source CI，不能代替 native WebKit 点击／安装或正式发行；更早 CI 的成功与失败快照保存在候选历史 |
+| 本机 Native 构建 | canonical desktop-tauri-bundle 首次在 1800s 时限内未完成，记录为失败。确认进程已停后，使用仅跳过已完成 beforeBuildCommand 的本地 override 复用已核对的前端／host／扩展／runner 资源；两次 raw Tauri 构建均 exit 0，最终 clean `25a8649` release 编译 73m05s。没有改 updater／identifier／发行配置；这是本机构建成本，不是分组 CI 的耗时或 canonical timeout 已修复的声明 |
+| 资源与包装 | clean `25a8649` macOS arm64 App 为 30,465,374 bytes（约 29.06 MiB），zip 为 11,806,522 bytes；复制件及 zip 解包的 28 个文件逐字节／权限一致。内置 x86_64／aarch64 runner 为 5,891,792／5,196,336 bytes，host 789,392 bytes，Chromium／Firefox 资源与 canonical generated resources 全部一致。实际包内 host framing／allowlist 与扩展合成安装两个检查通过；复用相关 Rust source 未改变的既有测试 executable，不宣称重新编译测试。ICNS 一致、无 woff2、clean docs revision 已核对。仅 linker ad-hoc signature，无 Team ID／资源签封／公证；候选、报告与测试数据不进 Git |
+| Preview 试用入口 | 最终 `25a8649` App 在显式合成 Foundation HOME／core HOME／state 下启动，真实 WebKit 首页显示 Synthetic native Preview；WebKit cache／local storage 位于合成 HOME，六份原件／控制文件未变。本次 QA 进程已停止。原生点击接口连续报 elementHasNoFrame，刷新同一候选绑定未消除，未完成 native 归档／阅读／设置／日夜点击旅程；历史 `afa98f66` 的合成 native 旅程独立保留。quickstart 与双语源码构建入口不变，无公开 Release 下载 |
+| 官网托管 | [lintel.page](https://lintel.page/) 已上线；Direct Upload Pages project `lintel`，平台 hostname `lintel-aue.pages.dev`，生产 deployment `291cc34b`。公开 `site-build.json` 读回 clean source `6c4e5df562550b37e9445b2d4fffe98a46be4493`；apex proxied CNAME、Pages domain／验证状态 active、正常 TLS 与 HTTPS 200 已核对。1440／390 隔离 Chromium 的正式域名检查通过：CSP 下 ES modules 挂载、日夜无溢出、初始及打开 dialog 不下载／不播放影片，主动播放实际前进、1920×1080／20.01s、14.4s seek、四条 captions、关闭复位与返回焦点、无 JS 正文及普通短片链接可用，页面错误与外部资源请求均为零。另核对 MJS／VTT MIME、分享图、robots／sitemap、真实 404 与视频 Range 206。项目无 Functions／Web Analytics 配置，zone RUM 已在 dashboard 完全禁用并复验无 beacon 注入；托管平台仍处理普通 HTTP 请求。不是 Safari／真实手机验收，不提供正式 App 下载；更新程序见 [site-hosting](site-hosting.md) |
+
 ## 八项修复与短直腿候选（afa98f66，2026-10-09）
 
 以下保存被 `25a8649` 本地 App 替代之前的交付与资源身份。独立三平台 CLI 仍保留 `bb9fa824`；旧 App 的 native 归档／阅读／游戏验收不能自动归给新 App。旧段落中的“当前”“本轮”只指当时观察。
