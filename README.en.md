@@ -260,7 +260,7 @@ flow; scenery can be paused and respects reduced motion. Source-reading examples
 Chinese and English trial links, and the opt-in Clawd game remain available.
 A quiet link opens the 20-second English concept film with speech, music and sound
 effects; playback starts only on request. The existing static site is live at
-[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages. The site provides `/` Simplified Chinese and `/en/` English, six tasks with original title icons and alternating SVG scenes, and tap or hold-and-release jumps. [Current state (Chinese)](docs/current-state.md) records the live revision and returning-browser stylesheet cache status.
+[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages. The site provides `/` Simplified Chinese and `/en/` English, six tasks with original title icons and alternating SVG scenes, and tap or hold-and-release jumps. [Current state (Chinese)](docs/current-state.md) records the live revision and later gameplay work.
 It does not connect to the local execution core or offer a formal app download.
 See the [site README (Chinese)](apps/site/README.md) to start it and the
 [hosting guide (Chinese)](docs/site-hosting.md) to update it.

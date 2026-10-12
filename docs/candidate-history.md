@@ -6,6 +6,14 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 双语组合官网（427e981，2026-10-12）
+
+此轮随后由 clean `fdf18b2` 加入能力区开场协调与版本化样式入口；以下“尚未上线”仅是当时缓存修正的状态，最新状态见 current-state。
+
+| 对象 | 历史证据 |
+| --- | --- |
+| 官网托管 | Direct Upload Pages project `lintel`，production `027679d0-6f0c-444c-921b-424c47e856bc`，preview `5302a610-62b4-45f0-914d-273328a690a7`，均声明 clean source `427e981be402e46148ca5bf5de78353acfb82c11`；同一 24 文件有限 payload 加 provenance manifest 先 preview 再生产，媒体与原审阅字节相同，无下载／feed。正式 [中文](https://lintel.page/)／[English](https://lintel.page/en/) HTTPS 返回 200，六标题 icon＋六场景、指南／canonical／无横向溢出／蓄力控件已观察；实际取得的 runner 与冻结包逐字节一致。影片通过原生控件播到 20.01s（1920×1080），关闭暂停且归零。回访浏览器仍拿旧 CSS；临时禁用缓存观察到服务器新 CSS 与冻结包逐字节一致，实际 CSS header 为 max-age=14400，debug 设置已还原。canonical 两样式入口已加版本 query 并生成 English，本地四项语言检查通过，修正尚未上线；不把诊断中的 cache-disabled 状态称为正常回访通过。此前 `47158cd` 证据见 [候选历史](candidate-history.md)；程序见 [site-hosting](site-hosting.md) |
+
 ## 官网短直腿部署（47158cd，2026-10-12）
 
 此部署后来被 clean `427e981` 的官网双语／组合能力场景／蓄力版本替代；旧有限 payload 保留。下行只记录当时线上观察，不证明后续 revision。
