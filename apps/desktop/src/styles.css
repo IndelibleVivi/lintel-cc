@@ -54,6 +54,11 @@ input[type=text],input[type=search],input:not([type]),textarea{border:1px solid 
 .target-bar{min-height:63px;display:flex;align-items:center;padding:14px 29px;gap:8px}
 .target-icon{display:none}
 .target-context{min-width:0;flex:1}
+.language-switch{max-width:36rem}
+.target-bar>.language-switch{flex:0 0 136px;min-width:0;margin:0;gap:0}
+.target-bar>.language-switch>span,.target-bar>.language-switch>small{display:none}
+.target-bar>.language-switch select{width:100%;min-width:0;padding:5px 22px 5px 8px;font-size:11px;background:transparent}
+@media(max-width:1000px){.target-bar>.language-switch{flex-basis:118px}}
 .target-context>.eyebrow{display:none}
 .target-context>strong{display:block;font-size:14px}
 .target-line{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;line-height:1.45}

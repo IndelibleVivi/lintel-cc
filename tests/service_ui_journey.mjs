@@ -54,7 +54,7 @@ try{
   const page=await browser.newPage({viewport:{width:1120,height:760}});page.setDefaultTimeout(10000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.exposeFunction('syntheticInvoke',invoke);
-  await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
+  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'清理与重建',exact:true}).click();
   await page.getByRole('radio',{name:/修复本地登录/}).check();
   const writersWarning=page.getByText(/仍有无法归属到此目录的 Claude 写入进程/);

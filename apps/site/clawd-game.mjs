@@ -115,14 +115,78 @@ export function clawdPose(run, reduced = false) {
     eyes: EYES_OPEN,
   };
 }
-export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {}) {
+// Finite, static copy for the shared runner. `zh-CN` is the default so the
+// standalone website is unchanged; the App mounts with its resolved locale and
+// can switch it live (labels/aria/status) without disposing the run.
+const COPY = {
+  'zh-CN': {
+    topline: 'CLAWD / LITTLE RUN',
+    thisRun: '这次', best: '最好',
+    boardAria: 'Clawd 跳跃跑道',
+    canvasAria: '四条腿的 Clawd 沿纸面小路奔跑，跳过石头和书本，收集星星',
+    jumpLabel: '跳一下',
+    pause: '暂停', resume: '继续',
+    keys: 'SPACE / ↑ \u00a0 跳跃 \u00a0 · \u00a0 P 暂停',
+    instructions: '点跑道或「跳一下」开始。空格 / ↑ 跳跃，P 暂停；每颗星星 +25 分。离开游戏会自动暂停。',
+    storage: '最好成绩只留在这个浏览器里。',
+    storageUnavailable: '浏览器存储不可用，成绩仅保留到关闭本页。',
+    phaseReady: '把星星收进口袋。',
+    phaseRunning: '嘿咻。星星在前面。',
+    phasePausedTitle: '歇一下，路还在。',
+    phasePausedSub: (n) => `已经收下 ${n} 颗星星。`,
+    phasePausedStart: '继续走',
+    phasePausedStatus: '已暂停。准备好再继续。',
+    phaseOverTitle: '脚滑了一下。问题不大。',
+    phaseOverSub: (pts, collected, cleared) => `${pts} 分 · ${collected} 颗星星 · 跳过 ${cleared} 个障碍`,
+    phaseOverStart: '再来一次',
+    phaseOverStatus: '碰到障碍了。星星先收好，再试一次。',
+    collected: (n) => `收到第 ${n} 颗星星，+25 分。`,
+    emptyMessage: '把星星收进口袋。',
+    emptySub: '跳过小石头，顺便带一点光回来。',
+    emptyStart: '出发吧',
+    emptyStatus: '准备好了就出发。',
+  },
+  en: {
+    topline: 'CLAWD / LITTLE RUN',
+    thisRun: 'This run', best: 'Best',
+    boardAria: 'Clawd jump track',
+    canvasAria: 'Four-legged Clawd runs along a paper path, jumping stones and books and collecting stars',
+    jumpLabel: 'Jump',
+    pause: 'Pause', resume: 'Resume',
+    keys: 'SPACE / ↑ \u00a0 Jump \u00a0 · \u00a0 P Pause',
+    instructions: 'Click the track or “Jump” to start. Space / ↑ to jump, P to pause; each star +25 points. Leaving the game pauses it automatically.',
+    storage: 'Your best score stays only in this browser.',
+    storageUnavailable: 'Browser storage is unavailable; the score is kept only until this page closes.',
+    phaseReady: 'Pop the stars in your pocket.',
+    phaseRunning: 'Heave-ho. The stars are ahead.',
+    phasePausedTitle: 'A little break; the road is still here.',
+    phasePausedSub: (n) => `Collected ${n} star(s) so far.`,
+    phasePausedStart: 'Keep going',
+    phasePausedStatus: 'Paused. Continue when ready.',
+    phaseOverTitle: 'Slipped a little. No big deal.',
+    phaseOverSub: (pts, collected, cleared) => `${pts} points · ${collected} star(s) · cleared ${cleared} obstacle(s)`,
+    phaseOverStart: 'Try again',
+    phaseOverStatus: 'Hit an obstacle. Pocket the stars and try once more.',
+    collected: (n) => `Collected star ${n}, +25 points.`,
+    emptyMessage: 'Pop the stars in your pocket.',
+    emptySub: 'Hop the little stones and bring a bit of light back.',
+    emptyStart: 'Set off',
+    emptyStatus: 'Set off whenever you are ready.',
+  },
+};
+function resolveCopy(language) { return Object.hasOwn(COPY, language) ? COPY[language] : COPY['zh-CN']; }
+
+export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', language = 'zh-CN' } = {}) {
   root.className = 'clawd-game';
-  root.innerHTML = `<div class="cg-topline"><span>CLAWD / LITTLE RUN</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span>这次 <b class="cg-score">00000</b></span><span>最好 <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="Clawd 跳跃跑道" aria-describedby="cg-instructions"><canvas aria-label="四条腿的 Clawd 沿纸面小路奔跑，跳过石头和书本，收集星星"></canvas><div class="cg-overlay"><p class="cg-message">把星星收进口袋。</p><p class="cg-submessage">跳过小石头，顺便带一点光回来。</p><button class="cg-start">出发吧</button></div><span class="cg-collect" aria-hidden="true"></span></div><div class="cg-controls"><div><button class="cg-jump">跳一下 <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>暂停</button></div><p class="cg-status" role="status">准备好了就出发。</p><span class="cg-keys" aria-hidden="true">SPACE / ↑ &nbsp; 跳跃 &nbsp; · &nbsp; P 暂停</span></div><p id="cg-instructions" class="cg-instructions">点跑道或「跳一下」开始。空格 / ↑ 跳跃，P 暂停；每颗星星 +25 分。离开游戏会自动暂停。<span class="cg-storage">最好成绩只留在这个浏览器里。</span></p>`;
+  let copy = resolveCopy(language);
+  root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
   const $ = selector => root.querySelector(selector);
   const board = $('.cg-board'), canvas = $('canvas'), ctx = canvas.getContext('2d');
   const score = $('.cg-score'), bestOutput = $('.cg-best'), overlay = $('.cg-overlay');
   const startButton = $('.cg-start'), pauseButton = $('.cg-pause'), status = $('.cg-status');
   let run = newRun(), best = 0, frame = 0, last = 0, width = 800;
+  let currentLanguage = Object.hasOwn(COPY, language) ? language : 'zh-CN';
+  let storageBroken = false;
   const key = scoreKey;
   const controller = new AbortController();
   const listen = (target, event, listener) => target.addEventListener(event, listener, { signal: controller.signal });
@@ -136,26 +200,47 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
     draw();
   }
   try { const saved = Number(localStorage.getItem(key)); if (Number.isFinite(saved) && saved > 0) best = Math.floor(saved); }
-  catch { $('.cg-storage').textContent = '浏览器存储不可用，成绩仅保留到关闭本页。'; }
+  catch { storageBroken = true; $('.cg-storage').textContent = copy.storageUnavailable; }
   const pad = n => String(Math.floor(n)).padStart(5, '0');
   function saveBest() {
     best = Math.max(best, points(run)); bestOutput.textContent = pad(best);
     try { localStorage.setItem(key, String(best)); }
-    catch { $('.cg-storage').textContent = '浏览器存储不可用，成绩仅保留到关闭本页。'; }
+    catch { storageBroken = true; $('.cg-storage').textContent = copy.storageUnavailable; }
+  }
+  function statusCopy() {
+    return {
+      ready: [copy.phaseReady, copy.emptySub, copy.emptyStart, copy.emptyStatus],
+      running: ['', '', '', copy.phaseRunning],
+      paused: [copy.phasePausedTitle, copy.phasePausedSub(run.collected), copy.phasePausedStart, copy.phasePausedStatus],
+      over: [copy.phaseOverTitle, copy.phaseOverSub(points(run), run.collected, run.cleared), copy.phaseOverStart, copy.phaseOverStatus],
+    }[run.status];
   }
   function sync() {
     root.dataset.state = run.status;
+    root.setAttribute('lang', currentLanguage);
     overlay.hidden = run.status === 'running';
     pauseButton.disabled = ['ready', 'over'].includes(run.status);
-    pauseButton.textContent = run.status === 'paused' ? '继续' : '暂停';
-    const copy = {
-      ready: ['把星星收进口袋。', '跳过小石头，顺便带一点光回来。', '出发吧', '准备好了就出发。'],
-      running: ['', '', '', '嘿咻。星星在前面。'],
-      paused: ['歇一下，路还在。', `已经收下 ${run.collected} 颗星星。`, '继续走', '已暂停。准备好再继续。'],
-      over: ['脚滑了一下。问题不大。', `${points(run)} 分 · ${run.collected} 颗星星 · 跳过 ${run.cleared} 个障碍`, '再来一次', '碰到障碍了。星星先收好，再试一次。'],
-    }[run.status];
-    $('.cg-message').textContent = copy[0]; $('.cg-submessage').textContent = copy[1]; startButton.textContent = copy[2]; status.textContent = copy[3];
+    pauseButton.textContent = run.status === 'paused' ? copy.resume : copy.pause;
+    const text = statusCopy();
+    $('.cg-message').textContent = text[0]; $('.cg-submessage').textContent = text[1]; startButton.textContent = text[2]; status.textContent = text[3];
     score.textContent = pad(points(run)); bestOutput.textContent = pad(best); $('.cg-stars').textContent = run.collected;
+  }
+  // Live language switch: relabel static text/aria and re-render the current
+  // status/overlay without touching `run`, `best` or the animation loop.
+  function applyLanguage(next) {
+    currentLanguage = Object.hasOwn(COPY, next) ? next : 'zh-CN';
+    copy = resolveCopy(currentLanguage);
+    root.setAttribute('lang', currentLanguage);
+    $('.cg-board').setAttribute('aria-label', copy.boardAria);
+    $('canvas').setAttribute('aria-label', copy.canvasAria);
+    $('.cg-topline-label').textContent = copy.topline;
+    $('.cg-run-label').textContent = copy.thisRun;
+    $('.cg-best-label').textContent = copy.best;
+    $('.cg-jump-label').textContent = copy.jumpLabel;
+    $('.cg-keys').textContent = copy.keys;
+    $('.cg-instructions-text').textContent = copy.instructions;
+    $('.cg-storage').textContent = storageBroken ? copy.storageUnavailable : copy.storage;
+    sync();
   }
   function pixelStar(x, y, size, color) {
     ctx.fillStyle = color;
@@ -230,7 +315,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
     advance(run,last ? (now-last)/1000 : 0,width);last=now;
     score.textContent=pad(points(run));$('.cg-stars').textContent=run.collected;
     $('.cg-collect').textContent=run.particles.some(p=>p.kind==='star') ? '✦ +25' : '';
-    if (collected !== run.collected) status.textContent=`收到第 ${run.collected} 颗星星，+25 分。`;
+    if (collected !== run.collected) status.textContent=copy.collected(run.collected);
     draw();
     if (run.status === 'over') {saveBest();sync();frame=0;}
     else frame=requestAnimationFrame(tick);
@@ -273,11 +358,16 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best' } = {
   listen(reduced,'change',draw);
   listen(darkScheme,'change',setPalette);
   sync();setPalette();
-  return () => {
+  const dispose = () => {
     cancelAnimationFrame(frame);
     controller.abort(); visibility.disconnect(); resize.disconnect(); themeChanges.disconnect();
     if (run.distance > 0) saveBest();
     run.status = 'paused';
     root.replaceChildren();
   };
+  // One interface for the website default (dispose fn) and the App (which also
+  // needs a live language switch); both keep a single mount implementation.
+  dispose.setLanguage = applyLanguage;
+  dispose.language = () => currentLanguage;
+  return dispose;
 }

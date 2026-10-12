@@ -46,7 +46,7 @@ try{
  const url=await new Promise((resolve,reject)=>{let output='';const timer=setTimeout(()=>reject(Error('Preview timeout '+output)),15000);preview.once('error',reject);for(const s of [preview.stdout,preview.stderr])s.on('data',c=>{output+=c;const m=stripVTControlCharacters(output).match(/http:\/\/127\.0\.0\.1:\d+\//);if(m){clearTimeout(timer);resolve(m[0]);}});});
  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1120,height:760}});page.setDefaultTimeout(10000);const errors=[],outside=[];
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(url))outside.push(r.url());});
- await page.exposeFunction('syntheticInvoke',invoke);await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>window.syntheticInvoke(cmd,args)};});
+ await page.exposeFunction('syntheticInvoke',invoke);await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>cmd==='app_set_language'||cmd==='app_preferred_languages'?window.__LANG_PRESENT(cmd,args):window.syntheticInvoke(cmd,args)};});
  await page.goto(url);await page.getByRole('button',{name:/本地工作空间/}).click();await page.getByRole('button',{name:'Lintel 版本与更新'}).click();
  const dialog=page.getByRole('dialog',{name:'Lintel 更新',exact:true});await dialog.getByText('此构建尚未配置更新发行',{exact:true}).waitFor();
  assert.equal(calls.some(c=>c.op==='check'),false,'Default startup contacted feed');

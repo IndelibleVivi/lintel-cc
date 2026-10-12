@@ -54,9 +54,9 @@ try{
     if(args.payload.op==='pair_create')pair=response.data;return response;
   });
   await page.addInitScript(()=>{
-    window.isTauri=true;window.clipboardWrites=[];
+    try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.clipboardWrites=[];
     Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.clipboardWrites.push(text)}});
-    window.__TAURI_INTERNALS__={invoke:(command,args)=>window.actualInvoke(command,args)};
+    window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.actualInvoke(command,args)};
   });
   await page.goto(url);await page.getByRole('button',{name:'浏览器',exact:true}).click();
   const dialog=page.getByRole('dialog');await dialog.getByText('连接一个新的 profile',{exact:true}).click();

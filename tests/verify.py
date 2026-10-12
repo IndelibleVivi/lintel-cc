@@ -63,6 +63,7 @@ class Check:
     requires: str = ""                    # shown by --list
     build: Sequence[Sequence[str]] = ()   # built before the check
     independent: bool = False             # real-runtime evidence; not default
+    explicit_only: bool = False           # never in the implicit default group; opt in via --checks/--all
     reason: str = ""                      # shown while deferred
 
     @property
@@ -74,10 +75,10 @@ def _check(
     id: str, description: str, category: str, *command: str,
     cwd: Path = ROOT, tools: Sequence[str] = (), paths: Sequence[Path] = (),
     loopback: bool = False, requires: str = "", build: Sequence[Sequence[str]] = (),
-    independent: bool = False, reason: str = "",
+    independent: bool = False, reason: str = "", explicit_only: bool = False,
 ) -> Check:
     return Check(id, description, category, list(command), cwd, "synthetic-temp-root",
-                 tools, paths, loopback, requires, build, independent, reason)
+                 tools, paths, loopback, requires, build, independent, explicit_only, reason)
 
 
 _CARGO_BUILD_RUNNER = ([CARGO or "cargo", "build", "-p", "lintel-runner"],)
@@ -117,6 +118,15 @@ CHECKS: List[Check] = [
            *(NODE or "node", "--test", "tests/site_game.test.mjs"), tools=("node",)),
     _check("home-greetings-test", "Clawd greeting pools, local date dedup and egg priorities", "js",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/home_greetings.test.mjs"), tools=("node",)),
+    # Localization unit checks. Kept OUT of the implicit default group (the
+    # canonical entrypoint's default group is unchanged); CI and explicit
+    # selection opt in through `--checks`/the CI profiles.
+    _check("i18n-test", "desktop locale resolution, catalog parity/interpolation, format and greeting identity (node:test, no deps)", "i18n",
+           *(NODE or "node", "--experimental-strip-types", "--test", "tests/i18n.test.mjs"), tools=("node",),
+           explicit_only=True),
+    _check("i18n-coverage-test", "every desktop source translation key resolves in both zh-CN/en catalogs (node:test, no deps)", "i18n",
+           *(NODE or "node", "--experimental-strip-types", "--test", "tests/i18n_coverage.test.mjs"), tools=("node",),
+           explicit_only=True),
     _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
            *(NODE or "node", "--test", "tests/app_release.test.mjs"), tools=("node", "python3")),
     _check("site-ui", "static website responsive story, native reading, theme and Clawd journey", "independent",
@@ -127,6 +137,10 @@ CHECKS: List[Check] = [
            *(NODE or "node", "tests/clawd_app_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
            loopback=True, independent=True, reason="built App in isolated Chromium with synthetic inventory; not native WebKit"),
+    _check("i18n-ui", "built App bilingual switching, state/plan identity, persistence, languagechange and accessibility", "independent",
+           *(NODE or "node", "tests/i18n_ui_journey.mjs"), tools=("node",),
+           paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
+           loopback=True, independent=True, reason="built App in isolated Chromium with synthetic invoke; not native WebKit"),
     _check("python-ssh-test", "platform/ssh Python controller tests (fake SSH, synthetic)",
            "python", PYTHON, "-m", "unittest", "discover", "-s", "platform/ssh/tests", "-v"),
     _check("desktop-typecheck", "desktop TypeScript typecheck (tsc --noEmit)", "desktop",
@@ -246,7 +260,8 @@ def select(args: argparse.Namespace) -> List[Check]:
     # Independent checks are excluded from the implicit default group. Naming
     # them explicitly, selecting their category, or --all is the opt-in.
     if not args.all and not (args.checks or args.category):
-        chosen = [check for check in chosen if not check.independent and check.id != "desktop-typecheck"]
+        chosen = [check for check in chosen if not check.independent and not check.explicit_only
+                  and check.id != "desktop-typecheck"]
     return chosen
 
 
@@ -441,8 +456,13 @@ def run_self_test(require_passed: bool = False) -> int:
     default_ids = {check.id for check in select(ns())}
     expect({"journey-cli", "journey-policy"} <= default_ids, "default group includes journey checks")
     expect("browser-smoke" not in default_ids, "default group excludes independent checks")
+    expect("i18n-test" not in default_ids and "i18n-coverage-test" not in default_ids,
+           "default group excludes explicit-only i18n checks (unchanged canonical default)")
     every = {check.id for check in select(ns(all=True))}
     expect({"browser-smoke", "desktop-tauri-bundle"} <= every, "--all includes independent checks")
+    expect({"i18n-test", "i18n-coverage-test"} <= every, "--all includes explicit-only i18n checks")
+    expect({c.id for c in select(ns(checks="i18n-test"))} == {"i18n-test"},
+           "explicit --checks can name an explicit-only check")
     expect([c.id for c in select(ns(checks="browser-smoke"))] == ["browser-smoke"],
            "explicit --checks can name an independent check")
     expect(select(ns(category="independent")), "--category independent selects independent checks")

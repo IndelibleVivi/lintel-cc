@@ -5,9 +5,21 @@ mod app_updates;
 mod bundled_browser_extension;
 mod bundled_browser_host;
 mod cli_inspector;
+mod locale;
+mod locale_menu;
 mod network;
 mod remote;
 mod resources;
+
+#[tauri::command]
+fn app_preferred_languages() -> Vec<String> {
+    locale::preferred_languages()
+}
+
+#[tauri::command]
+fn app_set_language(app: tauri::AppHandle, language: String) -> Result<(), String> {
+    locale_menu::set_language(&app, &language)
+}
 
 #[tauri::command]
 async fn request(
@@ -130,6 +142,7 @@ async fn remote_request(app: tauri::AppHandle, payload: serde_json::Value) -> se
 
 fn main() {
     tauri::Builder::default()
+        .menu(|app| locale_menu::build(app, locale_menu::initial_language()))
         .plugin(
             tauri_plugin_updater::Builder::new()
                 .default_version_comparator(|current, release| {
@@ -147,7 +160,9 @@ fn main() {
             remote_request,
             app_updates::app_update_request,
             resources::open_resource,
-            cli_inspector::inspect_cli
+            cli_inspector::inspect_cli,
+            app_preferred_languages,
+            app_set_language
         ])
         .run(tauri::generate_context!())
         .expect("Lintel could not start");

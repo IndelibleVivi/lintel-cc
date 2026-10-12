@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from 'react';
 import './clawd-interactions.css';
 import ClawdFlightMenu, { type ClawdDestination } from './ClawdFlightMenu';
+import { useI18n } from './i18n-provider';
 
 export type ClawdMood = 'hello' | 'plan' | 'pack' | 'rest' | 'done' | 'care' | 'work';
 type Scene = 'idle' | 'heart' | 'tea' | 'flower' | 'book' | 'sleep' | 'party' | 'stars' | 'friend' | 'fluster' | 'moon' | 'snack';
-const surprises: { scene: Scene; text: string }[] = [
-  { scene: 'heart', text: '摸摸收到。也给你一颗小小的心。' },
-  { scene: 'tea', text: '给你留了一杯热的。' },
-  { scene: 'flower', text: '今天也长出了一点点新东西。' },
-  { scene: 'book', text: '你的工作，值得好好留下来。' },
-  { scene: 'sleep', text: '嘘——小憩一下。草案还在。' },
-  { scene: 'party', text: '没什么大事，也可以戴小帽子。' },
-  { scene: 'stars', text: '把星星收进口袋，晚一点再用。' },
-  { scene: 'friend', text: '叫来一个小伙伴，一起陪你。' },
-  { scene: 'moon', text: '替你看了看月亮，今晚很亮。' },
-  { scene: 'snack', text: '烤了小饼干，分你一半。' },
+const surprises: { scene: Scene; key: string }[] = [
+  { scene: 'heart', key: 'clawd.surprise.heart' },
+  { scene: 'tea', key: 'clawd.surprise.tea' },
+  { scene: 'flower', key: 'clawd.surprise.flower' },
+  { scene: 'book', key: 'clawd.surprise.book' },
+  { scene: 'sleep', key: 'clawd.surprise.sleep' },
+  { scene: 'party', key: 'clawd.surprise.party' },
+  { scene: 'stars', key: 'clawd.surprise.stars' },
+  { scene: 'friend', key: 'clawd.surprise.friend' },
+  { scene: 'moon', key: 'clawd.surprise.moon' },
+  { scene: 'snack', key: 'clawd.surprise.snack' },
 ];
 const scenes: Record<ClawdMood, Scene> = { hello: 'idle', plan: 'book', pack: 'book', rest: 'sleep', done: 'stars', care: 'heart', work: 'tea' };
 
@@ -43,9 +44,12 @@ function Decorations({ scene }: { scene: Scene }) {
   return null;
 }
 export default function Clawd({ mood = 'hello', small = false, interactive = false, caption, scrollRef, onChoose }: { mood?: ClawdMood; small?: boolean; interactive?: boolean; caption?: string; scrollRef?: RefObject<HTMLElement | null>; onChoose?: (destination: ClawdDestination) => void }) {
+  const { t } = useI18n();
   const [visit, setVisit] = useState(-1);
   const [chosenScene, setChosenScene] = useState<Scene | null>(null);
-  const [note, setNote] = useState('');
+  // Store the translation KEY, not the translated text, so a language switch
+  // relabels the current Clawd note.
+  const [noteKey, setNoteKey] = useState('');
   const [held, setHeld] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [look, setLook] = useState({ x: 0, y: 0 });
@@ -61,19 +65,19 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
   useEffect(() => () => { clearTimeout(longPress.current); clearTimeout(jumpTimer.current); clearTimeout(flightTimer.current); }, []);
   const surprise = visit >= 0 ? surprises[visit % surprises.length] : null;
   const scene = chosenScene ?? surprise?.scene ?? scenes[mood];
-  function react(next: Scene, text: string) { setChosenScene(next); setNote(text); }
-  function comeBack() { clearTimeout(flightTimer.current); setHiding(false); setFlinging(false); setOffset({ x: 0, y: 0 }); clicks.current.count = 0; react('heart', '好吧，再给你摸一下。就一下。'); }
+  function react(next: Scene, key: string) { setChosenScene(next); setNoteKey(key); }
+  function comeBack() { clearTimeout(flightTimer.current); setHiding(false); setFlinging(false); setOffset({ x: 0, y: 0 }); clicks.current.count = 0; react('heart', 'clawd.okPetAgain'); }
   function pet() {
     if (ignoreClick.current) { ignoreClick.current = false; return; }
     const now = performance.now();
     clicks.current.count = now - clicks.current.time < 460 ? clicks.current.count + 1 : 1;
     clicks.current.time = now;
-    if (clicks.current.count >= 6) { setHiding(true); react('fluster', '……我躲好了。才没有露出脚脚。'); }
-    else if (clicks.current.count >= 3) { react('fluster', clicks.current.count >= 5 ? '>< 再戳就要逃跑啦！' : '>< 呜哇，痒痒痒！'); }
-    else { setChosenScene(null); setNote(''); setVisit(value => value + 1); }
+    if (clicks.current.count >= 6) { setHiding(true); react('fluster', 'clawd.hidFluster'); }
+    else if (clicks.current.count >= 3) { react('fluster', clicks.current.count >= 5 ? 'clawd.tickle5' : 'clawd.tickle3'); }
+    else { setChosenScene(null); setNoteKey(''); setVisit(value => value + 1); }
   }
   function leap() {
-    clearTimeout(jumpTimer.current); setJump(true); react('stars', '嘿咻！够到一颗星星。');
+    clearTimeout(jumpTimer.current); setJump(true); react('stars', 'clawd.reachStar');
     jumpTimer.current = setTimeout(() => setJump(false), 700);
   }
   function start(event: PointerEvent<HTMLButtonElement>) {
@@ -82,7 +86,7 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     clearTimeout(flightTimer.current); setFlinging(false);
     drag.current = { x: event.clientX, y: event.clientY, moved: false, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), vx: 0, vy: 0 }; ignoreClick.current = false; setHeld(true);
     clearTimeout(longPress.current);
-    longPress.current = setTimeout(() => { ignoreClick.current = true; react('heart', '被你抱住了。再待一会儿。'); }, 520);
+    longPress.current = setTimeout(() => { ignoreClick.current = true; react('heart', 'clawd.thanksHug'); }, 520);
   }
   function move(event: PointerEvent<HTMLButtonElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -96,7 +100,7 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     if (Math.hypot(x, y) > 5) {
       drag.current.moved = true; clearTimeout(longPress.current);
       setOffset({ x: Math.max(-60, Math.min(80, x)), y: Math.max(-65, Math.min(45, y)) });
-      react('heart', '哇——被抱起来啦。');
+      react('heart', 'clawd.pickedUp');
     }
   }
   function release(cancelled = false) {
@@ -105,17 +109,17 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     if (!cancelled && gesture?.moved && performance.now() - gesture.lastTime < 120 && Math.hypot(gesture.vx, gesture.vy) > .65) {
       ignoreClick.current = true; drag.current = null; setHeld(false); setFlinging(true);
       setOffset({ x: Math.max(-125, Math.min(145, gesture.vx * 150)), y: Math.max(-95, Math.min(65, gesture.vy * 110)) });
-      react('fluster', '呜——小螃蟹发射！');
-      flightTimer.current = setTimeout(() => { setFlinging(false); setHiding(true); setOffset({ x: 0, y: 0 }); react('fluster', '降落完毕。让我躲一小会儿。'); }, 540);
+      react('fluster', 'clawd.launch');
+      flightTimer.current = setTimeout(() => { setFlinging(false); setHiding(true); setOffset({ x: 0, y: 0 }); react('fluster', 'clawd.landed'); }, 540);
       return;
     }
-    if (drag.current?.moved) { ignoreClick.current = true; if (!cancelled) react('flower', '平稳着陆。送你一朵小花。'); }
+    if (drag.current?.moved) { ignoreClick.current = true; if (!cancelled) react('flower', 'clawd.stableLand'); }
     drag.current = null; setHeld(false); setOffset({ x: 0, y: 0 });
   }
   const sprite = <svg className="clawd-scene" viewBox="0 0 120 80" shapeRendering="crispEdges" aria-hidden="true"><g transform="translate(20 26)"><Sprite sleeping={scene === 'sleep'} flustered={scene === 'fluster'}/></g><Decorations scene={scene}/></svg>;
   return <div className={`clawd ${small ? 'clawd-small' : ''} clawd-${mood} scene-${scene} ${held ? 'is-held' : ''} ${jump ? 'is-jumping' : ''} ${hiding ? 'is-hiding' : ''} ${flinging ? 'is-flinging' : ''}`} style={{ '--pet-x': `${offset.x}px`, '--pet-y': `${offset.y}px`, '--look-x': `${look.x}px`, '--look-y': `${look.y}px` } as CSSProperties}>
-    {interactive ? <><button className="clawd-pet" aria-label="摸摸 Clawd，发现小彩蛋" aria-describedby="clawd-pet-instructions" disabled={hiding} onPointerDown={start} onPointerMove={move} onPointerUp={() => release()} onPointerCancel={() => release(true)} onLostPointerCapture={() => { if (drag.current) release(true); }} onPointerLeave={() => setLook({ x: 0, y: 0 })} onClick={pet} onKeyDown={event => { if (event.key === 'ArrowUp') { event.preventDefault(); leap(); } if (event.key === 'Escape') { release(true); setChosenScene(null); setNote(''); setVisit(-1); } }} title="摸摸、抱起来，连着戳会害羞哦">{sprite}</button><span id="clawd-pet-instructions" className="sr-only">点按摸摸，快速连续点击会害羞躲藏，按住拥抱，拖动抱起来，快速甩动并松手弹飞，上方向键跳跃。躲藏后点露出的脚脚或哄回来。</span>{hiding && <button className="clawd-hideout" aria-label="找到 Clawd 露出的脚脚，哄它回来" onClick={comeBack}><svg width="54" height="30" viewBox="0 0 54 30" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M21 17H25V24H21ZM29 17H33V24H29Z"/><path fill="var(--bg)" d="M3 0H50V19H3Z"/><path stroke="var(--line)" d="M2 19H51"/><path fill="currentColor" opacity=".35" d="M0 27H3V29H0ZM9 25H12V27H9Z"/></svg></button>}<ClawdFlightMenu scrollRef={scrollRef} onChoose={onChoose} actions={hiding ? <button onClick={comeBack}>哄回来</button> : <><button onClick={() => react('tea', '咕嘟。你也记得喝水。')}>喝茶</button><button onClick={leap}>跳跳</button><button onClick={() => react('moon', '嘿咻——摘到了。月亮慢慢圆，事情慢慢好。')}>摘月亮</button><button onClick={() => scene === 'sleep' ? react('flower', '醒啦，我们继续。') : react('sleep', '在你旁边，睡一小会儿。')}>{scene === 'sleep' ? '叫醒' : '小憩'}</button></>}/></> : sprite}
-    {interactive && <span className={`clawd-caption ${surprise || note ? 'revealed' : ''}`} role="status">{note || surprise?.text || caption || '摸摸我，也可以把我抱起来。'}</span>}
+    {interactive ? <><button className="clawd-pet" aria-label={t('clawd.pet')} aria-describedby="clawd-pet-instructions" disabled={hiding} onPointerDown={start} onPointerMove={move} onPointerUp={() => release()} onPointerCancel={() => release(true)} onLostPointerCapture={() => { if (drag.current) release(true); }} onPointerLeave={() => setLook({ x: 0, y: 0 })} onClick={pet} onKeyDown={event => { if (event.key === 'ArrowUp') { event.preventDefault(); leap(); } if (event.key === 'Escape') { release(true); setChosenScene(null); setNoteKey(''); setVisit(-1); } }} title={t('clawd.petTitle')}>{sprite}</button><span id="clawd-pet-instructions" className="sr-only">{t('clawd.petInstructions')}</span>{hiding && <button className="clawd-hideout" aria-label={t('clawd.hideout')} onClick={comeBack}><svg width="54" height="30" viewBox="0 0 54 30" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M21 17H25V24H21ZM29 17H33V24H29Z"/><path fill="var(--bg)" d="M3 0H50V19H3Z"/><path stroke="var(--line)" d="M2 19H51"/><path fill="currentColor" opacity=".35" d="M0 27H3V29H0ZM9 25H12V27H9Z"/></svg></button>}<ClawdFlightMenu scrollRef={scrollRef} onChoose={onChoose} actions={hiding ? <button onClick={comeBack}>{t('clawd.comeBack')}</button> : <><button onClick={() => react('tea', 'clawd.sip')}>{t('clawd.tea')}</button><button onClick={leap}>{t('clawd.jump')}</button><button onClick={() => react('moon', 'clawd.reachedMoon')}>{t('clawd.moon')}</button><button onClick={() => scene === 'sleep' ? react('flower', 'clawd.goodmorning') : react('sleep', 'clawd.goodnight')}>{t(scene === 'sleep' ? 'clawd.wake' : 'clawd.nap')}</button></>}/></> : sprite}
+    {interactive && <span className={`clawd-caption ${surprise || noteKey ? 'revealed' : ''}`} role="status">{noteKey ? t(noteKey) : surprise ? t(surprise.key) : caption || t('clawd.captionDefault')}</span>}
     {!interactive && caption && <span className="clawd-caption revealed">{caption}</span>}
   </div>;
 }

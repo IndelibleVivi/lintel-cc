@@ -1,7 +1,7 @@
 {
   "schema": "lintel.tasks/1",
   "version": 1,
-  "notes": "One maintained finite task map. Labels, user-facing summaries, App routes, help anchors, related operations and runnable CLI examples are shared by the App help and the CLI tasks/capabilities commands. Metadata only: no execution layer and no capability claims. `operations` is the technical mapping; `summary` is the product wording.",
+  "notes": "One maintained finite task map. Labels, user-facing summaries, App routes, help anchors, related operations and runnable CLI examples are shared by the App help and the CLI tasks/capabilities commands. Metadata only: no execution layer and no capability claims. `operations` is the technical mapping; `summary` is the product wording. Additive `label_en`/`summary_en` provide the maintained English projection of the App/help metadata; the base `label`/`summary` remain the shared Chinese wording.",
   "tasks": [
     {
       "id": "reduce_egress",
@@ -38,7 +38,9 @@
       "target_kinds": [
         "local",
         "ssh_remote"
-      ]
+      ],
+      "label_en": "Reduce outbound while keeping what you need",
+      "summary_en": "Pick a host and environment, preview the version conditions and changes, then write and read back after approval. Optional telemetry targets can join the controlled channel and be tested separately; shared IPv4／IPv6 observation works on its own. Existing sessions are not restarted automatically."
     },
     {
       "id": "preserve_work",
@@ -71,7 +73,9 @@
       "target_kinds": [
         "local",
         "ssh_remote"
-      ]
+      ],
+      "label_en": "Preserve work, or prepare a new config environment",
+      "summary_en": "Archive only the selected work, or archive then create a new environment and import by purpose. The old login and old environment are kept; the new environment’s protection plan and login happen separately."
     },
     {
       "id": "repair_cleanup_retire",
@@ -94,7 +98,9 @@
       "target_kinds": [
         "local",
         "ssh_remote"
-      ]
+      ],
+      "label_en": "Repair local login, clean and rebuild, retire an environment",
+      "summary_en": "Stop writers first, then handle the recognized local state within the approved scope; official logout is expressed separately. Archive and new-environment preparation come before any deletion."
     },
     {
       "id": "browser_profile",
@@ -112,7 +118,9 @@
       ],
       "target_kinds": [
         "local_browser"
-      ]
+      ],
+      "label_en": "Handle a specific browser profile",
+      "summary_en": "Install and pair the host and extension for one browser profile; clearing needs confirmation after a real browser restart."
     },
     {
       "id": "ssh_remote",
@@ -136,7 +144,9 @@
       ],
       "target_kinds": [
         "ssh_remote"
-      ]
+      ],
+      "label_en": "Connect to an SSH host and operate a remote environment",
+      "summary_en": "Choose an existing SSH alias, verify the runner and target, then run remotely; after a connection drop, query the original task only — never resubmit."
     },
     {
       "id": "recover_results",
@@ -161,7 +171,9 @@
       "target_kinds": [
         "local",
         "ssh_remote"
-      ]
+      ],
+      "label_en": "Recover results, restore config or a service",
+      "summary_en": "View completed steps and errors by the original task ID; config restore and service restore are each previewed and run after approval."
     }
   ]
 }

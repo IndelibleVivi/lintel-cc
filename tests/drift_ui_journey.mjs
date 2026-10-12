@@ -41,7 +41,7 @@ try{
     }
     throw new Error('unexpected invoke '+command);
   });
-  await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
+  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'环境详情',exact:true}).click();
   await check();await choose('B');await release('STALE_A');
   assert.equal(await page.locator('.drift-result').count(),0,'A result must not appear under B');

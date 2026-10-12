@@ -47,7 +47,7 @@ try{
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1120,height:800}});page.setDefaultTimeout(10000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.exposeFunction('syntheticInvoke',async(command,args)=>{if(command==='open_resource'){resources.push(args.resource);return null;}assert.equal(command,'request');return core(args.payload);});
-  await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
+  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'帮助',exact:true}).focus();await page.keyboard.press('Enter');
   const dialog=page.getByRole('dialog'),reader=page.locator('main .archive-panel');await dialog.getByRole('heading',{name:'使用 Lintel',exact:true}).waitFor();assert.equal(await dialog.locator('.help-tasks section').count(),6);
   await page.screenshot({path:path.join(fixture,'help-day.png')});await dialog.getByRole('link',{name:/完整人类操作指南/}).click();assert.deepEqual(resources,['operator-guide']);

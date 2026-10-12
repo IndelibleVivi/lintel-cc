@@ -27,12 +27,14 @@ export async function appClearJourney({root,profile,state,host,context,launch,ex
   const openApp=async ctx=>{
     const app=await ctx.newPage();
     await app.exposeFunction('actualInvoke',(command,args)=>{
+      if(command==='app_preferred_languages')return ['zh-CN'];
+      if(command==='app_set_language'){assert(['zh-CN','en'].includes(args.language));return null;}
       if(command==='remote_request'&&args.payload.op==='hosts')return {ok:true,data:{hosts:[],tasks:[],installations:[]}};
       assert(['request','browser_request'].includes(command),command);
       calls.push({command,payload:args.payload});
       return JSON.parse(execFileSync(command==='request'?runner:host,[command==='request'?'request':'control'],{env,input:JSON.stringify(args.payload)+'\n',encoding:'utf8'}));
     });
-    await app.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.actualInvoke(command,args)};});
+    await app.addInitScript(()=>{localStorage.setItem('lintel.language','zh-CN');window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.actualInvoke(command,args)};});
     await app.goto(url);await app.getByRole('button',{name:'浏览器',exact:true}).click();return app;
   };
   const confirm=async popup=>{

@@ -2,11 +2,14 @@ export type LandscapeInk = 'sky' | 'far' | 'near' | 'light' | 'clawd' | 'eye' | 
 export type LandscapeCell = { char: string; ink: LandscapeInk };
 export const LANDSCAPE_COLS = 72;
 export const LANDSCAPE_ROWS = 24;
+// Display text (title/subtitle/description/secret) lives ONLY in the zh-CN/en
+// catalogs (keys `album.<index>.*`); the grid geometry and per-plate placement
+// stay here. `place` is a fixed English plate label, not translated copy.
 export const landscapes = [
-  { title: '月下山湖', subtitle: '月亮不用赶路。我们也不用。', description: 'Clawd 站在左岸，右上是一弯明月，远山在湖中留下安静的倒影。', place: 'A MOON TO KEEP', clawd: [9, 15], secret: 'Clawd 把湖边的一颗星星放进了你的口袋。' },
-  { title: '雨夜小屋', subtitle: '灯亮着，茶也还温热。', description: '雨落在远处松林，Clawd 站在木屋门前，右边的窗户亮着一盏灯。', place: 'A LIGHT LEFT ON', clawd: [29, 15], secret: '给你留的那杯茶，一直都是热的。' },
-  { title: '海边灯塔', subtitle: '再走一点点，就能听见海。', description: 'Clawd 在左边海岸等潮水，右侧灯塔向海面投出细光，几只飞鸟掠过天空。', place: 'WHERE THE SEA BEGINS', clawd: [9, 15], secret: '这枚小贝壳，说它想跟你回家。' },
-  { title: '星野营火', subtitle: '今晚的待办：看星星。', description: 'Clawd 坐在帐篷和营火之间，头上是星座，远处的山安静地围住营地。', place: 'NOWHERE ELSE TO BE', clawd: [25, 15], secret: '一颗给你，一颗留给今晚。' },
+  { place: 'A MOON TO KEEP', clawd: [9, 15] },
+  { place: 'A LIGHT LEFT ON', clawd: [29, 15] },
+  { place: 'WHERE THE SEA BEGINS', clawd: [9, 15] },
+  { place: 'NOWHERE ELSE TO BE', clawd: [25, 15] },
 ] as const;
 
 // Original terminal tableaux. Every mark has a fixed cell: shading characters

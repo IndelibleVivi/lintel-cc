@@ -45,7 +45,7 @@ try{
   }
   throw new Error('unexpected invoke '+command+JSON.stringify(args));
  });
- await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
+ await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
  await page.goto(url);await page.getByRole('button',{name:'环境详情',exact:true}).click();await page.getByRole('tab',{name:'关联组件',exact:true}).click();
  const panel=page.getByRole('region',{name:'关联组件与处理范围'});
  await panel.locator('[data-component=desktop_ide]').getByText('暂不支持',{exact:true}).waitFor();

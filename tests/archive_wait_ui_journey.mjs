@@ -56,7 +56,7 @@ try {
     }
     return { ok: true, data };
   });
-  await page.addInitScript(() => { window.isTauri = true; window.__TAURI_INTERNALS__ = { invoke: (command, args) => window.syntheticInvoke(command, args) }; });
+  await page.addInitScript(() => { try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri = true; window.__TAURI_INTERNALS__ = { invoke: (command, args) => window.syntheticInvoke(command, args) }; });
   await page.goto(url); await page.locator('.home-title').waitFor();
   const navigate = name => page.locator('.sidebar nav').getByRole('button', { name, exact: true }).click();
   const activity = page.getByRole('status', { name: '工作包读取状态' });

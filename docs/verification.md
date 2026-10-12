@@ -528,6 +528,25 @@ These are the same gaps recorded in [current-state](current-state.md#完整目�
 and the [acceptance status](acceptance-status.json). Passing the default checks
 does not close them.
 
+## App 简中 / English
+
+`i18n-test` 与 `i18n-coverage-test` 是显式 selections，不加入原有 28 项 implicit default group。前者检查语言标识／系统顺序／手动覆盖、catalog parity、插值与日期数字格式，以及同一问候身份和日期彩蛋；后者检查 App 使用的文案 key 在两套随包 catalog 中都存在，以及有限 backend 投影的原文确实存在于 canonical source。CI 的 frontend／app-ui／core／full profiles 按 `tests/ci_plan.py` 消费这些检查，选中项 skipped 不能算通过。
+
+```sh
+python3 tests/verify.py --checks i18n-test,i18n-coverage-test,home-greetings-test,desktop-build --require-passed
+```
+
+`i18n-ui` 是独立选择，由 CI browser job 消费一次。先完成 build，再运行 UI，因为 canonical registry 的选择顺序不按参数重排：
+
+```sh
+python3 tests/verify.py --checks desktop-build --require-passed
+python3 tests/verify.py --checks i18n-ui,clawd-app-ui,network-ui --require-passed
+```
+
+`i18n-ui` 使用随 App 构建的界面、隔离 Chromium 与合成 native command／core envelope，检查首屏 locale、重载持久化、迟到／乱序读取、手动覆盖、未知／失败 fallback、原问候身份、打开的草稿、审批原 ID／hash、六任务与设置／帮助、900px Day／Night；另用实际 development StrictMode 验 setup／cleanup／setup 后仍可更新。`clawd-app-ui` 验同一 game／canvas 在切换后保留暂停状态、分数、星星和最高成绩；`network-ui` 验已出现的本地规则错误随当前语言更新，原草稿不变，也不发起通道操作。这些不能替代 native WebKit 或真实服务。
+
+macOS 的 `desktop-rust-test` 包含有限 preferred-language 投影与菜单语言准入；`Info.plist` 声明 `en`／`zh-Hans`。真实 native command／menu、built Chromium 合成 invoke 与完整 native WebKit 点击是不同证据。当前源码、候选是否重建及本轮实际观察见 [当前状态](current-state.md)。测试不改系统语言、个人 Claude 数据或 browser profile。
+
 ## Large work resource evidence
 
 `journey-large-work` remains synthetic and uses the canonical debug runner. Its

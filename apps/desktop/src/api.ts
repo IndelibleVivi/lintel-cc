@@ -1,5 +1,20 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { Api } from './types';
+import { translate } from './i18n';
+import { zhCN } from './i18n.catalog.zh-CN';
+import { en } from './i18n.catalog.en';
+
+// Transport-level failures and package-activity labels are user-visible App
+// text. They resolve through the same catalog system without importing the
+// provider (which would create a cycle): the resolved locale is read from the
+// document element set by LanguageProvider.
+const catalogs = { 'zh-CN': zhCN, en } as const;
+function activeLocale(): 'zh-CN' | 'en' {
+  return document.documentElement.lang === 'en' ? 'en' : 'zh-CN';
+}
+function tr(key: string): string {
+  return translate(catalogs, activeLocale(), key);
+}
 
 export const transport = isTauri() ? 'native' : import.meta.env.MODE === 'fixture' ? 'synthetic' : 'unavailable';
 export type RequestDiagnostic = {
@@ -19,10 +34,10 @@ async function send<C extends keyof Api>(command: C, fields: Api[C]['request']):
     envelope = await invoke('request', { payload });
   } else if (transport === 'synthetic') {
     const response = await fetch('/__lintel_fixture/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!response.ok) throw new RequestError('BRIDGE_UNAVAILABLE', '合成测试执行器暂不可用。请保留任务 ID，重连后查询原任务。');
+    if (!response.ok) throw new RequestError('BRIDGE_UNAVAILABLE', tr('api.bridgeUnavailable'));
     envelope = await response.json();
   } else {
-    throw new RequestError('NATIVE_REQUIRED', '请在 Lintel 桌面应用中使用本机功能。浏览器页面没有获得本机执行权限。');
+    throw new RequestError('NATIVE_REQUIRED', tr('api.nativeRequired'));
   }
   if (!envelope.ok) throw new RequestError(envelope.error.code, envelope.error.message, envelope.error.diagnostic);
   return envelope.data;
@@ -34,11 +49,13 @@ let coreQueue: Promise<unknown> = Promise.resolve();
 // Only finite operation names and host labels leave the transport closure.
 // Paths, passphrases, request fields and decoded content never enter this store.
 const packageLabels: Partial<Record<keyof Api, string>> = {
-  archive_inspect: '核验并解锁工作包', session_read: '核验工作包并读取一页',
-  plan_import: '核验工作包并冻结迁入落点', plan_resume: '核验工作包并检查续聊',
+  archive_inspect: 'package.archiveInspect', session_read: 'package.sessionRead',
+  plan_import: 'package.planImport', plan_resume: 'package.planResume',
 };
 type QueueItem = { id: number; hostAlias: string | null; command: keyof Api; running: boolean; queue: object };
-export type PackageActivity = { id: number; hostAlias: string | null; label: string; running: boolean; waiting: number };
+// `labelKey` is a finite catalog key, translated at render so a language
+// switch relabels in-flight activity (no paths, commands or content here).
+export type PackageActivity = { id: number; hostAlias: string | null; labelKey: string; running: boolean; waiting: number };
 const localQueue = {};
 let nextActivityId = 0;
 const queueItems = new Map<number, QueueItem>();
@@ -46,7 +63,7 @@ const activityListeners = new Set<() => void>();
 let activitySnapshot: PackageActivity[] = [];
 function publishActivity() {
   activitySnapshot = [...queueItems.values()].filter(item => packageLabels[item.command]).map(item => ({
-    id: item.id, hostAlias: item.hostAlias, label: packageLabels[item.command]!, running: item.running,
+    id: item.id, hostAlias: item.hostAlias, labelKey: packageLabels[item.command]!, running: item.running,
     waiting: [...queueItems.values()].filter(other => other.queue === item.queue && other.id > item.id).length,
   }));
   activityListeners.forEach(listener => listener());

@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-11 · **Lintel 0.1.0 Preview / 开发预览**。最新本地 macOS arm64 App 已从 clean source `25a8649fb313eeac159503801a392ee6cb969e12` 构建并包装，包含 IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 的美化；同时补齐主按钮、选中主题和分段按钮的键盘焦点提示。候选复制件与 zip 解包逐文件字节／权限一致，内置 host／扩展的合成安装测试通过；隔离 HOME／state 的真实 WebKit 首页已渲染。原生点击接口仍报 `elementHasNoFrame`，设置／日夜／归档等点击旅程未完成本轮 native 验收，不能借历史候选或 Chromium 证据标绿。独立三平台 CLI 仍为 `bb9fa824b1a2aa509e749519c5d700eba1bb02be`；官网仍运行 `6c4e5df`。未安装到 Applications、无正式 Release／Developer ID 签名／公证，更新公钥／feed 未配置。A01–A18 与完整 SPEC 的 G01–G04 保留全部目标与具体未验证项。
+2026-10-12 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。App 简中／English 为本轮源码更新；已有本地候选不含此次更新。最新本地 macOS arm64 App 已从 clean source `25a8649fb313eeac159503801a392ee6cb969e12` 构建并包装，包含 IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 的美化；同时补齐主按钮、选中主题和分段按钮的键盘焦点提示。候选复制件与 zip 解包逐文件字节／权限一致，内置 host／扩展的合成安装测试通过；隔离 HOME／state 的真实 WebKit 首页已渲染。原生点击接口仍报 `elementHasNoFrame`，设置／日夜／归档等点击旅程未完成本轮 native 验收，不能借历史候选或 Chromium 证据标绿。独立三平台 CLI 仍为 `bb9fa824b1a2aa509e749519c5d700eba1bb02be`；官网仍运行 `6c4e5df`。未安装到 Applications、无正式 Release／Developer ID 签名／公证，更新公钥／feed 未配置。A01–A18 与完整 SPEC 的 G01–G04 保留全部目标与具体未验证项。
 
 ## 当前交付与证据
 
@@ -8,6 +8,7 @@
 | --- | --- |
 | 2026-10-09 Preview 修复 | 通用 execute／submit 在新 job／ACK 前拒绝 launch／resume／未知计划，原 ID 查询保留；Markdown 不假设 records，JSONL 选取保留真实 byte offset／content block；ARM 两侧架构名归一后 canonical 包可被 native inspector 核对；漂移检查及接受绑定主机／环境／请求世代；browser expiry 与 mutation 串行且只消费本次暂停记录；catalog 区分预览和 exact-plan／TTY 执行；独立 import coverage 依据全部逐文件发布／sync／readback 完成记录。workspace／两个独立 Rust crates、15 条 CLI journeys、Python controller、JS 与 frontend build 通过；work／baseline／archive-wait／drift／site／clawd-app UI、独立 browser restart／pairing 通过，网站检查使用实际电影。同版本 CLI 解包首用通过；`bb9fa824` 原生 CLI 核对通过，`afa98f66` 原生精确归档／会话阅读／锁定和游戏检查通过，官网未更新 |
 | 共享产品合同 | 六任务 catalog；计划新增冻结目标／完整落点与用途；结构化任务结果与覆盖；旧协议、历史计划、包与原 ID 恢复保留 |
+| App 多语言源码 | 简体中文／English，默认读取 macOS App preferred languages，手动选择本机持久保存；两套随包文案与原生菜单同步，未知语言使用 English。切换保留页面、表单、目标、任务、原 plan／hash、问候身份与工作原文；CLI／扩展／官网语言独立。验证与候选状态见下方，源码更新不等于旧候选升级 |
 | App 界面 | 安静的 Clawd 首页／56 句原创时段问候与日期／整分钟／稀有彩蛋；日期只在当天首次打开显示，点击后展开六任务，保留持续目标；配置 root／项目 cwd 分离；资料阅读／交接稿；CLI 核对与 Agent。默认 1120、最低 900、宽 1440 成品 UI 检查通过；保护／保全／清理底栏独立于正文滚动 |
 | 2026-10-06 连续性修复 | 本机→A／B→A 打开 A 的回执后，查询、Agent 包及启动预览均固定 A；参考指令与重名副本再次保全，不自动激活。官方注销将完整认证状态摘要冻结在私有计划，主体缺失拒绝，执行前及保全后复查；只验证 synthetic CLI，Keychain-only token 世代仍未验证 |
 | 关联组件与容量预检 | core／named CLI／App 接通有限组件清单、明确 project cwd 来源、认证位置元数据、原任务 coverage 与最多 8 个原 unit 的当前核验；账号未知、Desktop／IDE 暂不支持、浏览器独立。容量预检不读正文，列出超限文件与未覆盖路径；FIFO 不打开、不计入；按类别或精确原件重新检查。有限 SSH controller 已放行这几个明确只读入口 |
@@ -16,7 +17,7 @@
 | 历史 native runtime | 2026-10-05 unsigned arm64 Tauri App 构建通过。隔离 HOME／state 的 native WebKit 已实际创建环境、加密保全并建立新 root、逐字节读回三份资料。默认与 900×640 窗口已检查首页／任务入口，900 审批正文滚动后标题与底栏保持固定；Night→Day 控件换色已实际通过。宽窗口受当前屏幕限制，完整原生矩阵仍未逐一验收；截图为本地 QA |
 | 阅读等待交互 | `archive-wait-ui` 在 built App 验首读、翻页、旧页标记、跨页面队列占用、错误释放和迟到结果隔离；1120 Day／900 Night 已目视。persistent activity 只含有限操作名、主机标签和队列状态。Chromium 合成延迟不证明 native WebKit 或解密性能 |
 | Release 资源实测 | macOS arm64 release，scrypt log N 19、四个确定字节模式原件共 1 GiB：archive/readback 120.6s，inspect 70.9s，每页 59.1–66.3s，import preview 57.4s／execute 54.3s，峰值 RSS 518.2–518.5 MiB；10,000 文件 import 194.7s，峰值 RSS 550.8 MiB。整个 fixture 的已分配块采样最大约 6.51 GiB，含原件／密文／副本，不能当纯暂存峰值。部分步骤与本地 QA／build 并行；这些是此次成本观察，不是普适性能预算 |
-| CLI 与分层验证 | 最新 App 源码 `25a8649` 的分组 CI 与 aggregate 已通过；本机 fresh frontend build、选中主题／主按钮的真实 Tab 与旧样式反例、moon／snack、reduced motion、Escape／卸载和短脚风景检查通过（built Chromium／合成 invoke）。独立 CLI 发行候选仍是 `bb9fa824`，其历史解包／首次试用证据见候选历史；本轮没有重发 CLI 包。App 内两架构 Linux runner 已从 clean `f611911` 重建，与最新 App 的相关 Rust source 一致；格式与包内字节一致不等于其它架构 runtime |
+| CLI 与分层验证 | 已包装 App 候选源码 `25a8649` 的分组 CI 与 aggregate 已通过；本机 fresh frontend build、选中主题／主按钮的真实 Tab 与旧样式反例、moon／snack、reduced motion、Escape／卸载和短脚风景检查通过（built Chromium／合成 invoke）。独立 CLI 发行候选仍是 `bb9fa824`，其历史解包／首次试用证据见候选历史；本轮没有重发 CLI 包。App 内两架构 Linux runner 已从 clean `f611911` 重建，与最新 App 的相关 Rust source 一致；格式与包内字节一致不等于其它架构 runtime |
 | 本机 Native 构建 | canonical desktop-tauri-bundle 首次在 1800s 时限内未完成，记录为失败。确认进程已停后，使用仅跳过已完成 beforeBuildCommand 的本地 override 复用已核对的前端／host／扩展／runner 资源；两次 raw Tauri 构建均 exit 0，最终 clean `25a8649` release 编译 73m05s。没有改 updater／identifier／发行配置；这是本机构建成本，不是分组 CI 的耗时或 canonical timeout 已修复的声明 |
 | 资源与包装 | clean `25a8649` macOS arm64 App 为 30,465,374 bytes（约 29.06 MiB），zip 为 11,806,522 bytes；复制件及 zip 解包的 28 个文件逐字节／权限一致。内置 x86_64／aarch64 runner 为 5,891,792／5,196,336 bytes，host 789,392 bytes，Chromium／Firefox 资源与 canonical generated resources 全部一致。实际包内 host framing／allowlist 与扩展合成安装两个检查通过；复用相关 Rust source 未改变的既有测试 executable，不宣称重新编译测试。ICNS 一致、无 woff2、clean docs revision 已核对。仅 linker ad-hoc signature，无 Team ID／资源签封／公证；候选、报告与测试数据不进 Git |
 | Preview 试用入口 | 最终 `25a8649` App 在显式合成 Foundation HOME／core HOME／state 下启动，真实 WebKit 首页显示 Synthetic native Preview；WebKit cache／local storage 位于合成 HOME，六份原件／控制文件未变。本次 QA 进程已停止。原生点击接口连续报 elementHasNoFrame，刷新同一候选绑定未消除，未完成 native 归档／阅读／设置／日夜点击旅程；历史 `afa98f66` 的合成 native 旅程独立保留。quickstart 与双语源码构建入口不变，无公开 Release 下载 |
@@ -29,6 +30,14 @@
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作或生产 VPS 激活；官网上线和公开源码不等于正式 App 发行；未上传社交平台 |
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存此前候选的资源／CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
+
+## App 简中 / English 源码更新
+
+两套随包文案覆盖 App 页面、审批／结果、帮助、状态、可访问性、问候与游戏；CLI、扩展 popup、官网和外链文档保持独立。顶部与设置都可选择跟随系统／简体中文／English；macOS 只读 preferred languages，原生菜单同步。没有在线翻译或新增 runtime dependency。源码已接通，现有 `25a8649` App 候选仍不含此次变更，也没有重发 Release 或替换安装。
+
+本机 catalog／插值／原文投影／格式／问候检查、frontend build 与严格 CI controller self-test 已通过；新 `i18n-ui` 验首屏、持久化、迟到和乱序系统读取、手动覆盖、草稿、原审批 ID／hash及 900px Day／Night。Clawd 的切换保留同一 game／canvas、暂停状态、分数、星星、最高成绩与动画生命周期；规则错误随当前语言显示、草稿不变且不提交通道操作。相邻 App／网站／browser pairing 旅程使用独立 synthetic fixtures，详细命令见[验证说明](verification.md)。
+
+standalone desktop Rust 48 项通过，2 项既有安装前置检查 ignored；不是通过项。新 native debug executable 在隔离 HTML／WebKit harness 实际调用 preferred languages、简中／English 菜单切换与非法语言拒绝，菜单栏文字已观察；生产 getter 还在进程内 volatile `AppleLanguages` 简中顺序下返回匹配结果，不写持久系统语言。完整产品 App 的真实 WebKit 点击矩阵被 Mac 锁屏阻断，尚未验证；native command／menu 与 built Chromium UI 是分开的证据。测试不触碰个人 Claude、browser profile、services 或真实宿主网络。
 
 ## 新增 IPv4 / IPv6 Leaf
 

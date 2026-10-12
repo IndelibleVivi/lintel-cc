@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Icon } from './ui';
+import { useI18n } from './i18n-provider';
 import './clawd-interactions.css';
 
 export type ClawdDestination = 'landscapes' | 'runner';
@@ -10,6 +11,7 @@ export default function ClawdFlightMenu({ scrollRef, onChoose, actions }: {
   onChoose?: (destination: ClawdDestination) => void;
   actions: ReactNode;
 }) {
+  const { t } = useI18n();
   const [pull, setPull] = useState(0);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -101,18 +103,18 @@ export default function ClawdFlightMenu({ scrollRef, onChoose, actions }: {
 
   function choose(destination: ClawdDestination) { trigger.current?.focus({ preventScroll: true }); setOpen(false); onChoose?.(destination); }
   return <div ref={container} className={`clawd-flight ${open ? 'is-open' : ''} ${pull > 0 ? 'is-pulling' : ''}`} style={{ '--pull': `${pull}px` } as React.CSSProperties} onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-    <button ref={trigger} className="clawd-pull-trigger" aria-label="陪它玩，打开 Clawd 的口袋" aria-expanded={open} aria-controls="clawd-pocket" title="陪它玩 · 也可以在首页空白处往下拉" onClick={() => open ? close() : setOpen(true)}>
-      <span>陪它玩</span><Icon name="chevron" size={11}/><span className="pull-progress" aria-hidden="true"/>
+    <button ref={trigger} className="clawd-pull-trigger" aria-label={t('label.clawdCompanion')} aria-expanded={open} aria-controls="clawd-pocket" title={t('clawd.pullHint')} onClick={() => open ? close() : setOpen(true)}>
+      <span>{t('clawd.choose')}</span><Icon name="chevron" size={11}/><span className="pull-progress" aria-hidden="true"/>
     </button>
-    {pull > 0 && <span className="pull-hint" role="status">{pull >= threshold ? '松手，打开口袋' : '再拉一点点…'}</span>}
-    {open && <section id="clawd-pocket" className="clawd-pocket" role="dialog" aria-label="Clawd 的口袋菜单">
-      <div className="pocket-heading"><h2>Clawd 的口袋</h2><button className="icon-button" aria-label="收起口袋菜单" onClick={close}><Icon name="close" size={15}/></button></div>
-      <div ref={first} className="pocket-pet-actions" aria-label="陪 Clawd 玩" onClick={event => { if ((event.target as Element).closest('button')) close(); }}>{actions}</div>
+    {pull > 0 && <span className="pull-hint" role="status">{pull >= threshold ? t('clawd.release') : t('clawd.pullMore')}</span>}
+    {open && <section id="clawd-pocket" className="clawd-pocket" role="dialog" aria-label={t('clawd.pocketMenu')}>
+      <div className="pocket-heading"><h2>{t('clawd.pocket')}</h2><button className="icon-button" aria-label={t('clawd.collapsePocket')} onClick={close}><Icon name="close" size={15}/></button></div>
+      <div ref={first} className="pocket-pet-actions" aria-label={t('clawd.playActions')} onClick={event => { if ((event.target as Element).closest('button')) close(); }}>{actions}</div>
       {onChoose && <div className="pocket-destinations">
-        <button onClick={() => choose('landscapes')}><span className="pocket-glyph" aria-hidden="true">☾</span><span>去看月亮</span><Icon name="arrow" size={15}/></button>
-        <button onClick={() => choose('runner')}><span className="pocket-glyph" aria-hidden="true">↟</span><span>Clawd 跳一跳</span><Icon name="arrow" size={15}/></button>
+        <button onClick={() => choose('landscapes')}><span className="pocket-glyph" aria-hidden="true">☾</span><span>{t('clawd.goMoon')}</span><Icon name="arrow" size={15}/></button>
+        <button onClick={() => choose('runner')}><span className="pocket-glyph" aria-hidden="true">↟</span><span>{t('clawd.jumpGame')}</span><Icon name="arrow" size={15}/></button>
       </div>}
-      <p className="pocket-hint">点一下陪它玩，也能在空白处往下拉。</p>
+      <p className="pocket-hint">{t('clawd.pocketHint')}</p>
     </section>}
   </div>;
 }

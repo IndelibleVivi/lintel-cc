@@ -16,8 +16,10 @@ try{
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1120,height:800},colorScheme:'light'});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(()=>{
-    window.isTauri=true;
+    try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__preferred=['zh-Hans'];window.__menuCalls=[];window.isTauri=true;
     window.__TAURI_INTERNALS__={invoke:async(command,args)=>{
+      if(command==='app_preferred_languages')return window.__preferred;
+      if(command==='app_set_language'){window.__menuCalls.push(args.language);return null;}
       if(command==='request'&&args.payload.command==='discover')return {ok:true,data:{environments:[],capabilities:[]}};
       if(command==='request'&&args.payload.command==='jobs')return {ok:true,data:{jobs:[]}};
       throw new Error('Unexpected native call in playroom-only fixture: '+command);
@@ -30,6 +32,7 @@ try{
   });
   await page.goto(url);
   async function openGame(){await page.getByRole('button',{name:'陪它玩，打开 Clawd 的口袋',exact:true}).click();await page.getByRole('button',{name:'Clawd 跳一跳',exact:true}).click();await page.getByRole('group',{name:'Clawd 跳跃跑道'}).waitFor();}
+  await page.locator('.language-switch select').selectOption('system');
   await openGame();
   const dialog=page.getByRole('dialog'),game=dialog.locator('.clawd-game');
   assert.equal(await game.count(),1);assert.equal(await game.locator('.cg-best').textContent(),'00123');
@@ -37,6 +40,18 @@ try{
   await dialog.locator('.cg-jump').click();await page.waitForFunction(()=>Number(document.querySelector('.cg-score').textContent)>0);
   assert.equal(await game.getAttribute('data-state'),'running');
   assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),1);
+  await page.keyboard.press('p');
+  const beforeLanguage=await game.evaluate(node=>{window.__gameNode=node;window.__gameCanvas=node.querySelector('canvas');return {phase:node.dataset.state,score:node.querySelector('.cg-score').textContent,stars:node.querySelector('.cg-stars').textContent,best:node.querySelector('.cg-best').textContent};});
+  assert.equal(beforeLanguage.phase,'paused');assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),0);
+  await page.evaluate(()=>{window.__preferred=['en-US'];window.dispatchEvent(new Event('languagechange'));});
+  await dialog.getByRole('group',{name:'Clawd jump track',exact:true}).waitFor();
+  await dialog.locator('.cg-jump').getByText('Jump',{exact:true}).waitFor();
+  const afterLanguage=await game.evaluate(node=>({phase:node.dataset.state,score:node.querySelector('.cg-score').textContent,stars:node.querySelector('.cg-stars').textContent,best:node.querySelector('.cg-best').textContent}));
+  assert.deepEqual(afterLanguage,beforeLanguage,'language switch preserves game phase, score, collected stars and best');
+  assert.equal(await game.evaluate(node=>node===window.__gameNode&&node.querySelector('canvas')===window.__gameCanvas),true,'same game and canvas remain mounted');
+  assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),0,'paused game stays paused after relabeling');
+  await page.evaluate(()=>{window.__preferred=['zh-Hans'];window.dispatchEvent(new Event('languagechange'));});
+  await dialog.getByRole('group',{name:'Clawd 跳跃跑道',exact:true}).waitFor();
   await dialog.getByRole('tab',{name:'点阵风景册',exact:true}).click();
   assert.equal(await game.count(),0);assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),0);
   await dialog.getByRole('button',{name:'第 2 幅：雨夜小屋',exact:true}).click();
@@ -59,6 +74,6 @@ try{
   await page.emulateMedia({colorScheme:'dark'});await openGame();
   assert.equal(await game.evaluate(node=>getComputedStyle(node).getPropertyValue('--bg').trim().toLowerCase()),'#24231f');
   assert.deepEqual(errors,[]);
-  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause'],screenshots:output};
+  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause','live zh/en relabeling preserves game/canvas identity, paused phase, score, collected stars, best and RAF count'],screenshots:output};
   await writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();preview.kill('SIGTERM');}

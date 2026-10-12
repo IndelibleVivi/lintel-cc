@@ -94,7 +94,7 @@ try{
   const page=await browser.newPage({viewport:{width:1120,height:760}});page.setDefaultTimeout(10000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.exposeFunction('syntheticInvoke',invoke);
-  await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};});
+  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'本机',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await dialog.locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'检查并准备运行器',exact:true}).click();

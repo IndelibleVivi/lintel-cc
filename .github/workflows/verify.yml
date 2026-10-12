@@ -335,6 +335,7 @@ jobs:
           LINTEL_NETWORK_UI_REPORT: ${{ runner.temp }}/lintel-verify/network-ui.json
           LINTEL_DRIFT_UI_REPORT: ${{ runner.temp }}/lintel-verify/drift-ui.json
           LINTEL_BASELINE_UI_REPORT: ${{ runner.temp }}/lintel-verify/baseline-ui.json
+          LINTEL_I18N_UI_REPORT: ${{ runner.temp }}/lintel-verify/i18n-ui.json
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python3 tests/verify.py --require-passed \

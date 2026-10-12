@@ -74,7 +74,7 @@ try{
  const errors=[],outside=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',request=>{if(!request.url().startsWith(url))outside.push(request.url());});
  report.page_errors=errors;report.outside_requests=outside;
  await page.exposeFunction('syntheticInvoke',invoke);
- await page.addInitScript(id=>{window.isTauri=true;window.__TEL_ID=id;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>window.syntheticInvoke(cmd,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{}}});},environment.id);
+ await page.addInitScript(id=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TEL_ID=id;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>cmd==='app_set_language'||cmd==='app_preferred_languages'?window.__LANG_PRESENT(cmd,args):window.syntheticInvoke(cmd,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{}}});},environment.id);
  await page.goto(url);
  await page.getByRole('button',{name:'环境详情',exact:true}).click();
  await page.getByRole('tab',{name:'外发与权限',exact:true}).click();

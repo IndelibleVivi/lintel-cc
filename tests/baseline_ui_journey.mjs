@@ -64,7 +64,7 @@ try{
   if(legacyStartup && args.payload.command==='plan_launch' && response.ok)delete response.data.launch_request.startup;
   return response;
  });
- await page.addInitScript(()=>{if(!localStorage.getItem('lintel.selected'))localStorage.setItem('lintel.selected','stale-removed-environment');window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>window.syntheticInvoke(command,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:text=>window.syntheticClipboard(text)}})});
+ await page.addInitScript(()=>{if(!localStorage.getItem('lintel.selected'))localStorage.setItem('lintel.selected','stale-removed-environment');try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:text=>window.syntheticClipboard(text)}})});
  await page.clock.setFixedTime(new Date(2026,9,13,9,0));
  await page.goto(url);await page.locator('.home-title').waitFor();
  assert.equal(await page.locator('.home-title').innerText(),'一周年。门还开着。','StrictMode must not consume the opening date greeting');

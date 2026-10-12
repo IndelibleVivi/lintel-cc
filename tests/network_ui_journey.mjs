@@ -82,7 +82,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(10000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.exposeFunction('syntheticInvoke',invoke);
- await page.addInitScript(()=>{window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>window.syntheticInvoke(cmd,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.syntheticCopied=text;}}});});
+ await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(cmd,args)=>cmd==='app_set_language'||cmd==='app_preferred_languages'?window.__LANG_PRESENT(cmd,args):window.syntheticInvoke(cmd,args)};Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.syntheticCopied=text;}}});});
  await page.goto(url);await page.getByRole('button',{name:'环境详情',exact:true}).click();await page.getByRole('tab',{name:'外发与权限',exact:true}).click();
  const panel=page.getByRole('region',{name:'IPv4 / IPv6 网络路径',exact:true});
  await panel.getByText('Synthetic Wi-Fi',{exact:true}).waitFor();
@@ -99,6 +99,18 @@ try{
  await dialog.getByRole('button',{name:'返回调整',exact:true}).focus();await page.keyboard.press('Enter');assert.equal(config.enabled,true);
  report.checks.push('no automatic public probe; four cells and IP copy; full frozen manual configuration; cancel never mutates');
  const options=page.locator('.network-options');await options.locator('summary').click();await options.getByLabel('Lintel 建立的连接',{exact:true}).selectOption('ipv4_only');
+ const startsBeforeInvalid=calls.filter(c=>c.transport==='network_request'&&c.op==='start').length;
+ await options.getByLabel(/^显式阻止规则/).fill('example.invalid 70000');
+ await page.getByRole('button',{name:'启动通道',exact:true}).click();
+ await page.getByText('规则端口必须为 1–65535。',{exact:true}).waitFor();
+ await page.locator('.target-bar .language-switch select').selectOption('en');
+ await page.getByText('Rule ports must be 1–65535.',{exact:true}).waitFor();
+ assert.equal(await options.getByLabel(/^Explicit block rules/).inputValue(),'example.invalid 70000','invalid rule draft remains raw across language switch');
+ assert.equal(calls.filter(c=>c.transport==='network_request'&&c.op==='start').length,startsBeforeInvalid,'validation error and language switch never start a channel');
+ await page.locator('.target-bar .language-switch select').selectOption('zh-CN');
+ await page.getByText('规则端口必须为 1–65535。',{exact:true}).waitFor();
+ await options.getByLabel(/^显式阻止规则/).fill('');
+ report.checks.push('existing rule validation error relabels live; exact draft stays raw and no channel starts');
  await page.getByRole('button',{name:'启动通道',exact:true}).click();await page.getByText('严格 IPv4',{exact:true}).waitFor();assert.equal(calls.find(c=>c.transport==='network_request'&&c.op==='start').config.address_family,'ipv4_only');
  await panel.getByText(/网络状态、测试目标或通道已变化/).waitFor();
  await panel.getByRole('button',{name:'测试实际出口',exact:true}).click();assert.equal(await panel.getByText('请求成功',{exact:true}).count(),4);

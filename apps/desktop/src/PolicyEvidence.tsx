@@ -1,17 +1,24 @@
 import type { PolicyAssessment } from './types';
 import { Notice } from './ui';
+import { useI18n } from './i18n-provider';
+import { present } from './i18n-presentation';
+
+const sourceKeys: Record<string, string> = { native_version_path: 'policy.sourceNative', npm_package: 'policy.sourceNpm', unknown: 'policy.sourceUnknown' };
+const choiceKeys: Record<string, string> = { keep: 'policy.choiceKeep', disable: 'policy.choiceDisable', remove: 'policy.choiceRemove' };
 
 export default function PolicyEvidence({ policy, projected = false }: { policy: PolicyAssessment; projected?: boolean }) {
+  const { t, locale } = useI18n();
+  const p = (value: string | null | undefined) => present(value, locale);
   const remote = policy.remote_control;
-  const source = { native_version_path: '原生安装版本目录', npm_package: 'npm package metadata', unknown: '未找到可识别的安装 metadata' }[policy.product.source];
-  return <section className="policy-evidence" aria-label={projected ? '执行后预计功能条件' : '当前功能条件'}>
-    <div className="fact-row"><span>产品版本</span><span>{policy.product.version ?? '未识别'} · {source}</span></div>
-    <Notice tone={remote.status === 'configuration_compatible' ? 'neutral' : 'warning'}><strong>{projected ? '执行后预计条件' : '当前配置条件'}</strong><p>{remote.summary}</p></Notice>
-    {policy.preset === 'custom' && <details className="environment-diagnostics"><summary>本次自定义选择</summary><p>选择随计划与回执保存；未选字段保持原值。移除只撤掉本环境覆盖。</p>{policy.rules.map(rule => <div className="fact-row" key={rule.key}><span>{rule.label}</span><span>{{ keep: '保持原值', disable: '关闭这一项', remove: '移除本环境覆盖' }[policy.custom_settings?.[rule.key] ?? 'keep']}</span></div>)}</details>}
-    <details className="environment-diagnostics"><summary>变量语义与验证范围</summary>
-      <p>仅核对当前环境 user settings。组织条件为用户声明；shell、项目、组织配置、账号资格和实际 Remote Control 运行仍未验证。移除字段后需新启动。</p>
-      {policy.rules.map(rule => <div className="policy-rule" key={rule.key}><code>{rule.key}</code><span>{rule.value === null ? '未设置' : JSON.stringify(rule.value)} · {rule.disabled === null ? '取值语义未确认' : rule.disabled ? '配置为关闭' : '此开关未关闭'}</span><small>{rule.semantics === 'nonempty' ? '任意非空值生效，包括 0 / false' : '按布尔值解析，0 / false 不生效'}</small></div>)}
-      <p className="muted">规则：{policy.rule_version} · 版本条件：{remote.version_family} · 运行效果未验证</p>
+  const source = sourceKeys[policy.product.source] ? t(sourceKeys[policy.product.source]) : policy.product.source;
+  return <section className="policy-evidence" aria-label={t(projected ? 'policy.projectedAria' : 'policy.currentAria')}>
+    <div className="fact-row"><span>{t('policy.productVersion')}</span><span>{policy.product.version ?? t('policy.unidentified')} · {source}</span></div>
+    <Notice tone={remote.status === 'configuration_compatible' ? 'neutral' : 'warning'}><strong>{t(projected ? 'policy.projectedConditions' : 'policy.currentConditions')}</strong><p>{p(remote.summary)}</p></Notice>
+    {policy.preset === 'custom' && <details className="environment-diagnostics"><summary>{t('policy.customChoices')}</summary><p>{t('policy.customChoicesNote')}</p>{policy.rules.map(rule => <div className="fact-row" key={rule.key}><span>{p(rule.label)}</span><span>{t(choiceKeys[policy.custom_settings?.[rule.key] ?? 'keep'] ?? 'policy.choiceKeep')}</span></div>)}</details>}
+    <details className="environment-diagnostics"><summary>{t('policy.semantics')}</summary>
+      <p>{t('policy.semanticsNote')}</p>
+      {policy.rules.map(rule => <div className="policy-rule" key={rule.key}><code>{rule.key}</code><span>{rule.value === null ? t('policy.notSet') : JSON.stringify(rule.value)} · {rule.disabled === null ? t('policy.semanticsUnconfirmed') : rule.disabled ? t('policy.configuredOff') : t('policy.notOff')}</span><small>{t(rule.semantics === 'nonempty' ? 'policy.semanticsNonempty' : 'policy.semanticsBoolean')}</small></div>)}
+      <p className="muted">{t('policy.rulesLine', { rule: policy.rule_version, version: remote.version_family })}</p>
     </details>
   </section>;
 }

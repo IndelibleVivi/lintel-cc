@@ -91,6 +91,7 @@ _OWNER_DIR_RULES: Tuple[Tuple[str, str], ...] = (
     (AREA_SITE, "tests/site_game.test.mjs"),
     (AREA_APP_UI, "tests/*_ui_journey.mjs"),
     (AREA_APP_UI, "tests/home_greetings.test.mjs"),
+    (AREA_APP_UI, "tests/i18n*.test.mjs"),
     (AREA_CORE, "tests/**"),
 )
 
@@ -169,7 +170,8 @@ def classify_paths(paths: Iterable[str]) -> FrozenSet[str]:
 SELFTEST_CHECKS: Tuple[str, ...] = ("__verify_self_test__", "__ci_plan_test__")
 
 FRONTEND_CHECKS: Tuple[str, ...] = (
-    "js-engine-test", "site-game-test", "home-greetings-test", "app-release-test",
+    "js-engine-test", "site-game-test", "home-greetings-test", "i18n-test",
+    "i18n-coverage-test", "app-release-test",
     "python-ssh-test", "linux-vm-control-test", "desktop-typecheck", "desktop-build",
 )
 NATIVE_CHECKS: Tuple[str, ...] = (
@@ -187,7 +189,7 @@ HEAVY_CHECKS: Tuple[str, ...] = (
 APP_UI_CHECKS: Tuple[str, ...] = (
     "browser-smoke", "browser-pairing-ui", "service-ui", "remote-task-ui", "work-ui",
     "components-ui", "baseline-ui", "archive-wait-ui", "drift-ui", "network-ui",
-    "telemetry-ui", "app-update-ui", "clawd-app-ui",
+    "telemetry-ui", "app-update-ui", "clawd-app-ui", "i18n-ui",
 )
 SITE_UI_CHECKS: Tuple[str, ...] = ("site-ui",)
 RUNNER_CHECKS: Tuple[str, ...] = ("linux-ssh-runtime", "cli-candidate")
@@ -290,7 +292,8 @@ PROFILES: Dict[str, Profile] = {
         "desktop frontend / built-App UI only: frontend build plus applicable built-App/browser checks (Linux first)",
         (
             _job("control", SELFTEST_CHECKS, LINUX_ONLY),
-            _job("frontend", ("desktop-typecheck", "desktop-build", "home-greetings-test"),
+            _job("frontend", ("desktop-typecheck", "desktop-build", "home-greetings-test",
+                              "i18n-test", "i18n-coverage-test"),
                  LINUX_ONLY),
             _job("native", (), LINUX_ONLY),
             _job("heavy", (), LINUX_ONLY),

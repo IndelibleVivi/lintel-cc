@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { requester, transport } from './api';
 import { Notice, Status } from './ui';
+import { useI18n } from './i18n-provider';
+import { present } from './i18n-presentation';
 import { ResourceLink } from './Resources';
 import type { Inspection, TelemetryCatalog } from './types';
 import './telemetry.css';
@@ -39,6 +41,8 @@ const FINE_GRAINED = ['DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING', 'CLAUDE_CO
 // only reads it and lets the user select blockable destinations into the
 // existing stopped-channel draft; it never starts or changes a running channel.
 export default function TelemetryPanel({ hostAlias, selected, onChange, disabled, settings, onPrivacySettings, activeBinding, activeBlocked, onRuleTest }: Props) {
+  const { t, locale } = useI18n();
+  const presentText = (value: string | null | undefined) => present(value, locale);
   const send = useMemo(() => requester(hostAlias), [hostAlias]);
   const [catalog, setCatalog] = useState<TelemetryCatalog | null>(null);
   const [error, setError] = useState('');
@@ -83,59 +87,59 @@ export default function TelemetryPanel({ hostAlias, selected, onChange, disabled
   // remains until the channel changes.
   const currentTest = tested && activeBinding === tested.binding ? tested : null;
 
-  return <section className="telemetry-panel" aria-label="Telemetry 目标目录">
-    <div className="surface-heading"><h3>Telemetry 目标目录</h3><Status value={catalog ? 'available' : busy ? 'pending' : 'unknown'}/></div>
+  return <section className="telemetry-panel" aria-label={t('telemetry.aria')}>
+    <div className="surface-heading"><h3>{t('telemetry.aria')}</h3><Status value={catalog ? 'available' : busy ? 'pending' : 'unknown'}/></div>
     <div className="padded">
-      <p>官方文档列出的可选 Claude Code telemetry 目标。只有“可阻止”的确切 host 能加入草案的阻止规则；混合用途域名仅作说明，不能一键阻止。</p>
+      <p>{t('telemetry.intro')}</p>
       {error && <Notice tone="error">{error}</Notice>}
-      {!catalog && busy && <p className="small-print">正在读取静态目录…</p>}
+      {!catalog && busy && <p className="small-print">{t('telemetry.readingCatalog')}</p>}
       {catalog && <>
-        <p className="small-print"><ResourceLink resource="claude-network-reference">Claude 官方网络说明</ResourceLink> · 核对日期 {catalog.checked_date} · schema {catalog.schema}</p>
-        <section className="telemetry-privacy" aria-label="已观察的隐私设置">
-          <h4>已观察的隐私设置（读回值，非全局强制）</h4>
-          {notRead ? <p className="small-print" role="status">not_read · 尚未读取当前设置。这不代表已关闭或已强制。</p> : <>
-            <div className="fact-row"><span>非必要流量总开关 <code>{NONESSENTIAL}</code></span><strong>{(nonessential?.value ?? '未设置')} · {nonessential ? settingState(nonessential) : 'unknown'}</strong></div>
-            <p className="small-print">按官方 env-vars：此变量只要非空即生效（<code>0</code>／<code>false</code> 也会关闭），并同时关闭自动更新、release notes 与 feature flag 获取。它只描述已读回的值，不等于当前运行证明。</p>
-            <ul className="compact-list telemetry-info">{FINE_GRAINED.map(key => { const setting = observed(key); return <li key={key}><code>{key}</code> · {setting ? `${setting.value ?? '未设置'} · ${settingState(setting)}` : 'not_read'}</li>; })}</ul>
+        <p className="small-print"><ResourceLink resource="claude-network-reference">{t('telemetry.officialRef')}</ResourceLink> · {t('telemetry.checkedDate',{date:catalog.checked_date})} · schema {catalog.schema}</p>
+        <section className="telemetry-privacy" aria-label={t('telemetry.privacyAria')}>
+          <h4>{t('telemetry.privacyTitle')}</h4>
+          {notRead ? <p className="small-print" role="status">{t('telemetry.notRead')}</p> : <>
+            <div className="fact-row"><span>{t('telemetry.nonessentialLabel')} <code>{NONESSENTIAL}</code></span><strong>{(nonessential?.value ?? t('app.notSet'))} · {nonessential ? settingState(nonessential) : 'unknown'}</strong></div>
+            <p className="small-print">{t('telemetry.nonessentialNote')}</p>
+            <ul className="compact-list telemetry-info">{FINE_GRAINED.map(key => { const setting = observed(key); return <li key={key}><code>{key}</code> · {setting ? `${setting.value ?? t('app.notSet')} · ${settingState(setting)}` : 'not_read'}</li>; })}</ul>
           </>}
-          {onPrivacySettings && <button className="text-button" type="button" onClick={onPrivacySettings}>查看现有隐私设置</button>}
+          {onPrivacySettings && <button className="text-button" type="button" onClick={onPrivacySettings}>{t('telemetry.viewPrivacy')}</button>}
         </section>
-        <h4>可加入阻止规则</h4>
+        <h4>{t('telemetry.blockableTitle')}</h4>
         {blockable.map(entry => <label className="telemetry-row" key={entry.id}>
           <input type="checkbox" disabled={disabled} checked={selected.includes(entry.id)} onChange={event => toggle(entry.id, event.target.checked)}/>
-          <span><strong>{entry.purpose}</strong>
-            <span className="telemetry-detail"><code>{entry.host}:{entry.port}</code> · {entry.provider} · 客户端 {entry.clients.join('、')}</span>
-            <span className="telemetry-detail">适用性：{entry.applicability} · 版本：{entry.version_applicability}（核对 {entry.checked_date}）</span>
-            <span className="telemetry-detail telemetry-impact">影响：{entry.collateral_impact}</span>
+          <span><strong>{presentText(entry.purpose)}</strong>
+            <span className="telemetry-detail"><code>{entry.host}:{entry.port}</code> · {entry.provider} · {t('telemetry.clients',{clients:entry.clients.join('、')})}</span>
+            <span className="telemetry-detail">{t('telemetry.applicability',{applicability:presentText(entry.applicability),version:presentText(entry.version_applicability),date:entry.checked_date})}</span>
+            <span className="telemetry-detail telemetry-impact">{t('telemetry.impact',{impact:presentText(entry.collateral_impact)})}</span>
           </span>
         </label>)}
-        {blockable.length === 0 && <p className="small-print">当前目录没有可阻止的目标。</p>}
-        <h4>仅信息（混合或必要用途，不提供一键阻止）</h4>
+        {blockable.length === 0 && <p className="small-print">{t('telemetry.noBlockable')}</p>}
+        <h4>{t('telemetry.infoTitle')}</h4>
         <ul className="compact-list telemetry-info">{informational.map(entry => <li key={entry.id}>
-          <code>{entry.host}:{entry.port}</code> · {entry.purpose}
-          <span className="telemetry-detail">适用性：{entry.applicability}</span>
-          <span className="telemetry-detail telemetry-impact">影响：{entry.collateral_impact}</span>
+          <code>{entry.host}:{entry.port}</code> · {presentText(entry.purpose)}
+          <span className="telemetry-detail">{t('telemetry.applicabilityShort',{applicability:presentText(entry.applicability)})}</span>
+          <span className="telemetry-detail telemetry-impact">{t('telemetry.impact',{impact:presentText(entry.collateral_impact)})}</span>
         </li>)}</ul>
-        <Notice>选中目标在下次显式启动时合并，取消选择只撤回这次选择；草案中已有的规则由上方文本编辑。启动后在读回配置中核对。通道仅覆盖经过它的连接。</Notice>
-        <section className="telemetry-test" aria-label="受控规则测试">
-          <h4>受控规则测试（当前活动通道）</h4>
-          {!activeBinding ? <p className="small-print" role="status">当前没有正在运行的通道；请先显式启动通道，再测试已阻止的目标。</p> : <>
-            <p className="small-print">在活动通道上向本代理自身发送一次真实 CONNECT，验证确切目标被显式阻止。它不会连接目标、不会解析公网、也不代表系统级强制。</p>
+        <Notice>{t('telemetry.notice')}</Notice>
+        <section className="telemetry-test" aria-label={t('telemetry.testAria')}>
+          <h4>{t('telemetry.testTitle')}</h4>
+          {!activeBinding ? <p className="small-print" role="status">{t('telemetry.noActiveChannel')}</p> : <>
+            <p className="small-print">{t('telemetry.testNote')}</p>
             {blockable.map(entry => {
               const blockedNow = activeBlockedSet.has(entry.id);
               return <div className="telemetry-test-row" key={entry.id}>
                 <code>{entry.host}:{entry.port}</code>
                 {blockedNow
-                  ? <button className="text-button" type="button" disabled={!!testBusy} onClick={() => void runTest(entry.id)}>{testBusy === entry.id ? '测试中…' : '测试该阻止'}</button>
-                  : <span className="telemetry-detail">当前通道未显式阻止；先加入草案并重新启动通道后再测试。</span>}
+                  ? <button className="text-button" type="button" disabled={!!testBusy} onClick={() => void runTest(entry.id)}>{testBusy === entry.id ? t('telemetry.testing') : t('telemetry.testThisBlock')}</button>
+                  : <span className="telemetry-detail">{t('telemetry.notBlockedNow')}</span>}
               </div>;
             })}
             {currentTest && <div className="fact-row telemetry-test-result" role="status">
-              <span>受控测试 {currentTest.outcome?.destination_host || currentTest.id}</span>
-              <strong>{currentTest.outcome?.result === 'blocked_explicit' ? '已确认显式阻止' : '未通过'}</strong>
-              {currentTest.outcome ? <span className="small-print">test_id {currentTest.outcome.test_id} · 连接尝试 {currentTest.outcome.connection_attempted ? '是' : '否'} · 与客户端事件分列。</span> : <span className="small-print">{currentTest.error}</span>}
+              <span>{t('telemetry.controlledTest',{target:currentTest.outcome?.destination_host || currentTest.id})}</span>
+              <strong>{t(currentTest.outcome?.result === 'blocked_explicit' ? 'telemetry.blockConfirmed' : 'telemetry.blockNotPassed')}</strong>
+              {currentTest.outcome ? <span className="small-print">{t('telemetry.testDetail',{id:currentTest.outcome.test_id,attempted:currentTest.outcome.connection_attempted ? t('app.yes') : t('app.no')})}</span> : <span className="small-print">{currentTest.error}</span>}
             </div>}
-            <p className="small-print">真实客户端事件与受控测试分列：受控测试带 owner-origin 标记，普通 Claude/代理流量不带。通道停止或被替换后需对新实例重新测试。</p>
+            <p className="small-print">{t('telemetry.testFooter')}</p>
           </>}
         </section>
       </>}
