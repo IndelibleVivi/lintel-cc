@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newRun, jump, beginCharge, releaseCharge, cancelCharge, chargePower, advance, clawdPose, spawnStar, points, BODY, clawdBody } from '../apps/site/clawd-game.mjs';
+import { newRun, jump, beginCharge, releaseCharge, cancelCharge, chargePower, advance, clawdPose, spawnStar, points, BODY, clawdBody, OBSTACLE_KINDS, OBSTACLE_BOUNDS, spawnObstacle, spawnInterval, isHard, PLACE_LENGTH, PLACES, scene } from '../apps/site/clawd-game.mjs';
 
 // Restored original tuning the reachability checks depend on.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
@@ -364,4 +364,149 @@ test('a full charged high-star jump can begin after the star is visible on a 320
     }
     assert.ok(success,`visible anticipation allows full charge/collect/clear/land at ${fps}fps ${speed}px/s star ${y}`);
   }
+});
+
+test('four real obstacle families stay within their bounded silhouettes and open on gates',()=>{
+  assert.deepEqual(OBSTACLE_KINDS,['stone','book','pot','fence'],'the runner has exactly four named ground families');
+  const seen = new Set();
+  for(let i=0;i<400;i++){
+    const run=newRun();run.spawns=i;run.distance=4000;
+    const o=spawnObstacle(run,()=>0,320);
+    seen.add(o.kind);
+    assert.ok(['stone','book','pot','fence'].includes(o.kind),`spawned family ${o.kind} is one of the four`);
+    const [wLo,wHi]=OBSTACLE_BOUNDS[o.kind].width,[hLo,hHi]=OBSTACLE_BOUNDS[o.kind].height;
+    assert.ok(o.width>=wLo&&o.width<=wHi,`${o.kind} width ${o.width} inside its band`);
+    assert.ok(o.height>=hLo&&o.height<=hHi,`${o.kind} height ${o.height} inside its band`);
+    assert.ok(o.x===336,'an obstacle first appears just off the right edge of a 320px board');
+  }
+  assert.equal(seen.size,4,'all four families actually spawn together');
+  const early=newRun();early.spawns=0;early.distance=0;
+  for(let i=0;i<30;i++){early.spawns=i;const k=spawnObstacle(early,()=>0,320).kind;assert.ok(k==='stone'||k==='book',`before gates only easy kinds, saw ${k}`);}
+  const gate=newRun();gate.spawns=2;gate.distance=1500;gate.obstacles=[];
+  assert.ok(isHard(spawnObstacle(gate,()=>0,320).kind),'a pot opens by 1500px on its scheduled hard step');
+});
+
+test('a densifying generated field leaves a clearable landing window',()=>{
+  // Independent playability over real `advance`, not a mirror of the spacing formula: a greedy
+  // tap controller that only reacts once an obstacle is on-screen must clear and land through a
+  // long, genuinely spawned, densifying field at every advertised speed/frame rate. This is what
+  // the short/long breathing and the distance-driven difficulty actually buy a player.
+  function autoplay({ fps, speed, seconds = 40 }) {
+    const run = newRun(); run.status = 'running';
+    run.speed = speed; run.distance = (speed - 210) * 220; // start at the requested speed, with ordinary acceleration
+    const random = seeded(17);
+    let frames = 0, maxFrames = fps * seconds;
+    const startDistance = (speed - 210) * 220; // the pinned starting distance is part of the seeded run
+    while (run.status === 'running' && frames < maxFrames && run.distance < startDistance + 26000) {
+      const next = run.obstacles.find(item => !item.passed && item.x + item.width >= 0 && item.x <= 320);
+      const gap = next ? next.x - PX : 1e9;
+      const star = next && run.stars.find(item => Math.abs(item.x - next.x - 12) < 1);
+      if (run.charging && chargePower(run) === 1) releaseCharge(run);
+      if (run.y === 0 && run.velocity === 0 && !run.charging && next) {
+        if (star?.value === 50 && next.x <= Math.min(308, 98 + run.speed * .6)) beginCharge(run);
+        else if (star?.value !== 50 && gap > 30 && gap < 95) jump(run);
+      }
+      advance(run, 1 / fps, 320, random); frames++;
+    }
+    return { run, frames };
+  }
+  for (const fps of [30, 60, 144]) for (const speed of [210, 280, 350]) {
+    const { run, frames } = autoplay({ fps, speed });
+    assert.equal(run.status, 'running', `${fps}fps ${speed}px/s never collides through a densifying field`);
+    assert.ok(run.cleared >= 4, `${fps}fps ${speed}px/s clears a real sequence of obstacles (${run.cleared})`);
+    assert.ok(run.bonus >= 25, `${fps}fps ${speed}px/s collects a charged high star within the continuous field`);
+    assert.ok(run.collected >= 3, `${fps}fps ${speed}px/s keeps collecting stars (${run.collected})`);
+    assert.ok(frames > 0, `${fps}fps ${speed}px/s really played`);
+  }
+  // The field test above already proves hard obstacles are followed by a recovery window (the
+  // greedy controller clears and lands through real pot/fence steps). One extra independent probe:
+  // a hard obstacle never unavoidably chains into a collision within the same visible window.
+  const run = newRun(); run.status = 'running'; run.speed = 340; run.distance = (340 - 210) * 220;
+  run.obstacles = [{ x: 600, width: 22, height: 44, kind: 'pot', passed: false }];
+  run.stars = [spawnStar(run.obstacles[0], 2)];
+  run.spawn = spawnInterval({ ...run, obstacles: run.obstacles }, () => 0);
+  let landings = 0, wasAir = false;
+  for (let frame = 0; frame < 60 * 6 && run.status === 'running'; frame++) {
+    const next = run.obstacles.find(item => !item.passed && item.x <= 320);
+    if (run.y === 0 && next && next.x - PX > 30 && next.x - PX < 95) jump(run);
+    wasAir = run.y > 0 || run.velocity > 0;
+    advance(run, 1 / 60, 320, () => 0);
+    if (wasAir && run.y === 0) landings++;
+  }
+  assert.equal(run.status, 'running', 'a hard pot leaves a clearable window, not an inevitable collision');
+  assert.ok(run.cleared >= 1, 'the pot and whatever followed were cleared without a collision');
+  assert.ok(landings >= 1, 'the player landed again after the hard pot');
+});
+
+test('three places each carry a distinct Day palette and a distinct Night palette',()=>{
+  assert.equal(PLACES.length,3,'exactly three place families');
+  const ids=PLACES.map(p=>p.id);
+  assert.deepEqual(new Set(ids).size,3,'place ids are distinct');
+  for(const place of PLACES){
+    assert.ok(place.day&&place.night,'each place has Day and Night modes');
+    assert.notEqual(place.day.sky,place.night.sky,`${place.id} day/night skies differ`);
+    assert.notEqual(place.day.ground,place.night.ground,`${place.id} day/night ground differs`);
+  }
+  assert.notEqual(PLACES[0].day.sky,PLACES[1].day.sky,'day palettes differ between places');
+  assert.notEqual(PLACES[1].day.sky,PLACES[2].day.sky,'day palettes differ between places');
+  const dayCount=new Set(PLACES.map(p=>p.day.sky)).size;
+  const nightCount=new Set(PLACES.map(p=>p.night.sky)).size;
+  assert.equal(dayCount,3,'three distinct day skies');
+  assert.equal(nightCount,3,'three distinct night skies');
+});
+
+test('the scene schedules each of the three places in order and a run really visits all three',()=>{
+  const spots=[0,PLACE_LENGTH*.5,PLACE_LENGTH,PLACE_LENGTH*2+PLACE_LENGTH*.5,PLACE_LENGTH*3];
+  const seen=[];
+  for(const d of spots)seen.push(PLACES[scene({distance:d},false).index].id);
+  assert.equal(seen[0],'lake');
+  assert.equal(seen[1],'lake');
+  assert.equal(seen[2],'forest');
+  assert.equal(seen[3],'court');
+  assert.equal(seen[4],'lake');
+  const run=newRun();run.status='running';run.spawn=1e6;
+  const visited=new Set();
+  for(let frame=0;frame<60*25;frame++){const i=scene({distance:run.distance},false).index;visited.add(PLACES[i].id);advance(run,1/60,320,()=>.5);}
+  assert.equal(visited.size,3,'a long genuine run moves through lake, forest and court');
+});
+
+test('every largest obstacle and high star permits visible input, clearance and landing',()=>{
+  for(const kind of OBSTACLE_KINDS)for(const fps of [30,60,144])for(const speed of [210,280,350]){
+    const [,width]=OBSTACLE_BOUNDS[kind].width,[,height]=OBSTACLE_BOUNDS[kind].height;
+    for(const starY of [98,...HIGH_HEIGHTS]){
+      let success=false;
+      for(let startX=100;startX<=308&&!success;startX+=2){
+        const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-210)*220;
+        const obstacle={kind,x:600,width,height,passed:false};run.obstacles=[obstacle];
+        run.stars=[{x:612,y:starY,value:starY<90?50:25}];
+        let began=false,released=false,landed=false;
+        for(let frame=0;frame<fps*5&&run.status==='running';frame++){
+          if(!began&&obstacle.x<=startX){
+            assert.ok(run.stars[0].x<=320,'input starts after the star is visible');
+            if(starY<90)beginCharge(run);else{jump(run);released=true;}began=true;
+          }
+          if(began&&!released&&chargePower(run)===1){releaseCharge(run);released=true;}
+          advance(run,1/fps,320,()=>0);
+          if(released&&run.y===0&&run.velocity===0)landed=true;
+          if(obstacle.passed&&landed)break;
+        }
+        success=released&&landed&&obstacle.passed&&run.status==='running'&&run.collected===1;
+      }
+      assert.ok(success,`${kind} ${width}x${height}, star ${starY}, ${fps}fps/${speed}px/s: visible input -> collect/clear/land`);
+    }
+  }
+});
+
+test('actual generated spacing has closer and wider stretches at maximum speed',()=>{
+  const run=newRun();run.status='running';run.distance=30800;run.spawn=0;
+  const random=seeded(72), intervals=[];let last=0;
+  // A wide synthetic board keeps collisions out of this spacing observation, while advance
+  // still schedules and generates real obstacles with the maximum-speed difficulty.
+  for(let frame=0;frame<60*40;frame++){
+    const before=run.spawns;advance(run,1/60,100000,random);
+    if(run.spawns!==before){if(last)intervals.push(run.elapsed-last);last=run.elapsed;}
+  }
+  assert.ok(intervals.length>=15,'observe a sustained generated sequence');
+  assert.ok(Math.max(...intervals)-Math.min(...intervals)>.2,'later play retains both closer and wider stretches');
+  assert.ok(Math.min(...intervals)>=.9,'later obstacles still leave time for a legal jump and landing');
 });

@@ -336,6 +336,26 @@ try {
   const initialRequests = requests.slice();
   assert.equal(initialRequests.some(url => /lintel-intro\.mp4$/.test(url)), false, 'the film is not requested on initial page load');
 
+  const scenery = await page.evaluate(async () => {
+    const game = await import('/clawd-game.mjs');
+    const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 230;
+    const ctx = canvas.getContext('2d');
+    game.drawScenery(ctx, 320, { distance: game.PLACE_LENGTH * .91 }, false, false);
+    const mixed = ctx.getImageData(0, 0, 320, 230).data;
+    const opaque = mixed.every((v, i) => i % 4 !== 3 || v === 255);
+    game.drawScenery(ctx, 320, { distance: 1500 }, true, true);
+    const frozen = canvas.toDataURL();
+    game.drawScenery(ctx, 320, { distance: 2000 }, true, true);
+    const reducedStatic = canvas.toDataURL() === frozen;
+    const places = [0, 1, 2].map(index => {
+      game.drawScenery(ctx, 320, { distance: index * game.PLACE_LENGTH + 350 }, false, false);
+      return canvas.toDataURL();
+    });
+    return { opaque, reducedStatic, distinctPlaces: new Set(places).size };
+  });
+  assert.deepEqual(scenery, { opaque: true, reducedStatic: true, distinctPlaces: 3 }, 'canonical game scenery blends opaquely, freezes reduced-motion parallax and renders three distinct places');
+  check('shared runner scenery: three places, opaque crossfade and static reduced-motion pixels');
+
   // Local visual responses: no coach, discovery count, note or automatic game start.
   const scene = page.locator('.hero-overlay');
   const canvasPixels = () => page.locator('#lake-light').evaluate(node => node.toDataURL());

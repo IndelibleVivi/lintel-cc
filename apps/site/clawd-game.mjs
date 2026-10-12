@@ -34,6 +34,186 @@ export function spawnStar(obstacle, spawns = 0) {
   const y = STAR_ROWS[spawns % STAR_ROWS.length] + STAR_JITTER[spawns % STAR_JITTER.length];
   return { y, x: obstacle.x + 12 };
 }
+
+// ---- Obstacle families. Four real ground silhouettes, each with a fixed finite dimension band
+// and its own jump rhythm. pot and fence are taller/wider but their heights stay inside the tap
+// jump's reach; the charged jump is what buys the high double-value star, not obstacle clearance.
+// The kind ladder is deterministic, not random scatter: every third spawn may be harder once its
+// distance gate opens, and a hard step is always followed by an easy one, so there is a genuine
+// post-clear recovery window even at the densest spacing. Dimensions only jitter their band. --/
+export const OBSTACLE_KINDS = ['stone', 'book', 'pot', 'fence'];
+export const OBSTACLE_GATE = { stone: 0, book: 0, pot: 1400, fence: 2400 };
+export const OBSTACLE_BOUNDS = {
+  stone: { width: [22, 30], height: [16, 24] },
+  book: { width: [26, 34], height: [14, 22] },
+  pot: { width: [18, 24], height: [34, 44] },
+  fence: { width: [32, 42], height: [30, 40] },
+};
+export function isHard(kind) { return kind === 'pot' || kind === 'fence'; }
+export function pickKind(run) {
+  const seq = run.spawns, d = run.distance;
+  const hardPool = [];
+  if (d >= OBSTACLE_GATE.pot) hardPool.push('pot');
+  if (d >= OBSTACLE_GATE.fence) hardPool.push('fence');
+  const last = run.obstacles.at(-1);
+  if (hardPool.length && seq % 3 === 2 && !(last && isHard(last.kind))) return hardPool[seq % hardPool.length];
+  return seq % 2 === 0 ? 'stone' : 'book';
+}
+export function spawnObstacle(run, random, boardWidth = 320) {
+  const kind = pickKind(run);
+  const [wLo, wHi] = OBSTACLE_BOUNDS[kind].width;
+  const [hLo, hHi] = OBSTACLE_BOUNDS[kind].height;
+  return { x: boardWidth + 16, width: wLo + Math.floor(random() * (wHi - wLo + 1)), height: hLo + Math.floor(random() * (hHi - hLo + 1)), kind, passed: false };
+}
+export function spawnInterval(run, random) {
+  // Distance-driven difficulty densifies the field, and a slow sine gives short/long breathing
+  // so the pacing never feels printed. A large post-clear gap follows a hard step, and a real
+  // floor applied after the jitter keeps the consecutive-obstacle separation wide enough to
+  // clear one and land before the next at every speed.
+  const difficulty = Math.max(0, Math.min(1, run.distance / 3200));
+  const base = 1.6 - 0.5 * difficulty;
+  const breath = 1 + 0.3 * Math.sin(run.distance / 850);
+  let interval = base * breath;
+  const last = run.obstacles.at(-1);
+  if (last && isHard(last.kind)) interval *= 1.28;
+  interval *= 0.9 + random() * 0.28;
+  return Math.max(interval, 360 / Math.max(run.speed, 120));
+}
+
+// ---- Three recognizable places cycle by travelled distance. Each has its own Day and Night
+// palette so a fixed daylight stage never flips to night; a soft colour-and-silhouette crossfade
+// across the band boundary keeps transitions gentle. Layer offsets are a finite parallax of the
+// same silhouettes; reduced motion freezes them. All drawing is original canvas, no assets. --/
+export const PLACE_LENGTH = 1400;
+export const PLACES = [
+  { id: 'lake',
+    day:  { sky: '#dbe8ea', far: '#b7cdd2', hill: '#9cb7a9', trunk: '#5f7f68', leaf: '#85a487', ground: '#e7ddc9', accent: '#d98a4c', glow: '#f3d48a' },
+    night: { sky: '#131a23', far: '#1b2733', hill: '#253541', trunk: '#2f4a38', leaf: '#35604a', ground: '#2f2a1f', accent: '#e0b56e', glow: '#f5dfa0' } },
+  { id: 'forest',
+    day:  { sky: '#e8ecda', far: '#c5cfab', hill: '#8cab7e', trunk: '#7a5a3c', leaf: '#7fa06f', ground: '#e0d6bd', accent: '#c17749', glow: '#f0d98c' },
+    night: { sky: '#102019', far: '#172a1e', hill: '#203a2b', trunk: '#241a12', leaf: '#2c4f33', ground: '#2b241a', accent: '#d7b56b', glow: '#f3e6a6' } },
+  { id: 'court',
+    day:  { sky: '#efe5d3', far: '#d9c7a2', hill: '#c0a572', trunk: '#8a6a3a', leaf: '#a68b52', ground: '#e8dfc9', accent: '#b5651d', glow: '#f1c86a' },
+    night: { sky: '#17120c', far: '#231b11', hill: '#2c2114', trunk: '#2a1e10', leaf: '#3c2f1b', ground: '#3b2f1d', accent: '#df9f4d', glow: '#f6e2a0' } },
+];
+export function scene(run, night) {
+  const pos = run.distance / PLACE_LENGTH, idx = Math.floor(pos), prog = pos - idx;
+  const t = prog > 0.82 ? (prog - 0.82) / 0.18 : 0;
+  return { index: idx % PLACES.length, t, night };
+}
+function wrap(v, span) { return ((v % span) + span) % span; }
+function ridge(ctx, width, baseY, amp, off, segs, phase) {
+  ctx.beginPath(); ctx.moveTo(0, 188);
+  for (let i = 0; i <= segs; i++) { const x = i * width / segs; ctx.lineTo(x, baseY - Math.sin((x + off) * 0.012 + phase) * amp); }
+  ctx.lineTo(width, 188); ctx.closePath(); ctx.fill();
+}
+function drawLake(ctx, width, c, off) {
+  ctx.fillStyle = c.far; ridge(ctx, width, 131, 21, off * .15, 32, 2.8);
+  ctx.fillStyle = c.hill; ridge(ctx, width, 150, 16, off * 0.3, 24, 1.3);
+  const water = 158;
+  ctx.fillStyle = c.far; ctx.fillRect(0, water, width, 188 - water);
+  ctx.save(); ctx.globalAlpha *= .55;
+  ctx.fillStyle = c.sky;
+  const g = wrap(off * 0.9, 52);
+  for (let x = -52; x < width; x += 52) { ctx.fillRect(Math.round(x - g + 12), water + 7, 9, 1); ctx.fillRect(Math.round(x - g - 22), water + 16, 5, 1); }
+  ctx.restore();
+  const bx = wrap(width * .6 - off * .25 + 60, width + 120) - 60, by = water - 5;
+  ctx.fillStyle = c.trunk; ctx.fillRect(bx, by, 40, 3); ctx.fillRect(bx + 4, by + 3, 32, 3); ctx.fillRect(bx + 9, by + 6, 22, 2);
+  ctx.fillRect(bx + 20, by - 31, 2, 31);
+  ctx.fillStyle = c.glow;
+  for (let i = 0; i < 6; i++) ctx.fillRect(bx + 23, by - 29 + i * 4, 3 + i * 3, 4);
+  ctx.fillStyle = c.accent; ctx.fillRect(bx + 16, by - 2, 8, 2);
+  ctx.fillStyle = c.hill;
+  const rx = wrap(off * 1.1, 90);
+  for (let x = -90; x < width + 90; x += 90) { const cx = Math.round(x - rx + 30); ctx.fillRect(cx + 8, 188 - 16, 2, 16); ctx.fillRect(cx + 18, 188 - 11, 2, 11); }
+}
+function drawForest(ctx, width, c, off, night) {
+  ctx.fillStyle = c.far; ridge(ctx, width, 117, 21, off * .15, 32, .5);
+  const tree = (x, top, size, foliage, trunk) => {
+    ctx.fillStyle = trunk; ctx.fillRect(x - 2, top + size * .35, 4, 188 - top - size * .35);
+    ctx.fillStyle = foliage;
+    for (let tier = 0; tier < 3; tier++) for (let row = 0; row < 5; row++) {
+      const half = Math.round((row + 1) * size / 12 + tier * size / 12);
+      ctx.fillRect(x - half, top + tier * size * .28 + row * 4, half * 2, 4);
+    }
+  };
+  for (let x = -84; x < width + 84; x += 84) tree(Math.round(x + 35 - wrap(off * .35, 84)), 76, 44, c.hill, c.hill);
+  for (let x = -152; x < width + 152; x += 152) tree(Math.round(x + 75 - wrap(off * .75, 152)), 62, 64, c.leaf, c.trunk);
+  if (night) {
+    ctx.save(); ctx.globalAlpha *= .8; ctx.fillStyle = c.glow; for (let i = 0; i < 6; i++) { const fx = wrap(off * 0.6 + i * 53, width + 40) - 20; ctx.fillRect(Math.round(fx), 42 + (i * 31) % 66, 1, 1); } ctx.restore();
+  }
+}
+function drawCourt(ctx, width, c, off, night) {
+  ctx.fillStyle = c.hill; ridge(ctx, width, 140, 10, off * 0.3, 22, 3);
+  ctx.fillStyle = c.far; ctx.fillRect(0, 150, width, 188 - 150);
+  ctx.fillStyle = c.trunk; for (let x = 0; x < width; x += 26) ctx.fillRect(Math.round(x + 13 - (off * 0.05) % 26), 150, 4, 38);
+  const gx = Math.round(wrap(width * .65 - off * .45 + 80, width + 180) - 80);
+  ctx.fillStyle = c.trunk; ctx.fillRect(gx - 21, 118, 5, 70); ctx.fillRect(gx + 17, 118, 5, 70); ctx.fillRect(gx - 21, 118, 43, 5);
+  ctx.fillStyle = c.accent; ctx.fillRect(gx - 32, 114, 65, 4); ctx.fillRect(gx - 26, 110, 53, 4); ctx.fillRect(gx - 18, 106, 37, 4);
+  for (const side of [-1, 1]) {
+    const lx = gx + side * 31;
+    ctx.fillStyle = c.trunk; ctx.fillRect(lx, 142, 2, 46);
+    ctx.fillStyle = c.accent; ctx.fillRect(lx - 4, 144, 10, 14);
+    ctx.save(); ctx.globalAlpha *= night ? .85 : .45; ctx.fillStyle = c.glow; ctx.fillRect(lx - 2, 146, 6, 10); ctx.restore();
+  }
+}
+export function drawPlaceScene(ctx, width, place, night, off, reduced, alpha = 1) {
+  const c = place[night ? 'night' : 'day'];
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.fillStyle = c.sky; ctx.fillRect(0, 0, width, 188);
+  ctx.fillStyle = c.glow;
+  const sx = Math.round(width * .8);
+  ctx.fillRect(sx, 27, 14, 22); ctx.fillRect(sx - 4, 31, 22, 14);
+  if (night) { ctx.fillStyle = c.sky; ctx.fillRect(sx + 4, 24, 14, 20); }
+  else {
+    ctx.save(); ctx.globalAlpha *= .65; ctx.fillStyle = '#fff9e8';
+    for (const [x, y] of [[width * .2, 38], [width * .52, 65]]) { ctx.fillRect(x, y, 40, 4); ctx.fillRect(x + 7, y - 4, 23, 4); }
+    ctx.restore();
+  }
+  const o = reduced ? 0 : off;
+  if (place.id === 'lake') drawLake(ctx, width, c, o);
+  else if (place.id === 'forest') drawForest(ctx, width, c, o, night);
+  else drawCourt(ctx, width, c, o, night);
+  ctx.fillStyle = c.ground; ctx.fillRect(0, 188, width, 42);
+  ctx.save(); ctx.globalAlpha *= .3; ctx.fillStyle = c.trunk;
+  for (let x = -70; x < width + 70; x += 70) ctx.fillRect(Math.round(x + 19 - wrap(o, 70)), 205 + (x % 3), 8, 2);
+  ctx.restore();
+  ctx.restore();
+}
+export function drawScenery(ctx, width, run, night, reduced) {
+  const place = scene(run, night);
+  ctx.clearRect(0, 0, width, 230);
+  // The first layer is opaque; the second blends over it, retaining opaque pixels throughout.
+  drawPlaceScene(ctx, width, PLACES[place.index], night, run.distance * .06, reduced);
+  if (!reduced && place.t > 0) drawPlaceScene(ctx, width, PLACES[(place.index + 1) % PLACES.length], night, run.distance * .06, false, place.t);
+}
+export function drawObstacle(ctx, obstacle, p) {
+  const x = Math.round(obstacle.x), y = GROUND - obstacle.height;
+  const base = p.line, fill = p.muted, top = p.bg;
+  if (obstacle.kind === 'book') {
+    ctx.fillStyle = fill; ctx.fillRect(x, y + 6, obstacle.width, obstacle.height - 6); ctx.fillRect(x + 3, y, obstacle.width - 4, 6);
+    ctx.fillStyle = top; ctx.fillRect(x + 4, y + 9, obstacle.width - 7, 3); ctx.fillRect(x + 4, y + 15, obstacle.width - 7, 2);
+  } else if (obstacle.kind === 'pot') {
+    const rim = Math.round(obstacle.height * .55), middle = Math.round(x + obstacle.width / 2);
+    ctx.fillStyle = base; ctx.fillRect(middle - 1, y, 2, rim);
+    ctx.fillStyle = fill; ctx.fillRect(middle - 7, y + 5, 7, 3); ctx.fillRect(middle + 1, y + 10, 7, 3);
+    ctx.fillRect(x, y + rim, obstacle.width, 4); ctx.fillRect(x + 2, y + rim + 4, obstacle.width - 4, obstacle.height - rim - 6);
+    ctx.fillRect(x + 4, GROUND - 2, obstacle.width - 8, 2);
+  } else if (obstacle.kind === 'fence') {
+    const rail = Math.max(2, Math.round(obstacle.height * .16));
+    const slats = Math.max(2, Math.round((obstacle.width - 4) / 7));
+    for (let i = 0; i < slats; i++) {
+      const sx = x + 2 + Math.round(i * (obstacle.width - 4) / (slats - 1)) - 1;
+      if (sx >= x + obstacle.width - 3) continue;
+      ctx.fillStyle = fill; ctx.fillRect(sx, y, 3, obstacle.height);
+    }
+    ctx.fillStyle = fill; ctx.fillRect(x, y + rail, obstacle.width, 2); ctx.fillRect(x, y + obstacle.height - rail, obstacle.width, 1);
+  } else {
+    ctx.fillStyle = fill; ctx.fillRect(x, y + 6, obstacle.width, obstacle.height - 6); ctx.fillRect(x + 5, y, obstacle.width - 10, 6);
+    ctx.fillStyle = base; ctx.fillRect(x + 7, y + 6, 5, 3);
+  }
+}
+
 function burst(run, x, y, kind, count) {
   for (let i = 0; i < count; i++) run.particles.push({ x, y, vx: (i - (count - 1) / 2) * 35, vy: -40 - (i % 3) * 25, life: .4 + i * .025, kind });
 }
@@ -80,11 +260,11 @@ export function advance(run, dt, width, random = Math.random) {
     }
     run.spawn -= step;
     if (run.spawn <= 0) {
-      const obstacle = { x: width + 16, width: 20 + Math.floor(random() * 8), height: 18 + Math.floor(random() * 12), kind: random() < .5 ? 'stone' : 'book', passed: false };
+      const obstacle = spawnObstacle(run, random, width);
       run.obstacles.push(obstacle);
       run.stars.push(spawnStar(obstacle, run.spawns));
       run.spawns++;
-      run.spawn = 1.4 + random() * .6;
+      run.spawn = spawnInterval(run, random);
     }
     for (const obstacle of run.obstacles) {
       obstacle.x -= run.speed * step;
@@ -139,7 +319,7 @@ const COPY = {
     topline: 'CLAWD / LITTLE RUN',
     thisRun: '这次', best: '最好',
     boardAria: 'Clawd 跳跃跑道',
-    canvasAria: '四条腿的 Clawd 沿纸面小路奔跑，跳过石头和书本，收集星星',
+    canvasAria: '四条腿的 Clawd 沿湖边、林间与庭院的小路奔跑，跳过石头、书本、陶罐与栅栏，收集星星',
     jumpLabel: '跳一下', chargeLabel: '蓄力',
     pause: '暂停', resume: '继续',
     keys: 'SPACE / ↑ \u00a0 轻点跳 · 长按蓄力 \u00a0 · \u00a0 P 暂停',
@@ -166,7 +346,7 @@ const COPY = {
     topline: 'CLAWD / LITTLE RUN',
     thisRun: 'This run', best: 'Best',
     boardAria: 'Clawd jump track',
-    canvasAria: 'Four-legged Clawd runs along a paper path, jumping stones and books and collecting stars',
+    canvasAria: 'Four-legged Clawd runs along lakeside, forest and courtyard paths, jumping stones, books, pots and fences and collecting stars',
     jumpLabel: 'Jump', chargeLabel: 'Charge',
     pause: 'Pause', resume: 'Resume',
     keys: 'SPACE / ↑ \u00a0 Tap / hold \u00a0 · \u00a0 P Pause',
@@ -275,46 +455,12 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   }
   function draw() {
     if (!palette) return;
-    const p = palette; const drift = reduced.matches ? 0 : run.distance * .055;
-    ctx.clearRect(0, 0, width, 230); ctx.fillStyle = p.soft; ctx.fillRect(0, 0, width, 230);
-    // The two hill layers move only during an intentional run; reduced motion holds them still.
-    ctx.fillStyle = p.line;
-    for (let x = 0; x < width; x += 8) {
-      const top = 143 - Math.round((Math.sin((x + drift) / 95) * 19 + Math.sin((x + drift) / 47 + 2) * 9) / 4) * 4;
-      ctx.fillRect(x, top, 8, GROUND - top);
-    }
-    ctx.fillStyle = p.soft;
-    for (let x = 0; x < width; x += 8) {
-      const top = 165 - Math.round((Math.sin((x + drift * 1.8) / 65 + 1) * 8 + Math.sin((x + drift) / 37) * 4) / 4) * 4;
-      ctx.fillRect(x, top, 8, GROUND - top);
-    }
-    ctx.fillStyle = p.accent; ctx.globalAlpha = .55;
-    ctx.fillRect(width - 109, 33, 22, 30); ctx.fillRect(width - 113, 38, 30, 20); ctx.globalAlpha = 1;
-    if (p.night) {
-      ctx.fillStyle = p.soft; ctx.fillRect(width - 103, 28, 20, 25); ctx.fillRect(width - 98, 48, 16, 9);
-      for (let i=0;i<7;i++) pixelStar(29+i*137, 26+(i*29)%70, 1, p.muted);
-    }
-    // Pixel clouds, no remote assets.
-    ctx.fillStyle = p.line;
-    for (const [x,y] of [[width*.24,51],[width*.64,72]]) {
-      ctx.fillRect(x,y,36,4);ctx.fillRect(x+8,y-5,20,5);ctx.fillRect(x+13,y-9,10,4);
-    }
+    const p = palette;
+    // Soft crossfade between places keeps the boundary gentle; reduced motion freezes parallax
+    // but still paints the current place with the same palette (no theme flip).
+    drawScenery(ctx, width, run, p.night, reduced.matches);
     ctx.fillStyle = p.line; ctx.fillRect(0, GROUND, width, 1);
-    const groundOffset = reduced.matches ? 0 : run.distance % 107;
-    for (let x = -107; x < width + 107; x += 107) {
-      ctx.fillRect(Math.round(x + 18 - groundOffset), GROUND + 10, 8, 2);
-      ctx.fillRect(Math.round(x + 69 - groundOffset), GROUND + 22, 4, 2);
-    }
-    for (const obstacle of run.obstacles) {
-      const x = Math.round(obstacle.x), y = GROUND - obstacle.height;
-      if (obstacle.kind === 'book') {
-        ctx.fillStyle = p.muted; ctx.fillRect(x,y+6,obstacle.width,obstacle.height-6);ctx.fillRect(x+3,y,obstacle.width-4,6);
-        ctx.fillStyle = p.bg; ctx.fillRect(x+4,y+9,obstacle.width-7,3);ctx.fillRect(x+4,y+15,obstacle.width-7,2);
-      } else {
-        ctx.fillStyle = p.muted; ctx.fillRect(x,y+6,obstacle.width,obstacle.height-6);ctx.fillRect(x+5,y,obstacle.width-10,6);
-        ctx.fillStyle = p.line; ctx.fillRect(x+7,y+6,5,3);
-      }
-    }
+    for (const obstacle of run.obstacles) drawObstacle(ctx, obstacle, p);
     for (const star of run.stars) {
       const bob = reduced.matches ? 0 : Math.sin(run.elapsed * 4 + star.x / 60) * 2;
       pixelStar(star.x, star.y + bob, star.value === 50 ? 6 : 4, p.night ? '#dec488' : '#9b762f');
