@@ -14,7 +14,7 @@ export function hasConfirmedWorkArchive(receipt: Receipt): boolean {
   return !!receipt.archive_path && (!!receipt.archive_digest || receipt.steps.some(step => step.id === 'archive' && step.status === 'completed'));
 }
 
-export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download';
+export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download' | 'language';
 const paths: Record<IconName, ReactNode> = {
   sidebar: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></>,
   environments: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></>,
@@ -31,6 +31,7 @@ const paths: Record<IconName, ReactNode> = {
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/></>,
   moon: <path d="M20 14a8 8 0 0 1-10-10A9 9 0 1 0 20 14Z"/>,
   download: <><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></>,
+  language: <><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></>,
 };
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
 export function Brand() { return <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect className="brand-beam" x="4" y="8.5" width="23" height="4"/><rect className="brand-support" x="6.5" y="12.5" width="4" height="10.5"/><rect className="brand-support" x="20.5" y="12.5" width="3.5" height="10.5"/><rect className="brand-mark-cursor" x="24.75" y="21" width="4" height="2"/></svg>; }
@@ -79,7 +80,7 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
     { value: 'zh-CN', label: '简体中文' },
     { value: 'en', label: 'English' },
   ];
-  return <label className="field language-switch"><span>{t('language.select')}</span><select aria-label={t('language.select')} value={setting} onChange={event => setLanguage(event.target.value as 'system' | 'zh-CN' | 'en')}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><small>{t('language.hint')}</small></label>;
+  return <label className="field language-switch"><span className="language-switch-label">{t('language.select')}</span><span className="language-control"><Icon name="language" size={14}/><select aria-label={t('language.select')} value={setting} onChange={event => setLanguage(event.target.value as 'system' | 'zh-CN' | 'en')}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><Icon name="chevron" size={11}/></span><small>{t('language.hint')}</small></label>;
 }
 
 export function Status({ value }: { value: string }) {

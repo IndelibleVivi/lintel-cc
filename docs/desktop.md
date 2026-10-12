@@ -16,7 +16,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 ### 界面语言
 
-App 支持简体中文 / English，默认跟随系统；顶部语言选择器与“设置与模块”提供手动选择，并只在当前 webview 的本机存储中保存。macOS native command `app_preferred_languages` 从 CoreFoundation 只读取得最多 8 个有界语言标识，bundle 的 `Info.plist` 声明 `en` / `zh-Hans`；网页／合成运行使用浏览器语言作为 fallback。不支持的语言回到 English。`app_set_language` 只接受 `en` / `zh-CN`，同步普通 macOS 菜单的文字，保留原生动作与快捷键。此路径不读取 Claude 配置、账号或工作内容，不改动系统语言。
+App 支持简体中文 / English，默认跟随系统；顶部语言入口与 Day／Night 使用同一套轻量控件：地球标记、当前语言和下拉箭头，设置中显示完整标签与说明，键盘焦点保持可见。顶部语言选择器与“设置与模块”提供手动选择，并只在当前 webview 的本机存储中保存。macOS native command `app_preferred_languages` 从 CoreFoundation 只读取得最多 8 个有界语言标识，bundle 的 `Info.plist` 声明 `en` / `zh-Hans`；网页／合成运行使用浏览器语言作为 fallback。不支持的语言回到 English。`app_set_language` 只接受 `en` / `zh-CN`，同步普通 macOS 菜单的文字，保留原生动作与快捷键。此路径不读取 Claude 配置、账号或工作内容，不改动系统语言。
 
 切换立即更新界面和 `html.lang`，保留当前页面、目标、草案、输入和已冻结的计划／hash，不重新提交或批准操作。Clawd 继续使用这次打开选中的同一句问候及对应翻译，不重新随机、不重复消费日期彩蛋；日期与数字按当前 locale 格式化。翻译随 App 打包，无网络请求。core 已知的静态标题、步骤、保留范围与能力说明通过 `i18n-presentation.ts` 在显示层投影；未知／旧 runner 文案原样显示，原 plan 与 receipt 不改写。UI 自有错误保留文案 key，在当前 locale 下显示。用户命名、路径、命令、设置字段、任务 ID、工作原文与原始诊断不作语言改写。CLI、扩展 popup、官网及外链文档保留各自语言；候选是否已包含本次源码更新见[当前状态](current-state.md)。
 
