@@ -6,9 +6,17 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 官网短直腿部署（47158cd，2026-10-12）
+
+此部署后来被 clean `427e981` 的官网双语／组合能力场景／蓄力版本替代；旧有限 payload 保留。下行只记录当时线上观察，不证明后续 revision。
+
+| 对象 | 历史证据 |
+| --- | --- |
+| 官网托管 | [lintel.page](https://lintel.page/) 已更新；Direct Upload Pages project `lintel`，production deployment `f5525e87-87c7-47cb-9ed7-1cf77d992888`，preview `131dcc49-4656-4f0f-927a-a7766dc7f316`，均声明 clean source `47158cda045d03d2ffb3fb8210a2f2ac3ab503d4`。同一 21 文件有限 payload 先验 preview 再上传生产，影片／海报与原审阅字节相同，未加入下载或 feed。正式域名 HTTPS 页面正常加载，浏览器实际取得的 clawd-game.mjs 与当前源码逐字节一致：新 STRIDE_TRAVEL 短腿步态在场、旧 whole-body bounce 已退出；游戏启动／跳跃／暂停、390px Night 的继续／暂停与无横向溢出、无相关 console error 已核对；正式域名影片通过原生控件播放到 20.01s（1920×1080），关闭暂停并归零。旧实际线上脚本与 `6c4e5df` 完全相同，确认是部署落后。shell／web 直读受到 Cloudflare 1010／浏览器 manifest 直达受阻，本轮没有冒称重新读回公开 manifest、DNS／RUM 或完整首次上线矩阵。原先影片／headers／手机验收保留于候选历史；本轮实际媒体 site-ui 通过。更新程序见 [site-hosting](site-hosting.md) |
+
 ## 首次双语候选（47158cd，2026-10-12）
 
-以下保留入口简化之前的本地 App；它被 clean `e1a2df4` 候选替代，旧包保留。官网继续使用 `47158cd` 的独立静态 payload，这个 App 替代关系不改变生产部署。最初双语实现及 dev native 的六项语言旅程属于 `65495b7`，manual→System 的 native 选择尚未验证。
+以下保留入口简化之前的本地 App；它被 clean `e1a2df4` 候选替代，旧包保留。当时官网使用 `47158cd` 的独立静态 payload，App 替代关系没有改变该次生产部署；后续官网更新见 current-state。最初双语实现及 dev native 的六项语言旅程属于 `65495b7`，manual→System 的 native 选择尚未验证。
 
 | 对象 | 历史证据 |
 | --- | --- |

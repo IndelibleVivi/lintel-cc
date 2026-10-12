@@ -115,7 +115,7 @@ Linux systemd 服务可在“清理与重建”展开“目标后台服务”，
 
 [中英文文档入口](docs/index.md) 汇集维护中的使用／操作指南；中文是 canonical edition，规格、当前状态与开发证据仍由原中文文件拥有。
 
-官网源码在 [`apps/site`](apps/site/README.md)：独立静态页面，以六个任务说明当前能力，用合成保全旅程解释预览、批准执行与原任务核对；首屏在字标与山湖之间留出安静空间，完整橙脚承住末尾 `l`，header 的独立 `_` 慢闪。点湖面会产生扩散、渐隐并自行消失的水纹，三幅画中的 Clawd 藏着短暂回应，夜景以柔和暖灰衬托橙色身体与黑眼睛；彩蛋不显示提示或发现计数；四步工作包旅程可点击探索，提供风景暂停与 reduced motion。原件阅读示例、中英文试用入口与 opt-in Clawd 跳跃小游戏保持可达。按需打开的 20 秒英文概念短片保留配音、音乐与音效。既有静态站点已在 [lintel.page](https://lintel.page/) 上线，使用 Cloudflare Pages 同源托管。本次源码新增 `/` 简中与 `/en/` English、六任务标题小图标与交错 SVG 场景、蓄力玩法，尚不代表这些变化已部署；实际线上 revision 见[当前状态](docs/current-state.md)。网站不连接本机执行核心，不提供正式 App 下载。启动方式见[官网说明](apps/site/README.md)，更新程序见[托管说明](docs/site-hosting.md)。
+官网源码在 [`apps/site`](apps/site/README.md)：独立静态页面，以六个任务说明当前能力，用合成保全旅程解释预览、批准执行与原任务核对；首屏在字标与山湖之间留出安静空间，完整橙脚承住末尾 `l`，header 的独立 `_` 慢闪。点湖面会产生扩散、渐隐并自行消失的水纹，三幅画中的 Clawd 藏着短暂回应，夜景以柔和暖灰衬托橙色身体与黑眼睛；彩蛋不显示提示或发现计数；四步工作包旅程可点击探索，提供风景暂停与 reduced motion。原件阅读示例、中英文试用入口与 opt-in Clawd 跳跃小游戏保持可达。按需打开的 20 秒英文概念短片保留配音、音乐与音效。既有静态站点已在 [lintel.page](https://lintel.page/) 上线，使用 Cloudflare Pages 同源托管。官网现有 `/` 简中与 `/en/` English、六任务标题小图标与交错 SVG 场景，以及轻点／长按松手蓄力玩法；实际线上 revision 与回访样式缓存状态见[当前状态](docs/current-state.md)。网站不连接本机执行核心，不提供正式 App 下载。启动方式见[官网说明](apps/site/README.md)，更新程序见[托管说明](docs/site-hosting.md)。
 
 ```sh
 python3 tests/verify.py

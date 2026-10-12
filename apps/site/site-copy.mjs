@@ -34,7 +34,7 @@ const pairs = [
   ["c029","你的浏览器不支持内嵌视频，可","Your browser does not support embedded video. You can "],
   ["c030","下载短片","download the film"],
   ["c031","20 秒英文短片：从你的工作开始。可用原生控件播放、暂停、开启字幕或全屏。","A 20-second film in English: start with your work. Use the native controls to play, pause, enable English captions, or enter full screen."],
-  ["c032","从环境设置，","From environment settings"],
+  ["c032","从环境设置，","From your setup,"],
   ["c033","到工作的下一站。","to your next stretch of work."],
   ["c034","六个入口，对应六类实际任务。","Six ways in, for six real kinds of task."],
   ["c035","在本机或指定的主机上，把范围和变化说清楚。","Know the scope and changes, on your machine or a selected host."],

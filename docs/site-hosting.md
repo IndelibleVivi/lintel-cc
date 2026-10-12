@@ -21,6 +21,8 @@ python3 -m http.server 4317 --bind 127.0.0.1 \
 
 中文 markup／paired copy 有变更时，先运行 `node scripts/prepare-site-languages.mjs`；`--check` 和 `site-ui` 会拒绝过期 English 页面。完整 payload 同时供应 `/` 与 `/en/`，无需 JavaScript 就有各自的文案、SVG 图注、元数据与对应使用指南入口。`site-ui` 另检查切换／history 后游戏、视频播放、details 与旅程仍是原实例。源文件也可直接本地预览，但只有完整 payload 含实际短片与分享图。`site-build.json` 记录打包时的 source revision、dirty 状态及公开文件字节数，不包含输入目录或账户信息；它是来源声明，不是签名或完整性认证。正式更新优先在已提交的 clean source 上重新打包，不修改旧 manifest 来冒充另一个 revision。
 
+正式域名曾实际返回 CSS `max-age=14400`；回访浏览器会继续使用旧样式，即使 `_headers` 的目标策略已经改为立即 revalidate。两条 canonical stylesheet 入口因此使用版本 query，CSS 字节变更时更新该 query 并重新生成 English。线上检查要包含一次正常缓存的回访，不以禁用浏览器缓存代替最终验收；此做法不改变 Cloudflare 账号缓存设置。
+
 ## Preview 与生产
 
 在已有正确 Cloudflare 登录和当前部署授权下，从 repo 根目录执行。Wrangler 固定为本次使用的 `4.148.0`，不进入 App dependency graph：

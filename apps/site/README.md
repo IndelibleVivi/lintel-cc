@@ -4,6 +4,8 @@ Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个
 
 ## 本地预览
 
+`index.html` 的两条 stylesheet 入口带版本 query。修改网站或共享游戏 CSS 时同步更新该版本，再生成 English 页面；两路使用相同入口，有限静态 payload 仍只包含原 CSS 文件。
+
 在 repository 根目录运行：
 
 ```sh
@@ -19,7 +21,7 @@ python3 -m http.server 4317 --bind 127.0.0.1 --directory apps/site
 - **hero `#top`** — 本地 raster 山湖叠加原生 `.brand-wordmark-svg` 和梁柱标记；缩小字标、拉开字标／Preview／标题关系、下移风景，保留较多安静纸面。完整橙脚承住最后一个 `l`，微圆角下面的原色字脚由 canonical mask 去掉；向右仍只伸出短截。header／footer 用同一 glyph 配独立、较细的 `_`，按 2.6 秒节奏慢闪，hero 橙脚静止；reduced motion 下全部静止。中文字句、产品说明与中英文试用入口紧接画面，正文没有覆盖风景的卡片。
 - **hero 短片入口 `#film-open`** — 既有 CTA 旁一个安静的 `.film-open` 链接（“看 20 秒短片 · 英文”）。无 JavaScript（或模块加载失败）时它就是一个指向同源 `media/lintel-intro.mp4` 的普通链接；`film.mjs` 挂载后由同一链接经 `showModal()` 打开 `#film-dialog`。短片为英文，无中文配音，打开后再按原生播放控件开始。
 - **`#film-dialog`** — 原生 `<dialog>` 全屏深色 cinematic 表面：真实原生 `<video controls playsinline preload="none" poster>`（初始不下载、不开播）、可见的 `.film-close`、accessible `aria-label`，焦点移入并由原生 modal 保证被遮住的页面不可点击；`Esc`／关闭按钮停止声音并把焦点还给入口，重开从干净状态开始。含一条同源英文 `<track kind="captions">`（`film.vtt`，四句，时间取自生产源）。桌面 1440 与手机 390／320 均保持 16:9、无溢出、close 可见。不自动滚动、不加 storage／analytics／外部 CDN／YouTube iframe。
-- **`#capabilities`（正文第一段）** — 首屏之后是六项能力索引：六个开放的 `article[data-capability]` 条目（无外框卡片），其 `data-capability` 必须等于 [task-catalog](../../contracts/task-catalog.json) 的六个稳定任务 id（`reduce_egress`、`preserve_work`、`repair_cleanup_retire`、`browser_profile`、`ssh_remote`、`recover_results`）。每个条目标题直接链接对应权威文档／anchor（保护方案→`docs/operator-guide.md#protect`，保全→`#work`，清理→`#cleanup`，浏览器→`docs/browser.md`，SSH→`docs/remote.md`，恢复→`#recovery`），正文给出具体结果，另有一行“就近限制”。每项标题旁配一个 32px 原创细线小图标（设置、携带工作、文件夹、浏览器、主机、回执），沿用 Lintel 柔和转角与陶土强调色；小图标装饰性 `aria-hidden`，accessible 名称由实际标题提供。同一个条目再配一幅解释对象／去向的 SVG 场景：桌面交错图文，手机先文字再场景，保留独立图注与双语 SVG labels／accessible 名称。每项只有一份文字与就近限制，示意不读电脑、不执行操作。旧 `.capability-line` 已退休，不再出现。
+- **`#capabilities`（正文第一段）** — 首屏之后以共同 kicker、顶端对齐的标题／介绍和成对小注打开六项能力索引：六个开放的 `article[data-capability]` 条目（无外框卡片），其 `data-capability` 必须等于 [task-catalog](../../contracts/task-catalog.json) 的六个稳定任务 id（`reduce_egress`、`preserve_work`、`repair_cleanup_retire`、`browser_profile`、`ssh_remote`、`recover_results`）。每个条目标题直接链接对应权威文档／anchor（保护方案→`docs/operator-guide.md#protect`，保全→`#work`，清理→`#cleanup`，浏览器→`docs/browser.md`，SSH→`docs/remote.md`，恢复→`#recovery`），正文给出具体结果，另有一行“就近限制”。每项标题旁配一个 32px 原创细线小图标（设置、携带工作、文件夹、浏览器、主机、回执），沿用 Lintel 柔和转角与陶土强调色；小图标装饰性 `aria-hidden`，accessible 名称由实际标题提供。同一个条目再配一幅解释对象／去向的 SVG 场景：桌面交错图文，手机先文字再场景，保留独立图注与双语 SVG labels／accessible 名称。每项只有一份文字与就近限制，示意不读电脑、不执行操作。旧 `.capability-line` 已退休，不再出现。
 - **`#journey`** — 插画旅程的起点（正文叙事由此展开）。
 - **`#keep`、`#sample-pages`、`#review`** — 中文产品叙事与合成阅读示例：精确保全、原生 `<details id="sample-pages">` 阅读示例（带 `<summary>`，鼠标／键盘开合，链接会直接展开并定位到原件，内含**显式合成**的 `CLAUDE.md`、`MEMORY.md`、`session.jsonl` 片段，无 reader 编辑／写入、剪贴板、crypto 或“生成工作包”按钮）、预览→批准→原任务结果，内容不等待滚动动画。
 - **`#how-it-works`** — 用“只保全、不清理”的三份合成原件示例解释四步（明确对象 → 预览 → 批准执行 → 原任务核对），`.execution-entries` 说明 macOS App／独立 CLI／SSH 三个入口（App 与 CLI 共用执行核心；SSH 由目标主机 runner 执行），`.execution-boundary` 说明浏览器与官网的独立有限边界；末尾 `.thread-line` 保留 `accepted ≠ completed · 只核对，不重放`。四步 `li` 与全部文本是**服务器渲染**的权威说明；其上的交互式“工作包旅程”（`#workflow-trail`）为近旁解释，缺 JavaScript 时保持隐藏。
