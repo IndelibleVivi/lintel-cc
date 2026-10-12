@@ -14,18 +14,18 @@ const EYES_SHUT = [[19, 18, 8, 3], [55, 18, 8, 3]];
 const STAR_HIT_X = 30, STAR_HIT_Y = 24;
 // Two opposing pairs of short straight legs step once per 100px of travel.
 const STRIDE_TRAVEL = 100;
-const CHARGE_SECONDS = .4, TAP_SECONDS = .09;
+const HOLD_SECONDS = .26, TAP_SECONDS = .09, HOLD_LIFT = 1400;
 // Three visible star rows. The row advances every spawn, so successive stars sit at clearly
 // different heights; a small deterministic jitter keeps them from looking printed. All three rows
 // (and their jitter) stay inside a tap jump's reach. Every fourth star is a higher, double-value
-// star that asks for a charged jump; nothing is collectible from the ground.
+// star that asks for a held jump; nothing is collectible from the ground.
 const STAR_ROWS = [98, 118, 138];
 const STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
 export function newRun() {
-  return { status: 'ready', y: 0, velocity: 0, distance: 0, speed: 210, spawn: 1,
+  return { status: 'ready', y: 0, velocity: 0, distance: 0, speed: 260, spawn: 1,
     obstacles: [], stars: [], collected: 0, elapsed: 0, landing: 0, buffer: 0,
-    particles: [], dust: 0, cleared: 0, spawns: 0, charging: false, charge: 0,
-    bufferPower: 0, bonus: 0, lastReward: 25 };
+    particles: [], dust: 0, cleared: 0, spawns: 0, holding: false, holdTime: 0,
+    boosting: false, bonus: 0, lastReward: 25 };
 }
 export function points(run) { return Math.floor(run.distance / 10) + run.collected * 25 + (run.bonus || 0); }
 // The star keeps its horizontal bond to the obstacle (12px in) but takes the next visible row.
@@ -37,7 +37,7 @@ export function spawnStar(obstacle, spawns = 0) {
 
 // ---- Obstacle families. Four real ground silhouettes, each with a fixed finite dimension band
 // and its own jump rhythm. pot and fence are taller/wider but their heights stay inside the tap
-// jump's reach; the charged jump is what buys the high double-value star, not obstacle clearance.
+// jump's reach; the held jump is what buys the high double-value star, not obstacle clearance.
 // The kind ladder is deterministic, not random scatter: every third spawn may be harder once its
 // distance gate opens, and a hard step is always followed by an easy one, so there is a genuine
 // post-clear recovery window even at the densest spacing. Dimensions only jitter their band. --/
@@ -80,112 +80,79 @@ export function spawnInterval(run, random) {
   return Math.max(interval, 360 / Math.max(run.speed, 120));
 }
 
-// ---- Three recognizable places cycle by travelled distance. Each has its own Day and Night
-// palette so a fixed daylight stage never flips to night; a soft colour-and-silhouette crossfade
-// across the band boundary keeps transitions gentle. Layer offsets are a finite parallax of the
-// same silhouettes; reduced motion freezes them. All drawing is original canvas, no assets. --/
+// Keep the original monochrome pixel/ASCII-like landscape: theme ink, stepped hills,
+// small clouds and the same sun/moon. Places vary the marks, never the visual language.
 export const PLACE_LENGTH = 1400;
-export const PLACES = [
-  { id: 'lake',
-    day:  { sky: '#dbe8ea', far: '#b7cdd2', hill: '#9cb7a9', trunk: '#5f7f68', leaf: '#85a487', ground: '#e7ddc9', accent: '#d98a4c', glow: '#f3d48a' },
-    night: { sky: '#131a23', far: '#1b2733', hill: '#253541', trunk: '#2f4a38', leaf: '#35604a', ground: '#2f2a1f', accent: '#e0b56e', glow: '#f5dfa0' } },
-  { id: 'forest',
-    day:  { sky: '#e8ecda', far: '#c5cfab', hill: '#8cab7e', trunk: '#7a5a3c', leaf: '#7fa06f', ground: '#e0d6bd', accent: '#c17749', glow: '#f0d98c' },
-    night: { sky: '#102019', far: '#172a1e', hill: '#203a2b', trunk: '#241a12', leaf: '#2c4f33', ground: '#2b241a', accent: '#d7b56b', glow: '#f3e6a6' } },
-  { id: 'court',
-    day:  { sky: '#efe5d3', far: '#d9c7a2', hill: '#c0a572', trunk: '#8a6a3a', leaf: '#a68b52', ground: '#e8dfc9', accent: '#b5651d', glow: '#f1c86a' },
-    night: { sky: '#17120c', far: '#231b11', hill: '#2c2114', trunk: '#2a1e10', leaf: '#3c2f1b', ground: '#3b2f1d', accent: '#df9f4d', glow: '#f6e2a0' } },
-];
-export function scene(run, night) {
+export const PLACES = [{ id: 'lake' }, { id: 'forest' }, { id: 'court' }];
+export function scene(run) {
   const pos = run.distance / PLACE_LENGTH, idx = Math.floor(pos), prog = pos - idx;
-  const t = prog > 0.82 ? (prog - 0.82) / 0.18 : 0;
-  return { index: idx % PLACES.length, t, night };
+  return { index: idx % PLACES.length, t: prog > .82 ? (prog - .82) / .18 : 0 };
 }
 function wrap(v, span) { return ((v % span) + span) % span; }
-function ridge(ctx, width, baseY, amp, off, segs, phase) {
-  ctx.beginPath(); ctx.moveTo(0, 188);
-  for (let i = 0; i <= segs; i++) { const x = i * width / segs; ctx.lineTo(x, baseY - Math.sin((x + off) * 0.012 + phase) * amp); }
-  ctx.lineTo(width, 188); ctx.closePath(); ctx.fill();
-}
-function drawLake(ctx, width, c, off) {
-  ctx.fillStyle = c.far; ridge(ctx, width, 131, 21, off * .15, 32, 2.8);
-  ctx.fillStyle = c.hill; ridge(ctx, width, 150, 16, off * 0.3, 24, 1.3);
-  const water = 158;
-  ctx.fillStyle = c.far; ctx.fillRect(0, water, width, 188 - water);
-  ctx.save(); ctx.globalAlpha *= .55;
-  ctx.fillStyle = c.sky;
-  const g = wrap(off * 0.9, 52);
-  for (let x = -52; x < width; x += 52) { ctx.fillRect(Math.round(x - g + 12), water + 7, 9, 1); ctx.fillRect(Math.round(x - g - 22), water + 16, 5, 1); }
-  ctx.restore();
-  const bx = wrap(width * .6 - off * .25 + 60, width + 120) - 60, by = water - 5;
-  ctx.fillStyle = c.trunk; ctx.fillRect(bx, by, 40, 3); ctx.fillRect(bx + 4, by + 3, 32, 3); ctx.fillRect(bx + 9, by + 6, 22, 2);
-  ctx.fillRect(bx + 20, by - 31, 2, 31);
-  ctx.fillStyle = c.glow;
-  for (let i = 0; i < 6; i++) ctx.fillRect(bx + 23, by - 29 + i * 4, 3 + i * 3, 4);
-  ctx.fillStyle = c.accent; ctx.fillRect(bx + 16, by - 2, 8, 2);
-  ctx.fillStyle = c.hill;
-  const rx = wrap(off * 1.1, 90);
-  for (let x = -90; x < width + 90; x += 90) { const cx = Math.round(x - rx + 30); ctx.fillRect(cx + 8, 188 - 16, 2, 16); ctx.fillRect(cx + 18, 188 - 11, 2, 11); }
-}
-function drawForest(ctx, width, c, off, night) {
-  ctx.fillStyle = c.far; ridge(ctx, width, 117, 21, off * .15, 32, .5);
-  const tree = (x, top, size, foliage, trunk) => {
-    ctx.fillStyle = trunk; ctx.fillRect(x - 2, top + size * .35, 4, 188 - top - size * .35);
-    ctx.fillStyle = foliage;
-    for (let tier = 0; tier < 3; tier++) for (let row = 0; row < 5; row++) {
-      const half = Math.round((row + 1) * size / 12 + tier * size / 12);
-      ctx.fillRect(x - half, top + tier * size * .28 + row * 4, half * 2, 4);
-    }
-  };
-  for (let x = -84; x < width + 84; x += 84) tree(Math.round(x + 35 - wrap(off * .35, 84)), 76, 44, c.hill, c.hill);
-  for (let x = -152; x < width + 152; x += 152) tree(Math.round(x + 75 - wrap(off * .75, 152)), 62, 64, c.leaf, c.trunk);
-  if (night) {
-    ctx.save(); ctx.globalAlpha *= .8; ctx.fillStyle = c.glow; for (let i = 0; i < 6; i++) { const fx = wrap(off * 0.6 + i * 53, width + 40) - 20; ctx.fillRect(Math.round(fx), 42 + (i * 31) % 66, 1, 1); } ctx.restore();
-  }
-}
-function drawCourt(ctx, width, c, off, night) {
-  ctx.fillStyle = c.hill; ridge(ctx, width, 140, 10, off * 0.3, 22, 3);
-  ctx.fillStyle = c.far; ctx.fillRect(0, 150, width, 188 - 150);
-  ctx.fillStyle = c.trunk; for (let x = 0; x < width; x += 26) ctx.fillRect(Math.round(x + 13 - (off * 0.05) % 26), 150, 4, 38);
-  const gx = Math.round(wrap(width * .65 - off * .45 + 80, width + 180) - 80);
-  ctx.fillStyle = c.trunk; ctx.fillRect(gx - 21, 118, 5, 70); ctx.fillRect(gx + 17, 118, 5, 70); ctx.fillRect(gx - 21, 118, 43, 5);
-  ctx.fillStyle = c.accent; ctx.fillRect(gx - 32, 114, 65, 4); ctx.fillRect(gx - 26, 110, 53, 4); ctx.fillRect(gx - 18, 106, 37, 4);
-  for (const side of [-1, 1]) {
-    const lx = gx + side * 31;
-    ctx.fillStyle = c.trunk; ctx.fillRect(lx, 142, 2, 46);
-    ctx.fillStyle = c.accent; ctx.fillRect(lx - 4, 144, 10, 14);
-    ctx.save(); ctx.globalAlpha *= night ? .85 : .45; ctx.fillStyle = c.glow; ctx.fillRect(lx - 2, 146, 6, 10); ctx.restore();
-  }
-}
-export function drawPlaceScene(ctx, width, place, night, off, reduced, alpha = 1) {
-  const c = place[night ? 'night' : 'day'];
+function drawPlaceScene(ctx, width, place, p, distance, reduced, alpha = 1) {
+  const drift = reduced ? 0 : distance * .055;
   ctx.save(); ctx.globalAlpha = alpha;
-  ctx.fillStyle = c.sky; ctx.fillRect(0, 0, width, 188);
-  ctx.fillStyle = c.glow;
-  const sx = Math.round(width * .8);
-  ctx.fillRect(sx, 27, 14, 22); ctx.fillRect(sx - 4, 31, 22, 14);
-  if (night) { ctx.fillStyle = c.sky; ctx.fillRect(sx + 4, 24, 14, 20); }
-  else {
-    ctx.save(); ctx.globalAlpha *= .65; ctx.fillStyle = '#fff9e8';
-    for (const [x, y] of [[width * .2, 38], [width * .52, 65]]) { ctx.fillRect(x, y, 40, 4); ctx.fillRect(x + 7, y - 4, 23, 4); }
-    ctx.restore();
+  ctx.fillStyle = p.soft; ctx.fillRect(0, 0, width, 230);
+  ctx.fillStyle = p.line;
+  for (let x = 0; x < width; x += 8) {
+    const top = 143 - Math.round((Math.sin((x + drift) / 95) * 19 + Math.sin((x + drift) / 47 + 2) * 9) / 4) * 4;
+    ctx.fillRect(x, top, 8, GROUND - top);
   }
-  const o = reduced ? 0 : off;
-  if (place.id === 'lake') drawLake(ctx, width, c, o);
-  else if (place.id === 'forest') drawForest(ctx, width, c, o, night);
-  else drawCourt(ctx, width, c, o, night);
-  ctx.fillStyle = c.ground; ctx.fillRect(0, 188, width, 42);
-  ctx.save(); ctx.globalAlpha *= .3; ctx.fillStyle = c.trunk;
-  for (let x = -70; x < width + 70; x += 70) ctx.fillRect(Math.round(x + 19 - wrap(o, 70)), 205 + (x % 3), 8, 2);
-  ctx.restore();
+  ctx.fillStyle = p.soft;
+  for (let x = 0; x < width; x += 8) {
+    const top = 165 - Math.round((Math.sin((x + drift * 1.8) / 65 + 1) * 8 + Math.sin((x + drift) / 37) * 4) / 4) * 4;
+    ctx.fillRect(x, top, 8, GROUND - top);
+  }
+  // Quiet background marks share the old hill ink; obstacles retain the stronger foreground ink.
+  ctx.fillStyle = p.line;
+  if (place.id === 'forest') {
+    for (let x = -152; x < width + 152; x += 152) {
+      const centre = Math.round((x + 76 - wrap(drift, 152)) / 4) * 4;
+      ctx.fillRect(centre - 2, 108, 4, 58);
+      for (let tier = 0; tier < 3; tier++) for (let row = 0; row < 4; row++) {
+        const half = (row + 1 + tier) * 4;
+        ctx.fillRect(centre - half, 76 + tier * 20 + row * 4, half * 2, 4);
+      }
+    }
+  } else if (place.id === 'court') {
+    const x = Math.round((width * .62 - wrap(drift, width + 160) + 60) / 4) * 4;
+    ctx.fillRect(x, 112, 4, 60); ctx.fillRect(x + 52, 112, 4, 60);
+    ctx.fillRect(x - 12, 108, 80, 4); ctx.fillRect(x - 4, 104, 64, 4);
+    ctx.fillRect(x + 4, 100, 48, 4);
+    for (const side of [-16, 68]) {
+      ctx.fillRect(x + side, 130, 4, 38);
+      ctx.fillRect(x + side - 4, 132, 12, 12);
+      ctx.fillStyle = p.soft; ctx.fillRect(x + side, 136, 4, 4); ctx.fillStyle = p.line;
+    }
+  }
+  ctx.fillStyle = p.accent; ctx.globalAlpha = alpha * .55;
+  ctx.fillRect(width - 109, 33, 22, 30); ctx.fillRect(width - 113, 38, 30, 20);
+  ctx.globalAlpha = alpha;
+  if (p.night) {
+    ctx.fillStyle = p.soft; ctx.fillRect(width - 103, 28, 20, 25); ctx.fillRect(width - 98, 48, 16, 9);
+    ctx.fillStyle = p.muted;
+    for (let i = 0; i < 7; i++) {
+      const x = 29 + i * 137, y = 26 + (i * 29) % 70;
+      ctx.fillRect(x, y - 1, 1, 3); ctx.fillRect(x - 1, y, 3, 1);
+    }
+  }
+  ctx.fillStyle = p.line;
+  for (const [x, y] of [[width * .24, 51], [width * .64, 72]]) {
+    ctx.fillRect(x, y, 36, 4); ctx.fillRect(x + 8, y - 5, 20, 5); ctx.fillRect(x + 13, y - 9, 10, 4);
+  }
+  ctx.fillRect(0, GROUND, width, 1);
+  const groundOffset = reduced ? 0 : distance % 107;
+  for (let x = -107; x < width + 107; x += 107) {
+    ctx.fillRect(Math.round(x + 18 - groundOffset), GROUND + 10, 8, 2);
+    ctx.fillRect(Math.round(x + 69 - groundOffset), GROUND + 22, 4, 2);
+  }
   ctx.restore();
 }
-export function drawScenery(ctx, width, run, night, reduced) {
-  const place = scene(run, night);
+export function drawScenery(ctx, width, run, palette, reduced) {
+  const place = scene(run);
   ctx.clearRect(0, 0, width, 230);
-  // The first layer is opaque; the second blends over it, retaining opaque pixels throughout.
-  drawPlaceScene(ctx, width, PLACES[place.index], night, run.distance * .06, reduced);
-  if (!reduced && place.t > 0) drawPlaceScene(ctx, width, PLACES[(place.index + 1) % PLACES.length], night, run.distance * .06, false, place.t);
+  drawPlaceScene(ctx, width, PLACES[place.index], palette, run.distance, reduced);
+  if (!reduced && place.t > 0) drawPlaceScene(ctx, width, PLACES[(place.index + 1) % PLACES.length], palette, run.distance, false, place.t);
 }
 export function drawObstacle(ctx, obstacle, p) {
   const x = Math.round(obstacle.x), y = GROUND - obstacle.height;
@@ -217,41 +184,52 @@ export function drawObstacle(ctx, obstacle, p) {
 function burst(run, x, y, kind, count) {
   for (let i = 0; i < count; i++) run.particles.push({ x, y, vx: (i - (count - 1) / 2) * 35, vy: -40 - (i % 3) * 25, life: .4 + i * .025, kind });
 }
-function takeoff(run, power = 0) {
-  run.velocity = 480 + 170 * Math.max(0, Math.min(1, power)); run.buffer = 0; run.bufferPower = 0; run.landing = 0;
+function takeoff(run) {
+  run.velocity = 480; run.buffer = 0; run.landing = 0;
+  run.holdTime = 0; run.boosting = run.holding;
   burst(run, PLAYER_X + 20, GROUND - 2, 'dust', 4);
 }
-export function jump(run, power = 0) {
+export function jump(run) {
   if (run.status !== 'running') return;
-  if (run.y === 0) takeoff(run, power);
-  else { run.buffer = .12; run.bufferPower = power; } // A release just before landing is kept for the next step.
+  if (run.y === 0) takeoff(run);
+  else run.buffer = .12; // A press just before landing is kept for the next step.
 }
-export function chargePower(run) { return Math.max(0, Math.min(1, (run.charge - TAP_SECONDS) / (CHARGE_SECONDS - TAP_SECONDS))); }
-export function beginCharge(run) {
-  if (run.status !== 'running' || run.charging) return;
-  run.charging = true; run.charge = 0;
+export function holdPower(run) { return Math.max(0, Math.min(1, (run.holdTime - TAP_SECONDS) / (HOLD_SECONDS - TAP_SECONDS))); }
+export function pressJump(run) {
+  if (run.status !== 'running' || run.holding) return;
+  run.holding = true;
+  jump(run); // Every input takes off now. Holding only extends this ascent.
 }
-export function releaseCharge(run) {
-  if (!run.charging) return;
-  const power = chargePower(run); run.charging = false; run.charge = 0; jump(run, power);
+export function releaseJump(run) {
+  run.holding = false; run.boosting = false; run.holdTime = 0;
 }
-export function cancelCharge(run) { run.charging = false; run.charge = 0; run.buffer = 0; run.bufferPower = 0; }
+export function cancelJump(run) { releaseJump(run); run.buffer = 0; }
 export function advance(run, dt, width, random = Math.random) {
   if (run.status !== 'running' || dt <= 0) return;
   let remaining = Math.min(dt, .1);
   while (remaining > 0 && run.status === 'running') {
     const step = Math.min(remaining, 1 / 120); remaining -= step;
     run.elapsed += step; run.distance += run.speed * step;
-    run.speed = Math.min(350, 210 + run.distance / 220);
+    run.speed = Math.min(350, 260 + run.distance / 300);
     run.buffer = Math.max(0, run.buffer - step); run.landing = Math.max(0, run.landing - step);
     const airborne = run.y > 0 || run.velocity > 0;
-    if (run.charging && !airborne) run.charge = Math.min(CHARGE_SECONDS, run.charge + step);
     if (airborne) {
-      run.y += run.velocity * step - GRAVITY * step * step / 2; run.velocity -= GRAVITY * step;
+      // Split at the tap/hold boundaries so the same gesture has the same flight at every FPS.
+      let flight = step;
+      while (flight > 1e-9) {
+        const canLift = run.holding && run.boosting && run.velocity > 0 && run.holdTime < HOLD_SECONDS;
+        const boundary = run.holdTime < TAP_SECONDS ? TAP_SECONDS : HOLD_SECONDS;
+        const part = canLift ? Math.min(flight, boundary - run.holdTime) : flight;
+        const gravity = GRAVITY - (canLift && run.holdTime >= TAP_SECONDS ? HOLD_LIFT : 0);
+        run.y += run.velocity * part - gravity * part * part / 2; run.velocity -= gravity * part;
+        if (canLift) run.holdTime = Math.min(HOLD_SECONDS, run.holdTime + part);
+        flight -= part;
+      }
       if (run.y <= 0) {
         run.y = 0; run.velocity = 0; run.landing = .14;
         burst(run, PLAYER_X + 22, GROUND - 2, 'dust', 5);
-        if (run.buffer > 0) takeoff(run, run.bufferPower);
+        run.boosting = false;
+        if (run.buffer > 0) takeoff(run);
       }
     }
     run.dust -= step;
@@ -283,7 +261,7 @@ export function advance(run, dt, width, random = Math.random) {
       particle.life -= step; particle.x += particle.vx * step; particle.y += particle.vy * step; particle.vy += 160 * step;
     }
     run.particles = run.particles.filter(particle => particle.life > 0);
-    if (run.obstacles.some(obstacle => PLAYER_X + 52 > obstacle.x + 3 && PLAYER_X + 11 < obstacle.x + obstacle.width - 3 && run.y + 4 < obstacle.height)) { run.status = 'over'; cancelCharge(run); }
+    if (run.obstacles.some(obstacle => PLAYER_X + 52 > obstacle.x + 3 && PLAYER_X + 11 < obstacle.x + obstacle.width - 3 && run.y + 4 < obstacle.height)) { run.status = 'over'; cancelJump(run); }
   }
 }
 export function clawdPose(run, reduced = false) {
@@ -297,7 +275,6 @@ export function clawdPose(run, reduced = false) {
   const landing = run.landing / .14;
   const ascending = air && run.velocity > 0;
   const stretch = ascending ? Math.min(1, run.velocity / 480) : 0;
-  const tension = !air && run.charging ? chargePower(run) : 0;
   // Move only the continuous leg edges: the chest stays level and a supporting pair stays planted.
   const legs = anchored ? STANDING_LEGS.map(({ x }, i) => {
     const phase = pace + (i === 0 || i === 3 ? 0 : Math.PI);
@@ -305,8 +282,8 @@ export function clawdPose(run, reduced = false) {
   }) : STANDING_LEGS;
   return {
     anchor: 0,
-    scaleX: 1 + landing * .1 + tension * .14,
-    scaleY: 1 - landing * .1 + stretch * .1 - tension * .16,
+    scaleX: 1 + landing * .1,
+    scaleY: 1 - landing * .1 + stretch * .1,
     legs,
     eyes: EYES_OPEN,
   };
@@ -319,11 +296,11 @@ const COPY = {
     topline: 'CLAWD / LITTLE RUN',
     thisRun: '这次', best: '最好',
     boardAria: 'Clawd 跳跃跑道',
-    canvasAria: '四条腿的 Clawd 沿湖边、林间与庭院的小路奔跑，跳过石头、书本、陶罐与栅栏，收集星星',
-    jumpLabel: '跳一下', chargeLabel: '蓄力',
+    canvasAria: '四条腿的 Clawd 沿单色像素小路，经过山线、树林与庭院，跳过石头、书本、陶罐与栅栏，收集星星',
+    jumpLabel: '跳一下', holdLabel: '高跳',
     pause: '暂停', resume: '继续',
-    keys: 'SPACE / ↑ \u00a0 轻点跳 · 长按蓄力 \u00a0 · \u00a0 P 暂停',
-    instructions: '轻点跑道或「跳一下」跳跃；长按后松手，跳得更高。空格 / ↑ 同样可蓄力，P 暂停。普通星星 +25，高处的大星星 +50；离开游戏自动暂停。',
+    keys: 'SPACE / ↑ \u00a0 按下跳 · 按住更高 \u00a0 · \u00a0 P 暂停',
+    instructions: '按下跑道或「跳一下」立即起跳；按住跳得更高，松手停止加高。空格 / ↑ 同样可用，P 暂停。普通星星 +25，高处的大星星 +50；离开游戏自动暂停。',
     storage: '最好成绩只留在这个浏览器里。',
     storageUnavailable: '浏览器存储不可用，成绩仅保留到关闭本页。',
     phaseReady: '把星星收进口袋。',
@@ -346,11 +323,11 @@ const COPY = {
     topline: 'CLAWD / LITTLE RUN',
     thisRun: 'This run', best: 'Best',
     boardAria: 'Clawd jump track',
-    canvasAria: 'Four-legged Clawd runs along lakeside, forest and courtyard paths, jumping stones, books, pots and fences and collecting stars',
-    jumpLabel: 'Jump', chargeLabel: 'Charge',
+    canvasAria: 'Four-legged Clawd runs through monochrome pixel hills, woods and courtyard marks, jumping stones, books, pots and fences and collecting stars',
+    jumpLabel: 'Jump', holdLabel: 'Higher',
     pause: 'Pause', resume: 'Resume',
-    keys: 'SPACE / ↑ \u00a0 Tap / hold \u00a0 · \u00a0 P Pause',
-    instructions: 'Tap the track or “Jump” to hop; hold, then release to jump higher. Space / ↑ can charge too; P pauses. Stars +25, large high stars +50. Leaving the game pauses it.',
+    keys: 'SPACE / ↑ \u00a0 Press / hold \u00a0 · \u00a0 P Pause',
+    instructions: 'Press the track or “Jump” to hop immediately; keep holding to jump higher, release to stop the lift. Space / ↑ work too; P pauses. Stars +25, large high stars +50. Leaving the game pauses it.',
     storage: 'Your best score stays only in this browser.',
     storageUnavailable: 'Browser storage is unavailable; the score is kept only until this page closes.',
     phaseReady: 'Pop the stars in your pocket.',
@@ -375,7 +352,7 @@ function resolveCopy(language) { return Object.hasOwn(COPY, language) ? COPY[lan
 export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', language = 'zh-CN' } = {}) {
   root.className = 'clawd-game';
   let copy = resolveCopy(language);
-  root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span><label class="cg-charge"><span class="cg-charge-label">${copy.chargeLabel}</span><progress max="100" value="0" aria-label="${copy.chargeLabel}"></progress></label></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
+  root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span><label class="cg-hold"><span class="cg-hold-label">${copy.holdLabel}</span><progress max="100" value="0" aria-label="${copy.holdLabel}"></progress></label></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
   const $ = selector => root.querySelector(selector);
   const board = $('.cg-board'), canvas = $('canvas'), ctx = canvas.getContext('2d');
   const score = $('.cg-score'), bestOutput = $('.cg-best'), overlay = $('.cg-overlay');
@@ -413,13 +390,13 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
       over: [copy.phaseOverTitle, copy.phaseOverSub(points(run), run.collected, run.cleared), copy.phaseOverStart, copy.phaseOverStatus],
     }[run.status];
   }
-  function syncCharge() {
-    root.dataset.charging = String(run.charging);
-    $('.cg-charge').setAttribute('aria-hidden', String(!run.charging));
-    $('progress').value = Math.round(chargePower(run) * 100);
+  function syncHold() {
+    root.dataset.holding = String(run.holding && run.boosting && run.holdTime > TAP_SECONDS);
+    $('.cg-hold').setAttribute('aria-hidden', String(!(run.holding && run.boosting && run.holdTime > TAP_SECONDS)));
+    $('progress').value = Math.round(holdPower(run) * 100);
   }
   function sync() {
-    syncCharge();
+    syncHold();
     root.dataset.state = run.status;
     root.setAttribute('lang', currentLanguage);
     overlay.hidden = run.status === 'running';
@@ -441,8 +418,8 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     $('.cg-run-label').textContent = copy.thisRun;
     $('.cg-best-label').textContent = copy.best;
     $('.cg-jump-label').textContent = copy.jumpLabel;
-    $('.cg-charge-label').textContent = copy.chargeLabel;
-    $('progress').setAttribute('aria-label', copy.chargeLabel);
+    $('.cg-hold-label').textContent = copy.holdLabel;
+    $('progress').setAttribute('aria-label', copy.holdLabel);
     $('.cg-keys').textContent = copy.keys;
     $('.cg-instructions-text').textContent = copy.instructions;
     $('.cg-storage').textContent = storageBroken ? copy.storageUnavailable : copy.storage;
@@ -456,9 +433,8 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   function draw() {
     if (!palette) return;
     const p = palette;
-    // Soft crossfade between places keeps the boundary gentle; reduced motion freezes parallax
-    // but still paints the current place with the same palette (no theme flip).
-    drawScenery(ctx, width, run, p.night, reduced.matches);
+    // The original theme ink and stepped landscape remain the same through each place.
+    drawScenery(ctx, width, run, p, reduced.matches);
     ctx.fillStyle = p.line; ctx.fillRect(0, GROUND, width, 1);
     for (const obstacle of run.obstacles) drawObstacle(ctx, obstacle, p);
     for (const star of run.stars) {
@@ -487,7 +463,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     advance(run,last ? (now-last)/1000 : 0,width);last=now;
     score.textContent=pad(points(run));$('.cg-stars').textContent=run.collected;
     $('.cg-collect').textContent=run.particles.some(p=>p.kind==='star') ? `✦ +${run.lastReward}` : '';
-    syncCharge();
+    syncHold();
     if (collected !== run.collected) status.textContent=copy.collected(run.collected, run.lastReward);
     draw();
     if (run.status === 'over') {clearInput();saveBest();sync();frame=0;}
@@ -504,20 +480,20 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     clearInput();run.status='paused';cancelAnimationFrame(frame);frame=0;saveBest();sync();draw();
   }
   function clearInput() {
-    const previous = input; input = null; cancelCharge(run);
+    const previous = input; input = null; cancelJump(run);
     if (previous?.kind === 'pointer' && previous.target.hasPointerCapture(previous.id)) previous.target.releasePointerCapture(previous.id);
-    syncCharge();
+    syncHold();
   }
   function hop() {start();jump(run);board.focus({preventScroll:true});}
   function pressPointer(event) {
     if (event.button !== 0 || !event.isPrimary || input || (event.currentTarget === board && event.target.closest('button'))) return;
-    start(); beginCharge(run);
+    start(); pressJump(run);
     input = {kind:'pointer',id:event.pointerId,target:event.currentTarget};
-    event.currentTarget.setPointerCapture(event.pointerId); syncCharge();
+    event.currentTarget.setPointerCapture(event.pointerId); syncHold();
   }
   function releasePointer(event) {
     if (input?.kind !== 'pointer' || input.id !== event.pointerId) return;
-    const previous = input; input = null; releaseCharge(run); syncCharge();
+    const previous = input; input = null; releaseJump(run); syncHold();
     if (previous.target.hasPointerCapture(previous.id)) previous.target.releasePointerCapture(previous.id);
     board.focus({preventScroll:true});
   }
@@ -525,7 +501,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   const jumpButton = $('.cg-jump');
   listen(startButton,'click',start);
   // Assistive technology's semantic click is a normal hop. Pointer/key gestures
-  // already committed on release and must never jump a second time on click.
+  // already committed on press and must never jump a second time on click.
   listen(jumpButton,'click',event=>{if(event.detail===0)hop();});
   listen(pauseButton,'click',()=>run.status==='paused'?start():pause());
   for (const target of [board,jumpButton]) {
@@ -537,14 +513,14 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
       event.preventDefault(); if(event.repeat)return;
       if(event.key.toLowerCase()==='p'){if(run.status==='paused')start();else pause();return;}
       if(input)return;
-      start(); beginCharge(run);input={kind:'key',key:event.key};syncCharge();
+      start(); pressJump(run);input={kind:'key',key:event.key};syncHold();
     });
   }
   listen(window,'pointerup',releasePointer);
   listen(window,'pointercancel',cancelPointer);
   listen(window,'keyup',event=>{
     if(input?.kind!=='key'||input.key!==event.key)return;
-    event.preventDefault();input=null;releaseCharge(run);syncCharge();board.focus({preventScroll:true});
+    event.preventDefault();input=null;releaseJump(run);syncHold();board.focus({preventScroll:true});
   });
   listen(root,'focusout',event=>{if(!root.contains(event.relatedTarget))pause();});
   listen(window,'blur',pause);

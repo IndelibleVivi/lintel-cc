@@ -30,10 +30,13 @@ try{
     window.cancelAnimationFrame=id=>{pending.delete(id);cancel(id);};
     window.pendingAnimationFrames=()=>pending.size;
     // Observe actual canvas placement, without a product game-state getter.
-    window.__clawdMinY=188;window.__clawdY=188;
+    window.__clawdMinY=188;window.__clawdY=188;window.__firstLiftProgress=null;
     const translate=CanvasRenderingContext2D.prototype.translate;
     CanvasRenderingContext2D.prototype.translate=function(x,y){
-      if(x===80&&this.canvas.closest('.clawd-game')){window.__clawdY=y;window.__clawdMinY=Math.min(window.__clawdMinY,y);}
+      if(x===80&&this.canvas.closest('.clawd-game')){
+        if(y<188&&window.__firstLiftProgress===null)window.__firstLiftProgress=document.querySelector('.cg-hold progress').value;
+        window.__clawdY=y;window.__clawdMinY=Math.min(window.__clawdMinY,y);
+      }
       return translate.call(this,x,y);
     };
   });
@@ -64,50 +67,54 @@ try{
   await dialog.getByRole('button',{name:'第 2 幅：雨夜小屋',exact:true}).click();
   await dialog.getByRole('tab',{name:'跳一小段',exact:true}).click();
   assert.equal(await game.count(),1);assert.equal(await game.getAttribute('data-state'),'ready');
-  async function freshChargeRun(){
+  async function freshHoldRun(){
     await dialog.getByRole('tab',{name:'点阵风景册',exact:true}).click();
     await dialog.getByRole('tab',{name:'跳一小段',exact:true}).click();
-    await page.evaluate(()=>{window.__clawdMinY=188;window.__clawdY=188;});
+    await page.evaluate(()=>{window.__clawdMinY=188;window.__clawdY=188;window.__firstLiftProgress=null;});
   }
   await dialog.locator('.cg-jump').click();await page.waitForTimeout(650);
   const tapPeak=await page.evaluate(()=>188-window.__clawdMinY);
   assert.ok(tapPeak>70&&tapPeak<85,'pointer tap retains the original jump height');
-  await freshChargeRun();
+  await freshHoldRun();
   const jumpBox=await dialog.locator('.cg-jump').boundingBox();
   await page.mouse.move(jumpBox.x+jumpBox.width/2,jumpBox.y+jumpBox.height/2);await page.mouse.down();
-  await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value===100);
-  assert.equal(await page.evaluate(()=>window.__clawdMinY),188,'holding continues the run without takeoff');
-  assert.equal(await game.getAttribute('data-charging'),'true');
+  await page.waitForFunction(()=>window.__clawdMinY<180);
+  assert.equal(await page.evaluate(()=>window.__firstLiftProgress),0,'the first visible lift precedes the hold window');
+  await page.waitForFunction(()=>document.querySelector('.cg-hold progress').value===100);
+  assert.ok(await page.evaluate(()=>window.__clawdMinY)<188,'pointer down takes off before pointer up');
+  assert.equal(await game.getAttribute('data-holding'),'true');
   await page.mouse.up();await page.waitForFunction(()=>window.__clawdMinY<70);
-  assert.equal(await game.getAttribute('data-charging'),'false','release consumes charge once');
-  await page.keyboard.press('p');await dialog.screenshot({path:path.join(output,'app-charged-jump.png')});
-  await freshChargeRun();const chargeBoard=dialog.locator('.cg-board');await chargeBoard.focus();
-  await page.keyboard.down('Space');await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value>20);
-  await game.evaluate(node=>{window.__chargingCanvas=node.querySelector('canvas')});
+  assert.equal(await game.getAttribute('data-holding'),'false','release ends the lift without a second takeoff');
+  await page.keyboard.press('p');await dialog.screenshot({path:path.join(output,'app-held-jump.png')});
+  await freshHoldRun();const holdBoard=dialog.locator('.cg-board');await holdBoard.focus();
+  await page.keyboard.down('Space');await page.waitForFunction(()=>document.querySelector('.cg-hold progress').value>20);
+  await game.evaluate(node=>{window.__holdingCanvas=node.querySelector('canvas')});
   await page.evaluate(()=>{window.__preferred=['en-US'];window.dispatchEvent(new Event('languagechange'));});
-  await dialog.getByRole('progressbar',{name:'Charge',exact:true}).waitFor();
-  assert.equal(await game.getAttribute('data-charging'),'true');
-  assert.equal(await game.evaluate(node=>node.querySelector('canvas')===window.__chargingCanvas),true,'relabeling keeps the held input and canvas');
-  assert.ok(await game.locator('progress').evaluate(node=>node.value>=20),'language change does not clear charge');
+  await dialog.getByRole('progressbar',{name:'Higher',exact:true}).waitFor();
+  assert.equal(await game.getAttribute('data-holding'),'true');
+  assert.equal(await game.evaluate(node=>node.querySelector('canvas')===window.__holdingCanvas),true,'relabeling keeps the held input and canvas');
+  assert.ok(await game.locator('progress').evaluate(node=>node.value>=20),'language change does not clear the active hold');
   await page.evaluate(()=>{window.__preferred=['zh-Hans'];window.dispatchEvent(new Event('languagechange'));});
-  await dialog.getByRole('progressbar',{name:'蓄力',exact:true}).waitFor();
+  await dialog.getByRole('progressbar',{name:'高跳',exact:true}).waitFor();
   await page.keyboard.press('p');
-  assert.equal(await game.getAttribute('data-state'),'paused');assert.equal(await game.getAttribute('data-charging'),'false');
+  assert.equal(await game.getAttribute('data-state'),'paused');assert.equal(await game.getAttribute('data-holding'),'false');
   assert.equal(await game.locator('progress').evaluate(node=>node.value),0);
-  await page.keyboard.up('Space');await dialog.locator('.cg-start').click();await page.waitForTimeout(100);
+  await page.keyboard.up('Space');await dialog.locator('.cg-start').click();await page.waitForFunction(()=>window.__clawdY===188);await page.waitForTimeout(100);
   assert.equal(await page.evaluate(()=>window.__clawdY),188,'cancelled key release cannot trigger a delayed takeoff');
-  await freshChargeRun();await chargeBoard.focus();await page.keyboard.down('ArrowUp');
-  await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value===100);
-  assert.equal(await page.evaluate(()=>window.__clawdMinY),188);
+  await freshHoldRun();await holdBoard.focus();await page.keyboard.down('ArrowUp');
+  await page.waitForFunction(()=>document.querySelector('.cg-hold progress').value===100);
+  assert.ok(await page.evaluate(()=>window.__clawdMinY)<188,'keyboard down takes off while the key remains held');
   await page.keyboard.up('ArrowUp');await page.waitForFunction(()=>window.__clawdMinY<70);
-  assert.equal(await game.getAttribute('data-charging'),'false','keyboard release launches the charged jump');
-  await freshChargeRun();const touchBox=await chargeBoard.boundingBox();const touch=await page.context().newCDPSession(page);
+  assert.equal(await game.getAttribute('data-holding'),'false','keyboard release ends the existing lift');
+  await freshHoldRun();const touchBox=await holdBoard.boundingBox();const touch=await page.context().newCDPSession(page);
   await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchBox.x+110,y:touchBox.y+150,id:1}]});
-  await page.waitForFunction(()=>document.querySelector('.clawd-game').dataset.charging==='true');await page.waitForTimeout(180);
+  await page.waitForFunction(()=>document.querySelector('.cg-hold progress').value>20);
   await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
-  assert.equal(await game.getAttribute('data-charging'),'false');await page.waitForTimeout(100);
-  assert.equal(await page.evaluate(()=>window.__clawdY),188,'cancelled touch never jumps');
-  await touch.detach();await freshChargeRun();
+  assert.equal(await game.getAttribute('data-holding'),'false');await page.waitForFunction(()=>window.__clawdY===188);
+  const cancelledPeak=await page.evaluate(()=>188-window.__clawdMinY);
+  assert.ok(cancelledPeak>70&&cancelledPeak<130,'touch down jumps immediately; cancellation stops extra lift');
+  await page.waitForTimeout(100);assert.equal(await page.evaluate(()=>window.__clawdY),188,'cancelled touch cannot jump again');
+  await touch.detach();await freshHoldRun();
   await dialog.locator('.cg-jump').click();assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),1);
   await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   await page.waitForFunction(()=>window.pendingAnimationFrames()===0);
@@ -125,6 +132,6 @@ try{
   await page.emulateMedia({colorScheme:'dark'});await openGame();
   assert.equal(await game.evaluate(node=>getComputedStyle(node).getPropertyValue('--bg').trim().toLowerCase()),'#24231f');
   assert.deepEqual(errors,[]);
-  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause','pointer tap retains original height; pointer and keyboard hold/release jump higher; pause and touch cancellation clear held input; live language switch preserves charging and canvas','live zh/en relabeling preserves game/canvas identity, paused phase, score, collected stars, best and RAF count'],screenshots:output};
+  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause','pointer tap retains original height; pointer and keyboard down jump immediately, holding raises that same jump; pause and touch cancellation clear held input; live language switch preserves active hold and canvas','live zh/en relabeling preserves game/canvas identity, paused phase, score, collected stars, best and RAF count'],screenshots:output};
   await writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();preview.kill('SIGTERM');}

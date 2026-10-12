@@ -125,7 +125,7 @@ requires a new preview and approval, and old IDs are never redone.
   themes are available. Clawd has moon and snack surprises, and the
   pocket menu includes a moon-picking action. The pocket playroom shares one opt-in runner with the
   website: Clawd keeps its connected short legs, bounces over obstacles, and
-  collects stars at different heights. Current source supports tap-height jumps, hold-and-release charging and a high +50 star every fourth star. The track moves through a lakeshore, forest and courtyard as distance grows, with stones, books, plant pots and fences in different sizes and varied spacing; existing App candidates retain the older game. Scores stay local to each client.
+  collects stars at different heights. Current source jumps immediately on press; short taps keep the original height and holding adds lift to that same jump. Starting speed is 260px/s, increasing smoothly to 350px/s, with a high +50 star every fourth star. The original monochrome pixel/ASCII-like hills remain, with forest and courtyard marks appearing as distance grows. Stones, books, plant pots and fences vary in size and spacing; existing App candidates retain the older game. Scores stay local to each client.
 - Explicitly test IPv4/IPv6 from the host-default path and the selected Lintel channel, with echoed IP, elapsed time and specific failures. An absent channel stays untested. macOS supports an approved shared-service IPv6 off/link-local change, automatic comparison against the same targets and complete original-configuration restore. Linux offers readonly inspection and probes. Real macOS configuration round trips remain unverified; see the [IPv4/IPv6 Leaf (Chinese)](docs/specs/ip-network.md).
 - Optionally start a loopback proxy in the desktop environment detail, set a
   default allow/block and exact host/port rules, read back the live config, and
@@ -260,7 +260,7 @@ flow; scenery can be paused and respects reduced motion. Source-reading examples
 Chinese and English trial links, and the opt-in Clawd game remain available.
 A quiet link opens the 20-second English concept film with speech, music and sound
 effects; playback starts only on request. The existing static site is live at
-[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages. The site provides `/` Simplified Chinese and `/en/` English, six tasks with original title icons and alternating SVG scenes, and tap or hold-and-release jumps. Shared track source also has three places, four obstacle families and varied spacing. [Current state (Chinese)](docs/current-state.md) records the live revision and candidate status.
+[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages. The site provides `/` Simplified Chinese and `/en/` English, six tasks with original title icons and alternating SVG scenes, and tap or hold-and-release jumps. Shared track source now uses immediate press-and-hold jumps with the original monochrome scenery, three places, four obstacle families and varied spacing. [Current state (Chinese)](docs/current-state.md) records the live revision and candidate status.
 It does not connect to the local execution core or offer a formal app download.
 See the [site README (Chinese)](apps/site/README.md) to start it and the
 [hosting guide (Chinese)](docs/site-hosting.md) to update it.

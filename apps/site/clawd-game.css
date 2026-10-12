@@ -5,8 +5,8 @@
 .clawd-game button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;box-shadow:none}.clawd-game button:disabled{cursor:default;opacity:.5}
 
 /* Hold feedback is finite and driven by the existing game loop, never an ambient timer. */
-.cg-charge{position:absolute;left:20px;bottom:14px;display:flex;align-items:center;gap:8px;font:10px var(--cg-mono);color:var(--muted);opacity:0;pointer-events:none}
-.clawd-game[data-charging="true"] .cg-charge{opacity:1}
-.cg-charge progress{appearance:none;width:76px;height:4px;border:0;background:var(--line);color:var(--accent)}
-.cg-charge progress::-webkit-progress-bar{background:var(--line)}.cg-charge progress::-webkit-progress-value{background:var(--accent)}.cg-charge progress::-moz-progress-bar{background:var(--accent)}
+.cg-hold{position:absolute;left:20px;bottom:14px;display:flex;align-items:center;gap:8px;font:10px var(--cg-mono);color:var(--muted);opacity:0;pointer-events:none}
+.clawd-game[data-holding="true"] .cg-hold{opacity:1}
+.cg-hold progress{appearance:none;width:76px;height:4px;border:0;background:var(--line);color:var(--accent)}
+.cg-hold progress::-webkit-progress-bar{background:var(--line)}.cg-hold progress::-webkit-progress-value{background:var(--accent)}.cg-hold progress::-moz-progress-bar{background:var(--accent)}
 .cg-jump{touch-action:manipulation;user-select:none;-webkit-user-select:none}

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newRun, jump, beginCharge, releaseCharge, cancelCharge, chargePower, advance, clawdPose, spawnStar, points, BODY, clawdBody, OBSTACLE_KINDS, OBSTACLE_BOUNDS, spawnObstacle, spawnInterval, isHard, PLACE_LENGTH, PLACES, scene } from '../apps/site/clawd-game.mjs';
+import { newRun, jump, pressJump, releaseJump, cancelJump, holdPower, advance, clawdPose, spawnStar, points, BODY, clawdBody, OBSTACLE_KINDS, OBSTACLE_BOUNDS, spawnObstacle, spawnInterval, isHard, PLACE_LENGTH, PLACES, scene, drawScenery } from '../apps/site/clawd-game.mjs';
 
-// Restored original tuning the reachability checks depend on.
+// Current speed tuning used by independent reachability checks.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
-const MIN_SPEED = 210, MAX_SPEED = 350;
+const MIN_SPEED = 260, MAX_SPEED = 350;
 // Every height the star scheme can produce: the three visible rows, each plus its bounded jitter.
 const STAR_ROWS = [98, 118, 138], STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
 const HIGH_HEIGHTS = [...new Set(STAR_JITTER.map(j=>56+Math.max(-4,Math.min(4,j))))];
@@ -78,7 +78,7 @@ test('successive stars take visibly different heights that a real jump can reach
   for (let i = 0; i < 12; i++) sequence.push(spawnStar({ x: 0 }, i).y);
   assert.ok(new Set(sequence).size >= 9, `heights must vary across spawns, saw ${new Set(sequence).size}`);
   assert.ok(Math.max(...sequence) - Math.min(...sequence) >= 40, `the spread is at least 40px, saw ${Math.max(...sequence) - Math.min(...sequence)}`);
-  for (const y of sequence) assert.ok([...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y), `${y} is a normal or charged star height`);
+  for (const y of sequence) assert.ok([...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y), `${y} is a normal or held star height`);
   // Three consecutive stars sit on three different rows, so the change is visible in a play session.
   assert.equal(spawnStar({ x: 0 }, 0).y, 98);
   assert.equal(spawnStar({ x: 0 }, 1).y, 123);
@@ -93,7 +93,7 @@ test('successive stars take visibly different heights that a real jump can reach
     if (run.spawns !== before) spawned.push(run.stars.at(-1)?.y);
   }
   assert.ok(spawned.length >= 3, `advance must really spawn several stars, saw ${spawned.length}`);
-  assert.ok(spawned.every(y => [...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y)), 'every advance-spawned star uses the normal/charged height scheme');
+  assert.ok(spawned.every(y => [...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y)), 'every advance-spawned star uses the normal/held height scheme');
   assert.ok(Math.max(...spawned) - Math.min(...spawned) >= 40, 'the advance-spawned heights visibly spread');
 });
 
@@ -110,17 +110,18 @@ test('nobody can collect a star from the ground: every height needs a real jump'
 // run is still running, no unrelated obstacle/star ever appeared, and the requested speed held.
 function fly(starY, obstacleH, obstacleW, speed, launchX, trace, power=0) {
   const run = newRun(); run.status = 'running';
-  // advance() recomputes speed as min(350, 210 + distance/220); seed distance so the requested speed
-  // holds from the first step. At 350 (the clamp) any distance past 30800 pins it exactly at 350;
-  // at 210 the game keeps accelerating from here, which is the real behaviour, not a downgrade.
-  run.speed = speed; run.distance = (speed - 210) * 220;
+  // advance() recomputes speed as min(350, 260 + distance/300); seed distance so the requested speed
+  // holds from the first step. At 350 (the clamp) any distance past 27000 pins it exactly at 350;
+  // at 260 the game keeps accelerating from here, which is the real behaviour, not a downgrade.
+  run.speed = speed; run.distance = (speed - 260) * 300;
   const obstacle = { x: 600, width: obstacleW, height: obstacleH, kind: 'stone', passed: false };
   run.obstacles = [obstacle];
   run.stars = [{ x: 612, y: starY }];
   run.spawn = 1e6; // a finite spawn delay far beyond this short trial: no unrelated star can appear
   let launched = false, landed = false, speedHeld = run.speed === speed, minSpeed = run.speed, maxSpeed = run.speed;
   for (let step = 0; step < 200000; step++) {
-    if (!launched && obstacle.x <= launchX) { jump(run,power); launched = true; }
+    if (!launched && obstacle.x <= launchX) { if (power) pressJump(run); else jump(run); launched = true; }
+    if (run.holding && holdPower(run) === 1) releaseJump(run);
     advance(run, 1 / 240, 0, () => 0);
     if (run.obstacles.length > 1 || run.stars.length > 1) return false; // spawn delay holds: no extra spawns
     if (speed === 350 && run.speed !== 350) speedHeld = false; // the max-speed trial must never drift
@@ -151,14 +152,14 @@ test('a legal jump collects every star height at normal and maximum speed, talle
   }
   assert.equal(cases, 2 * 2 * 2 * STAR_HEIGHTS.length, 'every advertised speed/height/width/star case ran');
   // Prove the cases really ran at their advertised speed. At the 350 clamp speed can never fall back
-  // toward 210; at 210 the run starts at 210 and only accelerates upward, which is the real game.
+  // toward 260; at 260 the run starts at 260 and only accelerates upward, which is the real game.
   const fast = {};
   assert.ok(fly(STAR_HEIGHTS[0], 29, 28, MAX_SPEED, 118, fast), 'a 350px/s run collects, clears and lands cleanly');
   assert.equal(fast.minSpeed, MAX_SPEED, 'the maximum-speed trial never drifted below 350');
   assert.equal(fast.maxSpeed, MAX_SPEED, 'the maximum-speed trial stayed pinned at the 350 clamp');
   const slow = {};
-  assert.ok(fly(STAR_HEIGHTS[0], 29, 28, MIN_SPEED, 118, slow), 'a 210px/s run collects, clears and lands cleanly');
-  assert.equal(slow.minSpeed, MIN_SPEED, 'the normal-speed trial starts at 210, not a hidden 350');
+  assert.ok(fly(STAR_HEIGHTS[0], 29, 28, MIN_SPEED, 118, slow), 'a 260px/s run collects, clears and lands cleanly');
+  assert.equal(slow.minSpeed, MIN_SPEED, 'the normal-speed trial starts at 260, not a hidden 350');
 });
 
 test('timed jumps collect stars, clear obstacles and score each star only once', () => {
@@ -199,7 +200,7 @@ test('jump height stays consistent at 30 and 144 frames per second', () => {
 // driving the game, so these are outcome checks over real gameplay rather than pose formulas.
 function flyRun({ fps, speed, seconds = 20 }) {
   const run = newRun(); run.status = 'running';
-  run.speed = speed; run.distance = (speed - 210) * 220; // hold the requested speed from the first step
+  run.speed = speed; run.distance = (speed - 260) * 300; // hold the requested speed from the first step
   const wide = 100000; // no obstacle can reach Clawd; this isolates ordinary grounded running
   let footPeak = 0, footFloor = 0;
   for (let i = 0; i < fps * seconds; i++) {
@@ -216,7 +217,7 @@ test('ordinary running anchors the feet on the ground and never bobs the body', 
   // The repeated ground jolt came from a whole-body lift keyed to travelled distance. The repair
   // keeps grounded feet exactly on GROUND: over a real run the pose anchor must hold at 0, never
   // lifting or dropping the body, so no vertical ground beat can exist to jolt it.
-  for (const speed of [210, 280, 350]) {
+  for (const speed of [260, 280, 350]) {
     for (const fps of [30, 60, 144]) {
       const { run, footPeak, footFloor } = flyRun({ fps, speed });
       assert.ok(run.distance > 0, `the ${fps}fps ${speed}px/s run really travelled`);
@@ -227,8 +228,8 @@ test('ordinary running anchors the feet on the ground and never bobs the body', 
 });
 
 test('short straight legs alternate while the chest stays level across frame rates', () => {
-  for (const speed of [210, 280, 350]) for (const fps of [30, 60, 144]) {
-    const run = newRun(); run.status = 'running'; run.distance = (speed - 210) * 220; run.speed = speed;
+  for (const speed of [260, 280, 350]) for (const fps of [30, 60, 144]) {
+    const run = newRun(); run.status = 'running'; run.distance = (speed - 260) * 300; run.speed = speed;
     const tips = [], positions = [];
     for (let i = 0; i < fps * 2; i++) {
       advance(run, 1 / fps, 100000, () => .5);
@@ -290,50 +291,71 @@ test('a real jump keeps the accepted flight stretch and scoring', () => {
 });
 
 
-test('tap releases the original jump; longer holds increase height, cap, and never launch by themselves',()=>{
+test('press takes off immediately; holding raises the same jump, caps and never auto-repeats',()=>{
   const peaks=[];
-  for(const duration of [.05,.3,1]){
+  for(const duration of [.05,.17,.5,1.2]){
     const run=newRun();run.status='running';run.spawn=1e6;
-    beginCharge(run);
-    for(let t=0;t<duration;t+=1/240)advance(run,1/240,2000);
-    assert.equal(run.y,0,'holding never auto-launches');assert.equal(run.velocity,0);
-    assert.ok(run.distance>0,'the road continues while charging');
-    assert.ok(chargePower(run)<=1);
-    const power=chargePower(run);releaseCharge(run);
-    assert.equal(run.charging,false);assert.equal(run.charge,0);
-    assert.equal(run.velocity,480+170*power);
-    let peak=0;for(let i=0;i<300;i++){advance(run,1/240,2000);peak=Math.max(peak,run.y);}
-    assert.equal(run.y,0);peaks.push(peak);
+    pressJump(run);assert.equal(run.velocity,480,'the down event starts the original jump');
+    let peak=0;
+    for(let t=0;t<duration;t+=1/240){advance(run,1/240,2000);peak=Math.max(peak,run.y);}
+    assert.ok(holdPower(run)<=1);
+    const before={y:run.y,velocity:run.velocity};releaseJump(run);
+    assert.equal(run.holding,false);assert.equal(run.holdTime,0);
+    assert.deepEqual({y:run.y,velocity:run.velocity},before,'release adds no second jump or impulse');
+    for(let i=0;i<360;i++){advance(run,1/240,2000);peak=Math.max(peak,run.y);}
+    assert.equal(run.y,0);assert.equal(run.velocity,0);peaks.push(peak);
   }
-  assert.ok(Math.abs(peaks[0]-480**2/(2*1450))<.1,'tap keeps the original jump height');
-  assert.ok(peaks[1]>peaks[0]+20);assert.ok(peaks[2]>peaks[1]+20);
-  assert.ok(peaks[2]<150,'charged leap stays inside the board');
+  assert.ok(Math.abs(peaks[0]-480**2/(2*1450))<.1,'short taps retain the original ballistic height');
+  assert.ok(peaks[1]>peaks[0]+15);assert.ok(peaks[2]>peaks[1]+15);
+  assert.ok(Math.abs(peaks[3]-peaks[2])<.1,'holding past the finite window cannot add height or repeat');
+  assert.ok(peaks[2]<150,'the held leap stays inside the board');
 });
 
-test('charged height is consistent at 30/60/144fps; cancellation cannot leave a delayed jump',()=>{
+test('held height is consistent at 30/60/144fps; cancellation and midair re-press cannot relaunch',()=>{
   const peaks=[];
   for(const fps of [30,60,144]){
-    const run=newRun();run.status='running';run.spawn=1e6;beginCharge(run);
+    const run=newRun();run.status='running';run.spawn=1e6;pressJump(run);
+    let peak=0;
+    for(let i=0;i<fps*2;i++){advance(run,1/fps,2000);peak=Math.max(peak,run.y);}
+    assert.equal(run.y,0,'a held key does not auto-repeat on landing');
+    releaseJump(run);assert.equal(run.velocity,0);peaks.push(peak);
+    pressJump(run);advance(run,.1,2000);cancelJump(run);
+    const velocity=run.velocity;releaseJump(run);assert.equal(run.velocity,velocity,'cancelled release adds no impulse');
+    assert.equal(run.holdTime,0);assert.equal(run.buffer,0);
     for(let i=0;i<fps;i++)advance(run,1/fps,2000);
-    assert.equal(chargePower(run),1);releaseCharge(run);let peak=0;
-    for(let i=0;i<fps*2;i++){advance(run,1/fps,2000);peak=Math.max(peak,run.y);}peaks.push(peak);
-    beginCharge(run);advance(run,.1,2000);cancelCharge(run);releaseCharge(run);
-    assert.equal(run.velocity,0);assert.equal(run.charge,0);assert.equal(run.buffer,0);
+    assert.equal(run.y,0);assert.equal(run.velocity,0);
   }
   assert.ok(Math.max(...peaks)-Math.min(...peaks)<1);
-  const paused=newRun();paused.status='paused';beginCharge(paused);releaseCharge(paused);
-  assert.equal(paused.charging,false);assert.equal(paused.velocity,0);
+  const paused=newRun();paused.status='paused';pressJump(paused);releaseJump(paused);
+  assert.equal(paused.holding,false);assert.equal(paused.velocity,0);
+  const midair=newRun();midair.status='running';midair.spawn=1e6;
+  pressJump(midair);advance(midair,.1,2000);releaseJump(midair);
+  const speed=midair.velocity;pressJump(midair);
+  assert.equal(midair.velocity,speed,'another down event in the air cannot add an impulse');
+  assert.equal(midair.boosting,false,'re-pressing cannot renew the lift window in midair');
 });
 
-test('high double stars require charge, remain cleanly reachable at every speed, and award once',()=>{
+test('a new run starts briskly and accelerates continuously without exceeding the speed cap',()=>{
+  const run=newRun();run.status='running';run.spawn=1e6;
+  assert.equal(run.speed,260);
+  let previous=run.speed;
+  for(let i=0;i<60*110;i++){
+    advance(run,1/60,2000);
+    assert.ok(run.speed>=previous&&run.speed-previous<.1,'acceleration has no step change');
+    assert.ok(run.speed<=350);previous=run.speed;
+  }
+  assert.equal(run.speed,350);
+});
+
+test('high double stars require a held ascent, remain cleanly reachable at every speed, and award once',()=>{
   for(let i=0;i<20;i++)assert.equal(spawnStar({x:100},i).value===50,i%4===3,'one high reward in each group of four');
   for(const y of HIGH_HEIGHTS){
     // Original ballistic apex cannot reach even the lowest edge of this star's hit region.
     assert.ok(GROUND-HEIGHT/2-480**2/(2*1450)-y>HIT_Y,'tap cannot collect a high star');
-    for(const speed of [210,350]){
+    for(const speed of [260,350]){
       let reachable=false;
       for(let x=40;x<500&&!reachable;x++)reachable=fly(y,29,28,speed,x,null,1);
-      assert.ok(reachable,`charged jump can collect high star ${y} and clear tallest obstacle at ${speed}`);
+      assert.ok(reachable,`held jump can collect high star ${y} and clear tallest obstacle at ${speed}`);
     }
   }
   const run=newRun();run.status='running';run.y=100;run.spawn=1e6;
@@ -343,26 +365,26 @@ test('high double stars require charge, remain cleanly reachable at every speed,
   advance(run,1/240,1000);assert.equal(run.collected,1);assert.equal(run.bonus,25);
 });
 
-test('a full charged high-star jump can begin after the star is visible on a 320px track',()=>{
-  for(const fps of [30,144])for(const speed of [210,350])for(const y of HIGH_HEIGHTS){
+test('a full held high-star jump can begin after the star is visible on a 320px track',()=>{
+  for(const fps of [30,144])for(const speed of [260,350])for(const y of HIGH_HEIGHTS){
     let success=false;
     for(let startX=120;startX<=308&&!success;startX++){
-      const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-210)*220;run.speed=speed;
+      const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-260)*300;run.speed=speed;
       const obstacle={x:600,width:28,height:29,passed:false};run.obstacles=[obstacle];run.stars=[{x:612,y,value:50}];
       let began=false,released=false,landed=false;
       for(let frame=0;frame<fps*5&&run.status==='running';frame++){
         if(!began&&obstacle.x<=startX){
-          assert.ok(run.stars[0].x<=320,'charge begins only once the star is on-screen');
-          beginCharge(run);began=true;
+          assert.ok(run.stars[0].x<=320,'input begins only once the star is on-screen');
+          pressJump(run);began=true;
         }
-        if(began&&!released&&chargePower(run)===1){releaseCharge(run);released=true;}
+        if(began&&!released&&holdPower(run)===1){releaseJump(run);released=true;}
         advance(run,1/fps,320,()=>.5);
         if(released&&run.y===0&&run.velocity===0)landed=true;
         if(obstacle.passed&&landed)break;
       }
       success=released&&landed&&obstacle.passed&&run.status==='running'&&run.collected===1&&run.bonus===25;
     }
-    assert.ok(success,`visible anticipation allows full charge/collect/clear/land at ${fps}fps ${speed}px/s star ${y}`);
+    assert.ok(success,`visible anticipation allows full press/hold/collect/clear/land at ${fps}fps ${speed}px/s star ${y}`);
   }
 });
 
@@ -393,36 +415,38 @@ test('a densifying generated field leaves a clearable landing window',()=>{
   // the short/long breathing and the distance-driven difficulty actually buy a player.
   function autoplay({ fps, speed, seconds = 40 }) {
     const run = newRun(); run.status = 'running';
-    run.speed = speed; run.distance = (speed - 210) * 220; // start at the requested speed, with ordinary acceleration
+    run.speed = speed; run.distance = (speed - 260) * 300; // start at the requested speed, with ordinary acceleration
     const random = seeded(17);
     let frames = 0, maxFrames = fps * seconds;
-    const startDistance = (speed - 210) * 220; // the pinned starting distance is part of the seeded run
+    const startDistance = (speed - 260) * 300; // the pinned starting distance is part of the seeded run
     while (run.status === 'running' && frames < maxFrames && run.distance < startDistance + 26000) {
       const next = run.obstacles.find(item => !item.passed && item.x + item.width >= 0 && item.x <= 320);
       const gap = next ? next.x - PX : 1e9;
       const star = next && run.stars.find(item => Math.abs(item.x - next.x - 12) < 1);
-      if (run.charging && chargePower(run) === 1) releaseCharge(run);
-      if (run.y === 0 && run.velocity === 0 && !run.charging && next) {
-        if (star?.value === 50 && next.x <= Math.min(308, 98 + run.speed * .6)) beginCharge(run);
+      if (run.holding && holdPower(run) === 1) releaseJump(run);
+      if (run.y === 0 && run.velocity === 0 && !run.holding && next) {
+        if (star?.value === 50 && next.x <= Math.min(308, 98 + run.speed * .4)) pressJump(run);
         else if (star?.value !== 50 && gap > 30 && gap < 95) jump(run);
       }
       advance(run, 1 / fps, 320, random); frames++;
     }
     return { run, frames };
   }
-  for (const fps of [30, 60, 144]) for (const speed of [210, 280, 350]) {
+  for (const fps of [30, 60, 144]) for (const speed of [260, 280, 350]) {
     const { run, frames } = autoplay({ fps, speed });
     assert.equal(run.status, 'running', `${fps}fps ${speed}px/s never collides through a densifying field`);
     assert.ok(run.cleared >= 4, `${fps}fps ${speed}px/s clears a real sequence of obstacles (${run.cleared})`);
-    assert.ok(run.bonus >= 25, `${fps}fps ${speed}px/s collects a charged high star within the continuous field`);
+    assert.ok(run.bonus >= 25, `${fps}fps ${speed}px/s collects a held high star within the continuous field`);
     assert.ok(run.collected >= 3, `${fps}fps ${speed}px/s keeps collecting stars (${run.collected})`);
     assert.ok(frames > 0, `${fps}fps ${speed}px/s really played`);
   }
   // The field test above already proves hard obstacles are followed by a recovery window (the
   // greedy controller clears and lands through real pot/fence steps). One extra independent probe:
   // a hard obstacle never unavoidably chains into a collision within the same visible window.
-  const run = newRun(); run.status = 'running'; run.speed = 340; run.distance = (340 - 210) * 220;
-  run.obstacles = [{ x: 600, width: 22, height: 44, kind: 'pot', passed: false }];
+  const run = newRun(); run.status = 'running'; run.speed = 340; run.distance = (340 - 260) * 300;
+  // Use the real first-spawn position. A manually placed obstacle at x=600 while later
+  // ones spawn at x=336 creates an artificial overlap unrelated to the generator's gaps.
+  run.obstacles = [{ x: 336, width: 22, height: 44, kind: 'pot', passed: false }];
   run.stars = [spawnStar(run.obstacles[0], 2)];
   run.spawn = spawnInterval({ ...run, obstacles: run.obstacles }, () => 0);
   let landings = 0, wasAir = false;
@@ -438,21 +462,19 @@ test('a densifying generated field leaves a clearable landing window',()=>{
   assert.ok(landings >= 1, 'the player landed again after the hard pot');
 });
 
-test('three places each carry a distinct Day palette and a distinct Night palette',()=>{
-  assert.equal(PLACES.length,3,'exactly three place families');
-  const ids=PLACES.map(p=>p.id);
-  assert.deepEqual(new Set(ids).size,3,'place ids are distinct');
-  for(const place of PLACES){
-    assert.ok(place.day&&place.night,'each place has Day and Night modes');
-    assert.notEqual(place.day.sky,place.night.sky,`${place.id} day/night skies differ`);
-    assert.notEqual(place.day.ground,place.night.ground,`${place.id} day/night ground differs`);
+test('three places retain the original theme ink and rectilinear pixel marks',()=>{
+  assert.deepEqual(PLACES.map(p=>p.id),['lake','forest','court']);
+  for(const night of [false,true]){
+    const palette={soft:'#faf9f6',line:'#dedbd4',muted:'#8d8a82',accent:'#cd7855',night};
+    for(let index=0;index<3;index++){
+      const ink=new Set(),rects=[];
+      const ctx={save(){},restore(){},clearRect(){},fillRect(x,y,w,h){ink.add(this.fillStyle);rects.push([x,y,w,h]);}};
+      drawScenery(ctx,320,{distance:index*PLACE_LENGTH},palette,true);
+      assert.ok([...ink].every(c=>Object.values(palette).includes(c)),'scenery cannot introduce an independent colourful palette');
+      assert.ok(rects.some(([x,y,w,h])=>x===0&&y===0&&w===320&&h===230),'the original paper field covers the board');
+      assert.ok(rects.some(([,y,w,h])=>w===8&&h===188-y),'the original stepped hill columns remain');
+    }
   }
-  assert.notEqual(PLACES[0].day.sky,PLACES[1].day.sky,'day palettes differ between places');
-  assert.notEqual(PLACES[1].day.sky,PLACES[2].day.sky,'day palettes differ between places');
-  const dayCount=new Set(PLACES.map(p=>p.day.sky)).size;
-  const nightCount=new Set(PLACES.map(p=>p.night.sky)).size;
-  assert.equal(dayCount,3,'three distinct day skies');
-  assert.equal(nightCount,3,'three distinct night skies');
 });
 
 test('the scene schedules each of the three places in order and a run really visits all three',()=>{
@@ -471,21 +493,21 @@ test('the scene schedules each of the three places in order and a run really vis
 });
 
 test('every largest obstacle and high star permits visible input, clearance and landing',()=>{
-  for(const kind of OBSTACLE_KINDS)for(const fps of [30,60,144])for(const speed of [210,280,350]){
+  for(const kind of OBSTACLE_KINDS)for(const fps of [30,60,144])for(const speed of [260,280,350]){
     const [,width]=OBSTACLE_BOUNDS[kind].width,[,height]=OBSTACLE_BOUNDS[kind].height;
     for(const starY of [98,...HIGH_HEIGHTS]){
       let success=false;
       for(let startX=100;startX<=308&&!success;startX+=2){
-        const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-210)*220;
+        const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-260)*300;
         const obstacle={kind,x:600,width,height,passed:false};run.obstacles=[obstacle];
         run.stars=[{x:612,y:starY,value:starY<90?50:25}];
         let began=false,released=false,landed=false;
         for(let frame=0;frame<fps*5&&run.status==='running';frame++){
           if(!began&&obstacle.x<=startX){
             assert.ok(run.stars[0].x<=320,'input starts after the star is visible');
-            if(starY<90)beginCharge(run);else{jump(run);released=true;}began=true;
+            if(starY<90)pressJump(run);else{jump(run);released=true;}began=true;
           }
-          if(began&&!released&&chargePower(run)===1){releaseCharge(run);released=true;}
+          if(began&&!released&&holdPower(run)===1){releaseJump(run);released=true;}
           advance(run,1/fps,320,()=>0);
           if(released&&run.y===0&&run.velocity===0)landed=true;
           if(obstacle.passed&&landed)break;
@@ -498,7 +520,7 @@ test('every largest obstacle and high star permits visible input, clearance and 
 });
 
 test('actual generated spacing has closer and wider stretches at maximum speed',()=>{
-  const run=newRun();run.status='running';run.distance=30800;run.spawn=0;
+  const run=newRun();run.status='running';run.distance=27000;run.spawn=0;
   const random=seeded(72), intervals=[];let last=0;
   // A wide synthetic board keeps collisions out of this spacing observation, while advance
   // still schedules and generates real obstacles with the maximum-speed difficulty.

@@ -340,15 +340,17 @@ try {
     const game = await import('/clawd-game.mjs');
     const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 230;
     const ctx = canvas.getContext('2d');
-    game.drawScenery(ctx, 320, { distance: game.PLACE_LENGTH * .91 }, false, false);
+    const style = getComputedStyle(document.querySelector('.clawd-game'));
+    const palette = Object.fromEntries(['soft','line','muted','accent'].map(key=>[key,style.getPropertyValue('--'+key).trim()]));
+    game.drawScenery(ctx, 320, { distance: game.PLACE_LENGTH * .91 }, { ...palette, night: false }, false);
     const mixed = ctx.getImageData(0, 0, 320, 230).data;
     const opaque = mixed.every((v, i) => i % 4 !== 3 || v === 255);
-    game.drawScenery(ctx, 320, { distance: 1500 }, true, true);
+    game.drawScenery(ctx, 320, { distance: 1500 }, { ...palette, night: true }, true);
     const frozen = canvas.toDataURL();
-    game.drawScenery(ctx, 320, { distance: 2000 }, true, true);
+    game.drawScenery(ctx, 320, { distance: 2000 }, { ...palette, night: true }, true);
     const reducedStatic = canvas.toDataURL() === frozen;
     const places = [0, 1, 2].map(index => {
-      game.drawScenery(ctx, 320, { distance: index * game.PLACE_LENGTH + 350 }, false, false);
+      game.drawScenery(ctx, 320, { distance: index * game.PLACE_LENGTH + 350 }, { ...palette, night: false }, false);
       return canvas.toDataURL();
     });
     return { opaque, reducedStatic, distinctPlaces: new Set(places).size };
@@ -1019,7 +1021,7 @@ try {
     assert.equal(await live.locator('.clawd-game').getAttribute('data-state'),'paused');
     assert.equal(await live.locator('.clawd-game').getAttribute('lang'),'en');
     assert.equal(await live.locator('.cg-score').innerText(),score);
-    assert.match(await live.locator('.cg-instructions-text').innerText(),/hold, then release/);
+    assert.match(await live.locator('.cg-instructions-text').innerText(),/hop immediately; keep holding/);
     assert.equal(await live.evaluate(()=>document===window.__siteLanguageDocument && window.__siteLanguageNodes.every((node,index)=>node===document.querySelector(['#clawd-game canvas','#film-dialog video','#sample-pages','#workflow-trail','.hero-overlay'][index]))),true);
     assert.deepEqual(await live.evaluate(()=>Object.keys(localStorage).filter(key=>!['lintel.site.theme','lintel.site.clawd.best'].includes(key))),[],'locale switching writes no language or other new storage');
     await live.goBack();
