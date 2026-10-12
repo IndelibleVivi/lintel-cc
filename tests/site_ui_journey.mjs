@@ -152,6 +152,49 @@ async function assertProductCopyVisible(page, label) {
   }));
   for (const copy of copies) assert.ok(copy.visible && copy.text.length > 0, `${label}: product copy stays visible (${copy.text.slice(0, 24)})`);
 }
+// The small title icon and the larger explanatory scene serve different jobs. Check both
+// together, including actual layout order and the scene's local SVG label bounds.
+async function assertCapabilityComposition(page, label, width) {
+  const cards = page.locator('#capabilities article[data-capability]');
+  assert.equal(await cards.count(),6,`${label}: six combined capability entries`);
+  for (const card of await cards.all()) {
+    const icon = card.locator(':scope > .capability-copy > svg.capability-icon');
+    const scene = card.locator(':scope > figure.capability-visual > svg[role="img"]');
+    assert.equal(await icon.count(),1,`${label}: one small icon inside each copy`);
+    assert.equal(await icon.getAttribute('viewBox'),'0 0 32 32');
+    assert.equal(await icon.getAttribute('aria-hidden'),'true');
+    assert.equal(await icon.getAttribute('focusable'),'false');
+    assert.equal(await icon.evaluate(node=>node.tabIndex),-1,'decorative title icons stay outside keyboard tab order');
+    assert.equal(await scene.count(),1,`${label}: one large explanatory scene`);
+    assert.equal(await card.getByRole('img').count(),1,'only the large scene is an accessible image');
+    assert.ok((await scene.getAttribute('aria-label'))?.trim().length>10,'large scenes retain their own localized accessible description');
+    assert.ok((await card.locator(':scope > figure.capability-visual > figcaption').innerText()).trim().length>10,'large scenes retain their visible localized caption');
+  }
+  const entries = await cards.evaluateAll(nodes=>nodes.map(node=>{
+    const rect=element=>{const box=element.getBoundingClientRect();return {x:box.x,y:box.y,right:box.right,bottom:box.bottom,width:box.width,height:box.height};};
+    return {id:node.dataset.capability,entry:rect(node),copy:rect(node.querySelector(':scope > .capability-copy')),
+      icon:rect(node.querySelector(':scope > .capability-copy > svg.capability-icon')),title:rect(node.querySelector('h3')),
+      figure:rect(node.querySelector(':scope > figure.capability-visual'))};
+  }));
+  for (const [index,row] of entries.entries()) {
+    assert.equal(row.icon.width,32); assert.equal(row.icon.height,32,'title icons remain small at every viewport');
+    assert.ok(row.icon.x>=row.copy.x && row.icon.right<row.title.x && Math.abs(row.icon.y-row.title.y)<=8,`${label} ${row.id}: icon sits beside the title without overlap`);
+    assert.equal(row.entry.width,entries[0].entry.width,'capabilities retain six full-width rows');
+    if(index)assert.ok(row.entry.y>=entries[index-1].entry.bottom-1,'capability rows never overlap or share a grid row');
+    if(width>700){
+      assert.ok(index%2 ? row.figure.right<=row.copy.x : row.copy.right<=row.figure.x,`${label} ${row.id}: large scenes alternate around the copy`);
+    }else{
+      assert.ok(row.figure.y>=row.copy.bottom,`${label} ${row.id}: mobile keeps copy before its large scene`);
+      assert.ok(Math.abs(row.copy.x-row.figure.x)<=1,'mobile copy and figure share the same column');
+    }
+  }
+  const labels=await page.locator('#capabilities figure.capability-visual svg text').evaluateAll(nodes=>nodes.map(node=>{
+    const box=node.getBBox(),viewport=node.ownerSVGElement.viewBox.baseVal;
+    return {text:node.textContent,x:box.x,y:box.y,right:box.x+box.width,bottom:box.y+box.height,width:viewport.width,height:viewport.height};
+  }));
+  assert.ok(labels.length>=12,'large scene drawings retain their meaningful text labels');
+  for(const text of labels)assert.ok(text.x>=0 && text.y>=0 && text.right<=text.width && text.bottom<=text.height,`${label}: large SVG label fits (${text.text})`);
+}
 // Read the actual browser composite, including SVG clipping, filters and responsive cropping.
 // The PNG is a disposable screenshot; it never becomes a product asset or leaves this context.
 async function assertNightClawdEyes(page, label) {
@@ -200,6 +243,7 @@ try {
     assert.match(await page.locator('#capabilities').innerText(), /[\u4e00-\u9fff]/, 'no-JS: capability section carries Chinese copy');
     assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, 'no-JS: four workflow steps present');
     await assertProductCopyVisible(page, 'no-JS');
+    await assertCapabilityComposition(page,'Chinese no-JS',1280);
     assert.equal(await page.locator('#how-it-works .execution-entries > div').count(), 3, 'no-JS: three execution entries present');
     // The interactive workflow trail ships hidden: without JS its host stays hidden and the
     // four-step explanation is still the authoritative, visible copy.
@@ -255,14 +299,7 @@ try {
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://lintel.page/en/');
     assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/no formal download/);
     assert.equal(await page.locator('.language-links [data-site-language="en"]').getAttribute('aria-current'),'page');
-    assert.equal(await page.locator('#capabilities article > svg.capability-icon').count(),6);
-    assert.equal(await page.locator('#capabilities figure').count(),0,'retired large capability figures stay absent');
-    for (const icon of await page.locator('#capabilities article > svg.capability-icon').all()) {
-      assert.equal(await icon.getAttribute('viewBox'),'0 0 32 32');
-      assert.equal(await icon.getAttribute('aria-hidden'),'true','the real title names the task; its small icon is decorative');
-      assert.equal(await icon.getAttribute('focusable'),'false');
-      assert.equal(await icon.evaluate(node=>node.tabIndex),-1,'decorative icons do not enter keyboard tab order');
-    }
+    await assertCapabilityComposition(page,'English no-JS',390);
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="primary"]').getAttribute('href'),docBase+'quickstart.en.md');
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="alternate"]').getAttribute('href'),docBase+'quickstart.md');
     assert.match(await page.locator('#try .reading-links').innerText(),/Current capabilities and limits \(Chinese\)/);
@@ -529,12 +566,12 @@ try {
   for (const id of catalogIds) {
     const card = page.locator(`#capabilities article[data-capability="${id}"]`);
     assert.equal(await card.count(), 1, `card ${id} present`);
-    const icon = card.locator(':scope > svg.capability-icon');
+    const icon = card.locator(':scope > .capability-copy > svg.capability-icon');
     assert.equal(await icon.count(),1,`card ${id} has one small title icon`);
     assert.equal(await icon.getAttribute('aria-hidden'),'true');
     assert.equal(await icon.getAttribute('viewBox'),'0 0 32 32');
     assert.equal(await icon.evaluate(node=>node.tabIndex),-1);
-    assert.equal(await card.getByRole('img').count(),0,'the decorative icon does not duplicate the accessible title');
+    assert.equal(await card.getByRole('img').count(),1,'only the large scene is announced as an image');
     const link = card.locator('h3 a');
     assert.equal(await link.count(), 1, `card ${id} has one title link`);
     const href = await link.getAttribute('href');
@@ -550,6 +587,7 @@ try {
     assert.ok((await card.locator('p.capability-boundary').innerText()).trim().length > 8, `card ${id} boundary names a concrete limit, not a slogan`);
   }
   check('#capabilities: six catalog-aligned cards, real doc links that resolve and per-card boundary notes');
+  await assertCapabilityComposition(page,'Chinese 1440px',1440);
 
   // --- Boundary keywords live near the relevant capability (presence, not verbatim copy). ---
   const boundaryOf = id => page.locator(`#capabilities article[data-capability="${id}"] .capability-boundary`).innerText();
@@ -777,10 +815,12 @@ try {
   if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.getByRole('button',{name:'切换到夜色'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'desktop-night capture is night');
   await capture(page, 'desktop-night.png');
+  if(qa)await captureSection(page,'#capabilities','capabilities-zh-1440-dark.png');
   await page.getByRole('button',{name:'切换到日光'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
   for (const character of await page.locator('.story-character').all()) assert.equal(await character.isVisible(), false, 'day keeps only the accepted original illustration');
   await capture(page, 'desktop-day.png');
+  if(qa)await captureSection(page,'#capabilities','capabilities-zh-1440-light.png');
   await captureFull(page, 'desktop-full.png');
   // Cover the new contract sections as well as the retained story sections.
   if (qa) for (const id of ['capabilities','how-it-works','keep','review','continue']) await captureSection(page, `#${id}`, `section-${id}-1440.png`);
@@ -823,6 +863,7 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth), false, 'no 390px overflow');
   assert.equal(await page.locator('#capabilities article[data-capability]').count(), 6, '390px keeps all six capability cards');
   await assertProductCopyVisible(page, '390px');
+  await assertCapabilityComposition(page,'Chinese 390px',390);
   assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, '390px keeps all four workflow steps');
   assert.equal(await page.locator('#how-it-works .execution-entries > div').count(), 3, '390px keeps all three execution entries');
   // The interaction stays reachable and functional at mobile width.
@@ -836,6 +877,7 @@ try {
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'mobile-night capture is night');
   await assertNightClawdEyes(page, '390px mobile crop');
   await capture(page, 'mobile-night.png');
+  if(qa)await captureSection(page,'#capabilities','capabilities-zh-390-dark.png');
   await captureFull(page, 'mobile-full.png');
   if (qa) for (const id of ['capabilities','how-it-works','keep','review','continue']) await captureSection(page, `#${id}`, `section-${id}-390.png`);
   await page.locator('.cg-jump').click();
@@ -845,10 +887,12 @@ try {
   if (await page.locator('html').getAttribute('data-theme') !== 'light') await page.getByRole('button',{name:'切换到日光'}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light', 'mobile-day capture is day');
   await capture(page, 'mobile-day.png');
+  if(qa)await captureSection(page,'#capabilities','capabilities-zh-390-light.png');
   await page.setViewportSize({width:320,height:844});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth > innerWidth), false, 'no 320px overflow');
   assert.equal(await page.locator('#capabilities article[data-capability]').count(), 6, '320px keeps all six capability cards');
   await assertProductCopyVisible(page, '320px');
+  await assertCapabilityComposition(page,'Chinese 320px',320);
   assert.equal(await page.locator('#how-it-works .workflow > li').count(), 4, '320px keeps all four workflow steps');
   await page.locator('#theme-toggle').click();
   await assertNightClawdEyes(page, '320px mobile crop');
@@ -977,34 +1021,14 @@ try {
     await live.keyboard.press('Escape');
     assert.equal(await live.locator('#film-open').evaluate(node=>node===document.activeElement),true);
     check('live locale + back/forward: same DOM/game/video; selected step, open reading, score, scenery/theme, query/hash and modal focus preserved');
-    // English visual acceptance includes six small decorative title icons in the compact 2x3
-    // desktop grid / one mobile column, with readable titles, both themes and reduced motion.
+    // English visual acceptance keeps small decorative title icons together with six full-width
+    // alternating scene rows, stacked copy-first on mobile, in both themes and reduced motion.
     for (const width of [1440,390,320]) {
       await live.setViewportSize({width,height:900});
       assert.equal(await live.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`English ${width}px has no page overflow`);
       assert.match(await live.locator('#play-title').innerText(), /Stay here\s+a little longer\./, 'responsive line break preserves English word spacing');
       await assertProductCopyVisible(live,`English ${width}px`);
-      const entries = await live.locator('#capabilities article').evaluateAll(nodes=>nodes.map(node=>{
-        const box=node.getBoundingClientRect(), icon=node.querySelector(':scope > svg.capability-icon')?.getBoundingClientRect(), title=node.querySelector('h3')?.getBoundingClientRect();
-        return {id:node.dataset.capability,x:box.x,y:box.y,right:box.right,bottom:box.bottom,
-          icon:icon?{x:icon.x,y:icon.y,right:icon.right,width:icon.width,height:icon.height}:null,title:title?{x:title.x,y:title.y}:null};
-      }));
-      assert.equal(entries.length,6);
-      for (const entry of entries) {
-        assert.ok(entry.icon && entry.title,`English ${width}px ${entry.id} retains the icon and real title`);
-        assert.equal(entry.icon.width,32); assert.equal(entry.icon.height,32,'icons remain small at every width');
-        assert.ok(entry.icon.x>=entry.x && entry.icon.right<entry.title.x && Math.abs(entry.icon.y-entry.title.y)<=8,`English ${width}px ${entry.id}: icon sits beside the title without overlap`);
-      }
-      if(width===1440){
-        for (let row=0;row<3;row++) {
-          const [left,right]=entries.slice(row*2,row*2+2);
-          assert.equal(left.y,right.y,`desktop capability row ${row+1} aligns`);
-          assert.ok(left.right<right.x,'desktop uses two compact columns');
-        }
-      }else for(let index=1;index<entries.length;index++) {
-        assert.equal(entries[index].x,entries[0].x,'mobile retains one capability column');
-        assert.ok(entries[index].y>entries[index-1].bottom,'mobile capability entries remain separate');
-      }
+      await assertCapabilityComposition(live,`English ${width}px`,width);
       for (const theme of ['dark','light']) {
         if(await live.locator('html').getAttribute('data-theme')!==theme)await live.locator('#theme-toggle').click();
         assert.equal(await live.locator('html').getAttribute('data-theme'),theme);
@@ -1024,7 +1048,7 @@ try {
     assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN','explicit locale URL survives reload');
     await live.goto(base+'/en/');
     assert.equal(await live.locator('html').getAttribute('lang'),'en','direct English URL mounts in English');
-    check('English 1440/390/320 day/night: six small title icons, compact 2x3/one-column layout, readable copy, no overflow and reduced-motion locale changes');
+    check('English 1440/390/320 day/night: six small title icons and alternating large scenes, mobile copy-first layout, readable labels/copy, no overflow and reduced-motion locale changes');
     await bilingual.close();
   }
 

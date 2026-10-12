@@ -55,7 +55,7 @@ Pages 的 Custom domains 维护 `lintel.page` 关联；Cloudflare 的同名 DNS 
 - `https://lintel.page/` 与 `https://lintel.page/en/` 返回 200，TLS 正常；两路 canonical／OG／hreflang、分享图、robots 与 sitemap 指向正式域名；对应语言的使用指南链接可达；不存在的路径返回真正 404。
 - `.mjs` 为 JavaScript、`film.vtt` 为 `text/vtt`、MP4 为 `video/mp4`；视频 Range 请求返回 206，可播放、seek，四条英文 captions 正常加载。
 - [`_headers`](../apps/site/_headers) 的 CSP 与安全 headers 生效；页面和播放器在此策略下正常运行。播放器初始 `preload=none`，点开不开播，主动播放后才请求电影，关闭停止并复位。
-- 桌面与手机日夜布局无溢出，两路六能力图标索引／四步正文无需 JavaScript 即可阅读；切换和 back／forward 保留同一游戏、视频播放进度、details 与旅程步骤。站点不增加 analytics beacon、远程字体或外部视频 iframe；所有页面资源同源。Cloudflare 作为托管平台处理普通 HTTP 请求。
+- 桌面与手机日夜布局无溢出，两路六能力标题图标＋交错场景／四步正文无需 JavaScript 即可阅读；切换和 back／forward 保留同一游戏、视频播放进度、details 与旅程步骤。站点不增加 analytics beacon、远程字体或外部视频 iframe；所有页面资源同源。Cloudflare 作为托管平台处理普通 HTTP 请求。
 
 将具体 URL、deployment ID、来源声明、检查结果与当前状态同步到 current-state。HTTP 200 不替代实际播放，平台的 success 也不替代 apex HTTPS 验收。
 
