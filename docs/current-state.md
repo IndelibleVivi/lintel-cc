@@ -37,7 +37,11 @@
 
 本机 catalog／插值／原文投影／格式／问候检查、frontend build 与严格 CI controller self-test 已通过；新 `i18n-ui` 验首屏、持久化、迟到和乱序系统读取、手动覆盖、草稿、原审批 ID／hash及 900px Day／Night。Clawd 的切换保留同一 game／canvas、暂停状态、分数、星星、最高成绩与动画生命周期；规则错误随当前语言显示、草稿不变且不提交通道操作。相邻 App／网站／browser pairing 旅程使用独立 synthetic fixtures，详细命令见[验证说明](verification.md)。
 
-standalone desktop Rust 48 项通过，2 项既有安装前置检查 ignored；不是通过项。新 native debug executable 在隔离 HTML／WebKit harness 实际调用 preferred languages、简中／English 菜单切换与非法语言拒绝，菜单栏文字已观察；生产 getter 还在进程内 volatile `AppleLanguages` 简中顺序下返回匹配结果，不写持久系统语言。完整产品 App 的真实 WebKit 点击矩阵被 Mac 锁屏阻断，尚未验证；native command／menu 与 built Chromium UI 是分开的证据。测试不触碰个人 Claude、browser profile、services 或真实宿主网络。
+standalone desktop Rust 48 项通过，2 项既有安装前置检查 ignored；不是通过项。新 native debug executable 在隔离 HTML／WebKit harness 实际调用 preferred languages、简中／English 菜单切换与非法语言拒绝，菜单栏文字已观察；生产 getter 还在进程内 volatile `AppleLanguages` 简中顺序下返回匹配结果，不写持久系统语言。
+
+解锁后，源码 `65495b7` 的真实产品 WebKit／native core 在隔离 synthetic HOME／state 下完成首屏 System 模式、简中／English 手动选择、设置面板与原生菜单同步、工作保全路径草稿／分类保留，以及退出重启后保留简中／Night 的检查。三份 synthetic 原件逐字节未变，没有提交计划、任务或归档输出。后台 AX 打开下拉框未交接输入焦点时曾只改显示值；按当前截图定向聚焦后，实际页面／菜单更新与结构化表单状态已核对。手动模式回到 System 的 native 操作仍未验证：菜单首项的 AX 路径被拒投，其他后台输入路径也未产生可核对的选择。以上是选定语言旅程的 dev runtime 证据，不替代其余操作的完整 native 矩阵或已包装候选验收。测试不触碰个人 Claude、browser profile、services 或真实宿主网络。
+
+源码 `65495b7` 的[完整 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38205602479) 已通过两平台 frontend／native／browser UI／runner CLI、heavy work、Linux VM 与 aggregate；这不表示本地候选已更新或正式发行。
 
 ## 新增 IPv4 / IPv6 Leaf
 
