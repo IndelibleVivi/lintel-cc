@@ -14,35 +14,48 @@ const EYES_SHUT = [[19, 18, 8, 3], [55, 18, 8, 3]];
 const STAR_HIT_X = 30, STAR_HIT_Y = 24;
 // Two opposing pairs of short straight legs step once per 100px of travel.
 const STRIDE_TRAVEL = 100;
+const CHARGE_SECONDS = .4, TAP_SECONDS = .09;
 // Three visible star rows. The row advances every spawn, so successive stars sit at clearly
 // different heights; a small deterministic jitter keeps them from looking printed. All three rows
-// (and their jitter) stay inside one jump's reach at every speed, and none is collectible from the
-// ground, so each star still asks for a real jump.
+// (and their jitter) stay inside a tap jump's reach. Every fourth star is a higher, double-value
+// star that asks for a charged jump; nothing is collectible from the ground.
 const STAR_ROWS = [98, 118, 138];
 const STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
 export function newRun() {
   return { status: 'ready', y: 0, velocity: 0, distance: 0, speed: 210, spawn: 1,
     obstacles: [], stars: [], collected: 0, elapsed: 0, landing: 0, buffer: 0,
-    particles: [], dust: 0, cleared: 0, spawns: 0 };
+    particles: [], dust: 0, cleared: 0, spawns: 0, charging: false, charge: 0,
+    bufferPower: 0, bonus: 0, lastReward: 25 };
 }
-export function points(run) { return Math.floor(run.distance / 10) + run.collected * 25; }
+export function points(run) { return Math.floor(run.distance / 10) + run.collected * 25 + (run.bonus || 0); }
 // The star keeps its horizontal bond to the obstacle (12px in) but takes the next visible row.
 export function spawnStar(obstacle, spawns = 0) {
+  if (spawns % 4 === 3) return { y: 56 + Math.max(-4, Math.min(4, STAR_JITTER[spawns % STAR_JITTER.length])), x: obstacle.x + 12, value: 50 };
   const y = STAR_ROWS[spawns % STAR_ROWS.length] + STAR_JITTER[spawns % STAR_JITTER.length];
   return { y, x: obstacle.x + 12 };
 }
 function burst(run, x, y, kind, count) {
   for (let i = 0; i < count; i++) run.particles.push({ x, y, vx: (i - (count - 1) / 2) * 35, vy: -40 - (i % 3) * 25, life: .4 + i * .025, kind });
 }
-function takeoff(run) {
-  run.velocity = 480; run.buffer = 0; run.landing = 0;
+function takeoff(run, power = 0) {
+  run.velocity = 480 + 170 * Math.max(0, Math.min(1, power)); run.buffer = 0; run.bufferPower = 0; run.landing = 0;
   burst(run, PLAYER_X + 20, GROUND - 2, 'dust', 4);
 }
-export function jump(run) {
+export function jump(run, power = 0) {
   if (run.status !== 'running') return;
-  if (run.y === 0) takeoff(run);
-  else run.buffer = .12; // A press just before landing is kept for the next step.
+  if (run.y === 0) takeoff(run, power);
+  else { run.buffer = .12; run.bufferPower = power; } // A release just before landing is kept for the next step.
 }
+export function chargePower(run) { return Math.max(0, Math.min(1, (run.charge - TAP_SECONDS) / (CHARGE_SECONDS - TAP_SECONDS))); }
+export function beginCharge(run) {
+  if (run.status !== 'running' || run.charging) return;
+  run.charging = true; run.charge = 0;
+}
+export function releaseCharge(run) {
+  if (!run.charging) return;
+  const power = chargePower(run); run.charging = false; run.charge = 0; jump(run, power);
+}
+export function cancelCharge(run) { run.charging = false; run.charge = 0; run.buffer = 0; run.bufferPower = 0; }
 export function advance(run, dt, width, random = Math.random) {
   if (run.status !== 'running' || dt <= 0) return;
   let remaining = Math.min(dt, .1);
@@ -52,12 +65,13 @@ export function advance(run, dt, width, random = Math.random) {
     run.speed = Math.min(350, 210 + run.distance / 220);
     run.buffer = Math.max(0, run.buffer - step); run.landing = Math.max(0, run.landing - step);
     const airborne = run.y > 0 || run.velocity > 0;
+    if (run.charging && !airborne) run.charge = Math.min(CHARGE_SECONDS, run.charge + step);
     if (airborne) {
       run.y += run.velocity * step - GRAVITY * step * step / 2; run.velocity -= GRAVITY * step;
       if (run.y <= 0) {
         run.y = 0; run.velocity = 0; run.landing = .14;
         burst(run, PLAYER_X + 22, GROUND - 2, 'dust', 5);
-        if (run.buffer > 0) takeoff(run);
+        if (run.buffer > 0) takeoff(run, run.bufferPower);
       }
     }
     run.dust -= step;
@@ -80,7 +94,8 @@ export function advance(run, dt, width, random = Math.random) {
     for (const star of run.stars) {
       star.x -= run.speed * step;
       if (Math.abs(star.x - (PLAYER_X + 32)) < STAR_HIT_X && Math.abs(star.y - (GROUND - HEIGHT / 2 - run.y)) < STAR_HIT_Y) {
-        star.caught = true; run.collected++; burst(run, star.x, star.y, 'star', 7);
+        star.caught = true; run.collected++; run.lastReward = star.value || 25;
+        run.bonus += run.lastReward - 25; burst(run, star.x, star.y, 'star', 7);
       }
     }
     run.stars = run.stars.filter(star => !star.caught && star.x > -10);
@@ -88,7 +103,7 @@ export function advance(run, dt, width, random = Math.random) {
       particle.life -= step; particle.x += particle.vx * step; particle.y += particle.vy * step; particle.vy += 160 * step;
     }
     run.particles = run.particles.filter(particle => particle.life > 0);
-    if (run.obstacles.some(obstacle => PLAYER_X + 52 > obstacle.x + 3 && PLAYER_X + 11 < obstacle.x + obstacle.width - 3 && run.y + 4 < obstacle.height)) run.status = 'over';
+    if (run.obstacles.some(obstacle => PLAYER_X + 52 > obstacle.x + 3 && PLAYER_X + 11 < obstacle.x + obstacle.width - 3 && run.y + 4 < obstacle.height)) { run.status = 'over'; cancelCharge(run); }
   }
 }
 export function clawdPose(run, reduced = false) {
@@ -101,7 +116,8 @@ export function clawdPose(run, reduced = false) {
   // Only a real landing arms this finite settle; buffered takeoff clears it.
   const landing = run.landing / .14;
   const ascending = air && run.velocity > 0;
-  const stretch = ascending ? run.velocity / 480 : 0;
+  const stretch = ascending ? Math.min(1, run.velocity / 480) : 0;
+  const tension = !air && run.charging ? chargePower(run) : 0;
   // Move only the continuous leg edges: the chest stays level and a supporting pair stays planted.
   const legs = anchored ? STANDING_LEGS.map(({ x }, i) => {
     const phase = pace + (i === 0 || i === 3 ? 0 : Math.PI);
@@ -109,8 +125,8 @@ export function clawdPose(run, reduced = false) {
   }) : STANDING_LEGS;
   return {
     anchor: 0,
-    scaleX: 1 + landing * .1,
-    scaleY: 1 - landing * .1 + stretch * .1,
+    scaleX: 1 + landing * .1 + tension * .14,
+    scaleY: 1 - landing * .1 + stretch * .1 - tension * .16,
     legs,
     eyes: EYES_OPEN,
   };
@@ -124,10 +140,10 @@ const COPY = {
     thisRun: '这次', best: '最好',
     boardAria: 'Clawd 跳跃跑道',
     canvasAria: '四条腿的 Clawd 沿纸面小路奔跑，跳过石头和书本，收集星星',
-    jumpLabel: '跳一下',
+    jumpLabel: '跳一下', chargeLabel: '蓄力',
     pause: '暂停', resume: '继续',
-    keys: 'SPACE / ↑ \u00a0 跳跃 \u00a0 · \u00a0 P 暂停',
-    instructions: '点跑道或「跳一下」开始。空格 / ↑ 跳跃，P 暂停；每颗星星 +25 分。离开游戏会自动暂停。',
+    keys: 'SPACE / ↑ \u00a0 轻点跳 · 长按蓄力 \u00a0 · \u00a0 P 暂停',
+    instructions: '轻点跑道或「跳一下」跳跃；长按后松手，跳得更高。空格 / ↑ 同样可蓄力，P 暂停。普通星星 +25，高处的大星星 +50；离开游戏自动暂停。',
     storage: '最好成绩只留在这个浏览器里。',
     storageUnavailable: '浏览器存储不可用，成绩仅保留到关闭本页。',
     phaseReady: '把星星收进口袋。',
@@ -140,7 +156,7 @@ const COPY = {
     phaseOverSub: (pts, collected, cleared) => `${pts} 分 · ${collected} 颗星星 · 跳过 ${cleared} 个障碍`,
     phaseOverStart: '再来一次',
     phaseOverStatus: '碰到障碍了。星星先收好，再试一次。',
-    collected: (n) => `收到第 ${n} 颗星星，+25 分。`,
+    collected: (n, reward) => `收到第 ${n} 颗星星，+${reward} 分。`,
     emptyMessage: '把星星收进口袋。',
     emptySub: '跳过小石头，顺便带一点光回来。',
     emptyStart: '出发吧',
@@ -151,10 +167,10 @@ const COPY = {
     thisRun: 'This run', best: 'Best',
     boardAria: 'Clawd jump track',
     canvasAria: 'Four-legged Clawd runs along a paper path, jumping stones and books and collecting stars',
-    jumpLabel: 'Jump',
+    jumpLabel: 'Jump', chargeLabel: 'Charge',
     pause: 'Pause', resume: 'Resume',
-    keys: 'SPACE / ↑ \u00a0 Jump \u00a0 · \u00a0 P Pause',
-    instructions: 'Click the track or “Jump” to start. Space / ↑ to jump, P to pause; each star +25 points. Leaving the game pauses it automatically.',
+    keys: 'SPACE / ↑ \u00a0 Tap / hold \u00a0 · \u00a0 P Pause',
+    instructions: 'Tap the track or “Jump” to hop; hold, then release to jump higher. Space / ↑ can charge too; P pauses. Stars +25, large high stars +50. Leaving the game pauses it.',
     storage: 'Your best score stays only in this browser.',
     storageUnavailable: 'Browser storage is unavailable; the score is kept only until this page closes.',
     phaseReady: 'Pop the stars in your pocket.',
@@ -167,7 +183,7 @@ const COPY = {
     phaseOverSub: (pts, collected, cleared) => `${pts} points · ${collected} star(s) · cleared ${cleared} obstacle(s)`,
     phaseOverStart: 'Try again',
     phaseOverStatus: 'Hit an obstacle. Pocket the stars and try once more.',
-    collected: (n) => `Collected star ${n}, +25 points.`,
+    collected: (n, reward) => `Collected star ${n}, +${reward} points.`,
     emptyMessage: 'Pop the stars in your pocket.',
     emptySub: 'Hop the little stones and bring a bit of light back.',
     emptyStart: 'Set off',
@@ -179,12 +195,14 @@ function resolveCopy(language) { return Object.hasOwn(COPY, language) ? COPY[lan
 export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', language = 'zh-CN' } = {}) {
   root.className = 'clawd-game';
   let copy = resolveCopy(language);
-  root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
+  root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span><label class="cg-charge"><span class="cg-charge-label">${copy.chargeLabel}</span><progress max="100" value="0" aria-label="${copy.chargeLabel}"></progress></label></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
   const $ = selector => root.querySelector(selector);
   const board = $('.cg-board'), canvas = $('canvas'), ctx = canvas.getContext('2d');
   const score = $('.cg-score'), bestOutput = $('.cg-best'), overlay = $('.cg-overlay');
   const startButton = $('.cg-start'), pauseButton = $('.cg-pause'), status = $('.cg-status');
-  let run = newRun(), best = 0, frame = 0, last = 0, width = 800;
+  // Initialise the visible width before accepting the first key. The observer's
+  // first delivery is measurement, not a resize that should pause a new run.
+  let run = newRun(), best = 0, frame = 0, last = 0, width = Math.round(board.clientWidth) || 800, input = null;
   let currentLanguage = Object.hasOwn(COPY, language) ? language : 'zh-CN';
   let storageBroken = false;
   const key = scoreKey;
@@ -215,7 +233,13 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
       over: [copy.phaseOverTitle, copy.phaseOverSub(points(run), run.collected, run.cleared), copy.phaseOverStart, copy.phaseOverStatus],
     }[run.status];
   }
+  function syncCharge() {
+    root.dataset.charging = String(run.charging);
+    $('.cg-charge').setAttribute('aria-hidden', String(!run.charging));
+    $('progress').value = Math.round(chargePower(run) * 100);
+  }
   function sync() {
+    syncCharge();
     root.dataset.state = run.status;
     root.setAttribute('lang', currentLanguage);
     overlay.hidden = run.status === 'running';
@@ -237,6 +261,8 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     $('.cg-run-label').textContent = copy.thisRun;
     $('.cg-best-label').textContent = copy.best;
     $('.cg-jump-label').textContent = copy.jumpLabel;
+    $('.cg-charge-label').textContent = copy.chargeLabel;
+    $('progress').setAttribute('aria-label', copy.chargeLabel);
     $('.cg-keys').textContent = copy.keys;
     $('.cg-instructions-text').textContent = copy.instructions;
     $('.cg-storage').textContent = storageBroken ? copy.storageUnavailable : copy.storage;
@@ -291,7 +317,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     }
     for (const star of run.stars) {
       const bob = reduced.matches ? 0 : Math.sin(run.elapsed * 4 + star.x / 60) * 2;
-      pixelStar(star.x, star.y + bob, 4, p.night ? '#dec488' : '#9b762f');
+      pixelStar(star.x, star.y + bob, star.value === 50 ? 6 : 4, p.night ? '#dec488' : '#9b762f');
       ctx.fillStyle = p.bg; ctx.fillRect(Math.round(star.x-1),Math.round(star.y+bob-1),2,2);
     }
     if (!reduced.matches) for (const particle of run.particles) {
@@ -314,10 +340,11 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     const collected = run.collected;
     advance(run,last ? (now-last)/1000 : 0,width);last=now;
     score.textContent=pad(points(run));$('.cg-stars').textContent=run.collected;
-    $('.cg-collect').textContent=run.particles.some(p=>p.kind==='star') ? '✦ +25' : '';
-    if (collected !== run.collected) status.textContent=copy.collected(run.collected);
+    $('.cg-collect').textContent=run.particles.some(p=>p.kind==='star') ? `✦ +${run.lastReward}` : '';
+    syncCharge();
+    if (collected !== run.collected) status.textContent=copy.collected(run.collected, run.lastReward);
     draw();
-    if (run.status === 'over') {saveBest();sync();frame=0;}
+    if (run.status === 'over') {clearInput();saveBest();sync();frame=0;}
     else frame=requestAnimationFrame(tick);
   }
   function start() {
@@ -328,19 +355,50 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   }
   function pause() {
     if (run.status !== 'running') return;
-    run.status='paused';cancelAnimationFrame(frame);frame=0;saveBest();sync();draw();
+    clearInput();run.status='paused';cancelAnimationFrame(frame);frame=0;saveBest();sync();draw();
+  }
+  function clearInput() {
+    const previous = input; input = null; cancelCharge(run);
+    if (previous?.kind === 'pointer' && previous.target.hasPointerCapture(previous.id)) previous.target.releasePointerCapture(previous.id);
+    syncCharge();
   }
   function hop() {start();jump(run);board.focus({preventScroll:true});}
+  function pressPointer(event) {
+    if (event.button !== 0 || !event.isPrimary || input || (event.currentTarget === board && event.target.closest('button'))) return;
+    start(); beginCharge(run);
+    input = {kind:'pointer',id:event.pointerId,target:event.currentTarget};
+    event.currentTarget.setPointerCapture(event.pointerId); syncCharge();
+  }
+  function releasePointer(event) {
+    if (input?.kind !== 'pointer' || input.id !== event.pointerId) return;
+    const previous = input; input = null; releaseCharge(run); syncCharge();
+    if (previous.target.hasPointerCapture(previous.id)) previous.target.releasePointerCapture(previous.id);
+    board.focus({preventScroll:true});
+  }
+  function cancelPointer(event) { if (input?.kind === 'pointer' && input.id === event.pointerId) { clearInput(); draw(); } }
+  const jumpButton = $('.cg-jump');
   listen(startButton,'click',start);
-  listen($('.cg-jump'),'click',hop);
+  // Assistive technology's semantic click is a normal hop. Pointer/key gestures
+  // already committed on release and must never jump a second time on click.
+  listen(jumpButton,'click',event=>{if(event.detail===0)hop();});
   listen(pauseButton,'click',()=>run.status==='paused'?start():pause());
-  listen(board,'pointerdown',event=>{if(event.button!==0||event.target.closest('button'))return;hop();});
-  listen(board,'keydown',event=>{
-    if(event.target!==board)return;
-    if([' ','ArrowUp','p','P'].includes(event.key)){
-      event.preventDefault();if(event.repeat)return;
-      if(event.key.toLowerCase()==='p'){if(run.status==='paused')start();else pause();}else hop();
-    }
+  for (const target of [board,jumpButton]) {
+    listen(target,'pointerdown',pressPointer);
+    listen(target,'lostpointercapture',cancelPointer);
+    listen(target,'keydown',event=>{
+      if(event.target!==target || ![' ','ArrowUp','Enter','p','P'].includes(event.key))return;
+      if(event.key==='Enter' && target===board)return;
+      event.preventDefault(); if(event.repeat)return;
+      if(event.key.toLowerCase()==='p'){if(run.status==='paused')start();else pause();return;}
+      if(input)return;
+      start(); beginCharge(run);input={kind:'key',key:event.key};syncCharge();
+    });
+  }
+  listen(window,'pointerup',releasePointer);
+  listen(window,'pointercancel',cancelPointer);
+  listen(window,'keyup',event=>{
+    if(input?.kind!=='key'||input.key!==event.key)return;
+    event.preventDefault();input=null;releaseCharge(run);syncCharge();board.focus({preventScroll:true});
   });
   listen(root,'focusout',event=>{if(!root.contains(event.relatedTarget))pause();});
   listen(window,'blur',pause);
@@ -359,7 +417,7 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   listen(darkScheme,'change',setPalette);
   sync();setPalette();
   const dispose = () => {
-    cancelAnimationFrame(frame);
+    clearInput();cancelAnimationFrame(frame);
     controller.abort(); visibility.disconnect(); resize.disconnect(); themeChanges.disconnect();
     if (run.distance > 0) saveBest();
     run.status = 'paused';

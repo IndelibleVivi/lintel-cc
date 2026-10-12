@@ -1,5 +1,7 @@
 # Lintel App 更新与发行准备
 
+简体中文（canonical） · [English](app-updates.en.md) · [文档入口](index.md)
+
 本指南说明当前源码中的 macOS App updater 与未来发行流程。当前公开入口仍是 **0.1.0 开发预览，没有正式 Release 下载、发行公钥或已激活 feed**。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 [current-state](current-state.md)。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
 
 ## 在 App 中使用

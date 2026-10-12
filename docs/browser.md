@@ -1,5 +1,7 @@
 # 浏览器扩展与本地桥接
 
+简体中文（canonical） · [English](browser.en.md) · [文档入口](index.md)
+
 状态：0.1.0 开发候选。Chrome/Edge 的 MV3 包和 Firefox 独立 event-page 适配可构建；正式浏览器安装、商店发布和完整三浏览器验收尚未完成。本文对应 [完整目标](SPEC.md#9-模块-c浏览器能力必须真实可操作) 与 [B01–B15 验收](ACCEPTANCE.md#c-浏览器实测)，不是完成整版目标的声明。
 
 ## 使用入口与实际范围

@@ -29,6 +29,13 @@ try{
     window.requestAnimationFrame=callback=>{const id=request(time=>{pending.delete(id);callback(time);});pending.add(id);return id;};
     window.cancelAnimationFrame=id=>{pending.delete(id);cancel(id);};
     window.pendingAnimationFrames=()=>pending.size;
+    // Observe actual canvas placement, without a product game-state getter.
+    window.__clawdMinY=188;window.__clawdY=188;
+    const translate=CanvasRenderingContext2D.prototype.translate;
+    CanvasRenderingContext2D.prototype.translate=function(x,y){
+      if(x===80&&this.canvas.closest('.clawd-game')){window.__clawdY=y;window.__clawdMinY=Math.min(window.__clawdMinY,y);}
+      return translate.call(this,x,y);
+    };
   });
   await page.goto(url);
   async function openGame(){await page.getByRole('button',{name:'陪它玩，打开 Clawd 的口袋',exact:true}).click();await page.getByRole('button',{name:'Clawd 跳一跳',exact:true}).click();await page.getByRole('group',{name:'Clawd 跳跃跑道'}).waitFor();}
@@ -57,6 +64,50 @@ try{
   await dialog.getByRole('button',{name:'第 2 幅：雨夜小屋',exact:true}).click();
   await dialog.getByRole('tab',{name:'跳一小段',exact:true}).click();
   assert.equal(await game.count(),1);assert.equal(await game.getAttribute('data-state'),'ready');
+  async function freshChargeRun(){
+    await dialog.getByRole('tab',{name:'点阵风景册',exact:true}).click();
+    await dialog.getByRole('tab',{name:'跳一小段',exact:true}).click();
+    await page.evaluate(()=>{window.__clawdMinY=188;window.__clawdY=188;});
+  }
+  await dialog.locator('.cg-jump').click();await page.waitForTimeout(650);
+  const tapPeak=await page.evaluate(()=>188-window.__clawdMinY);
+  assert.ok(tapPeak>70&&tapPeak<85,'pointer tap retains the original jump height');
+  await freshChargeRun();
+  const jumpBox=await dialog.locator('.cg-jump').boundingBox();
+  await page.mouse.move(jumpBox.x+jumpBox.width/2,jumpBox.y+jumpBox.height/2);await page.mouse.down();
+  await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value===100);
+  assert.equal(await page.evaluate(()=>window.__clawdMinY),188,'holding continues the run without takeoff');
+  assert.equal(await game.getAttribute('data-charging'),'true');
+  await page.mouse.up();await page.waitForFunction(()=>window.__clawdMinY<70);
+  assert.equal(await game.getAttribute('data-charging'),'false','release consumes charge once');
+  await page.keyboard.press('p');await dialog.screenshot({path:path.join(output,'app-charged-jump.png')});
+  await freshChargeRun();const chargeBoard=dialog.locator('.cg-board');await chargeBoard.focus();
+  await page.keyboard.down('Space');await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value>20);
+  await game.evaluate(node=>{window.__chargingCanvas=node.querySelector('canvas')});
+  await page.evaluate(()=>{window.__preferred=['en-US'];window.dispatchEvent(new Event('languagechange'));});
+  await dialog.getByRole('progressbar',{name:'Charge',exact:true}).waitFor();
+  assert.equal(await game.getAttribute('data-charging'),'true');
+  assert.equal(await game.evaluate(node=>node.querySelector('canvas')===window.__chargingCanvas),true,'relabeling keeps the held input and canvas');
+  assert.ok(await game.locator('progress').evaluate(node=>node.value>=20),'language change does not clear charge');
+  await page.evaluate(()=>{window.__preferred=['zh-Hans'];window.dispatchEvent(new Event('languagechange'));});
+  await dialog.getByRole('progressbar',{name:'蓄力',exact:true}).waitFor();
+  await page.keyboard.press('p');
+  assert.equal(await game.getAttribute('data-state'),'paused');assert.equal(await game.getAttribute('data-charging'),'false');
+  assert.equal(await game.locator('progress').evaluate(node=>node.value),0);
+  await page.keyboard.up('Space');await dialog.locator('.cg-start').click();await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(()=>window.__clawdY),188,'cancelled key release cannot trigger a delayed takeoff');
+  await freshChargeRun();await chargeBoard.focus();await page.keyboard.down('ArrowUp');
+  await page.waitForFunction(()=>document.querySelector('.cg-charge progress').value===100);
+  assert.equal(await page.evaluate(()=>window.__clawdMinY),188);
+  await page.keyboard.up('ArrowUp');await page.waitForFunction(()=>window.__clawdMinY<70);
+  assert.equal(await game.getAttribute('data-charging'),'false','keyboard release launches the charged jump');
+  await freshChargeRun();const touchBox=await chargeBoard.boundingBox();const touch=await page.context().newCDPSession(page);
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchBox.x+110,y:touchBox.y+150,id:1}]});
+  await page.waitForFunction(()=>document.querySelector('.clawd-game').dataset.charging==='true');await page.waitForTimeout(180);
+  await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+  assert.equal(await game.getAttribute('data-charging'),'false');await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(()=>window.__clawdY),188,'cancelled touch never jumps');
+  await touch.detach();await freshChargeRun();
   await dialog.locator('.cg-jump').click();assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),1);
   await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   await page.waitForFunction(()=>window.pendingAnimationFrames()===0);
@@ -74,6 +125,6 @@ try{
   await page.emulateMedia({colorScheme:'dark'});await openGame();
   assert.equal(await game.evaluate(node=>getComputedStyle(node).getPropertyValue('--bg').trim().toLowerCase()),'#24231f');
   assert.deepEqual(errors,[]);
-  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause','live zh/en relabeling preserves game/canvas identity, paused phase, score, collected stars, best and RAF count'],screenshots:output};
+  const report={status:'passed',runtime:'built App in isolated Chromium; synthetic inventory, not native WebKit',checks:['shared runner opens via existing pocket menu','existing App best score retained','one RAF while playing; zero after tab switch and modal close','landscape tab remains interactive','remount creates one fresh game','focus returns to pocket trigger','Day/Night, 1120x800 and 900x640, System dark palette','keyboard pause','pointer tap retains original height; pointer and keyboard hold/release jump higher; pause and touch cancellation clear held input; live language switch preserves charging and canvas','live zh/en relabeling preserves game/canvas identity, paused phase, score, collected stars, best and RAF count'],screenshots:output};
   await writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();preview.kill('SIGTERM');}

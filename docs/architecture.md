@@ -1,5 +1,7 @@
 # 执行权威与状态
 
+简体中文（canonical） · [English](architecture.en.md) · [文档入口](index.md)
+
 本图说明当前源码的调用与执行归属；它不代表所有平台或完整旅程已验收。运行证据与候选状态见 [当前状态](current-state.md)，完整目标仍由 [SPEC](SPEC.md) 保留。
 
 [查看可编辑 SVG 图](assets/architecture.svg)。SVG 使用暖纸上的本机／目标主机执行区与独立通道；下方 Mermaid 和本文拥有语义，SVG 保持相同执行归属，不单独定义能力。SVG 适合约 900 px 以上宽度阅读；小窗口可直接读下面的说明。

@@ -1,5 +1,7 @@
 # 精确 systemd 服务暂停与恢复
 
+简体中文（canonical） · [English](services.en.md) · [文档入口](index.md)
+
 Lintel 的 Linux runner 可以预览并暂停明确绑定到一个登记配置 root 的单一 systemd service，并在独立批准后恢复原启动状态。GUI 的远程服务入口、CLI JSON 与 TUI 都调用 `crates/core/src/service.rs`。暂停服务不注销账号、不清理凭据，也不代替随后单独预览的清理操作。
 
 ## 可支持的目标

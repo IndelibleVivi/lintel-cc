@@ -24,7 +24,12 @@ import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { checkSiteLanguages } = await import('../scripts/prepare-site-languages.mjs');
+await checkSiteLanguages();
+const languageChecks = spawnSync(process.execPath, ['--test','tests/site_languages.test.mjs'], {cwd:repo,encoding:'utf8'});
+assert.equal(languageChecks.status,0,languageChecks.stdout + languageChecks.stderr);
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE || path.join(repo, 'extensions/browser/node_modules/playwright/index.mjs')).href);
 // Canonical task map + finite named doc link allowlist. The page is checked against these
 // authoritative sources instead of embedding a copy of the copy.
@@ -44,8 +49,8 @@ const cardLinks = {
 };
 const docBase = 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/';
 // Finite named asset map only: the server never serves arbitrary files.
-const assets = new Map([['/', 'index.html'], ...[
-  'index.html','styles.css','site.mjs',
+const assets = new Map([['/', 'index.html'], ['/en/', 'en/index.html'], ...[
+  'index.html','en/index.html','styles.css','site.mjs','site-copy.mjs','site-language.mjs',
   'film.mjs','film.vtt',
   'workflow-trail.mjs','site-world.mjs',
   'clawd-game.mjs','clawd-game.css',
@@ -235,6 +240,44 @@ try {
     assert.match(await page.locator('video source').first().getAttribute('src'), /media\/lintel-intro\.mp4$/, 'no-JS: the video source is the same-origin film');
     assert.equal(await page.locator('#film-dialog video').count(), 1, 'no-JS: the film dialog markup is server-rendered');
     check('no-JS: capabilities, four steps, reading example and docs all visible; native reading opens without JavaScript');
+    await noJs.close();
+  }
+
+  // Both locale URLs ship complete static text. The real language links navigate without JS.
+  {
+    const noJs = await browser.newContext({javaScriptEnabled:false, viewport:{width:390,height:844}});
+    const page = await noJs.newPage();
+    page.on('request',request=>{if(!request.url().startsWith(base))external.push(request.url());});
+    page.on('response',response=>{if(response.status()>=400)errors.push(`${response.status()} ${response.url()}`);});
+    await page.goto(base + '/en/');
+    assert.equal(await page.locator('html').getAttribute('lang'),'en');
+    assert.match(await page.title(),/Keep your work/);
+    assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://lintel.page/en/');
+    assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/no formal download/);
+    assert.equal(await page.locator('.language-links [data-site-language="en"]').getAttribute('aria-current'),'page');
+    assert.match(await page.locator('#capabilities').innerText(),/Six illustrative scenes/);
+    assert.equal(await page.locator('#capabilities figure svg[role="img"]').count(),6);
+    for (const node of await page.locator('#capabilities figure svg').all()) assert.ok((await node.getAttribute('aria-label')).length > 10);
+    assert.equal(await page.locator('.hero-actions [data-site-quickstart="primary"]').getAttribute('href'),docBase+'quickstart.en.md');
+    assert.equal(await page.locator('.hero-actions [data-site-quickstart="alternate"]').getAttribute('href'),docBase+'quickstart.md');
+    assert.match(await page.locator('#try .reading-links').innerText(),/Current capabilities and limits \(Chinese\)/);
+    for (const name of ['operator-guide','agents','architecture']) assert.ok(await page.locator(`#try a[href="${docBase}${name}.en.md"]`).count());
+    for (const [id,links] of Object.entries(cardLinks)) {
+      const href = await page.locator(`#capabilities [data-capability="${id}"] h3 a`).getAttribute('href');
+      assert.ok(links.map(link=>docBase+link.replace('.md','.en.md')).includes(href),`English ${id} links its translated guide`);
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'English no-JS mobile has no horizontal overflow');
+    await assertProductCopyVisible(page,'English no-JS');
+    await page.locator('#sample-pages summary').click();
+    assert.equal(await page.locator('#sample-pages').evaluate(node=>node.open),true);
+    assert.equal(await page.locator('#workflow-trail').evaluate(node=>node.hidden),true);
+    assert.match(await page.locator('#film-open-label').innerText(),/20-second/);
+    await page.locator('.language-links [data-site-language="zh"]').click();
+    assert.equal(new URL(page.url()).pathname,'/');
+    assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN');
+    await page.locator('.language-links [data-site-language="en"]').click();
+    assert.equal(new URL(page.url()).pathname,'/en/');
+    check('English no-JS page: complete narration/scenes/limits/metadata, real locale links and English-first guides');
     await noJs.close();
   }
 
@@ -849,6 +892,100 @@ try {
   await page.evaluate(() => scrollTo({top:0, behavior:'instant'}));
   check('film layout: 16:9 with a visible close control and no overflow at 1440/390/320');
 
+  // Locale changes update existing nodes and module labels. The URL owns the choice; no
+  // language storage, no second game runner, no remount and no loss of open/selected state.
+  {
+    const bilingual = await browser.newContext({viewport:{width:1440,height:900},colorScheme:'light'});
+    const live = await bilingual.newPage();
+    live.on('pageerror',error=>errors.push(error.message));
+    live.on('request',request=>{if(!request.url().startsWith(base))external.push(request.url());});
+    live.on('response',response=>{if(response.status()>=400)errors.push(`${response.status()} ${response.url()}`);});
+    await live.goto(base+'/?trial=synthetic#how-it-works');
+    await live.locator('#sample-pages').evaluate(node=>{node.open=true;});
+    await live.locator('#workflow-trail [data-trail-step="3"]').click();
+    await live.locator('#motion-toggle').click();
+    await live.locator('#theme-toggle').click();
+    await live.locator('.cg-start').click();
+    await live.waitForFunction(()=>Number(document.querySelector('.cg-score').textContent)>0);
+    await live.locator('.cg-pause').click();
+    const score = await live.locator('.cg-score').innerText();
+    await live.evaluate(()=>{
+      window.__siteLanguageNodes = ['#clawd-game canvas','#film-dialog video','#sample-pages','#workflow-trail','.hero-overlay'].map(selector=>document.querySelector(selector));
+      window.__siteLanguageDocument = document;
+    });
+    await live.locator('[data-site-language="en"]').click();
+    assert.equal(new URL(live.url()).pathname,'/en/');
+    assert.equal(new URL(live.url()).search,'?trial=synthetic');
+    assert.equal(new URL(live.url()).hash,'#how-it-works');
+    assert.equal(await live.locator('html').getAttribute('lang'),'en');
+    assert.equal(await live.locator('html').getAttribute('data-theme'),'dark');
+    assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'Resume the scenery');
+    assert.equal(await live.locator('#theme-toggle').getAttribute('aria-label'),'Switch to daylight');
+    assert.equal(await live.locator('#workflow-trail').getAttribute('data-step'),'3');
+    assert.match(await live.locator('[data-trail-caption]').innerText(),/Step 4:.*accepted.*completed/);
+    assert.match(await live.locator('[data-trail-next]').innerText(),/Back to step 1/);
+    assert.equal(await live.locator('#sample-pages').evaluate(node=>node.open),true);
+    assert.equal(await live.locator('.clawd-game').getAttribute('data-state'),'paused');
+    assert.equal(await live.locator('.clawd-game').getAttribute('lang'),'en');
+    assert.equal(await live.locator('.cg-score').innerText(),score);
+    assert.match(await live.locator('.cg-instructions-text').innerText(),/hold, then release/);
+    assert.equal(await live.evaluate(()=>document===window.__siteLanguageDocument && window.__siteLanguageNodes.every((node,index)=>node===document.querySelector(['#clawd-game canvas','#film-dialog video','#sample-pages','#workflow-trail','.hero-overlay'][index]))),true);
+    assert.deepEqual(await live.evaluate(()=>Object.keys(localStorage).filter(key=>!['lintel.site.theme','lintel.site.clawd.best'].includes(key))),[],'locale switching writes no language or other new storage');
+    await live.goBack();
+    assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN');
+    assert.equal(await live.locator('#workflow-trail').getAttribute('data-step'),'3');
+    assert.equal(await live.locator('.cg-score').innerText(),score);
+    await live.goForward();
+    assert.equal(await live.locator('html').getAttribute('lang'),'en');
+    // The modal makes the page behind it inert. Browser history still changes the page language
+    // while preserving the exact video, open dialog and focus; it never starts/stops playback.
+    await live.locator('#film-open').click();
+    await live.goBack();
+    assert.equal(await live.locator('#film-dialog').evaluate(node=>node.open),true);
+    assert.equal(await live.locator('#film-dialog video').evaluate(node=>node===window.__siteLanguageNodes[1]),true);
+    assert.match(await live.locator('#film-dialog').getAttribute('aria-label'),/看 20 秒/);
+    assert.equal(await live.locator('.film-close').evaluate(node=>node===document.activeElement),true);
+    await live.goForward();
+    assert.match(await live.locator('#film-dialog').getAttribute('aria-label'),/Watch the 20-second/);
+    await live.keyboard.press('Escape');
+    assert.equal(await live.locator('#film-open').evaluate(node=>node===document.activeElement),true);
+    check('live locale + back/forward: same DOM/game/video; selected step, open reading, score, scenery/theme, query/hash and modal focus preserved');
+    // English visual acceptance includes all six SVG labels, alternating desktop placement,
+    // stacked mobile placement, both themes and system reduced motion.
+    for (const width of [1440,390,320]) {
+      await live.setViewportSize({width,height:900});
+      assert.equal(await live.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`English ${width}px has no page overflow`);
+      assert.match(await live.locator('#play-title').innerText(), /Stay here\s+a little longer\./, 'responsive line break preserves English word spacing');
+      await assertProductCopyVisible(live,`English ${width}px`);
+      const labels = await live.locator('.capability-visual svg text').evaluateAll(nodes=>nodes.map(node=>{
+        const box=node.getBBox(), viewport=node.ownerSVGElement.viewBox.baseVal;
+        return {text:node.textContent,x:box.x,y:box.y,right:box.x+box.width,bottom:box.y+box.height,width:viewport.width,height:viewport.height};
+      }));
+      for (const label of labels) assert.ok(label.x>=0 && label.y>=0 && label.right<=label.width && label.bottom<=label.height,`English ${width}px SVG label fits: ${label.text}`);
+      for (const theme of ['dark','light']) {
+        if(await live.locator('html').getAttribute('data-theme')!==theme)await live.locator('#theme-toggle').click();
+        assert.equal(await live.locator('html').getAttribute('data-theme'),theme);
+        if(qa)await captureSection(live,'#capabilities',`capabilities-en-${width}-${theme}.png`);
+      }
+      if(qa)await captureFull(live,`full-en-${width}.png`);
+    }
+    await live.emulateMedia({reducedMotion:'reduce'});
+    await live.waitForFunction(()=>document.documentElement.dataset.motion==='reduced',undefined,{polling:50});
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'System reduced motion is on');
+    await live.locator('#workflow-trail [data-trail-step="2"]').click();
+    assert.match(await live.locator('[data-trail-caption]').innerText(),/Step 3:.*new preview and approval/);
+    await live.locator('[data-site-language="zh"]').click();
+    assert.equal(await live.locator('#workflow-trail').getAttribute('data-step'),'2');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'系统已减少动效');
+    await live.reload();
+    assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN','explicit locale URL survives reload');
+    await live.goto(base+'/en/');
+    assert.equal(await live.locator('html').getAttribute('lang'),'en','direct English URL mounts in English');
+    check('English 1440/390/320 day/night: all scene labels fit, readable copy, no overflow and reduced-motion locale changes');
+    await bilingual.close();
+  }
+
   // --- The non-persisted pagehide is the LAST functional action in this context. ---
   await page.locator('#film-open').click();
   assert.equal(await filmDialog.evaluate(node => node.open), true, 'the film is open before the unload lifecycle');
@@ -873,6 +1010,8 @@ try {
     const filmRequests = [];
     realPage.on('request', request => { if (/lintel-intro\.mp4$/.test(request.url())) filmRequests.push(request.url()); });
     await realPage.goto(base, {waitUntil:'domcontentloaded'});
+    await realPage.locator('[data-site-language="en"]').click();
+    assert.equal(await realPage.locator('html').getAttribute('lang'),'en');
     await realPage.locator('#film-open').scrollIntoViewIfNeeded();
     const beforeOpen = await realPage.locator('#film-dialog video').evaluate(v => ({readyState:v.readyState, paused:v.paused}));
     assert.equal(beforeOpen.paused, true, 'actual media: the film never autoplays on load');
@@ -890,11 +1029,20 @@ try {
     assert.ok(meta.d >= 19.9 && meta.d <= 20.3, `actual media duration is ~20s (got ${meta.d.toFixed(3)})`);
     assert.ok(meta.t > 0, 'actual media timeline advances when explicitly played');
     assert.ok(filmRequests.length >= 1, 'actual media: play() actually fetched the film (request evidence)');
+    const beforeLanguage = await realPage.locator('#film-dialog video').evaluate(video=>{window.__playingFilm=video;return video.currentTime;});
+    await realPage.goBack();
+    assert.equal(await realPage.locator('html').getAttribute('lang'),'zh-CN');
+    assert.equal(await realPage.locator('#film-dialog').evaluate(node=>node.open),true,'locale history leaves the playing modal open');
+    assert.equal(await realPage.locator('#film-dialog video').evaluate(video=>video===window.__playingFilm && !video.paused),true,'locale history keeps the exact playing video');
+    await realPage.waitForFunction(time=>document.querySelector('#film-dialog video').currentTime>time+.1,beforeLanguage);
+    await realPage.goForward();
+    assert.equal(await realPage.locator('html').getAttribute('lang'),'en');
+    assert.equal(await realPage.locator('#film-dialog video').evaluate(video=>video===window.__playingFilm && !video.paused),true);
     await realPage.locator('#film-dialog video').evaluate(v => v.pause());
     await realPage.locator('#film-dialog .film-close').click();
     await realPage.waitForFunction(() => { const d = document.getElementById('film-dialog'); return d && !d.open; }, null, {timeout:3000});
     assert.equal(await realPage.locator('#film-dialog video').evaluate(v => v.paused && v.currentTime === 0), true, 'closing the film stops and resets actual playback');
-    check('actual media: explicit play() fetches/advances the 1920x1080 ~20s film; opening never autoplays or fetches; close resets');
+    check('actual media: explicit play() advances the 1920x1080 ~20s film, live locale history preserves playback, opening never fetches/autoplays and close resets');
     await real.close();
   }
 

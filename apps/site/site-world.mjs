@@ -1,6 +1,7 @@
 // A local illustrated world, separate from the single opt-in Clawd runner.
 // No native bridge, network, audio, clipboard or persistent discovery state.
-export function mountSiteWorld({ toggleTheme }) {
+import { MOTION_COPY } from './site-copy.mjs';
+export function mountSiteWorld({ toggleTheme, language = 'zh' }) {
   const root = document.documentElement;
   const scene = document.querySelector('.hero-overlay');
   const canvas = document.querySelector('#lake-light');
@@ -87,14 +88,18 @@ export function mountSiteWorld({ toggleTheme }) {
     scene.dataset.ripple = String(Number(scene.dataset.ripple || 0) + 1);
     armWaveExpiry(); paint();
   }
+  function refreshMotionLabel() {
+    const copy = MOTION_COPY[language];
+    const label = reducedOn ? copy.reduced : paused ? copy.resume : copy.pause;
+    motion.setAttribute('aria-label', label); motion.title = label;
+    motion.lastElementChild.textContent = label;
+  }
   function refreshMotion() {
     reducedOn = reduced.matches;
     root.dataset.motion = reducedOn ? 'reduced' : paused ? 'paused' : 'live';
     motion.setAttribute('aria-pressed', String(!moving()));
     motion.disabled = reducedOn;
-    const label = reducedOn ? '系统已减少动效' : paused ? '让山湖动起来' : '停下风景';
-    motion.setAttribute('aria-label', label); motion.title = label;
-    motion.lastElementChild.textContent = label;
+    refreshMotionLabel();
     motion.firstElementChild.textContent = moving() ? 'Ⅱ' : '▷';
     if (!moving()) {
       const now = performance.now();
@@ -249,7 +254,7 @@ export function mountSiteWorld({ toggleTheme }) {
   [canvas, document.querySelector('#moon-toggle'), document.querySelector('#lake-touch'), clawd, document.querySelector('#tail-secret'), motion, progress].forEach(node => { node.hidden = false; });
   root.classList.add('world-ready');
   resize(); refreshMotion(); updateProgress();
-  return () => {
+  const dispose = () => {
     disposed = true;
     cancelAnimationFrame(frame); cancelAnimationFrame(progressFrame); clearTimeout(waveTimer);
     reactions.forEach(clearTimeout); reactions.clear();
@@ -258,4 +263,9 @@ export function mountSiteWorld({ toggleTheme }) {
     sceneObserver.disconnect(); sceneryObserver.disconnect(); sizeObserver.disconnect();
     listeners.forEach(remove => remove()); root.classList.remove('world-ready', 'scene-motion');
   };
+  dispose.setLanguage = next => {
+    language = next === 'en' ? 'en' : 'zh';
+    refreshMotionLabel();
+  };
+  return dispose;
 }

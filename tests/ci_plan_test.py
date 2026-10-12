@@ -56,6 +56,7 @@ class ClassificationTests(unittest.TestCase):
     def test_site_paths(self):
         for path in ("apps/site/index.html", "apps/site/site-world.mjs",
                      "assets/preview/hero.svg", "scripts/prepare-site.mjs",
+                     "scripts/prepare-site-languages.mjs", "tests/site_languages.test.mjs",
                      "scripts/prepare-preview-art.mjs"):
             self.assertEqual(ci_plan.classify_path(path), ci_plan.AREA_SITE, path)
 

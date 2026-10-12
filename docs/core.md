@@ -1,5 +1,7 @@
 # Core 与 CLI
 
+简体中文（canonical） · [English](core.en.md) · [文档入口](index.md)
+
 `crates/core` 是本地环境清单、计划、文件操作、任务 journal 与字段恢复的唯一实现。GUI 和 `apps/runner` 通过同一个 `handle_request` 调用它。完整目标仍由 [SPEC](SPEC.md) 定义，本页只描述当前实现。
 
 ## 宿主共享 IPv4 / IPv6

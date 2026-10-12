@@ -1,5 +1,7 @@
 # Telemetry 目标目录与受控规则测试
 
+简体中文（canonical） · [English](telemetry.en.md) · [文档入口](index.md)
+
 本文件拥有 telemetry 目标目录这一项能力的实现边界：静态目录、App 草案合并、CLI／有限 SSH 的只读目录，以及受控的规则测试。产品立场与既有受控通道（`docs/network.md`）保持不变。这里没有任何在线规则、第三方历史清单导入、通配符扩展或全域名黑名单。
 
 ## 目的与事实分离

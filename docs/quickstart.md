@@ -1,6 +1,6 @@
 # 快速上手：从公开源码做一次本地试用
 
-中文 · [English](quickstart.en.md)
+简体中文（canonical） · [English](quickstart.en.md) · [文档入口](index.md)
 
 这份文档带新访客在**一次性合成 fixture** 里走完一条小旅程：登记一个 Claude
 配置环境，生成合成的指令／记忆／会话原件（另加一个**故意不选**的原件），
@@ -325,6 +325,8 @@ service）。见 [Agent CLI 指南](agents.md#用户安装候选包) 与
   Agent 元数据**。请自行控制正文的终端显示与后续复制。
 
 ## 相关文档
+
+[中英文文档入口](index.md) 汇集完整使用／操作指南；中文是 canonical edition，英文 siblings 同步维护命令与边界。
 
 当前源码另有 [遥测控制](telemetry.md) 和 [App 更新与发行准备](app-updates.md)。首次合成试用不访问更新 feed，也不发送遥测测试到公网；App 后台检查默认关闭，正式公钥／feed 未配置，旧安装候选不因此升级。
 

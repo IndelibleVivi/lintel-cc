@@ -2,23 +2,29 @@ import { mountClawdGame } from './clawd-game.mjs';
 import { mountFilmPlayer } from './film.mjs';
 import { mountSiteWorld } from './site-world.mjs';
 import { mountWorkflowTrail } from './workflow-trail.mjs';
+import { mountSiteLanguage, siteLanguageFromPath } from './site-language.mjs';
+import { THEME_COPY } from './site-copy.mjs';
 
 const root = document.documentElement;
 const themeButton = document.querySelector('#theme-toggle');
+let language = siteLanguageFromPath(location.pathname);
 let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 try {
   const saved = localStorage.getItem('lintel.site.theme');
   if (saved === 'light' || saved === 'dark') theme = saved;
 } catch {}
 
-function applyTheme() {
-  root.dataset.theme = theme;
-  const label = theme === 'light' ? '切换到夜色' : '切换到日光';
+function refreshThemeLabels() {
+  const copy = THEME_COPY[language];
+  const label = theme === 'light' ? copy.night : copy.day;
   themeButton.setAttribute('aria-label', label);
   themeButton.title = label;
   themeButton.firstElementChild.textContent = theme === 'light' ? '☾' : '☼';
-  const sceneLabel = theme === 'light' ? '切换夜色主题' : '切换日光主题';
-  document.querySelector('#moon-toggle').setAttribute('aria-label', `碰一下月亮，${sceneLabel}`);
+  document.querySelector('#moon-toggle').setAttribute('aria-label', theme === 'light' ? copy.moonNight : copy.moonDay);
+}
+function applyTheme() {
+  root.dataset.theme = theme;
+  refreshThemeLabels();
   root.dispatchEvent(new Event('site-theme-change'));
 }
 applyTheme();
@@ -37,11 +43,19 @@ document.querySelector('a[href="#sample-pages"]').addEventListener('click', () =
 });
 
 // Only illustration moves. Copy and real trial links are available immediately.
-const disposeTrail = mountWorkflowTrail(document.querySelector('#workflow-trail'));
-const disposeWorld = mountSiteWorld({ toggleTheme });
-const disposeGame = mountClawdGame(document.querySelector('#clawd-game'));
+const disposeTrail = mountWorkflowTrail(document.querySelector('#workflow-trail'), { language });
+const disposeWorld = mountSiteWorld({ toggleTheme, language });
+const disposeGame = mountClawdGame(document.querySelector('#clawd-game'), { language: language === 'en' ? 'en' : 'zh-CN' });
 const disposeFilm = mountFilmPlayer(document);
+const disposeLanguage = mountSiteLanguage(next => {
+  language = next;
+  refreshThemeLabels();
+  disposeTrail.setLanguage?.(language);
+  disposeWorld.setLanguage?.(language);
+  disposeGame.setLanguage?.(language === 'en' ? 'en' : 'zh-CN');
+  disposeFilm.setLanguage?.(language);
+});
 // Preserve live mounts across the browser back/forward cache; ordinary unload disposes them.
 addEventListener('pagehide', event => {
-  if (!event.persisted) { disposeWorld(); disposeTrail(); disposeGame(); disposeFilm(); }
+  if (!event.persisted) { disposeLanguage(); disposeWorld(); disposeTrail(); disposeGame(); disposeFilm(); }
 });

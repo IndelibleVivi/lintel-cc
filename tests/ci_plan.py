@@ -77,6 +77,7 @@ _OWNER_DIR_RULES: Tuple[Tuple[str, str], ...] = (
     (AREA_SITE, "apps/site/**"),
     (AREA_SITE, "assets/preview/**"),
     (AREA_SITE, "scripts/prepare-site.mjs"),
+    (AREA_SITE, "scripts/prepare-site-languages.mjs"),
     (AREA_SITE, "scripts/prepare-preview-art.mjs"),
     (AREA_EXTENSIONS, "extensions/**"),
     # Broad product/native surface: any of these can invalidate core, shared
@@ -89,6 +90,7 @@ _OWNER_DIR_RULES: Tuple[Tuple[str, str], ...] = (
     (AREA_CORE, "scripts/**"),
     (AREA_SITE, "tests/site_ui_journey.mjs"),
     (AREA_SITE, "tests/site_game.test.mjs"),
+    (AREA_SITE, "tests/site_languages.test.mjs"),
     (AREA_APP_UI, "tests/*_ui_journey.mjs"),
     (AREA_APP_UI, "tests/home_greetings.test.mjs"),
     (AREA_APP_UI, "tests/i18n*.test.mjs"),

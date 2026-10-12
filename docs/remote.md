@@ -1,5 +1,7 @@
 # SSH 远程控制与断线核对
 
+简体中文（canonical） · [English](remote.en.md) · [文档入口](index.md)
+
 桌面应用通过 Rust native `remote_request` bridge 使用系统 OpenSSH，**不要求管理端安装 Python**。远端需要独立的 Rust `lintel` runner 和用户已有的 OpenSSH 服务；无需 Node 或桌面 runtime。私钥仍由用户的 OpenSSH 配置和系统 agent 管理，Lintel 不复制私钥或创建公网管理端口。
 
 `platform/ssh/lintel_ssh.py` 保留为可选的 Python 3.10+、stdlib-only 命令行 controller。它有独立 CLI 调用者；桌面不会启动或依赖该脚本。两个入口都只发送有限操作。桌面另有固定的安装条件探测、上传和核验脚本；不接受前端传入命令、URL、二进制路径或脚本。
@@ -83,7 +85,7 @@ cargo build --locked --release -p lintel-runner --bin lintel
 
 `uname` 显示目标系统与 CPU 架构，`rustc -vV` 的 `host` 字段显示当前 Rust 工具链平台。这里使用 [runner Cargo manifest](../apps/runner/Cargo.toml) 中的 package `lintel-runner` 和 binary `lintel`。未覆盖 Cargo 的 target 目录或 target triple 时，产物为仓库下的 `target/release/lintel`。`--help` 应能直接运行；使用 `lintel version --json` 核对版本与协议，`lintel capabilities --json` 核对静态 catalog。独立版本安装优先按 [Agent CLI 指南](agents.md) 选择准确 executable。
 
-确认目标用户和构建产物后，按 [Agent CLI 指南](agents.md#独立安装选定版本与升级) 安装到选定的新版本目录，保留旧 executable、state 与原任务 ID。不要把候选直接复制覆盖到已有 `lintel`。已有 PATH runner 是仍受支持的兼容入口；新版本目录需要由调用方明确选择。
+确认目标用户和构建产物后，按 [Agent CLI 指南](agents.md#从源码独立安装) 安装到选定的新版本目录，保留旧 executable、state 与原任务 ID。不要把候选直接复制覆盖到已有 `lintel`。已有 PATH runner 是仍受支持的兼容入口；新版本目录需要由调用方明确选择。
 
 若继续使用 PATH 兼容入口，确保所选版本的 `bin` 属于**该账号的非交互 SSH PATH**。仅在交互终端执行 `export PATH=...` 不足以证明桌面连接能找到它；PATH 的持久配置位置由目标账号的登录 shell 与 sshd 配置决定。不要为修复 PATH 改成关闭主机验证，或在 shell 启动文件向 stdout 打印调试信息。
 
@@ -255,7 +257,7 @@ CLI 的可导入 API 是 `list_aliases(Path)`、`Controller(state_dir).request(a
 ## 合成验证
 
 ```sh
-cargo test -p lintel-remote::
+cargo test -p lintel-remote
 python3 -m unittest discover -s platform/ssh/tests -v
 ```
 

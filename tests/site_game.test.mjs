@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newRun, jump, advance, clawdPose, spawnStar, points, BODY, clawdBody } from '../apps/site/clawd-game.mjs';
+import { newRun, jump, beginCharge, releaseCharge, cancelCharge, chargePower, advance, clawdPose, spawnStar, points, BODY, clawdBody } from '../apps/site/clawd-game.mjs';
 
 // Restored original tuning the reachability checks depend on.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
 const MIN_SPEED = 210, MAX_SPEED = 350;
 // Every height the star scheme can produce: the three visible rows, each plus its bounded jitter.
 const STAR_ROWS = [98, 118, 138], STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
+const HIGH_HEIGHTS = [...new Set(STAR_JITTER.map(j=>56+Math.max(-4,Math.min(4,j))))];
 const STAR_HEIGHTS = [...new Set(STAR_ROWS.flatMap(base => STAR_JITTER.map(j => base + j)))].sort((a, b) => a - b);
 // A seeded generator so the obstacle spawn sequence is fixed, not left to chance.
 const seeded = seed => () => { seed |= 0; seed = seed + 0x6d2b79f5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -77,7 +78,7 @@ test('successive stars take visibly different heights that a real jump can reach
   for (let i = 0; i < 12; i++) sequence.push(spawnStar({ x: 0 }, i).y);
   assert.ok(new Set(sequence).size >= 9, `heights must vary across spawns, saw ${new Set(sequence).size}`);
   assert.ok(Math.max(...sequence) - Math.min(...sequence) >= 40, `the spread is at least 40px, saw ${Math.max(...sequence) - Math.min(...sequence)}`);
-  for (const y of sequence) assert.ok(STAR_HEIGHTS.includes(y), `${y} is one of the defined rows plus jitter`);
+  for (const y of sequence) assert.ok([...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y), `${y} is a normal or charged star height`);
   // Three consecutive stars sit on three different rows, so the change is visible in a play session.
   assert.equal(spawnStar({ x: 0 }, 0).y, 98);
   assert.equal(spawnStar({ x: 0 }, 1).y, 123);
@@ -92,7 +93,7 @@ test('successive stars take visibly different heights that a real jump can reach
     if (run.spawns !== before) spawned.push(run.stars.at(-1)?.y);
   }
   assert.ok(spawned.length >= 3, `advance must really spawn several stars, saw ${spawned.length}`);
-  assert.ok(spawned.every(y => STAR_HEIGHTS.includes(y)), 'every advance-spawned star uses the height scheme');
+  assert.ok(spawned.every(y => [...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y)), 'every advance-spawned star uses the normal/charged height scheme');
   assert.ok(Math.max(...spawned) - Math.min(...spawned) >= 40, 'the advance-spawned heights visibly spread');
 });
 
@@ -107,7 +108,7 @@ test('nobody can collect a star from the ground: every height needs a real jump'
 // starts; the caller scans every launch x, so no timing constant is assumed. The trial counts only
 // when the star was collected exactly once, that original obstacle was passed, Clawd landed, the
 // run is still running, no unrelated obstacle/star ever appeared, and the requested speed held.
-function fly(starY, obstacleH, obstacleW, speed, launchX, trace) {
+function fly(starY, obstacleH, obstacleW, speed, launchX, trace, power=0) {
   const run = newRun(); run.status = 'running';
   // advance() recomputes speed as min(350, 210 + distance/220); seed distance so the requested speed
   // holds from the first step. At 350 (the clamp) any distance past 30800 pins it exactly at 350;
@@ -119,7 +120,7 @@ function fly(starY, obstacleH, obstacleW, speed, launchX, trace) {
   run.spawn = 1e6; // a finite spawn delay far beyond this short trial: no unrelated star can appear
   let launched = false, landed = false, speedHeld = run.speed === speed, minSpeed = run.speed, maxSpeed = run.speed;
   for (let step = 0; step < 200000; step++) {
-    if (!launched && obstacle.x <= launchX) { jump(run); launched = true; }
+    if (!launched && obstacle.x <= launchX) { jump(run,power); launched = true; }
     advance(run, 1 / 240, 0, () => 0);
     if (run.obstacles.length > 1 || run.stars.length > 1) return false; // spawn delay holds: no extra spawns
     if (speed === 350 && run.speed !== 350) speedHeld = false; // the max-speed trial must never drift
@@ -286,4 +287,81 @@ test('a real jump keeps the accepted flight stretch and scoring', () => {
   assert.ok(sawStretch, 'the rising body stretches vertically while airborne');
   assert.equal(clawdPose(run).anchor, 0, 'the landed body is anchored on the ground again');
   assert.equal(points({ distance: 1234, collected: 5 }), Math.floor(1234 / 10) + 5 * 25, 'scoring formula is unchanged');
+});
+
+
+test('tap releases the original jump; longer holds increase height, cap, and never launch by themselves',()=>{
+  const peaks=[];
+  for(const duration of [.05,.3,1]){
+    const run=newRun();run.status='running';run.spawn=1e6;
+    beginCharge(run);
+    for(let t=0;t<duration;t+=1/240)advance(run,1/240,2000);
+    assert.equal(run.y,0,'holding never auto-launches');assert.equal(run.velocity,0);
+    assert.ok(run.distance>0,'the road continues while charging');
+    assert.ok(chargePower(run)<=1);
+    const power=chargePower(run);releaseCharge(run);
+    assert.equal(run.charging,false);assert.equal(run.charge,0);
+    assert.equal(run.velocity,480+170*power);
+    let peak=0;for(let i=0;i<300;i++){advance(run,1/240,2000);peak=Math.max(peak,run.y);}
+    assert.equal(run.y,0);peaks.push(peak);
+  }
+  assert.ok(Math.abs(peaks[0]-480**2/(2*1450))<.1,'tap keeps the original jump height');
+  assert.ok(peaks[1]>peaks[0]+20);assert.ok(peaks[2]>peaks[1]+20);
+  assert.ok(peaks[2]<150,'charged leap stays inside the board');
+});
+
+test('charged height is consistent at 30/60/144fps; cancellation cannot leave a delayed jump',()=>{
+  const peaks=[];
+  for(const fps of [30,60,144]){
+    const run=newRun();run.status='running';run.spawn=1e6;beginCharge(run);
+    for(let i=0;i<fps;i++)advance(run,1/fps,2000);
+    assert.equal(chargePower(run),1);releaseCharge(run);let peak=0;
+    for(let i=0;i<fps*2;i++){advance(run,1/fps,2000);peak=Math.max(peak,run.y);}peaks.push(peak);
+    beginCharge(run);advance(run,.1,2000);cancelCharge(run);releaseCharge(run);
+    assert.equal(run.velocity,0);assert.equal(run.charge,0);assert.equal(run.buffer,0);
+  }
+  assert.ok(Math.max(...peaks)-Math.min(...peaks)<1);
+  const paused=newRun();paused.status='paused';beginCharge(paused);releaseCharge(paused);
+  assert.equal(paused.charging,false);assert.equal(paused.velocity,0);
+});
+
+test('high double stars require charge, remain cleanly reachable at every speed, and award once',()=>{
+  for(let i=0;i<20;i++)assert.equal(spawnStar({x:100},i).value===50,i%4===3,'one high reward in each group of four');
+  for(const y of HIGH_HEIGHTS){
+    // Original ballistic apex cannot reach even the lowest edge of this star's hit region.
+    assert.ok(GROUND-HEIGHT/2-480**2/(2*1450)-y>HIT_Y,'tap cannot collect a high star');
+    for(const speed of [210,350]){
+      let reachable=false;
+      for(let x=40;x<500&&!reachable;x++)reachable=fly(y,29,28,speed,x,null,1);
+      assert.ok(reachable,`charged jump can collect high star ${y} and clear tallest obstacle at ${speed}`);
+    }
+  }
+  const run=newRun();run.status='running';run.y=100;run.spawn=1e6;
+  run.stars=[{x:80,y:68,value:50}];advance(run,1/240,1000);
+  assert.equal(run.collected,1);assert.equal(run.bonus,25);
+  assert.equal(points(run),Math.floor(run.distance/10)+50);
+  advance(run,1/240,1000);assert.equal(run.collected,1);assert.equal(run.bonus,25);
+});
+
+test('a full charged high-star jump can begin after the star is visible on a 320px track',()=>{
+  for(const fps of [30,144])for(const speed of [210,350])for(const y of HIGH_HEIGHTS){
+    let success=false;
+    for(let startX=120;startX<=308&&!success;startX++){
+      const run=newRun();run.status='running';run.spawn=1e6;run.distance=(speed-210)*220;run.speed=speed;
+      const obstacle={x:600,width:28,height:29,passed:false};run.obstacles=[obstacle];run.stars=[{x:612,y,value:50}];
+      let began=false,released=false,landed=false;
+      for(let frame=0;frame<fps*5&&run.status==='running';frame++){
+        if(!began&&obstacle.x<=startX){
+          assert.ok(run.stars[0].x<=320,'charge begins only once the star is on-screen');
+          beginCharge(run);began=true;
+        }
+        if(began&&!released&&chargePower(run)===1){releaseCharge(run);released=true;}
+        advance(run,1/fps,320,()=>.5);
+        if(released&&run.y===0&&run.velocity===0)landed=true;
+        if(obstacle.passed&&landed)break;
+      }
+      success=released&&landed&&obstacle.passed&&run.status==='running'&&run.collected===1&&run.bonus===25;
+    }
+    assert.ok(success,`visible anticipation allows full charge/collect/clear/land at ${fps}fps ${speed}px/s star ${y}`);
+  }
 });

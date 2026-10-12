@@ -1,6 +1,6 @@
 # 当前状态
 
-2026-10-12 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 App 已从 clean source `e1a2df4ade484a42a438a4bf09d225d4b7a1a78c` 构建并包装，顶部只显示实际语言 EN／中文，包含 App 简中／English、IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 美化；两架构 Linux runner 已按当前 catalog 重新构建。候选复制与 zip 解包逐文件字节／权限一致，包内资源与此前实际通过 host／扩展合成安装检查的资源一致；隔离 HOME／state 的真实 release WebKit 已观察 EN 入口、原生三选项与 English 首页／菜单。手动回到 System 的 native 点击仍未验证，详见下方；其余完整原生矩阵与普通用户安装保持独立。官网已更新到 clean `47158cd` 的静态 payload，正式域名实际加载新版短直腿 runner。独立三平台 CLI 仍为 `bb9fa824b1a2aa509e749519c5d700eba1bb02be`。未安装到 Applications、无正式 Release／Developer ID 签名／公证，更新公钥／feed 未配置。A01–A18 与完整 SPEC 的 G01–G04 保留全部目标与具体未验证项。
+2026-10-12 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 App 已从 clean source `e1a2df4ade484a42a438a4bf09d225d4b7a1a78c` 构建并包装，顶部只显示实际语言 EN／中文，包含 App 简中／English、IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 美化；两架构 Linux runner 已按当前 catalog 重新构建。候选复制与 zip 解包逐文件字节／权限一致，包内资源与此前实际通过 host／扩展合成安装检查的资源一致；隔离 HOME／state 的真实 release WebKit 已观察 EN 入口、原生三选项与 English 首页／菜单。手动回到 System 的 native 点击仍未验证，详见下方；其余完整原生矩阵与普通用户安装保持独立。官网生产仍是 clean `47158cd` 的静态 payload，正式域名实际加载该版短直腿 runner。本轮源码另完成简中／English 官网、六幅 SVG 能力场景、仓库双语使用指南与 hold/release 蓄力玩法；本地完整 payload 和隔离 Chromium 检查已通过，尚未部署，现有 App 候选也未重建为新玩法。独立三平台 CLI 仍为 `bb9fa824b1a2aa509e749519c5d700eba1bb02be`。未安装到 Applications、无正式 Release／Developer ID 签名／公证，更新公钥／feed 未配置。A01–A18 与完整 SPEC 的 G01–G04 保留全部目标与具体未验证项。
 
 ## 当前交付与证据
 
@@ -21,6 +21,8 @@
 | 本机 Native 构建 | clean `e1a2df4` 的 canonical desktop-tauri-bundle 完整入口通过，152.576s，保留 beforeBuildCommand。没有改 updater／identifier／发行配置；此前 `47158cd` 与旧候选的构建观察见候选历史 |
 | 资源与包装 | clean `e1a2df4` macOS arm64 App 为 30,596,543 bytes（约 29.18 MiB），zip 为 11,880,053 bytes；复制件及 zip 解包的 28 文件逐字节／权限一致。内置 x86_64／aarch64 runner 为 5,895,888／5,196,336 bytes，均嵌入当前完整 task catalog；host 789,392 bytes，Chromium／Firefox、ICNS 与 canonical resources 一致，无 woff2。全部资源也与此前 `47158cd` 包逐字节相同，沿用其 fresh 编译／2 passed 的实际包内 host framing／allowlist 与扩展合成安装证据；本轮没有冒称重跑安装检查。clean docs revision 与 bundle en／zh-Hans 已核对。只有 linker ad-hoc signature，无 Team ID／资源签封／公证；候选、报告与测试数据不进 Git |
 | Preview 试用入口 | 最终 `e1a2df4` release executable 在显式 synthetic HOME／CFFIXED_USER_HOME／state 下实际显示 EN 顶部入口，偏好仍为 Follow system；原生三选项与 English 界面／菜单已观察，没有 dev server。输入工具检测到真实鼠标介入后停止，native 手动→System 选择仍未验证；三份 synthetic 原件未变、jobs 为零，QA App 已停止。旧 `47158cd`／`25a8649` 点击限制与更早归档／阅读旅程保持独立。quickstart 与双语源码入口不变，无公开 Release 下载 |
+| 官网／仓库双语源码 | `/` 简中与 `/en/` English 为完整静态页面，175 paired phrases 与生成一致性、元数据、指南链接检查通过；六任务改为交错图文 SVG 场景，明确示意与就近限制。README／quickstart／文档 hubs 及十一使用／操作／模块指南提供维护中的双语路径，中文 canonical；28 reader files 的 447 本地链接／anchors 与 64 对 fenced blocks 核对通过，规格／当前状态／开发证据仍明确标中文。完整实际媒体 site-ui 在最后视觉修复后通过 31 groups：两路 no-JS、1440／390／320 日夜、SVG 标签、same DOM／canvas／video、details／旅程／分数／主题及播放中的语言 back／forward；图景已目视。有限 payload 24 files 加 provenance manifest，影片与海报沿用原审阅字节，无 App release record。此行是 source/local candidate 证据，生产仍为下方 `47158cd` |
+| 共享 Clawd 蓄力源码 | 轻点普通跳，按住跑道／按钮／Space／↑ 后松开高跳，0.4 秒封顶而不自动起跳；普通 +25，每第四颗高处 +50。暂停、失焦、hidden、pointer cancel／lost capture、resize／卸载清除待释放输入。19 个 pure tests 覆盖多帧率、不同速度、蓄力取消和 320px 看到高星后开始蓄力仍可收星越障落地；最后 product 修改后 frontend typecheck／build 与 built-App clawd-app-ui 通过，包含实际 tap／hold 弹道、键盘／触摸取消、首次挂载立即输入与蓄力途中语言更新。网站与 App 仍共用一套 runner、原成绩 keys；当前 `e1a2df4` native App 与生产 `47158cd` 网站未含此玩法，不能借此声称已安装／上线／native 验收 |
 | 共享 Clawd 运动修复 | 身体保持水平，四条连续短直腿分两组交替抬起与前后移动，支撑腿贴地，无横向小脚；每 100px 行进一周期。起跳弹道与 140ms 落地收势保留，静态 BODY／电影轮廓不变。15 项游戏测试覆盖 30／60／144fps 与 210–350px/s；此前本地网站 canvas 连续 75 帧胸口高度一致、支撑脚底一致，61 种腿部像素状态。独立 `site-ui`（含真实影片）、built `clawd-app-ui`、desktop build 通过；此步态修正先进入 clean `afa98f66` App 与静态网站 payload，现已进入正式官网；原生游戏启动／计分／跳跃／暂停／继续／Escape 关闭通过，四张实际连续帧显示身体高度稳定、短直腿变化；正式官网更新证据见托管行，视觉接受独立于检查结果 |
 | Preview 视觉源码 | 首屏增加留白；完整微圆角橙脚与独立慢闪下划线；独立扩散／渐隐／2.6 秒清理的水纹与三幅 Clawd 的短暂反应，纸条指导／发现计数已退休。正文夜景以柔和暖灰衬托原色角色，保留深色双眼；共享游戏恢复连续短直腿与整体动作，星星真实高低变化。最后修改后 App frontend typecheck／build、canonical site-game-test（11 tests／240 个速度、障碍、星高组合）、site-ui、clawd-app-ui 均通过；1440／390 日夜、320 布局、900 contain／手机夜色合成像素、触摸／键盘、水纹到期清空、离屏停止、无 JavaScript 正文与无外部请求已核对，最终图景已目视。后台分支为合成 visibility，App UI 为 Chromium／合成 transport；网站已在正式域名上线，证据见官网托管行；历史 `afa98f66` Native 候选已重建并完成上述游戏交互检查，视觉接受独立于检查结果 |
 | 概念 intro | [独立制作入口](../scripts/preview-film/README.md)已实跑：20 秒、1920×1080、60fps／1200 帧的连续字符空间镜头，生成带英文配音与纯音乐／SFX 两份 MP4，共用编码视频。Clawd 使用共享 connected Sprite 的清晰矢量，脚沿桥拱走、前栏按深度遮挡下部、包裹随身体整体轻起伏。原创 Tone.js 音乐／SFX 与本地 Kokoro speech 保留分轨；最终 AAC 配音版 −16.97 LUFS／−1.66 dBTP，纯音乐版 −14.55 LUFS／−1.54 dBTP，为此次测量而非通用响度承诺。两份媒体完整解码通过，13 个实际编码抽帧已检查；本地播放器无 autoplay／外部请求，暂停与播放中切换音轨均保留进度。导出 manifest 如实声明 `0172ccdc`／dirty，并保留与当前 film 源码一致的快照；原版电影留在 ignored candidate 输出；网页带配音版约 16.4 MiB，完整解码通过并在正式官网实际播放，原版单独保留 |
@@ -67,9 +69,9 @@ GitHub Actions 仍是主要 CI owner；`tests/ci_plan.py` 按改动选择 `docs`
 
 | 读者／任务 | 权威入口 |
 | --- | --- |
-| 首次合成试用与英文入口 | [中文 quickstart](quickstart.md)、[English quickstart](quickstart.en.md)、[English README](../README.en.md)；公开源码构建，无公开 Release 下载 |
-| 人类任务、保全／重建、继续工作、原任务核对 | [操作指南](operator-guide.md) |
-| 独立 CLI、用户候选安装、stdin、schema 与 Agent | [Agent CLI](agents.md) |
+| 首次合成试用与英文入口 | [中文／English 文档入口](index.md)、[English documentation](index.en.md)、[中文 quickstart](quickstart.md)、[English quickstart](quickstart.en.md)、[English README](../README.en.md)；公开源码构建，无公开 Release 下载 |
+| 人类任务、保全／重建、继续工作、原任务核对 | [操作指南](operator-guide.md)、[English](operator-guide.en.md) |
+| 独立 CLI、用户候选安装、stdin、schema 与 Agent | [Agent CLI](agents.md)、[English](agents.en.md) |
 | 前端构图、组件入口与 Selen 后续工作 | [桌面](desktop.md)、[视觉身份](visual-language.md) |
 | 关联组件、保全与完整收尾的后续实现 | [环境覆盖与使用收尾方案](specs/environment-completion-plan.md)；组件清单、容量预检、精确选择、流式包与有限启动来源已接通源码；更多资产、独立完整退场、IDE/Desktop 和发行保留依赖与验收 gates |
 | App 自身更新／本地发行准备 | [App 更新](app-updates.md)；源码可用、发行配置未激活，实际首装／升级独立验收 |

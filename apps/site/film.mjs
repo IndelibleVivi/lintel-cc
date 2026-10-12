@@ -27,7 +27,8 @@ export function mountFilmPlayer(root = document) {
 
   // Reuse the trigger copy (the anchor is also the no-JS entrance) as the dialog's accessible name.
   const label = root.querySelector('#film-open-label');
-  if (label) dialog.setAttribute('aria-label', label.textContent.trim());
+  const refreshLabel = () => { if (label) dialog.setAttribute('aria-label', label.textContent.trim()); };
+  refreshLabel();
 
   // The film is only fetched on explicit play (preload=none remains). If a
   // previous session paused mid-film, reopen from a clean state.
@@ -78,7 +79,7 @@ export function mountFilmPlayer(root = document) {
   // Reflect the native closed state for assistive technology too.
   reflectHidden();
 
-  return () => {
+  const dispose = () => {
     if (disposed) return;
     disposed = true;
     link.removeEventListener('click', open);
@@ -89,4 +90,6 @@ export function mountFilmPlayer(root = document) {
     if (dialog.open) dialog.close();
     reflectHidden();
   };
+  dispose.setLanguage = refreshLabel;
+  return dispose;
 }

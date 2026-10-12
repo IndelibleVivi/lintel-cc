@@ -1,5 +1,7 @@
 # Lintel Agent CLI
 
+简体中文（canonical） · [English](agents.en.md) · [文档入口](index.md)
+
 此指南面向已有操作授权的 coding agent 和脚本作者。当前为 Lintel 0.1.0 Preview / 源码开发预览，协议 1 / catalog 1；没有正式签名发行或公开 Release 下载。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
 
 首次试用可先走 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。
@@ -335,7 +337,10 @@ install 的 prepare_runner → install_runner → query_install 与 App 共用�
 迁入的 `migration_path_conflict` 表示实际目标文件系统把包内路径视为同名或文件／目录冲突。批准执行中的空文件 preflight 在新根创建／正文写入前整批拒绝，预览不写目标。实际目标已有非目录祖先时，path guard 会在任何正文写入前返回 `path_unreadable`。已有目标根和父目录的权限保持不变，新建父目录为 `0700`、文件为 `0600`。包可继续 inspect/read；整理源内容重新归档，或选择能区分这些路径的文件系统。不要重发原任务来绕过名称冲突。
 
 路径 preflight 在创建临时目录前持久记录 `migration_probe:{path,status}` 和执行中的 `migration_preflight` 步骤。正常清理确认后 status 为 `removed`；无法确认清理则为 `retained` 并停止正文迁入。worker 中断会保留 `executing` 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。
-\n## 维护者附录：构建并打包候选\n\n### 可移植候选包的生成与校验
+
+## 维护者附录：构建并打包候选
+
+### 可移植候选包的生成与校验
 
 `scripts/package-cli.mjs` 把**明确提供的** canonical 构建产物打成候选归档：一个 macOS arm64 Mach-O、两个静态 Linux musl ELF（x86_64 与 aarch64），以及 CLI 自己解析的 canonical `remote-runners` 目录。打包器**不编译、不下载、不签名**，只核对格式与字节；缺少、架构错误、带动态加载器或与 canonical runner 字节不一致的 Linux 输入会以具体错误拒绝。两个 Linux CLI 输入必须与该架构的 canonical runner 逐字节相同，旧输入／混合输入不能被标成同一个 candidate。归档是扁平的运行时布局：`bin/lintel`、`bin/remote-runners/manifest.json`、`bin/remote-runners/<triple>/lintel`（两个 Linux runner）、`candidate.json`、`SHA256SUMS`、`README.txt`；CLI 在 `dirname(executable)/remote-runners` 找 runner，所以是 `bin/remote-runners`，不是归档根。
 

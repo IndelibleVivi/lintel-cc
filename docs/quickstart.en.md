@@ -1,6 +1,6 @@
 # Quickstart: a first local trial from public source
 
-[中文](quickstart.md) · English
+[简体中文 (canonical)](quickstart.md) · English · [Documentation](index.en.md)
 
 This page walks a new visitor through one small journey inside a **disposable
 synthetic fixture**: register a Claude config environment, generate synthetic
@@ -18,9 +18,9 @@ behavior on their own machine.
 > This is **Lintel 0.1.0 Preview / development preview**. Real authentication and
 > native resume, production Chrome/Edge/Firefox/AdsPower, production VPS and
 > signed distribution are **not verified**. See
-> [current state](current-state.md) for exact evidence and gaps.
+> [current state (Chinese)](current-state.md) for exact evidence and gaps.
 
-This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the [network guide](network.md).
+This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the [network guide](network.en.md).
 
 ---
 
@@ -319,14 +319,14 @@ then separately approve execution. It freezes the ciphertext byte digest and
 the target file state, and never overwrites a same-name file. Sessions and
 memory are kept as data; there is **no claim that a conversation can be
 resumed**. See the portable-work section of the
-[Agent CLI guide](agents.md#portable-work).
+[Agent CLI guide](agents.en.md#portable-work).
 
 ---
 
 ## Want to use the App instead?
 
 The desktop dev path is the local-build section of the repository
-[README](../README.md). `npm run dev:synthetic` creates a separate temporary
+[README](../README.en.md). `npm run dev:synthetic` creates a separate temporary
 home/state and calls the real CLI; the interface clearly labels it a "test
 space" and never uses your Claude login or browser data. Plain `npm run dev`
 does not provide a browser-to-host execution channel.
@@ -337,8 +337,8 @@ Public releases are empty; there is **no formal download link**. Install
 independently from verified source, or use the candidate-package flow (verify
 identity, platform and bytes, unpack into a new version directory, change no
 PATH / shell rc / App / service). See
-[obtaining a candidate](agents.md#用户安装候选包) and
-[independent source install](agents.md#从源码独立安装).
+[obtaining a candidate](agents.en.md#install-candidate) and
+[independent source install](agents.en.md#independent-source-installation).
 
 ## Three distinctions to keep straight
 
@@ -365,10 +365,12 @@ PATH / shell rc / App / service). See
 
 ## Related documentation
 
-Current source also includes [telemetry control](telemetry.md) and [App update preparation](app-updates.md). This synthetic first trial does not contact an update feed or a public telemetry endpoint. Background checks default off; a formal release key/feed is unconfigured and existing installed candidates are not upgraded.
+The [English documentation hub](index.en.md) links the maintained user/operator editions. Chinese remains canonical; specifications and evidence retain their original Chinese authority.
 
-- [Current state](current-state.md): candidate / resource / evidence table and undelivered goals.
-- [Human operator guide](operator-guide.md): pick an entry by goal in the GUI (Chinese).
-- [Agent CLI guide](agents.md): interface discovery, plan / approval / query, portable work and candidate install.
-- [Unified verification](verification.md): default synthetic entry point and independent runtime gates.
+Current source also includes [telemetry control](telemetry.en.md) and [App update preparation](app-updates.en.md). This synthetic first trial does not contact an update feed or a public telemetry endpoint. Background checks default off; a formal release key/feed is unconfigured and existing installed candidates are not upgraded.
+
+- [Current state (Chinese)](current-state.md): candidate / resource / evidence table and undelivered goals.
+- [Human operator guide](operator-guide.en.md): pick an entry by goal in the GUI.
+- [Agent CLI guide](agents.en.md): interface discovery, plan / approval / query, portable work and candidate install.
+- [Unified verification (Chinese)](verification.md): default synthetic entry point and independent runtime gates.
 - [Preview feedback template](../.github/ISSUE_TEMPLATE/preview-feedback.yml): attach synthetic / redacted examples only.

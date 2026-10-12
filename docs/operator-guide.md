@@ -1,5 +1,7 @@
 # Lintel 操作指南
 
+简体中文（canonical） · [English](operator-guide.en.md) · [文档入口](index.md)
+
 适用版本：Lintel 0.1.0 Preview / 开发预览。依据当前源码与各模块合同；这是尚未正式发行的操作说明，候选与 runtime 状态见[当前状态](current-state.md)。首次试用可先读 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)。
 
 Lintel 帮你处理具体的 Claude 使用环境：减少指定的可选外发、管理浏览器权限与站点状态、保住工作内容、清理已识别的旧状态，以及在 Mac 上管理 Linux VPS 的同类任务。每次先认准目标，再查看实际变化，最后根据执行回执继续工作或恢复。

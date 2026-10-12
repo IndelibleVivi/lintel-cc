@@ -1,5 +1,7 @@
 # IPv4 / IPv6 与受控网络通道
 
+简体中文（canonical） · [English](network.en.md) · [文档入口](index.md)
+
 `lintel-egress` 是 Rust loopback HTTP proxy。它已经实现 TCP CONNECT、有限普通 HTTP 转发、每个实例固定的环境与 hostname 规则，以及 HTTP/HTTPS 上游。它只约束实际进入此代理的连接。设置 `HTTP_PROXY` / `HTTPS_PROXY`、启动一个代理或者看到一条代理事件，均不能证明目标进程无法直连。
 
 ## IPv4 / IPv6 Leaf：宿主与通道分别实测

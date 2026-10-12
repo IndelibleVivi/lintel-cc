@@ -14,26 +14,14 @@
 // every SVG/CSS transition for the picture keyed off host.dataset.step; a step switch stays usable
 // with animations stopped and under prefers-reduced-motion. The disposer removes every listener.
 
-const STEP_LABELS = ['选定范围', '查看计划', '批准执行', '核对结果'];
-
-// One honest, explicitly synthetic sentence per step. Kept parallel to the four <li> in
-// #how-it-works so the nearby interaction never contradicts the plain text.
-const STEP_CAPTIONS = [
-  '第 1 步：选好这次要处理的三份合成原件（CLAUDE.md、MEMORY.md、session.jsonl），以及它们所在的环境。这一步只确定范围，原件一直留在原处。',
-  '第 2 步：查看这份计划——它冻结了范围、加密工作包的落点和将保留的内容。查看本身不改源原件，计划有自己的 ID。',
-  '第 3 步：批准同一份计划后才会执行。批准把这次意图固定下来；如果条件发生变化，会停下并需要新的预览与批准。',
-  '第 4 步：核对原任务。回执区分已接收与已完成，断开后按原 ID 回查、不重新提交。工作包可脱离原任务独立阅读，原件始终保留。',
-];
-
-// The next button advances 0→1→2→3 and then loops 3→0, relabelling on the last step.
-const TRAIL_HINT = '合成说明：这里只展示流程，不读取电脑或执行操作。';
+import { TRAIL_COPY } from './site-copy.mjs';
 
 /**
  * Wire up the four-step workflow explainer.
  * @param {Element|null|undefined} host the #workflow-trail container
  * @returns {() => void} disposer that removes every listener this call added
  */
-export function mountWorkflowTrail(host) {
+export function mountWorkflowTrail(host, { language = 'zh' } = {}) {
   if (!host) return () => {};
 
   const buttons = [...host.querySelectorAll('[data-trail-step]')];
@@ -65,13 +53,14 @@ export function mountWorkflowTrail(host) {
   // Single place that reconciles every outward surface from `current`. Idempotent, so rapid
   // reselection always converges on the latest state (no queued intermediate render).
   const render = () => {
+    const copy = TRAIL_COPY[language];
     host.dataset.step = String(current);
     steps.forEach(entry => entry.node.setAttribute('aria-pressed', String(entry.index === current)));
-    if (caption) caption.textContent = `${STEP_CAPTIONS[current]} ${TRAIL_HINT}`;
+    if (caption) caption.textContent = `${copy.captions[current]} ${copy.hint}`;
     if (nextButton) {
       const last = current === total - 1;
-      nextButton.textContent = last ? '回到第 1 步 ↺' : `下一步：${STEP_LABELS[current + 1]} →`;
-      nextButton.setAttribute('aria-label', last ? '回到第一步' : `前往第 ${current + 2} 步：${STEP_LABELS[current + 1]}`);
+      nextButton.textContent = last ? copy.restart : copy.next(copy.labels[current + 1]);
+      nextButton.setAttribute('aria-label', last ? copy.restartAria : copy.nextAria(current + 2, copy.labels[current + 1]));
     }
     applyHighlight();
   };
@@ -94,11 +83,16 @@ export function mountWorkflowTrail(host) {
   render();
   host.hidden = false; // fully initialised: reveal the control now
 
-  return () => {
+  const dispose = () => {
     for (const {node} of steps) node.removeEventListener('click', onStepClick);
     if (nextButton) nextButton.removeEventListener('click', onNextClick);
     workflowItems.forEach(li => delete li.dataset.highlight);
     host.hidden = true;
     delete host.dataset.step;
   };
+  dispose.setLanguage = next => {
+    language = next === 'en' ? 'en' : 'zh';
+    render();
+  };
+  return dispose;
 }
