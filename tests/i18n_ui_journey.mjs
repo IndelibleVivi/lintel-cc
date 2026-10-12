@@ -13,6 +13,8 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {stripVTControlCharacters} from 'node:util';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),desktop=path.join(repo,'apps/desktop');
+const {en}=await import(pathToFileURL(path.join(desktop,'src/i18n.catalog.en.ts')).href);
+const {zhCN}=await import(pathToFileURL(path.join(desktop,'src/i18n.catalog.zh-CN.ts')).href);
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE||path.join(repo,'extensions/browser/node_modules/playwright/index.mjs')).href);
 const output=await mkdtemp(path.join(os.tmpdir(),'lintel-i18n-ui-'));
 
@@ -50,8 +52,13 @@ try{
   await page.goto(url);
   await page.locator('.home-title').waitFor();
   const switchSel='.language-switch select';
+  const currentLanguage=page.locator('.target-bar .language-current');
   // (1) First paint follows the native preferred language (en), no zh flash.
   assert.equal(await page.locator(switchSel).inputValue(),'system');
+  assert.equal(await currentLanguage.innerText(),'EN','System face shows the effective App language, not the preference mode');
+  assert.deepEqual(await page.locator(switchSel).locator('option').allTextContents(),['Follow system','简体中文','English'],'all three preference choices retain full names');
+  const descriptionId=await page.locator(switchSel).getAttribute('aria-describedby');
+  assert.equal(await page.locator(`[id="${descriptionId}"]`).innerText(),'Current interface: English','effective language is available to assistive technology');
   assert.equal(await page.getByRole('button',{name:'Start a task',exact:true}).count(),1,'first paint is English from native en-US');
   assert.equal(await page.locator('html').getAttribute('lang'),'en');
   assert.equal(menuCalls.at(-1),'en','native menu language pushed on first resolve');
@@ -63,10 +70,13 @@ try{
   await page.locator(switchSel).selectOption('zh-CN');
   await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN');
+  assert.equal(await currentLanguage.innerText(),'中文');
   assert.equal(menuCalls.at(-1),'zh-CN','menu follows manual override');
   assert.equal(coreCalls.length,coreBefore,'language switch issues no core request');
   const titleAfter=await page.locator('.home-title').innerText();
-  assert.notEqual(titleAfter,titleBefore,'greeting is translated');
+  const greetingKeys=Object.keys(en).filter(key=>key.startsWith('greeting.')&&en[key]===titleBefore);
+  assert.ok(greetingKeys.length>0,'first greeting comes from the English catalog');
+  assert.ok(greetingKeys.some(key=>zhCN[key]===titleAfter),'same greeting resolves through the Chinese catalog, including shared English wording');
   // Same identity: switching back to en restores the same first-paint greeting text.
   await page.locator(switchSel).selectOption('en');await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
   assert.equal(await page.locator('.home-title').innerText(),titleBefore,'same greeting identity across a switch');
@@ -82,6 +92,7 @@ try{
   delayPreferred=true;nodePreferred=['en-US'];
   await page.locator(switchSel).selectOption('system');await waitPending(1);
   assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN','pending System read retains current locale');
+  assert.equal(await currentLanguage.innerText(),'中文','pending System read retains the displayed effective language');
   assert.equal(await page.locator(switchSel).inputValue(),'zh-CN','preference and System setting commit together');
   pendingPreferred.shift().resolve(['en-US']);await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
   nodePreferred=['zh-Hans'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));await waitPending(1);
@@ -89,6 +100,7 @@ try{
   pendingPreferred[1].resolve(pendingPreferred[1].value);await page.waitForTimeout(50);
   pendingPreferred[0].resolve(pendingPreferred[0].value);pendingPreferred.splice(0);await page.waitForTimeout(50);
   assert.equal(await page.locator('html').getAttribute('lang'),'en','older response cannot overwrite newer preference');
+  assert.equal(await currentLanguage.innerText(),'EN','late reads cannot replace the effective language face');
   nodePreferred=['zh-Hans'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));await waitPending(1);
   await page.locator(switchSel).selectOption('en');pendingPreferred.shift().resolve(['zh-Hans']);await page.waitForTimeout(50);
   assert.equal(await page.locator(switchSel).inputValue(),'en','manual selection wins while native preference read is pending');
@@ -99,6 +111,9 @@ try{
   await page.locator(switchSel).selectOption('system');
   await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor();
   assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN','System resolves to native zh-Hans without falling back');
+  assert.equal(await page.locator(switchSel).inputValue(),'system');
+  assert.equal(await currentLanguage.innerText(),'中文','Chinese System mode still displays 中文');
+  assert.deepEqual(await page.locator(switchSel).locator('option').allTextContents(),['跟随系统','简体中文','English']);
   report.checks.push('returning to System re-reads native preferences (zh-Hans) with no fallback flash');
   // (5) System mode follows a languagechange; manual mode ignores it.
   nodePreferred=['en-GB'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));
@@ -179,6 +194,8 @@ try{
   await settings.getByText('Network enforcement',{exact:true}).waitFor();
   // Language selector lives in settings too; it is accessible.
   assert.equal(await settings.locator('.language-switch select').count()>=1,true);
+  assert.equal(await settings.locator('.language-switch select').inputValue(),'system');
+  assert.equal(await settings.locator('.language-switch select option:checked').innerText(),'Follow system','settings retains the full selected preference mode');
   await page.keyboard.press('Escape');
   // Help dialog.
   await page.getByRole('button',{name:'Help',exact:true}).click();
@@ -196,13 +213,22 @@ try{
     await page.getByRole('button',{name:theme==='light'?'Light Day':'Dark Night',exact:true}).click();
     const geometry=await page.locator('.target-bar').evaluate(node=>({height:node.getBoundingClientRect().height,select:node.querySelector('.language-switch').getBoundingClientRect().width,context:node.querySelector('.target-context').getBoundingClientRect().width}));
     assert.ok(geometry.height<100,'language control must not turn the toolbar into a tall form');
-    assert.ok(geometry.select>=100&&geometry.select<=150,'finite compact language selector');
+    assert.ok(geometry.select>=44&&geometry.select<=80,'minimal language face retains a usable hit area');
     assert.ok(geometry.context>200,'target context remains readable at 900px');
     await page.screenshot({path:path.join(output,`i18n-en-900-${theme}.png`)});
   }
   await page.locator(switchSel).focus();assert.equal(await page.locator(switchSel).evaluate(node=>node===document.activeElement),true,'selector remains keyboard focusable');
+  assert.equal(await page.locator('.target-bar .language-control').evaluate(node=>getComputedStyle(node).boxShadow!=='none'),true,'keyboard focus is visible on the compact face');
+  // Chromium on macOS does not drive the OS-owned select popup with Playwright
+  // key events, including an ordinary visible select. Focus/visible feedback is
+  // checked here; native popup clicking/keyboard selection needs native evidence.
+  nodePreferred=['zh-Hans'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));
+  await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor();
+  await page.screenshot({path:path.join(output,'i18n-zh-system-900-dark.png')});
+  nodePreferred=['en-US'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));
+  await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
   assert.deepEqual(errors,[]);
-  report.checks.push('900px layout and html lang remain valid');
+  report.checks.push('minimal EN/中文 face tracks effective locale; full native choices and visible keyboard focus remain accessible at 900px in Day/Night');
   // The development build runs the real main.tsx StrictMode setup/cleanup/setup.
   // A preference refresh after this mount must still apply (production React
   // does not exercise this lifecycle).

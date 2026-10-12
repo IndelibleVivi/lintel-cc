@@ -71,16 +71,28 @@ export function useLabel(): (value: string) => string {
 }
 
 
-// Accessible System / 简体中文 / English selector. The control only changes the
-// interface language; it never issues a core operation or reopens the App.
+// The compact face shows the resolved locale; the native menu keeps the actual
+// preference, including Follow system. No core operation or App remount.
 export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
-  const { t, setting, setLanguage } = useI18n();
+  const { t, locale, localeLabel, setting, setLanguage } = useI18n();
+  const currentId = useId();
   const options: { value: 'system' | 'zh-CN' | 'en'; label: string }[] = [
-    { value: 'system', label: t(compact ? 'language.systemShort' : 'language.system') },
+    { value: 'system', label: t('language.system') },
     { value: 'zh-CN', label: '简体中文' },
     { value: 'en', label: 'English' },
   ];
-  return <label className="field language-switch"><span className="language-switch-label">{t('language.select')}</span><span className="language-control"><Icon name="language" size={14}/><select aria-label={t('language.select')} value={setting} onChange={event => setLanguage(event.target.value as 'system' | 'zh-CN' | 'en')}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><Icon name="chevron" size={11}/></span><small>{t('language.hint')}</small></label>;
+  return <label className={`field language-switch${compact ? ' compact' : ''}`}>
+    <span className="language-switch-label">{t('language.select')}</span>
+    <span className="language-control">
+      {compact ? <span className="language-current" aria-hidden="true">{t('language.short')}</span> : <Icon name="language" size={14}/>}
+      <select aria-label={t('language.select')} aria-describedby={compact ? currentId : undefined} value={setting} onChange={event => setLanguage(event.target.value as 'system' | 'zh-CN' | 'en')}>
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <Icon name="chevron" size={11}/>
+    </span>
+    {compact && <span id={currentId} className="sr-only">{t('language.current', { language: localeLabel(locale) })}</span>}
+    <small>{t('language.hint')}</small>
+  </label>;
 }
 
 export function Status({ value }: { value: string }) {

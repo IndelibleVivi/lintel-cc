@@ -6,7 +6,8 @@
 import type { Catalog } from './i18n';
 
 export const zhCN: Catalog = {
-  'language.systemShort': '跟随系统',
+  'language.short': '中文',
+  'language.current': '当前界面：{language}',
   'language.system': '跟随系统',
   'language.select': '界面语言',
   'language.hint': '跟随系统时使用 macOS 首选语言；选择简体中文或 English 会固定界面语言。',

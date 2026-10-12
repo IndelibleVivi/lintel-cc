@@ -4,7 +4,8 @@
 import type { Catalog } from './i18n';
 
 export const en: Catalog = {
-  'language.systemShort': 'System',
+  'language.short': 'EN',
+  'language.current': 'Current interface: {language}',
   'language.system': 'Follow system',
   'language.select': 'Interface language',
   'language.hint': 'Follow system tracks your macOS preferred languages; choosing 简体中文 or English pins the interface language.',

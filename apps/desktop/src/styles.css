@@ -62,11 +62,14 @@ input[type=text],input[type=search],input:not([type]),textarea{border:1px solid 
 .language-control:hover select{background:var(--soft);border-color:color-mix(in srgb,var(--muted) 35%,var(--line))}
 .language-control select:focus-visible{outline:none;background:var(--accent-bg);box-shadow:inset 0 -2px var(--focus);text-decoration:underline;text-underline-offset:3px}
 .settings-body>.language-switch{margin-top:14px;margin-bottom:16px}
-.target-bar>.language-switch{flex:0 0 124px;min-width:0;margin:7px 0 0;gap:0}
+.target-bar>.language-switch{flex:0 0 62px;min-width:0;margin:7px 0 0;gap:0}
 .target-bar>.language-switch>.language-switch-label,.target-bar>.language-switch>small{display:none}
-.target-bar>.language-switch .language-control{width:100%}
-.target-bar>.language-switch select{font-size:11px;min-height:35px}
-@media(max-width:1000px){.target-bar>.language-switch{flex-basis:118px}}
+.language-switch.compact .language-control{width:100%;min-height:35px;border-radius:6px;padding:7px 23px 7px 9px;color:var(--muted);font-size:12px;line-height:1.5}
+.language-switch.compact .language-current{pointer-events:none}
+.language-switch.compact .language-control:hover{color:var(--text);background:var(--soft)}
+.language-switch.compact .language-control:focus-within{color:var(--text);background:var(--accent-bg);box-shadow:inset 0 -2px var(--focus)}
+.language-switch.compact .language-control:focus-within .language-current{text-decoration:underline;text-underline-offset:3px}
+.language-switch.compact select{position:absolute;inset:0;height:100%;padding:0;opacity:0}
 .target-context>.eyebrow{display:none}
 .target-context>strong{display:block;font-size:14px}
 .target-line{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;line-height:1.45}
