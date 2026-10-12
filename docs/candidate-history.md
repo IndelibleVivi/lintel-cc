@@ -6,6 +6,16 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 首次双语候选（47158cd，2026-10-12）
+
+以下保留入口简化之前的本地 App；它被 clean `e1a2df4` 候选替代，旧包保留。官网继续使用 `47158cd` 的独立静态 payload，这个 App 替代关系不改变生产部署。最初双语实现及 dev native 的六项语言旅程属于 `65495b7`，manual→System 的 native 选择尚未验证。
+
+| 对象 | 历史证据 |
+| --- | --- |
+| 本机 Native 构建 | clean `47158cd` 的 canonical desktop-tauri-bundle 完整入口两次通过：初次 252.294s；更新 runner 资源后的最终构建 112.076s，保留 beforeBuildCommand。没有改 updater／identifier／发行配置，也没有将旧候选的 timeout 标为通过；旧构建成本见候选历史 |
+| 资源与包装 | clean `47158cd` macOS arm64 App 为 30,596,543 bytes（约 29.18 MiB），zip 为 11,879,150 bytes；复制件及 zip 解包的 28 文件逐字节／权限一致。内置 x86_64／aarch64 runner 为 5,895,888／5,196,336 bytes，均嵌入当前完整 task catalog；host 789,392 bytes，Chromium／Firefox、ICNS 与 canonical resources 一致，无 woff2。实际包内 host framing／allowlist 与扩展合成安装两项检查为 fresh 编译／2 passed，clean docs revision 与 bundle en／zh-Hans 已核对。只有 linker ad-hoc signature，无 Team ID／资源签封／公证；候选、报告与测试数据不进 Git |
+| Preview 试用入口 | 最终 `47158cd` release executable 已在显式 synthetic HOME／CFFIXED_USER_HOME／state 下观察 System／English 首页与原生菜单；没有 dev server。后台控制接口曾返回空图／空树，另一个原生观察接口能读到完整 UI，不能据此判为产品启动故障。native 手动→System 点击尚未验证；旧 `25a8649` 点击限制及更早归档／阅读旅程在候选历史，不归给新候选。quickstart 与双语源码入口不变，无公开 Release 下载 |
+
 ## Selen 美化与本地 App（25a8649，2026-10-11）
 
 以下保留被双语候选 `47158cd` 替代的 App／资源观察，以及更新之前的官网部署；各行的“本轮”仅指当时检查。旧包仍保留，未覆盖安装。`25a8649fb313eeac159503801a392ee6cb969e12` 包含 IPv4／IPv6 Leaf、遥测控制／App 更新准备与 Selen 美化，没有后来的 App 简中／English。新候选和实际官网以 [当前状态](current-state.md) 为准。
