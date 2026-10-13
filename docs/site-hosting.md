@@ -29,22 +29,52 @@ python3 -m http.server 4317 --bind 127.0.0.1 \
 
 ```sh
 WRANGLER_SEND_METRICS=false npx --yes wrangler@4.148.0 pages project list
+SITE_REVISION=$(python3 -c 'import json; print(json.load(open("candidate-packages/site-build/site-build.json"))["source_revision"])')
 WRANGLER_SEND_METRICS=false npx --yes wrangler@4.148.0 pages deploy \
   candidate-packages/site-build --project-name lintel --branch site-preview \
-  --commit-hash "$(git rev-parse HEAD)" --commit-dirty false
+  --commit-hash "$SITE_REVISION" --commit-dirty false
 ```
 
-仅当 source 确实 clean 时声明 `--commit-dirty false`；dirty preview 要如实改为 `true`。保留 CLI 返回的实际 deployment URL，不从名称猜测平台分配的 hostname。当前 preview branch alias 是 `site-preview.lintel-aue.pages.dev`；preview 默认有 `X-Robots-Tag: noindex`。
+revision 与 dirty 声明必须对应冻结包的 `site-build.json`，不以之后仅更新文档的 HEAD 替代包来源。仅当 source 确实 clean 时声明 `--commit-dirty false`；dirty preview 要如实改为 `true`。保留 CLI 返回的实际 deployment URL，不从名称猜测平台分配的 hostname。当前 preview branch alias 是 `site-preview.lintel-aue.pages.dev`；preview 默认有 `X-Robots-Tag: noindex`。
 
 在该 URL 检查 HTTP、页面 module、插画、手机布局与实际视频后，生产更新使用同一个已检查目录：
 
 ```sh
 WRANGLER_SEND_METRICS=false npx --yes wrangler@4.148.0 pages deploy \
   candidate-packages/site-build --project-name lintel --branch main \
-  --commit-hash "$(git rev-parse HEAD)" --commit-dirty false
+  --commit-hash "$SITE_REVISION" --commit-dirty false
 ```
 
 项目已经存在；更新不需要创建项目或额外 `--force`。首次创建时 Wrangler 4.148.0 曾尝试将新 Pages project 委派到 Workers；静态目录自动检测失败后，使用该版本支持的 `pages project create lintel --production-branch main --force` 创建了 Direct Upload Pages project。这个 flag 在这里选择 Pages 创建路径，不是覆盖已有内容的发布开关。
+
+### 已有 Dashboard 登录的 ZIP 上传路径
+
+Direct Upload 支持在同一个已有项目中使用 Wrangler 或 Dashboard。Wrangler 的钥匙串读取失败时，先确认该次是否产生 deployment；已有正常 Dashboard 登录可完成同一有限 payload 的上传，不需要导出 cookie/token、扩大权限或改动钥匙串。登录与系统访问提示由正常登录流程处理。
+
+ZIP 只能包含冻结包 manifest 列出的文件与 manifest 本身，路径从网站根开始，不带外层目录、QA、runtime 或 Mac metadata。Dashboard 限制为 1,000 个文件、单文件 25 MiB；当前有限包符合这两个边界。下例使用上方已经准备的目录，并拒绝覆盖同名 ZIP：
+
+```sh
+python3 - <<'PY'
+import json
+from pathlib import Path
+from zipfile import ZipFile, ZIP_DEFLATED
+
+payload = Path("candidate-packages/site-build")
+manifest = json.loads((payload / "site-build.json").read_text())
+names = [row["path"] for row in manifest["files"]] + ["site-build.json"]
+archive = Path("candidate-packages/site-build-upload.zip")
+with ZipFile(archive, "x", compression=ZIP_DEFLATED) as out:
+    for name in names:
+        out.write(payload / name, arcname=name)
+with ZipFile(archive) as check:
+    assert check.namelist() == names
+    assert all(check.read(name) == (payload / name).read_bytes() for name in names)
+PY
+```
+
+在 **计算 → Workers 和 Pages → lintel → 创建部署** 核对已有 project 的平台域名为 `lintel-aue.pages.dev`。先选择 **预览**、名称 `site-preview`，通过 **内容** 上传 ZIP；等到全部文件上传成功，再 **保存并部署**。UI 的部署前提示可能只使用 project 名称拼出 hostname，最终链接以成功页和 deployment 列表的实际 URL 为准。
+
+按下方线上检查核对 preview 后，再创建部署，选择 **生产**，上传同一个未修改的 ZIP并保存。保留列表中实际 production／preview deployment ID；Dashboard 此流程没有填写 Git commit metadata，来源声明仍来自原包 manifest，不把 UI 上传称为带 Wrangler commit 参数的部署。结果不明时先读原 deployment 列表，不重复提交。
 
 ## 域名与线上核对
 
