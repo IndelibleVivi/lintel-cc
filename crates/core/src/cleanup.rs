@@ -123,7 +123,7 @@ impl Engine {
         Ok((public, raw))
     }
 
-    fn cleanup_files(&self, e: &Value, recipe: &str) -> Result<Vec<Value>> {
+    fn cleanup_paths(&self, e: &Value, recipe: &str) -> Result<Vec<(PathBuf, &'static str)>> {
         let root = PathBuf::from(string(e, "root")?);
         let mut paths = vec![(root.join(".credentials.json"), "credentials")];
         if recipe != "repair_login" {
@@ -134,7 +134,11 @@ impl Engine {
             };
             paths.push((global, "client_state"));
         }
-        paths
+        Ok(paths)
+    }
+
+    fn cleanup_files(&self, e: &Value, recipe: &str) -> Result<Vec<Value>> {
+        self.cleanup_paths(e, recipe)?
             .into_iter()
             .map(|(path, category)| {
                 Ok(json!({"path":path,"category":category,"snapshot":snapshot(&path)?}))
@@ -198,9 +202,31 @@ impl Engine {
     }
 
     pub(crate) fn cleanup_inspect(&self, r: &Value) -> Result<Value> {
+        use std::os::unix::fs::MetadataExt;
         let e = self.env(r)?;
-        let files = self.cleanup_files(&e, "reset_client")?;
-        let visible:Vec<Value>=files.iter().map(|f|json!({"path":f["path"],"category":f["category"],"present":!f["snapshot"].is_null()})).collect();
+        // Inspection reports presence only. Full content snapshots belong to
+        // plan_cleanup/check_cleanup, never this automatic page-load read.
+        let visible = self
+            .cleanup_paths(&e, "reset_client")?
+            .into_iter()
+            .map(|(path, category)| {
+                guard(&path)?;
+                let present = match fs::symlink_metadata(&path) {
+                    Ok(meta) => {
+                        if meta.uid() != unsafe { libc::geteuid() } || meta.nlink() != 1 {
+                            return Err(err("unsafe_file", "文件所有者或硬链接状态不受支持"));
+                        }
+                        if !meta.is_file() {
+                            return Err(err("file_limit", "文件类型不受支持"));
+                        }
+                        true
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+                    Err(error) => return Err(error.into()),
+                };
+                Ok(json!({"path":path,"category":category,"present":present}))
+            })
+            .collect::<Result<Vec<Value>>>()?;
         let services = self.check_cleanup_services(&e);
         let profiles = self.home.join(".config/anthropic");
         Ok(

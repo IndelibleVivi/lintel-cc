@@ -31,6 +31,106 @@ fn run(engine: &Engine, p: &Value) -> Value {
 }
 
 #[test]
+fn cleanup_inspection_keeps_unreadable_credentials_metadata_only() {
+    let (_temp, engine, environment, root) = fixture();
+    let credentials = root.join(".credentials.json");
+    let original = b"synthetic credential body must not be needed for presence";
+    fs::write(&credentials, original).unwrap();
+    let frozen = clean_plan(&engine, &environment, "repair_login", false);
+    fs::set_permissions(&credentials, fs::Permissions::from_mode(0)).unwrap();
+    // Root can bypass Unix read permission bits; on ordinary supported desktop
+    // and CI users this proves the body is actually unreadable, not mocked.
+    let unreadable = unsafe { libc::geteuid() } != 0;
+    if unreadable {
+        assert_eq!(
+            fs::read(&credentials).unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
+    }
+    let inspection = data(
+        &engine,
+        json!({"command":"cleanup_inspect","environment_id":environment["id"]}),
+    );
+    assert_eq!(
+        inspection["files"],
+        json!([
+            {"path":credentials,"category":"credentials","present":true},
+            {"path":root.join(".claude.json"),"category":"client_state","present":false}
+        ])
+    );
+    assert!(!inspection.to_string().contains("synthetic credential body"));
+    if unreadable {
+        let preview = engine.request(json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}));
+        assert_eq!(preview["error"]["code"], "io_error", "{preview}");
+    }
+    let execute = engine.request(json!({"command":"execute","plan_id":frozen["id"],"approval":frozen["hash"]}));
+    assert_eq!(
+        execute["error"]["code"],
+        if unreadable { "io_error" } else { "stale_plan" },
+        "{execute}"
+    );
+    assert!(!engine.path("jobs", frozen["id"].as_str().unwrap()).exists());
+    assert_eq!(fs::metadata(&credentials).unwrap().permissions().mode() & 0o777, 0);
+    fs::set_permissions(&credentials, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(fs::read(&credentials).unwrap(), original);
+}
+
+#[test]
+fn cleanup_inspection_observes_large_files_without_weakening_plan_admission() {
+    let (_temp, engine, environment, root) = fixture();
+    let credentials = root.join(".credentials.json");
+    fs::File::create(&credentials)
+        .unwrap()
+        .set_len(8 * 1024 * 1024 + 1)
+        .unwrap();
+    let inspect = || data(&engine, json!({"command":"cleanup_inspect","environment_id":environment["id"]}));
+    assert_eq!(inspect()["files"][0]["present"], true);
+    let repair = json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false});
+    let refused = engine.request(repair.clone());
+    assert_eq!(refused["error"]["code"], "file_limit", "{refused}");
+    fs::write(&credentials, "synthetic credential").unwrap();
+    let state = root.join(".claude.json");
+    fs::File::create(&state)
+        .unwrap()
+        .set_len(8 * 1024 * 1024 + 1)
+        .unwrap();
+    let observed = inspect();
+    assert!(observed["files"].as_array().unwrap().iter().all(|file| file["present"] == true));
+    // A large unrelated mixed-state file does not stop the credential-only
+    // recipe. Its own destructive recipe still must freeze full bytes.
+    data(&engine, repair);
+    let refused = engine.request(json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":false,"categories":[]}));
+    assert_eq!(refused["error"]["code"], "file_limit", "{refused}");
+    assert_eq!(fs::metadata(&state).unwrap().len(), 8 * 1024 * 1024 + 1);
+    assert_eq!(fs::read(&credentials).unwrap(), b"synthetic credential");
+    assert_eq!(fs::read_dir(engine.state.join("jobs")).unwrap().count(), 0);
+}
+
+#[test]
+fn cleanup_inspection_rejects_links_instead_of_reporting_absence() {
+    let (_temp, engine, environment, root) = fixture();
+    let credentials = root.join(".credentials.json");
+    let target = root.join("unrelated-synthetic-file");
+    std::os::unix::fs::symlink(&target, &credentials).unwrap();
+    for target_exists in [false, true] {
+        if target_exists {
+            fs::write(&target, "unrelated bytes stay unchanged").unwrap();
+        }
+        for request in [
+            json!({"command":"cleanup_inspect","environment_id":environment["id"]}),
+            json!({"command":"plan_cleanup","environment_id":environment["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}),
+        ] {
+            let result = engine.request(request);
+            assert_eq!(result["error"]["code"], "symlink_target", "{result}");
+        }
+    }
+    assert!(fs::symlink_metadata(&credentials).unwrap().file_type().is_symlink());
+    assert_eq!(fs::read(&target).unwrap(), b"unrelated bytes stay unchanged");
+    assert_eq!(fs::read_dir(engine.state.join("plans")).unwrap().count(), 0);
+    assert_eq!(fs::read_dir(engine.state.join("jobs")).unwrap().count(), 0);
+}
+
+#[test]
 fn cleanup_preserves_work_archives_state_and_never_replays_new_login() {
     let (_tmp, engine, e, root) = fixture();
     fs::write(root.join(".credentials.json"), "synthetic-login").unwrap();
