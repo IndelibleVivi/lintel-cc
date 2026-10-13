@@ -72,5 +72,5 @@ export default defineConfig(({ command, mode }) => {
   // public/ currently contains only optional operator-supplied fonts. Ordinary
   // candidate builds must not carry those local assets into someone else's App.
   const localAssets = command === 'serve' || mode === 'local-candidate';
-  return { define: { __LINTEL_BUILD__: JSON.stringify(buildInfo()), __LINTEL_LOCAL_FONTS__: JSON.stringify(localAssets ? localFontUrls : []) }, publicDir: localAssets ? 'public' : false, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false };
+  return { define: { __LINTEL_BUILD__: JSON.stringify(buildInfo()), __LINTEL_LOCAL_FONTS__: JSON.stringify(localAssets ? localFontUrls : []) }, publicDir: localAssets ? 'public' : false, build: { license: { fileName: 'THIRD_PARTY_FRONTEND.md' } }, plugins: [react(), ...(mode === 'fixture' ? [fixtureBridge()] : [])], server: { host: '127.0.0.1', port: fixturePort, strictPort: true }, clearScreen: false };
 });

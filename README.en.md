@@ -153,6 +153,8 @@ See the [operator guide](docs/operator-guide.en.md) for the human workflow and
 [remote](docs/remote.en.md), [browser](docs/browser.en.md) and [services](docs/services.en.md)
 for the specific limitations.
 
+Third-party licence texts accompany the App under `Contents/Resources/third-party-notices`. The target-filtered Rust normal/build dependency inventory is a superset, not an exact linked SBOM. Upstream rights remain separate from Lintel original material; see [release preparation](docs/app-updates.en.md).
+
 ## Local build and trial
 
 Requires Rust stable, Node.js and npm; the macOS desktop build also needs Xcode
@@ -184,7 +186,7 @@ mkdir -p src-tauri/runner-bundles
 npm run desktop:build
 ```
 
-The build prepares Chromium/Firefox extensions and compiles/packages the current-platform browser host. It supports native builds matching the Rust host; cross-architecture/universal builds refuse. Default frontend builds exclude optional local fonts and use system fallbacks. Output is `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`: a local candidate without Developer ID, notarization or non-developer installation acceptance, never automatically copied into Applications. App users can prepare extension files from bundled resources; [browser installation](docs/browser.en.md) retains separate developer-loading limits.
+The build generates third-party licence texts (requiring the current Rust toolchain’s `rust-docs` component and cached locked dependencies), prepares Chromium/Firefox extensions and compiles/packages the current-platform browser host. It supports native builds matching the Rust host; cross-architecture/universal builds refuse. Default frontend builds exclude optional local fonts and use system fallbacks. Output is `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`: a local candidate without Developer ID, notarization or non-developer installation acceptance, never automatically copied into Applications. App users can prepare extension files from bundled resources; [browser installation](docs/browser.en.md) retains separate developer-loading limits.
 
 Standalone CLI (run these from the repository root):
 

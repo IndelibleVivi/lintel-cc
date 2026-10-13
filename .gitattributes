@@ -1,0 +1,2 @@
+# Retain the exact upstream licence text, including original trailing spaces.
+contracts/third-party-notices/texts/** whitespace=-blank-at-eol

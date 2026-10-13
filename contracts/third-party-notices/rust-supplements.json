@@ -1,0 +1,522 @@
+{
+  "schema": 1,
+  "scope": "Version-bound missing upstream license texts and declarations, not Lintel original-material licensing. Files are verbatim upstream or standard terms; standard placeholders are never replaced with inferred copyright.",
+  "packages": [
+    {
+      "name": "age",
+      "version": "0.12.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/str4d/rage",
+      "upstream_commit": "7a854c9c8c02dab2ebea19e02e6693a5730a8b2a",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/age-LICENSE-APACHE",
+          "source": "https://github.com/str4d/rage/blob/7a854c9c8c02dab2ebea19e02e6693a5730a8b2a/LICENSE-APACHE",
+          "kind": "license",
+          "sha256": "3708458dee7f359ac6c9c5558023ed481be87e5372c43ebd7f2ca7ad23c12026"
+        },
+        {
+          "file": "texts/age-LICENSE-MIT",
+          "source": "https://github.com/str4d/rage/blob/7a854c9c8c02dab2ebea19e02e6693a5730a8b2a/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "fe56c030c2d8c3404a37fe711cebb27ebea13d0aacf7e3524db4198335ad8cd1"
+        }
+      ]
+    },
+    {
+      "name": "age-core",
+      "version": "0.12.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/str4d/rage",
+      "upstream_commit": "f6383f367e9aa514a3b5fbce7feede08a425d647",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/age-LICENSE-APACHE",
+          "source": "https://github.com/str4d/rage/blob/f6383f367e9aa514a3b5fbce7feede08a425d647/LICENSE-APACHE",
+          "kind": "license",
+          "sha256": "3708458dee7f359ac6c9c5558023ed481be87e5372c43ebd7f2ca7ad23c12026"
+        },
+        {
+          "file": "texts/age-LICENSE-MIT",
+          "source": "https://github.com/str4d/rage/blob/f6383f367e9aa514a3b5fbce7feede08a425d647/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "fe56c030c2d8c3404a37fe711cebb27ebea13d0aacf7e3524db4198335ad8cd1"
+        }
+      ]
+    },
+    {
+      "name": "alloc-stdlib",
+      "version": "0.3.0",
+      "license": "BSD-3-Clause",
+      "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+      "upstream_commit": "0a81fd6928ea3b33c8cd484aa4575d50ffb98012",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/alloc-stdlib-LICENSE",
+          "source": "https://github.com/dropbox/rust-alloc-no-stdlib/blob/0a81fd6928ea3b33c8cd484aa4575d50ffb98012/LICENSE",
+          "kind": "license",
+          "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+        }
+      ]
+    },
+    {
+      "name": "block2",
+      "version": "0.6.2",
+      "license": "MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "b4167b582b2f75f9a1be75495c41b765344fd03c",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "cookie-factory",
+      "version": "0.3.3",
+      "license": "MIT",
+      "repository": "https://github.com/rust-bakery/cookie-factory",
+      "upstream_commit": "d36b805dbd7dd65f2df947235c5bcc573afe2c76",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/cookie-factory-MIT.txt",
+          "source": "https://github.com/rust-bakery/cookie-factory/blob/d36b805dbd7dd65f2df947235c5bcc573afe2c76/LICENSES/MIT.txt",
+          "kind": "license",
+          "sha256": "d09216dc1ea5f273997667935a8d6514d80f00b89fb6954ecc3a43e0a6e360de"
+        },
+        {
+          "file": "texts/cookie-factory-dep5",
+          "source": "https://github.com/rust-bakery/cookie-factory/blob/d36b805dbd7dd65f2df947235c5bcc573afe2c76/.reuse/dep5",
+          "kind": "notice",
+          "sha256": "fac95e33eb175ff151cde39e3f7ad52292e6acf83db22bef30d3bfad417a8846"
+        }
+      ]
+    },
+    {
+      "name": "defmt-parser",
+      "version": "1.0.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/knurling-rs/defmt",
+      "upstream_commit": "4a8cdb44891ed57b8ff5a023b6bec7137c48708f",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/defmt-parser-LICENSE-APACHE",
+          "source": "https://github.com/knurling-rs/defmt/blob/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-APACHE",
+          "kind": "license",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90"
+        },
+        {
+          "file": "texts/defmt-parser-LICENSE-MIT",
+          "source": "https://github.com/knurling-rs/defmt/blob/4a8cdb44891ed57b8ff5a023b6bec7137c48708f/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50"
+        }
+      ]
+    },
+    {
+      "name": "dispatch2",
+      "version": "0.3.1",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "fluent-langneg",
+      "version": "0.13.1",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/projectfluent/fluent-langneg-rs",
+      "upstream_commit": "7fdc590466ea63ca2367ac10fb1b881fe561f1a8",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/fluent-langneg-LICENSE-APACHE",
+          "source": "https://github.com/projectfluent/fluent-langneg-rs/blob/7fdc590466ea63ca2367ac10fb1b881fe561f1a8/LICENSE-APACHE",
+          "kind": "license",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        },
+        {
+          "file": "texts/fluent-langneg-LICENSE-MIT",
+          "source": "https://github.com/projectfluent/fluent-langneg-rs/blob/7fdc590466ea63ca2367ac10fb1b881fe561f1a8/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "016fcc02048817d628b04b140c54db290fd9d29a5e8a55b77871194e810716ac"
+        }
+      ]
+    },
+    {
+      "name": "intl_pluralrules",
+      "version": "7.0.2",
+      "license": "Apache-2.0/MIT",
+      "repository": "https://github.com/zbraniecki/pluralrules",
+      "upstream_commit": "d0715d5b7cca72e228d6e6c4de154bd30dfdd06a",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/intl_pluralrules-LICENSE-APACHE",
+          "source": "https://github.com/zbraniecki/pluralrules/blob/d0715d5b7cca72e228d6e6c4de154bd30dfdd06a/intl_pluralrules/LICENSE-APACHE",
+          "kind": "license",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "file": "texts/intl_pluralrules-LICENSE-MIT",
+          "source": "https://github.com/zbraniecki/pluralrules/blob/d0715d5b7cca72e228d6e6c4de154bd30dfdd06a/intl_pluralrules/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "io_tee",
+      "version": "0.1.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/TheOnlyMrCat/io_tee",
+      "upstream_commit": "8a7adecebf3429cbc58a0368751d1851dfaf58ed",
+      "reason": "The published README explicitly offers Apache-2.0 or MIT but the exact upstream tree contains neither text. Retain that declaration and the unmodified standard Apache-2.0 terms; do not invent attribution.",
+      "files": [
+        {
+          "file": "texts/io_tee-README.md",
+          "source": "https://github.com/TheOnlyMrCat/io_tee/blob/8a7adecebf3429cbc58a0368751d1851dfaf58ed/README.md",
+          "kind": "declaration",
+          "sha256": "0ba20a4b5d8188a85014c5f6d52b5407aec2077986c05f6ba686f9899b767b95"
+        },
+        {
+          "file": "texts/standard-Apache-2.0.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/Apache-2.0.txt",
+          "kind": "license",
+          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+        }
+      ],
+      "selected_license": "Apache-2.0"
+    },
+    {
+      "name": "objc2",
+      "version": "0.6.4",
+      "license": "MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-core-foundation",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-core-graphics",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-encode",
+      "version": "4.1.0",
+      "license": "MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-exception-helper",
+      "version": "0.1.1",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.3.2",
+      "license": "MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-io-surface",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-osa-kit",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-quartz-core",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "objc2-web-kit",
+      "version": "0.3.2",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "repository": "https://github.com/madsmtm/objc2",
+      "upstream_commit": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+      "reason": "The exact upstream LICENSE.md declares MIT for these crates or offers MIT as an option and links its standard terms; preserve that declaration, including the Apple SDK discussion. Standard MIT text is reproduced without filling its copyright placeholders or inferring a rights holder from package authors.",
+      "files": [
+        {
+          "file": "texts/objc2-LICENSE.md",
+          "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+          "kind": "declaration",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+        },
+        {
+          "file": "texts/standard-MIT.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MIT.txt",
+          "kind": "license",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+        }
+      ],
+      "selected_license": "MIT"
+    },
+    {
+      "name": "selectors",
+      "version": "0.38.0",
+      "license": "MPL-2.0",
+      "repository": "https://github.com/servo/stylo",
+      "upstream_commit": "572ecba2d1600e7c3d490586692a209faf703baa",
+      "reason": "The published source header and Cargo metadata explicitly apply MPL-2.0 and link the Mozilla terms. Preserve that header, standard terms, and the exact version source download in generated notices.",
+      "files": [
+        {
+          "file": "texts/selectors-source-notice.txt",
+          "source": "https://github.com/servo/stylo/blob/572ecba2d1600e7c3d490586692a209faf703baa/selectors/lib.rs",
+          "kind": "notice",
+          "sha256": "537ba1efbc411986ff686160846d04416d671a1202fa0ebc1e17f520e4e50fdb",
+          "excerpt": "Lines 1\u20134, unchanged source-file license header."
+        },
+        {
+          "file": "texts/standard-MPL-2.0.txt",
+          "source": "https://github.com/spdx/license-list-data/blob/v3.27.0/text/MPL-2.0.txt",
+          "kind": "license",
+          "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+        }
+      ],
+      "selected_license": "MPL-2.0"
+    },
+    {
+      "name": "tauri-plugin",
+      "version": "2.7.1",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/tauri-apps/tauri",
+      "upstream_commit": "30da1fd6e17de6107ecc850c95dfb16b5729f2dd",
+      "reason": "The published crate omits the upstream license text. Exact upstream revision comes from its .cargo_vcs_info.json.",
+      "files": [
+        {
+          "file": "texts/tauri-plugin-LICENSE-APACHE-2.0",
+          "source": "https://github.com/tauri-apps/tauri/blob/30da1fd6e17de6107ecc850c95dfb16b5729f2dd/LICENSE-APACHE-2.0",
+          "kind": "license",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "file": "texts/tauri-plugin-LICENSE-MIT",
+          "source": "https://github.com/tauri-apps/tauri/blob/30da1fd6e17de6107ecc850c95dfb16b5729f2dd/LICENSE-MIT",
+          "kind": "license",
+          "sha256": "9dd42ea92cff2ede5cd477cbfcce051b2d0115c0ac7f368ee88cb545055dff1d"
+        }
+      ]
+    }
+  ]
+}

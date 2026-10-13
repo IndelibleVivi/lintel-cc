@@ -37,6 +37,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared connected silhouette, tap/hold-release jumps, normal/high reachable stars, collision/cancellation, four obstacle families, generated pacing and 320px visible-input clearance/landing at 30/60/144fps, no dependencies) |
 | `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
 | `app-release-test` | js | strict SemVer, actual disposable Ed25519 artifact/comment/version verification, synthetic App identity/architecture and finite website metadata packaging |
+| `rust-notices-test` | js, explicit-only | locked Cargo graph selection, exact-version upstream evidence and missing/invalid notice rejection; no network or production licence changes |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
 | `desktop-typecheck` | desktop | `npm run typecheck` in `apps/desktop` |

@@ -27,6 +27,22 @@
 
 SemVer 只按 precedence 比较：`0.1.0-preview.1` 低于 `0.1.0`，`+build` 不提高优先级，相同版本不能作为升级。下一次 preview 可使用高于当前版本的 `0.2.0-preview.1`。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub `releases/latest` 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。
 
+## 本地未签名 DMG 与第三方说明
+
+没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。它是本地开发候选，不能据此宣称 Gatekeeper 首装通过或激活下载／updater。先准备两种 Linux runner（如需内置安装能力），在 clean source 上运行：
+
+```sh
+cd apps/desktop
+npm run desktop:build
+npm run tauri -- bundle --bundles dmg --ci --no-sign
+```
+
+第二条命令只包装刚构建的 native App；不要在源码改变后复用旧 executable。默认输出在 `src-tauri/target/release/bundle/dmg/`。把候选另存到一个新的 ignored 目录，记录 source revision、架构和实际检查结果，保留旧包；不自动覆盖 Applications，不绕过 Gatekeeper。Apple 签名、公证、真实首装、GitHub Release、官网下载和 feed 仍是独立步骤。
+
+`build:desktop-resources` 自动运行 `scripts/prepare-rust-notices.mjs`，从三个锁定 Cargo manifest 离线收集目标相关的 normal/build 依赖和当前 Rust 标准库许可；需要 `rust-docs` 与已缓存的依赖，缺少正文或精确 upstream 证据会拒绝准备。它包含 build/proc-macro 依赖超集，不是 exact linked SBOM。`contracts/third-party-notices` 保存版本绑定的补充正文与来源；旧 runner 必须保留其原 toolchain 说明，不能把当前 toolchain 说明当成旧二进制的构建证明。
+
+Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。两者随 App 放在 `Contents/Resources/third-party-notices`；保留子目录与 HTML 相对引用。生成目录不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。
+
 ## 一份记录准备三种输出
 
 [`app-release.mjs`](../scripts/app-release.mjs) 是本地发行准备入口。它不创建 key、不签名、不上传、不创建 GitHub Release、不部署 Pages。输入是本地 `lintel.app-release/1` 记录；包含实际 artifact 路径的输入留在 Git 外或 ignored 目录，公开输出不含本机路径。

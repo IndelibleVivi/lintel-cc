@@ -27,6 +27,22 @@ Cancelling an operation wait does not release a still-running blocking core chec
 
 SemVer comparisons use precedence only: `0.1.0-preview.1` is lower than `0.1.0`; `+build` does not increase precedence; an equal version is not an upgrade. A next preview can use `0.2.0-preview.1`, higher than the current version. Preview and stable feeds are separate; stable accepts no prereleases. Preview selection does not use GitHub `releases/latest`. Older installed Apps without the updater/public key need one manual upgrade.
 
+## Local unsigned DMG and third-party notices
+
+A DMG can still be built locally without Developer ID for retention and inspection. It remains a local development candidate; packaging does not establish Gatekeeper first-install acceptance or activate downloads/the updater. Prepare both Linux runners first if bundling their installation capability, then use clean source:
+
+```sh
+cd apps/desktop
+npm run desktop:build
+npm run tauri -- bundle --bundles dmg --ci --no-sign
+```
+
+The second command only packages the just-built native App; do not reuse an old executable after changing source. Default output is `src-tauri/target/release/bundle/dmg/`. Preserve each candidate in a new ignored directory with its source revision, architecture and actual checks, retaining previous packages. This neither replaces Applications nor bypasses Gatekeeper. Apple signing, notarization, real first installation, GitHub Release, website downloads and feed activation remain separate steps.
+
+`build:desktop-resources` automatically runs `scripts/prepare-rust-notices.mjs` to collect target-relevant normal/build dependencies from three locked Cargo manifests offline, plus current Rust standard-library notices. It requires `rust-docs` and cached dependencies; missing text or exact upstream evidence refuses preparation. The collection includes build/proc-macro dependencies and is not an exact linked SBOM. `contracts/third-party-notices` retains version-bound supplements and sources. Reused runners require their original toolchain notices; current toolchain text is not proof of how an older binary was built.
+
+Vite's built-in `build.license` generates frontend licence and copyright texts. Both sets ship under `Contents/Resources/third-party-notices`; retain subdirectories and HTML relative links. Generated output stays out of Git. Third-party terms do not select a licence for Lintel original code, documentation or independent assets. Rights for third-party identity/assets such as Clawd still require separate confirmation.
+
 ## One record prepares three outputs
 
 [`app-release.mjs`](../scripts/app-release.mjs) is the local release-preparation entry. It creates no keys, signs nothing, uploads nothing, creates no GitHub Release and deploys no Pages site. Its input is a local `lintel.app-release/1` record. Inputs containing actual artifact paths stay outside Git or in ignored directories; public outputs contain no local paths.

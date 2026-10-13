@@ -129,6 +129,8 @@ CHECKS: List[Check] = [
            explicit_only=True),
     _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
            *(NODE or "node", "--test", "tests/app_release.test.mjs"), tools=("node", "python3")),
+    _check("rust-notices-test", "Rust distribution notice graph, exact upstream evidence and fail-closed text admission", "js",
+           *(NODE or "node", "--test", "tests/rust_notices.test.mjs"), tools=("node",), explicit_only=True),
     _check("site-ui", "static website responsive story, native reading, theme and Clawd journey", "independent",
            *(NODE or "node", "tests/site_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright",),

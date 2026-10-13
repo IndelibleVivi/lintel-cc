@@ -59,6 +59,8 @@ App 的“帮助”包含六个任务入口、人类指南、Agent CLI 指南、
 
 独立项目 cwd 的新 launch／resume 预览需要文件系统提供目录创建时间；缺少时明确返回限制，资料阅读仍可用。旧未启动预览需重新核对，已经尝试的启动继续按原 ID 查询。普通项目文件新增／删除不使目录身份失效。
 
+第三方许可正文随 App 放在 `Contents/Resources/third-party-notices`；Rust 清单是按目标筛选的 normal/build 依赖超集，不是精确链接 SBOM。原项目与第三方的权利分别保留，详见 [发行准备](docs/app-updates.md)。
+
 ## 本地构建与试用
 
 需要 Rust stable、Node.js 与 npm；macOS 桌面构建还需要 Xcode Command Line Tools。当前本地构建与测试主机为 macOS arm64，Linux 源码已在 Ubuntu CI 通过合成旅程、独立 OpenSSH 与真实 systemd/PAM/reboot VM 检查；具体范围见[验证指南](docs/verification.md)，真实认证和生产 VPS 状态分别验收。
@@ -81,7 +83,7 @@ mkdir -p src-tauri/runner-bundles
 npm run desktop:build
 ```
 
-构建会自动准备 Chromium / Firefox 扩展并编译、打包当前平台的 browser host，目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 会明确拒绝；默认前端构建排除仅供本机使用的可选字体，使用系统 fallback。输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。App 用户可直接从内置文件准备扩展目录；独立开发 ZIP 与各浏览器加载限制见 [浏览器指南](docs/browser.md)。
+构建会自动生成第三方许可正文（需要当前 Rust toolchain 的 `rust-docs` 与已缓存的锁定依赖），准备 Chromium / Firefox 扩展并编译、打包当前平台的 browser host，目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 会明确拒绝；默认前端构建排除仅供本机使用的可选字体，使用系统 fallback。输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。App 用户可直接从内置文件准备扩展目录；独立开发 ZIP 与各浏览器加载限制见 [浏览器指南](docs/browser.md)。
 
 独立 CLI（在 repository 根目录执行）：
 

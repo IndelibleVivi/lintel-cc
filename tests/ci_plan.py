@@ -173,7 +173,7 @@ SELFTEST_CHECKS: Tuple[str, ...] = ("__verify_self_test__", "__ci_plan_test__")
 
 FRONTEND_CHECKS: Tuple[str, ...] = (
     "js-engine-test", "site-game-test", "home-greetings-test", "i18n-test",
-    "i18n-coverage-test", "app-release-test",
+    "i18n-coverage-test", "app-release-test", "rust-notices-test",
     "python-ssh-test", "linux-vm-control-test", "desktop-typecheck", "desktop-build",
 )
 NATIVE_CHECKS: Tuple[str, ...] = (
