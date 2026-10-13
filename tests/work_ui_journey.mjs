@@ -201,5 +201,12 @@ try{
   assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
   report.checks.push('Modeled retained-probe receipt → real original-job query → exact scratch path visible in Day/Night; no replay or cleanup');
   report.calls=[...new Set(calls)];report.passed=true;
-  async function approve(){await dialog.getByLabel('归档口令',{exact:true}).fill(password);await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();}
+  async function approve(){
+    await dialog.getByLabel('归档口令',{exact:true}).fill(password);
+    await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);
+    await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();
+    // Real age encryption/decryption runs inside the fixture's 55s core bound.
+    // Keep ordinary UI waits short, but allow the approved operation to finish.
+    await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor({timeout:60000});
+  }
 }finally{await browser?.close();preview.kill('SIGTERM');const reportPath=process.env.LINTEL_WORK_UI_REPORT||path.join(fixture,'report.json');await mkdir(path.dirname(reportPath),{recursive:true});await writeFile(reportPath,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}

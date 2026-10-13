@@ -1147,7 +1147,9 @@ try {
   await blockedPage.locator('#theme-toggle').tap();
   assert.notEqual(await blockedPage.locator('html').getAttribute('data-theme'), themeBeforeTouch, 'mobile theme works with blocked storage');
   await blockedPage.locator('#clawd-hello').tap();
-  assert.equal(await blockedPage.locator('#clawd-hello .scene-response.heart').isVisible(), true);
+  // Touch dispatch can finish before Chromium delivers the synthesized click.
+  // Require the same visible feedback within less than its finite lifetime.
+  await blockedPage.locator('#clawd-hello .scene-response.heart').waitFor({state:'visible',timeout:1000});
   await blockedPage.locator('#lake-touch').tap();
   assert.equal(await blockedPage.locator('.hero-overlay').getAttribute('data-ripple'), '1', 'touch creates the same local water response');
   assert.equal(await blockedPage.locator('.clawd-game').getAttribute('data-state'), 'ready', 'touch discoveries keep the game opt-in');
@@ -1157,7 +1159,8 @@ try {
     const button = blockedPage.locator(`#${id}`); await button.waitFor({state:'visible'});
     const box = await button.boundingBox();
     assert.ok(box.x >= 0 && box.x + box.width <= 390, 'the raster Clawd hit area fits the mobile crop');
-    await button.tap(); assert.equal(await button.locator(`.scene-response.${kind}`).isVisible(), true);
+    await button.tap();
+    await button.locator(`.scene-response.${kind}`).waitFor({state:'visible',timeout:1000});
   }
   check('390px real touch on hero and both lower raster Clawds works with blocked storage');
 
