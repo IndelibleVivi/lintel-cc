@@ -234,7 +234,9 @@ try{
   // does not exercise this lifecycle).
   devPreview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/vite.js'),'--host','127.0.0.1','--port','0','--strictPort'],{cwd:desktop,stdio:['ignore','pipe','pipe']});
   const devUrl=await new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(new Error('dev preview timeout')),15000);devPreview.once('error',reject);devPreview.once('exit',code=>reject(new Error(`dev preview exited ${code}`)));for(const stream of [devPreview.stdout,devPreview.stderr])stream.on('data',chunk=>{text+=chunk;const match=stripVTControlCharacters(text).match(/http:\/\/127\.0\.0\.1:\d+\//);if(match){clearTimeout(timer);resolve(match[0]);}});});
-  nodePreferred=['en-US'];await page.goto(devUrl);await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
+  // The cold dev module graph is transformed on demand, unlike the built App.
+  // Give that startup its own bound; keep the language interaction waits at 12s.
+  nodePreferred=['en-US'];await page.goto(devUrl,{timeout:60000});await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
   nodePreferred=['zh-Hans'];await page.evaluate(()=>window.dispatchEvent(new Event('languagechange')));
   await page.getByRole('button',{name:'开始一项任务',exact:true}).waitFor();
   await page.locator(switchSel).selectOption('en');
