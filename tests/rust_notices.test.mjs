@@ -4,10 +4,19 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { collectNativeRuntime, collectNotices, noticeKind, reachablePackages, renderMarkdown } from '../scripts/prepare-rust-notices.mjs';
+import { collectFrontendNotice, collectNativeRuntime, collectNotices, noticeKind, reachablePackages, renderMarkdown } from '../scripts/prepare-rust-notices.mjs';
 
 const registry = 'registry+https://github.com/rust-lang/crates.io-index';
 const terms = 'Permission is hereby granted. Synthetic license text for temporary tests only.\n';
+
+test('frontend distribution requires generated text and preserves its bytes', async t => {
+  const { root } = await fixture(t);
+  await assert.rejects(collectFrontendNotice(root), /ENOENT/);
+  await writeFile(path.join(root, 'THIRD_PARTY_FRONTEND.md'), '  \n');
+  await assert.rejects(collectFrontendNotice(root), /empty or binary/);
+  await writeFile(path.join(root, 'THIRD_PARTY_FRONTEND.md'), terms);
+  assert.equal(await collectFrontendNotice(root), terms);
+});
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'lintel-notices-'));

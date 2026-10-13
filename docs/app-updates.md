@@ -41,7 +41,7 @@ npm run tauri -- bundle --bundles dmg --ci --no-sign
 
 `build:desktop-resources` 自动运行 `scripts/prepare-rust-notices.mjs`，从三个锁定 Cargo manifest 离线收集目标相关的 normal/build 依赖和当前 Rust 标准库许可；需要 `rust-docs` 与已缓存的依赖，缺少正文或精确 upstream 证据会拒绝准备。它包含 build/proc-macro 依赖超集，不是 exact linked SBOM。`contracts/third-party-notices` 保存版本绑定的补充正文与来源；旧 runner 必须保留其原 toolchain 说明，不能把当前 toolchain 说明当成旧二进制的构建证明。
 
-Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。两者随 App 放在 `Contents/Resources/third-party-notices`；保留子目录与 HTML 相对引用。生成目录不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。
+Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完整构建先运行 Vite，再由同一 notices 生成器验证并收集 frontend 正文，缺失／空正文会拒绝；原生测试可使用只含 tracked README 的资源目录，不能把它当作发行包。两者随 App 放在 `Contents/Resources/third-party-notices`；保留子目录与 HTML 相对引用。生成正文不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。
 
 ## 一份记录准备三种输出
 

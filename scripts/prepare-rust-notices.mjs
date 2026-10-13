@@ -135,6 +135,10 @@ function command(program, args) {
   return execFileSync(program, args, { cwd: repoRoot, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
 }
 
+export async function collectFrontendNotice(frontendDist) {
+  return (await textFile(frontendDist, 'THIRD_PARTY_FRONTEND.md', 'Frontend distribution notice')).text;
+}
+
 export async function collectNativeRuntime(supplementRoot) {
   const manifest = JSON.parse(await readFile(path.join(supplementRoot, 'native-runtime.json'), 'utf8'));
   if (manifest.schema !== 1 || manifest.toolchain !== 'ziglang' || manifest.version !== '0.16.0' || manifest.files?.length !== 1) throw new Error('Unreviewed native runtime notice profile');
@@ -191,6 +195,9 @@ export async function prepare() {
   const nativeRuntime = await collectNativeRuntime(supplementRoot);
   const publicProfiles = profiles.map(({ metadata, ...profile }) => profile);
   const files = new Map();
+  // Vite owns the source text. Gather it with the native notices only after the
+  // frontend build, so a missing/empty source cannot produce a partial bundle.
+  files.set('frontend.md', await collectFrontendNotice(path.join(repoRoot, 'apps/desktop/dist')));
   const sysroot = command('rustc', ['--print', 'sysroot']).trim();
   const rustDocs = path.join(sysroot, 'share/doc/rust');
   // The distributed rust-docs component owns these exact version-specific texts.

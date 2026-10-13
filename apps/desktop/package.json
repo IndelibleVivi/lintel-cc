@@ -11,7 +11,7 @@
     "prepare:browser-host": "node scripts/prepare-browser-host.mjs",
     "prepare:browser-extension": "node scripts/prepare-browser-extension.mjs",
     "prepare:third-party-notices": "node ../../scripts/prepare-rust-notices.mjs",
-    "build:desktop-resources": "npm run prepare:browser-host && npm run prepare:browser-extension && npm run prepare:third-party-notices && npm run build",
+    "build:desktop-resources": "npm run prepare:browser-host && npm run prepare:browser-extension && npm run build && npm run prepare:third-party-notices",
     "tauri": "tauri",
     "desktop:build": "tauri build --bundles app"
   },

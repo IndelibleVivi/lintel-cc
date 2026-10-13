@@ -43,7 +43,6 @@
       "minimumSystemVersion": "12.0"
     },
     "resources": {
-      "../dist/THIRD_PARTY_FRONTEND.md": "third-party-notices/frontend.md",
       "third-party-notices/": "third-party-notices/",
       "runner-bundles/": "remote-runners/",
       "browser-host-bundle/": "browser-host/",

@@ -35,6 +35,8 @@
 | 官网托管 | Direct Upload Pages project `lintel`，production `0b6e2ece-ef40-4767-a6a6-52a7c4e31868`（[实际 deployment](https://0b6e2ece.lintel-aue.pages.dev/)），preview `27a23001-9ac6-437b-80dd-161cfc28dce1`（[实际 deployment](https://27a23001.lintel-aue.pages.dev/)）；同包 Dashboard 上传均成功。正式 [中文](https://lintel.page/)／[English](https://lintel.page/en/) HTTPS 200；正常缓存回访取得 styles.css?v=20261012 与 clawd-game.css?v=20261013，实际两份 CSS 与 runner 均与冻结 c80 包逐字节一致。正式网站启动／Space 轻跳／暂停、暂停分数在中英切换后保留、320px English／390px 中文夜景无横向溢出已观察；实际影片由原生控件播放至 20.01s（1920×1080），MP4 206／video/mp4 与字幕 text/vtt 已观察，关闭暂停并归零；无相关 console error 或页面外部请求，CSP 仍生效。CSS 实际 max-age 为 14400，继续使用版本入口；未修改账号缓存、DNS 或权限。Wrangler Keychain 读取失败后改用已有 Dashboard 正常登录，没有提取凭据或修改钥匙串。旧 fdf18b2 及更早部署证据见 [候选历史](candidate-history.md)；程序见 [site-hosting](site-hosting.md) |
 | 发行与账户 | 无正式签名／公证、Applications 安装、真实认证操作或生产 VPS 激活；官网上线和公开源码不等于正式 App 发行；未上传社交平台 |
 
+发行准备的 clean-checkout 回归：`4a5a635` 的 [run 38343526714](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38343526714) 原生 macOS job 因不存在的 frontend notice 资源失败，其余该 job 的 14 项检查通过。资源现统一从带 tracked README 的 notices 目录收集，完整 App 构建仍先生成 frontend 并拒绝缺失正文；本机临时移开 dist 与全部 generated notices 后，原生 48 项通过、2 项既有 ignored，9 项 notices 回归通过。该修正不把原 run 标绿，也不把只含 README 的开发目录当作发行包。
+
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存此前候选的资源／CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
 
 ## App 简中 / English 源码更新
