@@ -6,6 +6,18 @@
 
 项目仓库已于 2026-10-04 公开，保留原 main 历史；GitHub PUBLIC 与匿名 Git／README 读回已核对。当前仍未选定项目原创材料的公开复用许可证，第三方权利不由 Lintel 重新授权。源码公开与正式发行、完整验收是不同状态。
 
+## 本地 DMG 准备与复验（2026-10-13）
+
+clean `cdb0ba80426bcd819106844b026e280fed769d0c` 的 App／DMG 为本轮本地候选，包含 cleanup 检查改为 metadata-only、第三方 notices 与最新共享游戏。默认验证原始 25 PASS／3 FAIL 后分别完成 workspace 串行、native 真实 target 路径与 release 大工作包复验；独立 18 项 UI／browser 也均取得通过结果。没有把原失败报告改成成功，debug 大包的30分钟运行预算仍是已观察限制。当前包装与 native 证据见 current-state。
+
+此前 clean `e1a2df4ade484a42a438a4bf09d225d4b7a1a78c` App 的包装与观察保留如下；它已被 cdb0ba8 本地候选替代，旧文件未覆盖：
+
+| 对象 | 当时事实 |
+| --- | --- |
+| 本机 Native 构建 | clean `e1a2df4` 的 canonical desktop-tauri-bundle 完整入口通过，152.576s，保留 beforeBuildCommand。没有改 updater／identifier／发行配置；此前 `47158cd` 与旧候选的构建观察见候选历史 |
+| 资源与包装 | clean `e1a2df4` macOS arm64 App 为 30,596,543 bytes（约 29.18 MiB），zip 为 11,880,053 bytes；复制件及 zip 解包的 28 文件逐字节／权限一致。内置 x86_64／aarch64 runner 为 5,895,888／5,196,336 bytes，均嵌入当前完整 task catalog；host 789,392 bytes，Chromium／Firefox、ICNS 与 canonical resources 一致，无 woff2。全部资源也与此前 `47158cd` 包逐字节相同，沿用其 fresh 编译／2 passed 的实际包内 host framing／allowlist 与扩展合成安装证据；本轮没有冒称重跑安装检查。clean docs revision 与 bundle en／zh-Hans 已核对。只有 linker ad-hoc signature，无 Team ID／资源签封／公证；候选、报告与测试数据不进 Git |
+| Preview 试用入口 | 最终 `e1a2df4` release executable 在显式 synthetic HOME／CFFIXED_USER_HOME／state 下实际显示 EN 顶部入口，偏好仍为 Follow system；原生三选项与 English 界面／菜单已观察，没有 dev server。输入工具检测到真实鼠标介入后停止，native 手动→System 选择仍未验证；三份 synthetic 原件未变、jobs 为零，QA App 已停止。旧 `47158cd`／`25a8649` 点击限制与更早归档／阅读旅程保持独立。quickstart 与双语源码入口不变，无公开 Release 下载 |
+
 ## 跑道扩展候选修订（2026-10-13）
 
 clean `78a5de52eb3a18970582cabe98d8a488fed286e3` 的彩色三场景／松手蓄力方案曾通过 25 项逻辑、网站与 built-App Chromium 检查，有限网站包为 24 文件加 manifest／26,711,348 bytes；该包没有成功上传。此实现随后退休，视觉与手感接受不能从通过检查推断。
