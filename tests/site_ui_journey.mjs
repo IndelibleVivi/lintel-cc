@@ -203,8 +203,11 @@ async function assertNightClawdEyes(page, label) {
     ['keep', [[1474,670],[1493,670]], [[1480,674],[1484,674]]],
     ['review', [[529,507],[550,507]], [[538,515],[542,515]]],
   ]) {
-    await page.locator(`#${section} .story-clawd`).scrollIntoViewIfNeeded();
+    // The hotspot stays hidden until its lazy raster loads. Scroll the visible plate first;
+    // waiting to scroll a hidden hotspot can otherwise prevent that very load after reload.
+    await page.locator(`#${section} .story-world`).scrollIntoViewIfNeeded();
     await page.locator(`#${section} .story-art`).evaluate(img => img.decode());
+    await page.locator(`#${section} .story-clawd`).waitFor({state:'visible'});
     await page.waitForFunction(id => Number(getComputedStyle(document.querySelector(`#${id} .story-world`)).opacity) === 1, section);
     const png = (await page.screenshot({animations:'disabled'})).toString('base64');
     const colors = await page.evaluate(async ({png, section, eyes, body}) => {

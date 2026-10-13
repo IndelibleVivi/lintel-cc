@@ -15,12 +15,12 @@ const STAR_HIT_X = 30, STAR_HIT_Y = 24;
 // Two opposing pairs of short straight legs step once per 100px of travel.
 const STRIDE_TRAVEL = 100;
 const HOLD_SECONDS = .26, TAP_SECONDS = .09, HOLD_LIFT = 1400;
-// Three visible star rows. The row advances every spawn, so successive stars sit at clearly
-// different heights; a small deterministic jitter keeps them from looking printed. All three rows
-// (and their jitter) stay inside a tap jump's reach. Every fourth star is a higher, double-value
-// star that asks for a held jump; nothing is collectible from the ground.
-const STAR_ROWS = [98, 118, 138];
+// Ordinary stars sit along the original tap arc, with bounded height variation. Tall obstacles
+// lift their star too: clearing the obstacle must not leave its reward down by Clawd's feet.
+// Every fourth star remains higher and double-value, asking for a held ascent.
+const STAR_ROWS = [98, 106, 114];
 const STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
+const STAR_OBSTACLE_GAP = HEIGHT / 2 + 18;
 export function newRun() {
   return { status: 'ready', y: 0, velocity: 0, distance: 0, speed: 260, spawn: 1,
     obstacles: [], stars: [], collected: 0, elapsed: 0, landing: 0, buffer: 0,
@@ -31,7 +31,8 @@ export function points(run) { return Math.floor(run.distance / 10) + run.collect
 // The star keeps its horizontal bond to the obstacle (12px in) but takes the next visible row.
 export function spawnStar(obstacle, spawns = 0) {
   if (spawns % 4 === 3) return { y: 56 + Math.max(-4, Math.min(4, STAR_JITTER[spawns % STAR_JITTER.length])), x: obstacle.x + 12, value: 50 };
-  const y = STAR_ROWS[spawns % STAR_ROWS.length] + STAR_JITTER[spawns % STAR_JITTER.length];
+  const jitter = Math.max(-3, Math.min(3, STAR_JITTER[spawns % STAR_JITTER.length]));
+  const y = Math.min(STAR_ROWS[spawns % STAR_ROWS.length] + jitter, GROUND - (obstacle.height ?? 0) - STAR_OBSTACLE_GAP);
   return { y, x: obstacle.x + 12 };
 }
 

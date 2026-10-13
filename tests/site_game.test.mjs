@@ -5,10 +5,10 @@ import { newRun, jump, pressJump, releaseJump, cancelJump, holdPower, advance, c
 // Current speed tuning used by independent reachability checks.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
 const MIN_SPEED = 260, MAX_SPEED = 350;
-// Every height the star scheme can produce: the three visible rows, each plus its bounded jitter.
-const STAR_ROWS = [98, 118, 138], STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
+// Ordinary reward admission includes the bounded rows and obstacle-specific upward adjustment.
+const STAR_JITTER = [0, 5, -4, 3, -2, 6, -5, 4, -3, 2];
 const HIGH_HEIGHTS = [...new Set(STAR_JITTER.map(j=>56+Math.max(-4,Math.min(4,j))))];
-const STAR_HEIGHTS = [...new Set(STAR_ROWS.flatMap(base => STAR_JITTER.map(j => base + j)))].sort((a, b) => a - b);
+const STAR_HEIGHTS = Array.from({length:23},(_,i)=>95+i);
 // A seeded generator so the obstacle spawn sequence is fixed, not left to chance.
 const seeded = seed => () => { seed |= 0; seed = seed + 0x6d2b79f5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -81,8 +81,8 @@ test('successive stars take visibly different heights that a real jump can reach
   for (const y of sequence) assert.ok([...STAR_HEIGHTS,...HIGH_HEIGHTS].includes(y), `${y} is a normal or held star height`);
   // Three consecutive stars sit on three different rows, so the change is visible in a play session.
   assert.equal(spawnStar({ x: 0 }, 0).y, 98);
-  assert.equal(spawnStar({ x: 0 }, 1).y, 123);
-  assert.equal(spawnStar({ x: 0 }, 2).y, 134);
+  assert.equal(spawnStar({ x: 0 }, 1).y, 109);
+  assert.equal(spawnStar({ x: 0 }, 2).y, 111);
   // And `advance` really threads those heights through a live run: one generator, a wide board so
   // several obstacles spawn, and at least three actually spawned stars with a visible height spread.
   const run = newRun(); run.status = 'running'; const random = seeded(3);
@@ -417,6 +417,7 @@ test('a densifying generated field leaves a clearable landing window',()=>{
     const run = newRun(); run.status = 'running';
     run.speed = speed; run.distance = (speed - 260) * 300; // start at the requested speed, with ordinary acceleration
     const random = seeded(17);
+    const rewards=[];
     let frames = 0, maxFrames = fps * seconds;
     const startDistance = (speed - 260) * 300; // the pinned starting distance is part of the seeded run
     while (run.status === 'running' && frames < maxFrames && run.distance < startDistance + 26000) {
@@ -428,16 +429,21 @@ test('a densifying generated field leaves a clearable landing window',()=>{
         if (star?.value === 50 && next.x <= Math.min(308, 98 + run.speed * .4)) pressJump(run);
         else if (star?.value !== 50 && gap > 30 && gap < 95) jump(run);
       }
+      const before=run.spawns;
       advance(run, 1 / fps, 320, random); frames++;
+      if(run.spawns!==before)rewards.push(run.stars.at(-1));
     }
-    return { run, frames };
+    const ordinary=rewards.filter(star=>star.value!==50&&(star.caught||star.x<50));
+    return { run, frames, ordinary };
   }
   for (const fps of [30, 60, 144]) for (const speed of [260, 280, 350]) {
-    const { run, frames } = autoplay({ fps, speed });
+    const { run, frames, ordinary } = autoplay({ fps, speed });
     assert.equal(run.status, 'running', `${fps}fps ${speed}px/s never collides through a densifying field`);
     assert.ok(run.cleared >= 4, `${fps}fps ${speed}px/s clears a real sequence of obstacles (${run.cleared})`);
     assert.ok(run.bonus >= 25, `${fps}fps ${speed}px/s collects a held high star within the continuous field`);
     assert.ok(run.collected >= 3, `${fps}fps ${speed}px/s keeps collecting stars (${run.collected})`);
+    assert.ok(ordinary.length>=3,'the continuous field actually presented several ordinary rewards');
+    assert.ok(ordinary.every(star=>star.caught),`${fps}fps ${speed}px/s: every passed ordinary reward is collected by the normal tap rhythm`);
     assert.ok(frames > 0, `${fps}fps ${speed}px/s really played`);
   }
   // The field test above already proves hard obstacles are followed by a recovery window (the
@@ -531,4 +537,35 @@ test('actual generated spacing has closer and wider stretches at maximum speed',
   assert.ok(intervals.length>=15,'observe a sustained generated sequence');
   assert.ok(Math.max(...intervals)-Math.min(...intervals)>.2,'later play retains both closer and wider stretches');
   assert.ok(Math.min(...intervals)>=.9,'later obstacles still leave time for a legal jump and landing');
+});
+
+test('ordinary generated stars reward a normal safe tap across a useful timing window',()=>{
+  // Use a fixed, ordinary approach window rather than scanning for a pixel-perfect solution.
+  // Every successful clearance in this window must also collect its ordinary star.
+  for(const kind of OBSTACLE_KINDS)for(const fps of [30,60,144])for(const speed of [260,280,350]){
+    const [,width]=OBSTACLE_BOUNDS[kind].width,[,height]=OBSTACLE_BOUNDS[kind].height;
+    for(let ordinal=0;ordinal<12;ordinal++){
+      if(ordinal%4===3)continue;
+      let safe=0;
+      for(const approach of [130,140,150,160]){
+        const run=newRun();run.status='running';run.spawn=1e6;
+        run.distance=(speed-260)*300;run.speed=speed;
+        const obstacle={kind,x:336,width,height,passed:false};
+        const star=spawnStar(obstacle,ordinal);run.obstacles=[obstacle];run.stars=[star];
+        let pressed=false,released=false,held=0,landed=false;
+        for(let frame=0;frame<fps*3&&run.status==='running';frame++){
+          if(!pressed&&obstacle.x<=approach){pressJump(run);pressed=true;}
+          if(pressed&&!released){held+=1/fps;if(held>=.05){releaseJump(run);released=true;}}
+          advance(run,1/fps,320,()=>.5);
+          if(pressed&&run.y===0&&run.velocity===0)landed=true;
+          if(obstacle.passed&&landed)break;
+        }
+        if(obstacle.passed&&landed&&run.status==='running'){
+          safe++;
+          assert.equal(run.collected,1,`${kind}, star ${star.y}, ${fps}fps/${speed}px/s, press at ${approach}: safe tap also collects`);
+        }
+      }
+      assert.ok(safe>=2,`${kind}/${fps}/${speed}: ordinary tapping has several safe timings`);
+    }
+  }
 });
