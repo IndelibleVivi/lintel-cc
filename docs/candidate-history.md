@@ -1,5 +1,15 @@
 # 开发候选历史证据
 
+## 2026-10-13 cdb0ba8 本地 DMG
+
+后续 `878482f` 仅修正 notices 的 clean-checkout 构建接线并重封包；以下完整 native 交互仍对应本候选，未冒充后续包的逐项复验。
+
+| 对象 | 已观察证据 |
+| --- | --- |
+| 本机 Native 构建 | clean `cdb0ba8` 的 `npm run desktop:build` 完整入口通过，保留 beforeBuildCommand；随后 `tauri bundle --bundles dmg --ci --no-sign` 完成 DMG。Rust 1.98.0；两种 musl runner 使用既有 Zig 0.16.0 重新构建并通过 static ELF 检查。版本仍 0.1.0，identifier／未配置 updater 合同不变 |
+| 资源与包装 | App 45 文件／36,297,243 bytes；DMG 12,204,865 bytes。hdiutil verify、只读挂载、复制件文件字节／权限、native executable 与全部 canonical resources 一致；17 份 notices 含 frontend、387 个 Rust crate 的目标依赖超集和当前 Rust／Zig 工具链说明，不是 exact linked SBOM。en／zh-Hans 与 clean docs revision 核对；只有 linker ad-hoc signature，无 Team ID、资源签封或公证。候选与证据不进 Git，旧包保留 |
+| Preview 试用入口 | 从本轮 DMG 取出的 release App 在隔离 HOME／CFFIXED_USER_HOME／state 下实际运行：System English → 简中 → System English，页面与原生菜单同步；版本 0.1.0、空发行配置与 exact-source 文档链接可见；共享游戏运行、碰撞结果、重试和 P 暂停已观察。jobs 为零，测试 App 已停止。此证据不替代 quarantine／Gatekeeper 首装、完整 native 操作矩阵或真实认证；quickstart 不变，无公开 Release 下载 |
+
 本页保留历次阶段与候选（包括 `a239123` 与独立 CLI 候选）的验收记录，是历史快照。下文的“当前”“本轮”均指对应旧候选；不能据此推断后来 checkout 或 App 包所含资源。正在使用的候选、资源对应关系与未完成目标以 [current-state.md](current-state.md) 为准。
 
 2026-10-05 · 0.1.0 开发候选。完整 [SPEC](SPEC.md) 仍未交付，四条完整旅程 G01–G04 尚未通过。源码与本地 macOS App 已构建；未安装到 Applications、未正式发布、未部署真实远端。
