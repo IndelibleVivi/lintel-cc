@@ -178,6 +178,19 @@ const pairs = [
   ["c173","选定 profile","Selected profile"],
   ["c174","其他 profile","Other profile"],
   ["c175","。","."],
+  ["c176","Lintel 是什么","What Lintel is"],
+  ["c177","Lintel 是什么，","What Lintel is,"],
+  ["c178","从哪里开始。","and where to start."],
+  ["c179","Lintel 是一个简洁的 Claude Code 个人工具：先看清环境与变化，再由你批准执行。macOS App 与独立 CLI 共用同一套执行核心，也能通过 SSH 在你指定的主机上执行。","Lintel is a focused personal tool for Claude Code: see your environment and the changes first, then approve what runs. The macOS App and the standalone CLI share one execution core, and it can also run on hosts you choose over SSH."],
+  ["c180","快速上手","Quickstart"],
+  ["c181","从源码构建独立 CLI，在一份一次性合成 fixture 里走完登记、预览、批准与结果核对；不需要已安装的 App。","Build the standalone CLI from source and walk one disposable synthetic fixture through registration, preview, approval and result checking. No installed App required."],
+  ["c182","CLI 候选打包","CLI candidate packages"],
+  ["c183","维护者附录：把明确提供的构建产物打成候选归档。候选不是签名发行，字节一致也不证明来源。","Maintainer appendix: package candidate archives from explicitly supplied build outputs. A candidate is not a signed release, and matching bytes do not prove provenance."],
+  ["c184","打开打包说明","Open the packaging guide"],
+  ["c185","当前状态与边界","Current state and limits"],
+  ["c186","0.1.0 Preview 已交付与仍未验收的能力，以及发行与验收缺口；这份说明目前只有中文。","What the 0.1.0 Preview delivers, and which capabilities, distribution and verification items stay open. This note is Chinese only for now."],
+  ["c187","打开状态说明","Open the status note"],
+  ["c188","0.1.0 Preview · 无正式下载 · 尚无正式 Release 或公开二进制，现在只能从源码开始。","0.1.0 Preview · No formal download · No formal Release or public binary yet, so start from source for now."],
 ];
 export const SITE_COPY = Object.freeze(Object.fromEntries(pairs.map(([key,zh,en]) => [key,Object.freeze({zh,en})])));
 export const SITE_LOCALES = Object.freeze(['zh','en']);
