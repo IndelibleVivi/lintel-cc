@@ -31,7 +31,11 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 本机 Darwin arm64、`eb9bdd6` 加本次测试改动，经 canonical strict entrypoint 实跑：`journey-agent-cli` 18.367s、`journey-portable-work` 40.563s（7 tests）、`journey-execution-admission` 4.178s，三项均 PASS。这是当前本机合成证据；提供的 2026-10-14 非 systemd Linux x86_64 报告是另一次报告证据，原云主机／fixture 未在本轮复核。没有重新构建 App、发布二进制或激活 feed。
 
-同日重新取出本地 `878482f` DMG 的 App，仅观察到隔离 HOME／state 的原生 English 空工作区与登记表单；GUI 自动化输入遇到 `elementHasNoFrame`／`noWindowsAvailable`，字段未写入，0 mutation jobs。后续归档、退出重开与文件读包仍未验证；这不证明产品缺陷，也不能算首次使用通过。[App 更新指南的双语首用程序](app-updates.md#候选首次使用验收)保留完整人工验收路径。真实下载、干净 Mac 的 quarantine／Gatekeeper、签名／公证、认证与生产远端证据继续独立。
+同日现成 `878482f` DMG 重新只读挂载取出，实际 DMG 与既有 SHA256SUMS 一致，未重建二进制。macOS 26.5.2 arm64、全新合成 HOME／state 的真实 release WebKit 已完成：登记六文件 root；精确选择三件、预检与批准前预览（尚无密文）；一次批准后原 ID completed、无新 root；六份源 bytes 不变；原生 Quit／进程退出后重开，Records 仍显示原 ID completed；从独立文件入口重新输入路径和口令，三份原件均可读，会话结构化记录和完整 raw JSONL 均已观察。只产生一个归档 job／一个登记环境，密文 1,406 bytes，最终文件摘要与原回执匹配。另一独立 HOME／state 的真实 CLI 再 inspect／read 同一密文，三份摘要及完整 bytes 相同、没有源归档 job；隔离 HOME／state 的持久文件未发现测试口令，正常结束无解密 staging。测试 App 最后已正常退出。
+
+最初直接 executable／后台 AX 输入曾遇到 `elementHasNoFrame`／`noWindowsAvailable`；失败记录保留。后续使用 LaunchServices `open --env`、明确窗口／截图绑定，后半段经用户允许临时切到前台，完成原生操作。符号链接输出路径在预览前被拒绝，换成实际路径才生成计划；自动化对 secure field 的读回重试曾重复输入，清空后使用明确单次按键，确认两栏一致再批准。这些工具／fixture 过程事实不计为产品缺陷，也不覆盖早期未验证记录。[App 更新指南的双语首用程序](app-updates.md#候选首次使用验收)已更新启动方式与实际路径说明。上述是本机合成首用通过，真实下载、干净 Mac 的 quarantine／Gatekeeper、签名／公证、认证与生产远端证据继续独立。
+
+增强回归所在的 `1bf82b9f06a72a3c2a9389a1337a2f8f50f5819b` [full CI 38626316607](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38626316607) 已核对 completed/success，14 jobs 全 success，包含 macOS／Ubuntu 的 frontend、native、browser、runner、heavy、controller、Linux VM 与 aggregate。其源码证据与 `878482f` 本地候选的原生观察分别成立；后续纯文档接续不借此声明再次运行 runtime。
 
 ## Checks
 

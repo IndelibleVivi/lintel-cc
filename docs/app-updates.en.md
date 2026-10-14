@@ -48,18 +48,17 @@ Vite's built-in `build.license` generates frontend licence and copyright texts. 
 Use a Mac matching the candidate architecture and record the exact DMG, source revision, App version and macOS version. The following is a native procedure to execute; existing CLI or Chromium checks do not replace it.
 
 1. **Identify the tested package.** Mount the local candidate read-only and copy the App into a new test directory, preserving the DMG and existing installations. Test actual download/Gatekeeper behavior separately on a clean Mac. Record the original system message and stop if blocked; do not remove quarantine or disable security checks. Website download acceptance first requires authorization to publish downloads, then verifies that the downloaded bytes match this accepted candidate.
-2. **Prepare six synthetic originals.** In a separate child shell, follow [quickstart step 1](quickstart.en.md#1-open-a-separate-interactive-shell), creating only the fixture without continuing to CLI registration or submission. Retain the printed `ROOT`; never point at a real Claude root. Replace `APP` below with the absolute path of the copied candidate and launch from the same child shell. After quitting the App, use the same command to reopen it:
+2. **Prepare six synthetic originals.** In a separate child shell, follow [quickstart step 1](quickstart.en.md#1-open-a-separate-interactive-shell), creating only the fixture without continuing to CLI registration or submission. Retain the printed `ROOT`; never point at a real Claude root. Replace `APP` below with the absolute path of the copied candidate and launch through macOS LaunchServices in the background from the same child shell. Fully quit the test App before reopening with the same command and HOME/state:
 
    ```sh
    APP="/path/to/test-copy/Lintel.app"
-   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-     HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" \
-     LINTEL_TEST_HOME="$ROOT/home" LINTEL_STATE_DIR="$ROOT/state" \
-     LINTEL_BROWSER_STATE="$ROOT/browser-state" TMPDIR="$ROOT" \
-     "$APP/Contents/MacOS/lintel-desktop"
+   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /usr/bin/open -g -n -a "$APP" \
+     --env "HOME=$ROOT/home" --env "CFFIXED_USER_HOME=$ROOT/home" \
+     --env "LINTEL_TEST_HOME=$ROOT/home" --env "LINTEL_STATE_DIR=$ROOT/state" \
+     --env "LINTEL_BROWSER_STATE=$ROOT/browser-state" --env "TMPDIR=$ROOT"
    ```
 
-   These variables isolate the specified HOME/state for this trial. They are not an OS sandbox and do not replace first-install acceptance on a clean Mac.
+   A successful `open` only confirms that the launch request was sent; separately observe the actual window and selected environment. `-g` does not activate the App. Do not run multiple copies against the same test state. These variables isolate the specified HOME/state for this trial; they are not an OS sandbox and do not replace first-install acceptance on a clean Mac. The quickstart resolves `ROOT` to a physical path. Preserve that form for output paths as well; do not substitute a shorter path containing a symlink.
 3. **Register from an empty workspace.** Add an existing environment named `Synthetic native trial`, using the expanded absolute path of `$ROOT/claude-root` as its config directory. Register only; do not run Claude. Confirm that the selected host is this Mac and the environment is this fixture.
 4. **Preview exact selection.** Open Preserve work, choose Archive only and enable individual-file selection. Keep only `CLAUDE.md`, `projects/example/memory/MEMORY.md` and `projects/example/session.jsonl`, deselecting `NOT_SELECTED.md`. Use the absolute path of `$ROOT/carried.age` for output. Both capacity preflight and the approval plan must name exactly three files. No ciphertext should exist at preview time; settings and placeholder credentials must be excluded.
 5. **Approve once and query the original task.** Enter a passphrase used only for this synthetic trial and approve the current plan. Retain its original ID/hash. Wait for actual completion; acceptance is not completion. If uncertain, query the original ID without resubmission. The receipt must show archive-only with no new environment/root. Use the byte check in [quickstart step 6](quickstart.en.md#6-confirm-the-source-is-intact-and-no-root-was-created) to verify all six originals, including the unselected file.

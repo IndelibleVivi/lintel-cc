@@ -2,14 +2,15 @@
 
 2026-10-15 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 App／未签名 DMG 仍为 2026-10-13 构建的 clean `878482fa14f656776ef99b995c6f177ac52921d3`，包含最新共享跑道、双语入口、cleanup metadata-only 修复、完整第三方许可与 clean-checkout notices 接线修复。两个 Linux musl runner 和 native browser host 已在该轮重新构建；DMG 只读挂载与资源字节核对通过。新包隔离 HOME／state 的实际 release WebKit 首屏和原生设置已观察；完整语言／游戏操作对应 10-13 同日产品代码未变的 `cdb0ba8` 候选，分别留存。未安装到 Applications、无 Developer ID／公证、无公开二进制或 feed 激活。
 
-官网生产仍是 clean `c80a783` 的独立静态 payload，简中／English、六项能力场景、共享跑道与概念短片保持已验证版本，本轮未重新部署。独立三平台 CLI 发行候选仍为 `bb9fa824`，10-13 构建的 macOS CLI 仅用于当轮 release 大工作包复验。10-15 只接续合成回归与候选首用程序，没有产品行为／二进制变化。A01–A18 与完整 SPEC／G01–G04 的未验收范围继续保留。
+官网生产仍是 clean `c80a783` 的独立静态 payload，简中／English、六项能力场景、共享跑道与概念短片保持已验证版本，本轮未重新部署。独立三平台 CLI 发行候选仍为 `bb9fa824`，10-13 构建的 macOS CLI 仅用于当轮 release 大工作包复验。10-15 接续合成回归与现成候选的原生首用验收，没有产品行为／二进制变化。A01–A18 与完整 SPEC／G01–G04 的未验收范围继续保留。
 
 ## 当前交付与证据
 
 | 对象 | 当前事实与验收边界 |
 | --- | --- |
 | 2026-10-15 独立试用接续 | 已完整核对提供的 10-14 Linux 试用报告与六文件脚本：报告基于 `eb9bdd6`，记录非 systemd x86_64 Linux 上精确三件归档、原 ID 完成、六份源文件不变、独立 state 读包，以及 portable-work／execution-admission 回归通过；原云主机与 fixture 本轮未复核，属于报告证据。现将精确选择、独立 inspect/read、全部原件字节、口令／暂存清理断言合入既有 `journey-agent-cli`，不新增检查入口或更改默认组。当前本机 Darwin arm64 实跑结果见 [验证说明](verification.md#独立试用接续)；没有产品行为或候选二进制变更 |
-| 2026-10-15 原生首用复核 | 再次从 `878482f` DMG 只读挂载取出 App，在全新合成 HOME／state 观察到 English 空工作区及登记表单；输入自动化遇到 `elementHasNoFrame`／`noWindowsAvailable`，字段未写入，登记／归档／退出重开读包未验证。0 mutation jobs，测试进程已停止；不据此认定产品缺陷。双语 [候选首用程序](app-updates.md#候选首次使用验收) 已补齐。真实下载／quarantine／Gatekeeper、干净 Mac 首装、签名／公证仍独立未验收 |
+| 2026-10-15 原生首用复核 | 同一 `878482f` DMG 只读取出、原 SHA256SUMS 核对通过；macOS 26.5.2 arm64／全新合成 HOME／state 的真实 release WebKit 已完成登记、精确三件选择／预检／预览、一次批准归档与 completed 回执。六份源 bytes 不变，只有一个原 job／一个环境，无新 root。原生 Quit 后重开，Records 保留原 ID completed；从独立文件入口重新解锁并阅读指令／记忆／会话，结构化与 raw JSONL 均已观察。另一独立 HOME／state 的 CLI 对同一密文核对三份完整 bytes／摘要，无源归档 job；口令未进入隔离持久文件，正常结束无解密 staging，测试 App 已退出。早期 AX／无窗口失败保留，后续经 LaunchServices、明确窗口／截图绑定及经用户允许的前台操作完成。双语 [首用程序](app-updates.md#候选首次使用验收) 已对齐；真实下载／quarantine／Gatekeeper、干净 Mac 首装、签名／公证仍独立未验收 |
+| 2026-10-15 CI 收口 | `1bf82b9f06a72a3c2a9389a1337a2f8f50f5819b` 的 [full run 38626316607](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38626316607) 已直接核对 completed/success，14 jobs 全部 success：两平台 frontend／native／browser／runner／heavy、controller、Linux VM 与 aggregate。包含增强后的 CLI 回归；这是该源码的 CI 证据，本地 `878482f` App 的原生观察分别成立，不表示候选已重建或正式发行 |
 | 2026-10-09 Preview 修复 | 通用 execute／submit 在新 job／ACK 前拒绝 launch／resume／未知计划，原 ID 查询保留；Markdown 不假设 records，JSONL 选取保留真实 byte offset／content block；ARM 两侧架构名归一后 canonical 包可被 native inspector 核对；漂移检查及接受绑定主机／环境／请求世代；browser expiry 与 mutation 串行且只消费本次暂停记录；catalog 区分预览和 exact-plan／TTY 执行；独立 import coverage 依据全部逐文件发布／sync／readback 完成记录。workspace／两个独立 Rust crates、15 条 CLI journeys、Python controller、JS 与 frontend build 通过；work／baseline／archive-wait／drift／site／clawd-app UI、独立 browser restart／pairing 通过，网站检查使用实际电影。同版本 CLI 解包首用通过；`bb9fa824` 原生 CLI 核对通过，`afa98f66` 原生精确归档／会话阅读／锁定和游戏检查通过，官网未更新 |
 | 共享产品合同 | 六任务 catalog；计划新增冻结目标／完整落点与用途；结构化任务结果与覆盖；旧协议、历史计划、包与原 ID 恢复保留 |
 | App 多语言源码 | shared LanguageSwitch 顶部只显示实际语言 EN／中文与小箭头，点开原生菜单提供跟随系统／简体中文／English；设置保留完整选择方式与说明。本轮 frontend build、catalog／coverage 与 built-App i18n-ui 已通过；900px Day／Night、实际语言短标签、三选项、可见键盘焦点与原状态保留有合成证据，native 手动→System 已在本轮实际 release WebKit 中观察。最新入口已进入本地 `878482f` 候选。简体中文／English，默认读取 macOS App preferred languages，手动选择本机持久保存；两套随包文案与原生菜单同步，未知语言使用 English。切换保留页面、表单、目标、任务、原 plan／hash、问候身份与工作原文；CLI／扩展／官网语言独立。验证与候选状态见下方，源码更新不等于旧候选升级 |

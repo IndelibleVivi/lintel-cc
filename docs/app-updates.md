@@ -48,18 +48,17 @@ Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完
 使用与候选架构相符的 Mac，先记录确切 DMG、source revision、App 版本与 macOS 版本。以下是待执行的原生操作流程；已有 CLI／Chromium 检查不代替这份验收。
 
 1. **核对所测的包。** 本地候选只读挂载后，将 App 复制到新的测试目录，保留原 DMG 与旧安装。真实下载／Gatekeeper 另在干净 Mac 上检查；记录原始系统提示，遇到阻止时停止，不移除 quarantine 或关闭安全检查。未来官网下载验收须先有公开下载授权，再核对实际下载字节与这份已验收候选一致。
-2. **准备六份假原件。** 在独立子 shell 中执行 [quickstart 第 1 步](quickstart.md#1-一次明确的子-shell-边界)，只创建 fixture，不继续 CLI 登记或提交。保留打印出的 `ROOT`，不要指向真实 Claude root。将下列 `APP` 替换为刚复制的候选绝对路径，在同一子 shell 启动；退出 App 后用同一命令重开：
+2. **准备六份假原件。** 在独立子 shell 中执行 [quickstart 第 1 步](quickstart.md#1-一次明确的子-shell-边界)，只创建 fixture，不继续 CLI 登记或提交。保留打印出的 `ROOT`，不要指向真实 Claude root。将下列 `APP` 替换为刚复制的候选绝对路径，在同一子 shell 经 macOS LaunchServices 后台启动；完全退出测试 App 后用同一命令重开，保持相同 HOME／state：
 
    ```sh
    APP="/path/to/test-copy/Lintel.app"
-   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-     HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" \
-     LINTEL_TEST_HOME="$ROOT/home" LINTEL_STATE_DIR="$ROOT/state" \
-     LINTEL_BROWSER_STATE="$ROOT/browser-state" TMPDIR="$ROOT" \
-     "$APP/Contents/MacOS/lintel-desktop"
+   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /usr/bin/open -g -n -a "$APP" \
+     --env "HOME=$ROOT/home" --env "CFFIXED_USER_HOME=$ROOT/home" \
+     --env "LINTEL_TEST_HOME=$ROOT/home" --env "LINTEL_STATE_DIR=$ROOT/state" \
+     --env "LINTEL_BROWSER_STATE=$ROOT/browser-state" --env "TMPDIR=$ROOT"
    ```
 
-   这些变量隔离本次指定的 HOME／state，不构成 OS sandbox，也不代替干净 Mac 的首次安装验收。
+   `open` 返回只说明启动请求已发出，须另外观察真实窗口与所选环境；`-g` 不主动切前台。不要同时启动同一测试 state 的多个副本。这些变量隔离本次指定的 HOME／state，不构成 OS sandbox，也不代替干净 Mac 的首次安装验收。quickstart 的 `ROOT` 已解析为实际路径；输出路径也保留这一形式，不能改填指向符号链接的简写路径。
 3. **从空白工作区登记。** 添加已有环境，名称使用 `Synthetic native trial`，配置目录填写 `$ROOT/claude-root` 展开的绝对路径；只登记，不运行 Claude。确认当前主机是本机、环境是这份 fixture。
 4. **精确预览。** 进入“工作保全”，选择“只生成工作归档”，启用“精确到原件”，仅保留 `CLAUDE.md`、`projects/example/memory/MEMORY.md` 与 `projects/example/session.jsonl`，取消 `NOT_SELECTED.md`。输出使用 `$ROOT/carried.age` 的绝对路径。容量预检与批准前计划都应恰好三件；计划阶段密文尚不存在，settings 与占位凭据不在选择中。
 5. **批准一次并核对原任务。** 输入只用于此次合成试用的口令，批准当前计划；保存原 ID／hash。等待原任务真正完成，不能把已接收当完成；结果不确定时只查询原 ID，不重新提交。回执应只有归档结果，无新环境／新 root；按 [quickstart 第 6 步](quickstart.md#6-确认源原件保留没有新建根) 的字节检查核对全部六份原件，包括未选文件。
