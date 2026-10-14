@@ -98,7 +98,7 @@ export default function TelemetryPanel({ hostAlias, selected, onChange, disabled
         <section className="telemetry-privacy" aria-label={t('telemetry.privacyAria')}>
           <h4>{t('telemetry.privacyTitle')}</h4>
           {notRead ? <p className="small-print" role="status">{t('telemetry.notRead')}</p> : <>
-            <div className="fact-row"><span>{t('telemetry.nonessentialLabel')} <code>{NONESSENTIAL}</code></span><strong>{(nonessential?.value ?? t('app.notSet'))} · {nonessential ? settingState(nonessential) : 'unknown'}</strong></div>
+            <div className="fact-row telemetry-master-row"><span>{t('telemetry.nonessentialLabel')}</span><strong><code>{NONESSENTIAL}</code> · {(nonessential?.value ?? t('app.notSet'))} · {nonessential ? settingState(nonessential) : 'unknown'}</strong></div>
             <p className="small-print">{t('telemetry.nonessentialNote')}</p>
             <ul className="compact-list telemetry-info">{FINE_GRAINED.map(key => { const setting = observed(key); return <li key={key}><code>{key}</code> · {setting ? `${setting.value ?? t('app.notSet')} · ${settingState(setting)}` : 'not_read'}</li>; })}</ul>
           </>}
@@ -108,7 +108,7 @@ export default function TelemetryPanel({ hostAlias, selected, onChange, disabled
         {blockable.map(entry => <label className="telemetry-row" key={entry.id}>
           <input type="checkbox" disabled={disabled} checked={selected.includes(entry.id)} onChange={event => toggle(entry.id, event.target.checked)}/>
           <span><strong>{presentText(entry.purpose)}</strong>
-            <span className="telemetry-detail"><code>{entry.host}:{entry.port}</code> · {entry.provider} · {t('telemetry.clients',{clients:entry.clients.join('、')})}</span>
+            <span className="telemetry-detail"><code>{entry.host}:{entry.port}</code> · {entry.provider} · {t('telemetry.clients',{clients:entry.clients.join(t('list.separator'))})}</span>
             <span className="telemetry-detail">{t('telemetry.applicability',{applicability:presentText(entry.applicability),version:presentText(entry.version_applicability),date:entry.checked_date})}</span>
             <span className="telemetry-detail telemetry-impact">{t('telemetry.impact',{impact:presentText(entry.collateral_impact)})}</span>
           </span>

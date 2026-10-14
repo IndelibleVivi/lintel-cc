@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Modal, Notice } from './ui';
 import { ResourceLink } from './Resources';
-import { useI18n } from './i18n-provider';
+import { useI18n, type Translator } from './i18n-provider';
 import './app-updates.css';
 
 type UpdateStatus = {
@@ -14,9 +14,9 @@ type UpdateStatus = {
   installation_unresolved: boolean;
 };
 type Envelope = { ok: true; data: UpdateStatus } | { ok: false; error: { code: string; message: string } };
-async function send(payload: Record<string, unknown>) {
+async function send(payload: Record<string, unknown>, t: Translator) {
   const result = await invoke<Envelope>('app_update_request', { payload });
-  if (!result.ok) throw new Error(`${result.error.message}（${result.error.code}）`);
+  if (!result.ok) throw new Error(t('app.diagnosticWithCode', { message: result.error.message, code: result.error.code }));
   return result.data;
 }
 const phaseKeys: Record<string, string> = {
@@ -40,9 +40,9 @@ export default function AppUpdates({ visible, disabled, onClose }: { visible: bo
   const backgroundConsent = useRef(false);
   const read = useCallback(async () => {
     const sequence = ++statusSequence.current;
-    try { const value = await send({ op: 'status' }); if (active.current && sequence === statusSequence.current) { backgroundConsent.current = value.background_check; setStatus(value); } }
+    try { const value = await send({ op: 'status' }, t); if (active.current && sequence === statusSequence.current) { backgroundConsent.current = value.background_check; setStatus(value); } }
     catch (error) { if (active.current && visible) setFailure(error instanceof Error ? error.message : String(error)); }
-  }, [visible]);
+  }, [visible, t]);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   useEffect(() => { void read(); }, [read]);
   const run = useCallback(async (op: string, fields: Record<string, unknown> = {}) => {
@@ -50,7 +50,7 @@ export default function AppUpdates({ visible, disabled, onClose }: { visible: bo
     inFlight.current = true; ++statusSequence.current; setPending(op); setFailure('');
     if (op === 'preference' && fields.background_check === false) backgroundConsent.current = false;
     try {
-      const value = await send({ op, ...fields });
+      const value = await send({ op, ...fields }, t);
       backgroundConsent.current = value.background_check;
       ++statusSequence.current;
       if (active.current) { setStatus(value); setApprove(false); }

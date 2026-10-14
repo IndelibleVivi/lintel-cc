@@ -63,7 +63,7 @@ async function network<T>(payload: object): Promise<T> {
 }
 function RuleReadback({ rules }: { rules: Rule[] }) {
   const { t } = useI18n();
-  return rules.length ? <ul className="compact-list">{rules.map((rule, index) => <li key={index}><code>{rule.host}</code> · {rule.ports.length ? t('netPanel.ports',{ports:rule.ports.join('、')}) : t('netPanel.allPorts')}</li>)}</ul> : <span>{t('service.none')}</span>;
+  return rules.length ? <ul className="compact-list">{rules.map((rule, index) => <li key={index}><code>{rule.host}</code> · {rule.ports.length ? t('netPanel.ports',{ports:rule.ports.join(t('list.separator'))}) : t('netPanel.allPorts')}</li>)}</ul> : <span>{t('service.none')}</span>;
 }
 // The key owns the whole request lifetime, so even start/stop replies from the
 // previous environment cannot update the newly selected environment's panel.

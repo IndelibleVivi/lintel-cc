@@ -1,0 +1,58 @@
+/* Help dialog: a serious product document.
+   This file owns the help surface's own rhythm and spacing. The shared
+   ResourceLink primitives (.resource-links / .resource-link / .resource-version
+   / .resource-error) intentionally stay in styles.css because other panels
+   reuse them, and TaskHelp's .help-tasks also serves the "Start a task" dialog
+   that loads this file through the same Resources module. */
+.help-content{font-size:13px;line-height:1.85}
+.help-content p{color:var(--muted);margin:0}
+.help-content strong{color:var(--text)}
+.help-content>h3{margin:26px 0 8px}
+
+/* Identity lead. */
+.help-brand{display:flex;gap:15px;align-items:center;margin:1px 0 22px}
+.help-brand p{font-size:14px;margin-top:4px}
+
+/* Document sections share one calm cadence and a single divider. */
+.help-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.help-section>h3{margin-bottom:8px}
+.help-section>p{margin-top:7px}
+
+/* Scope: what Lintel is, and what it is not. */
+.help-scope{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 26px;margin:15px 0}
+.help-scope h4{margin:0 0 8px}
+.help-scope ul{padding-left:17px;margin:0;color:var(--muted)}
+.help-scope li+li{margin-top:8px}
+
+/* Six task entries (also used by the "Start a task" dialog). */
+.help-tasks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 28px;margin:20px 0 26px}
+.help-tasks section{border-top:1px solid var(--line);padding-top:14px}
+.help-tasks h4{margin:0 0 8px}
+.help-tasks p{margin:0 0 10px}
+@media(max-width:680px){.help-tasks{grid-template-columns:1fr}}
+
+/* Ways to use it: App / CLI / SSH. */
+.help-paths{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:15px}
+.help-path{display:flex;flex-direction:column;gap:7px;min-width:0;border:1px solid var(--line);border-radius:8px;padding:14px 15px}
+.help-path>strong{font-size:13px}
+.help-path>p{font-size:12px;flex:1}
+.help-path .resource-link{font-size:12px}
+@media(max-width:680px){.help-paths{grid-template-columns:1fr}}
+
+/* Working routine and troubleshooting. */
+.offline-help ol{padding-left:22px;margin:0;font-size:13px;line-height:1.9;color:var(--muted)}
+.offline-help li+li{margin-top:9px}
+.offline-help h4{margin:22px 0 6px}
+.offline-help p{line-height:1.85}
+.help-errors{padding-left:20px;margin:0;font-size:13px;line-height:1.85;color:var(--muted)}
+.help-errors li+li{margin-top:10px}
+.help-errors li>strong{display:block;margin-bottom:2px}
+.help-section .inline-route{margin-top:14px}
+
+/* Developers & project resources. */
+.help-content .developer-resources p{font-size:12px;line-height:1.8;margin:8px 0 0;color:var(--muted)}
+.developer-resources h4{font-size:13px;margin-top:22px}
+.developer-resources .small-print{font-size:11px}
+
+/* Build identity line closes the document. */
+.help-revision{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);font:11px var(--mono);color:var(--muted);overflow-wrap:anywhere}

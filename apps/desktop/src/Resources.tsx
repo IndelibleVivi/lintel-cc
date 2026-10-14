@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { transport } from './api';
 import { useI18n } from './i18n-provider';
 
+import './help.css';
 import resourceTable from '../../../contracts/documentation-resources.json';
 import { buildIdentity } from './buildIdentity';
 import taskCatalog from '../../../contracts/task-catalog.json';
@@ -21,7 +22,7 @@ export function ResourceLink({ resource, children }: { resource: keyof typeof re
 
 export default function DeveloperResources() {
   const { t } = useI18n();
-  return <section className="developer-resources separated" aria-label={t('resources.aria')}><h3>{t('resources.title')}</h3><p>{t('resources.intro')}</p><div className="resource-links"><ResourceLink resource="developer">{t('resources.developer')}</ResourceLink><ResourceLink resource="source">{t('resources.source')}</ResourceLink></div><p className="small-print">{t('resources.note')}</p><h4>{t('resources.vpsTitle')}</h4><p>{t('resources.vpsIntro')}</p><div className="resource-links"><ResourceLink resource="vps-guide">{t('resources.vpsGuideRepo')}</ResourceLink><ResourceLink resource="vps-basics">VPS 101</ResourceLink><ResourceLink resource="ssh-troubleshooting">{t('resources.connTroubleshooting')}</ResourceLink></div><p className="small-print">{t('resources.linkNote')}</p></section>;
+  return <section className="developer-resources separated" aria-label={t('resources.aria')}><h3>{t('resources.title')}</h3><p>{t('resources.intro')}</p><div className="resource-links"><ResourceLink resource="developer">{t('resources.developer')}</ResourceLink><ResourceLink resource="source">{t('resources.source')}</ResourceLink></div><p className="small-print">{t('resources.note')}</p><h4>{t('resources.vpsTitle')}</h4><p>{t('resources.vpsIntro')}</p><div className="resource-links"><ResourceLink resource="vps-guide">{t('resources.vpsGuideRepo')}</ResourceLink><ResourceLink resource="vps-basics">{t('resources.vpsBasics')}</ResourceLink><ResourceLink resource="ssh-troubleshooting">{t('resources.connTroubleshooting')}</ResourceLink></div><p className="small-print">{t('resources.linkNote')}</p></section>;
 }
 
 export const productTasks=taskCatalog.tasks;
@@ -40,11 +41,11 @@ export function useTaskHelp() {
   return { t, productTasks, label, summary, actionKey: (id: string) => actionKeys[id] ?? id };
 }
 
-export function TaskHelp({ onProtect, onWork, onCleanup, onBrowser, onRemote, onRecovery,onChooseTask }: { onProtect: () => void; onWork: () => void; onCleanup: () => void; onBrowser: () => void; onRemote: () => void; onRecovery: () => void;onChooseTask?:(id:string)=>void }) {
+export function TaskHelp({ onProtect, onWork, onCleanup, onBrowser, onRemote, onRecovery,onChooseTask,showGuides = true }: { onProtect: () => void; onWork: () => void; onCleanup: () => void; onBrowser: () => void; onRemote: () => void; onRecovery: () => void;onChooseTask?:(id:string)=>void;showGuides?:boolean }) {
   const { t, productTasks, label, summary, actionKey } = useTaskHelp();
   const actions:Record<string,()=>void>={
     reduce_egress:onProtect, preserve_work:onWork, repair_cleanup_retire:onCleanup,
     browser_profile:onBrowser, ssh_remote:onRemote, recover_results:onRecovery,
   };
-  return <><h3>{t('resources.startFromGoal')}</h3><div className="help-tasks">{productTasks.map(task => <section key={task.id} data-task-id={task.id}><h4>{label(task)}</h4><p>{summary(task)}</p><button className="text-button" onClick={()=>{onChooseTask?.(task.id);actions[task.id]?.();}}>{t(actionKey(task.id))}<span aria-hidden="true"> →</span></button></section>)}</div><div className="resource-links"><ResourceLink resource="operator-guide">{t('resources.operatorGuide')}</ResourceLink><ResourceLink resource="agent-guide">{t('resources.agentGuide')}</ResourceLink></div></>;
+  return <><h3>{t('resources.startFromGoal')}</h3><div className="help-tasks">{productTasks.map(task => <section key={task.id} data-task-id={task.id}><h4>{label(task)}</h4><p>{summary(task)}</p><button className="text-button" onClick={()=>{onChooseTask?.(task.id);actions[task.id]?.();}}>{t(actionKey(task.id))}<span aria-hidden="true"> →</span></button></section>)}</div>{showGuides && <div className="resource-links"><ResourceLink resource="operator-guide">{t('resources.operatorGuide')}</ResourceLink><ResourceLink resource="agent-guide">{t('resources.agentGuide')}</ResourceLink></div>}</>;
 }
