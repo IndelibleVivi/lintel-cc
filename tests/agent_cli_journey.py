@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Discoverable CLI contract and portable work, only in disposable homes."""
+import hashlib
 import json
 import os
 import pty
@@ -22,19 +23,20 @@ def run():
         home.mkdir()
         state = base / 'state'
         browser = base / 'browser-state'
-        env = dict(os.environ, HOME=str(home), LINTEL_TEST_HOME=str(home),
-                   LINTEL_STATE_DIR=str(state), LINTEL_BROWSER_STATE=str(browser))
+        env = {'PATH': '/usr/bin:/bin', 'HOME': str(home),
+               'LINTEL_TEST_HOME': str(home), 'LINTEL_STATE_DIR': str(state),
+               'LINTEL_BROWSER_STATE': str(browser), 'TMPDIR': str(base)}
 
         def command(*args, payload=None, good=True, context=env):
             proc = subprocess.run([str(BINARY), *args], input='' if payload is None else json.dumps(payload),
-                                  text=True, capture_output=True, env=context, timeout=55)
+                                  text=True, capture_output=True, cwd=base, env=context, timeout=55)
             result = json.loads(proc.stdout)
             assert result['ok'] is good, (args, result, proc.stderr)
             assert (proc.returncode == 0) is good, (args, result, proc.returncode)
             assert PASSWORD not in proc.stdout + proc.stderr
             return result['data'] if good else result
 
-        for args in [('version', '--json'), ('capabilities', '--json'), ('describe', 'plan_policy'),
+        for args in [('version', '--json'), ('capabilities', '--json'), ('tasks', '--json'), ('describe', 'plan_policy'),
                      ('schema', 'plan_archive'), ('remote','operations'), ('describe','remote.install_runner')]:
             command(*args)
             assert not state.exists() and not browser.exists(), 'Static discovery initialized private state'
@@ -129,12 +131,19 @@ def run():
         root = home / 'synthetic-claude'
         root.mkdir()
         (root / 'projects/synthetic/memory').mkdir(parents=True)
-        (root / 'CLAUDE.md').write_text('# Synthetic instructions\n')
-        (root / 'projects/synthetic/memory/notes.md').write_text('Synthetic note\n')
-        (root / 'projects/session.jsonl').write_text('{"synthetic":true}\n')
         original = '{"env":{"UNRELATED_SYNTHETIC":"keep"}}\n'
-        (root / 'settings.json').write_text(original)
-        (root / '.credentials.json').write_text('{"synthetic":"must-remain"}\n')
+        originals = {
+            'CLAUDE.md': b'# Synthetic instructions\n',
+            'projects/synthetic/memory/notes.md': b'Synthetic note\n',
+            'projects/synthetic/memory/NOT_SELECTED.md': b'Synthetic unselected memory\n',
+            'projects/session.jsonl': b'{"synthetic":true}\n',
+            'settings.json': original.encode(),
+            '.credentials.json': b'{"synthetic":"must-remain"}\n',
+        }
+        for path, content in originals.items():
+            (root / path).write_bytes(content)
+        selected = ['CLAUDE.md', 'projects/synthetic/memory/notes.md', 'projects/session.jsonl']
+        selection_args = tuple(arg for path in selected for arg in ('--path', path))
         identity = command('env', 'register', '--name', 'Synthetic source', '--root', str(root))['id']
         repair = {'environment_id': identity, 'recipe': 'repair_login',
                   'writers_confirmed_stopped': True, 'official_logout': False}
@@ -155,8 +164,20 @@ def run():
         assert 'detached_submission' in {c['name'] for c in a['capabilities']}
 
         output = base / 'portable.age'
+        inventory = command('work', 'inventory', '--environment', identity,
+                            '--categories', 'instructions,memory,sessions', '--json')
+        assert {item['path'] for item in inventory['files']} == set(
+            selected + ['projects/synthetic/memory/NOT_SELECTED.md'])
+        preflight = command('work', 'preflight', '--environment', identity,
+                            '--categories', 'instructions,memory,sessions', *selection_args, '--json')
+        assert preflight['eligible'] and preflight['totals']['files'] == len(selected)
         archive = command('work', 'archive', 'plan', '--environment', identity,
-                          '--categories', 'instructions,memory', '--output-path', str(output))
+                          '--categories', 'instructions,memory,sessions', *selection_args,
+                          '--output-path', str(output))
+        assert archive['kind'] == 'archive' and archive['outcome'] == 'archive_only'
+        assert archive['file_count'] == len(selected)
+        assert archive['work_selection']['mode'] == 'paths'
+        assert set(archive['work_selection']['paths']) == set(selected)
         assert command('plan', 'show', archive['id'])['hash'] == archive['hash']
         assert not output.exists(), 'Preview wrote the archive'
         before = command('env', 'list')['environments']
@@ -164,21 +185,36 @@ def run():
                            payload={'archive_passphrase': PASSWORD})
         assert accepted['id'] == archive['id']
         result = command('job', 'wait', archive['id'], '--timeout', '30s')
-        assert result['status'] == 'completed', result
+        assert result['id'] == archive['id'] and result['status'] == 'completed', result
+        assert 'new_root' not in result and Path(result['archive_path']) == output
+        assert any(step['id'] == 'archive' and step['status'] == 'completed' for step in result['steps'])
+        assert command('job', 'show', archive['id'], '--json')['id'] == archive['id']
         assert command('env', 'list')['environments'] == before, 'Archive-only created an environment'
-        assert (root / 'settings.json').read_text() == original
-        assert (root / '.credentials.json').read_text() == '{"synthetic":"must-remain"}\n'
+        for path, content in originals.items():
+            assert (root / path).read_bytes() == content, path
         assert output.is_file()
-        assert PASSWORD.encode() not in output.read_bytes()
+        ciphertext = output.read_bytes()
+        assert ciphertext.startswith(b'age-encryption.org/')
+        for content in [PASSWORD.encode(), *originals.values()]:
+            assert content.strip() not in ciphertext
 
         other_home = base / 'other-home'
         other_home.mkdir()
-        other = dict(env, HOME=str(other_home), LINTEL_TEST_HOME=str(other_home), LINTEL_STATE_DIR=str(base / 'other-state'))
+        other = dict(env, HOME=str(other_home), LINTEL_TEST_HOME=str(other_home),
+                     LINTEL_STATE_DIR=str(base / 'other-state'), LINTEL_BROWSER_STATE=str(base / 'other-browser-state'))
         portable = base / 'transferred.age'
         shutil.copyfile(output, portable)
         manifest = command('work', 'archive', 'inspect', '--archive-path', str(portable),
                            payload={'archive_passphrase': PASSWORD}, context=other)
-        assert {f['category'] for f in manifest['files']} == {'instructions', 'memory'}
+        assert {item['path'] for item in manifest['files']} == set(selected)
+        assert {item['path']: item['digest'] for item in manifest['files']} == {
+            path: hashlib.sha256(originals[path]).hexdigest() for path in selected}
+        read = command('work', 'archive', 'read', '--archive-path', str(portable), '--path', 'CLAUDE.md',
+                       payload={'archive_passphrase': PASSWORD}, context=other)
+        assert read['text'].encode() == originals['CLAUDE.md'] and not read['truncated']
+        assert command('work', 'archive', 'list', '--json', context=other)['jobs'] == []
+        for private_state in (state, base / 'other-state'):
+            assert not list(private_state.glob('.lintel-work-stage-*')), 'Decoded staging remained after reading'
         target = command('env', 'create', '--name', 'Synthetic destination', context=other)
         plan = command('work', 'import', 'plan', '--environment', target['id'], '--archive-path', str(portable),
                        '--categories', 'instructions,memory', payload={'archive_passphrase': PASSWORD}, context=other)
@@ -190,6 +226,7 @@ def run():
         assert (dest / 'CLAUDE.md').read_bytes() == (root / 'CLAUDE.md').read_bytes()
         assert (dest / 'lintel-imports/projects/synthetic/memory/notes.md').read_bytes() == (root / 'projects/synthetic/memory/notes.md').read_bytes()
         assert not list(dest.rglob('session.jsonl')) and not (dest / '.credentials.json').exists()
+        assert not list(dest.rglob('NOT_SELECTED.md'))
         command('work', 'import', 'plan', '--environment', target['id'], '--archive-path', str(portable),
                 '--categories', 'instructions', payload={'archive_passphrase': PASSWORD}, context=other, good=False)
 
@@ -217,9 +254,11 @@ def run():
         command('job', 'submit', '--plan', restore['id'], '--approval', restore['hash'])
         assert command('job', 'wait', restore['id'], '--timeout', '30s')['status'] == 'completed'
         assert (root / 'settings.json').read_text() == original, 'Source was modified'
-        for file in state.rglob('*.json'):
-            assert PASSWORD not in file.read_text(), 'Secret entered persistent state'
-        print('PASS: static catalog, discover parity, submit exit, portable archive, independent import, preservation, original-ID wait and restoration')
+        for private_state in (state, base / 'other-state'):
+            for file in private_state.rglob('*.json'):
+                assert PASSWORD not in file.read_text(), 'Secret entered persistent state'
+            assert not list(private_state.glob('.lintel-work-stage-*')), 'Decoded staging remained after completion'
+        print('PASS: static catalog, exact three-file archive, six unchanged originals, independent authenticated read/import, secret/staging hygiene, preservation, original-ID wait and restoration')
 
 
 if __name__ == '__main__':

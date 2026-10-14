@@ -25,6 +25,14 @@ executed check fails. `deferred` and `skipped` checks never count as passes.
 
 The table below lists the equivalent raw commands; [开发与文档](../README.md#开发与文档) points to this entrypoint.
 
+## 独立试用接续
+
+2026-10-15 将外部 Linux 六文件合成试用中的相关断言合入既有 `journey-agent-cli`，不另建检查入口。该 journey 现在通过 named CLI 核对：无 state 的静态发现；四件清单中精确选择三件的预检／归档；同一原任务 ID 的完成／查询；全部六份源文件逐字节不变；另一份 HOME／state 的独立包清单、SHA-256 与指令正文；独立读者没有源归档记录；输出及双方持久 JSON 不含测试口令，正常读取／完成不留解密 staging。既有选择性迁入、保全、等待超时及恢复场景继续保留。named CLI helper 使用临时 cwd；所有子进程使用显式合成 HOME／state 与有限环境，不继承调用者凭据、代理或 test hooks，需要的故障屏障由该旅程自行明确注入。
+
+本机 Darwin arm64、`eb9bdd6` 加本次测试改动，经 canonical strict entrypoint 实跑：`journey-agent-cli` 18.367s、`journey-portable-work` 40.563s（7 tests）、`journey-execution-admission` 4.178s，三项均 PASS。这是当前本机合成证据；提供的 2026-10-14 非 systemd Linux x86_64 报告是另一次报告证据，原云主机／fixture 未在本轮复核。没有重新构建 App、发布二进制或激活 feed。
+
+同日重新取出本地 `878482f` DMG 的 App，仅观察到隔离 HOME／state 的原生 English 空工作区与登记表单；GUI 自动化输入遇到 `elementHasNoFrame`／`noWindowsAvailable`，字段未写入，0 mutation jobs。后续归档、退出重开与文件读包仍未验证；这不证明产品缺陷，也不能算首次使用通过。[App 更新指南的双语首用程序](app-updates.md#候选首次使用验收)保留完整人工验收路径。真实下载、干净 Mac 的 quarantine／Gatekeeper、签名／公证、认证与生产远端证据继续独立。
+
 ## Checks
 
 | id | category | what it runs |
@@ -45,7 +53,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `shared-remote-journey` | python | shared Rust finite controller public API and schemas, synthetic transport |
 | `journey-product-baseline` | journey | `python3 tests/backend_baseline_journey.py`; readonly context/help, frozen target and bounded session/launch contracts |
 | `journey-network` | journey | finite IP targets/defaults, strict CLI/schema admission and synthetic-home host boundary; no public/host probes |
-| `journey-agent-cli` | journey | static catalog, named CLI, durable original-ID wait, portable archive/import and restore |
+| `journey-agent-cli` | journey | static catalog without state, exact three-file named archive with six unchanged originals, independent authenticated read/selective import, secret/staging hygiene, durable original-ID wait and restore |
 | `journey-agent-adapters` | journey | static telemetry without state, real controlled CONNECT/original event, finite refusal, synthetic SSH registry, browser absent-profile and foreground stream/stop |
 | `journey-portable-work` | journey | independent state import, package failures and persistent error codes |
 | `journey-cli` | journey | `python3 tests/cli_journey.py` (real CLI JSON boundary) |

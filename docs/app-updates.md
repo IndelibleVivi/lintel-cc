@@ -43,6 +43,29 @@ npm run tauri -- bundle --bundles dmg --ci --no-sign
 
 Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完整构建先运行 Vite，再由同一 notices 生成器验证并收集 frontend 正文，缺失／空正文会拒绝；原生测试可使用只含 tracked README 的资源目录，不能把它当作发行包。两者随 App 放在 `Contents/Resources/third-party-notices`；保留子目录与 HTML 相对引用。生成正文不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。
 
+## 候选首次使用验收
+
+使用与候选架构相符的 Mac，先记录确切 DMG、source revision、App 版本与 macOS 版本。以下是待执行的原生操作流程；已有 CLI／Chromium 检查不代替这份验收。
+
+1. **核对所测的包。** 本地候选只读挂载后，将 App 复制到新的测试目录，保留原 DMG 与旧安装。真实下载／Gatekeeper 另在干净 Mac 上检查；记录原始系统提示，遇到阻止时停止，不移除 quarantine 或关闭安全检查。未来官网下载验收须先有公开下载授权，再核对实际下载字节与这份已验收候选一致。
+2. **准备六份假原件。** 在独立子 shell 中执行 [quickstart 第 1 步](quickstart.md#1-一次明确的子-shell-边界)，只创建 fixture，不继续 CLI 登记或提交。保留打印出的 `ROOT`，不要指向真实 Claude root。将下列 `APP` 替换为刚复制的候选绝对路径，在同一子 shell 启动；退出 App 后用同一命令重开：
+
+   ```sh
+   APP="/path/to/test-copy/Lintel.app"
+   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+     HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" \
+     LINTEL_TEST_HOME="$ROOT/home" LINTEL_STATE_DIR="$ROOT/state" \
+     LINTEL_BROWSER_STATE="$ROOT/browser-state" TMPDIR="$ROOT" \
+     "$APP/Contents/MacOS/lintel-desktop"
+   ```
+
+   这些变量隔离本次指定的 HOME／state，不构成 OS sandbox，也不代替干净 Mac 的首次安装验收。
+3. **从空白工作区登记。** 添加已有环境，名称使用 `Synthetic native trial`，配置目录填写 `$ROOT/claude-root` 展开的绝对路径；只登记，不运行 Claude。确认当前主机是本机、环境是这份 fixture。
+4. **精确预览。** 进入“工作保全”，选择“只生成工作归档”，启用“精确到原件”，仅保留 `CLAUDE.md`、`projects/example/memory/MEMORY.md` 与 `projects/example/session.jsonl`，取消 `NOT_SELECTED.md`。输出使用 `$ROOT/carried.age` 的绝对路径。容量预检与批准前计划都应恰好三件；计划阶段密文尚不存在，settings 与占位凭据不在选择中。
+5. **批准一次并核对原任务。** 输入只用于此次合成试用的口令，批准当前计划；保存原 ID／hash。等待原任务真正完成，不能把已接收当完成；结果不确定时只查询原 ID，不重新提交。回执应只有归档结果，无新环境／新 root；按 [quickstart 第 6 步](quickstart.md#6-确认源原件保留没有新建根) 的字节检查核对全部六份原件，包括未选文件。
+6. **退出后重开读包。** 完全退出 App，再以同一 HOME／state 启动。在“记录与恢复”核对原任务，再从“会话与资料”的“独立加密包”入口填入密文绝对路径并重新输入口令。应恰好列出三份所选原件，指令、记忆和会话原文均可阅读；不批准迁入、启动或清理。独立 HOME／state 读包另用 [quickstart 第 7 步](quickstart.md#7-在另一份独立-state-里-inspect--read) 验证，不能把同一 state 重开当作独立安装。
+7. **分别记结果。** 记录启动、登记、精确选择、预览、批准、原任务完成、退出重开、独立文件读包及六份原件核对的实际结果。自动化无窗口、无法输入或截图失败时标未验证，并保存错误；不据此改写为产品成功或失败。原始截图、fixture、state、口令与内部记录留在本地，不上传整个候选 evidence 目录。
+
 ## 一份记录准备三种输出
 
 [`app-release.mjs`](../scripts/app-release.mjs) 是本地发行准备入口。它不创建 key、不签名、不上传、不创建 GitHub Release、不部署 Pages。输入是本地 `lintel.app-release/1` 记录；包含实际 artifact 路径的输入留在 Git 外或 ignored 目录，公开输出不含本机路径。

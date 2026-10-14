@@ -43,6 +43,29 @@ The second command only packages the just-built native App; do not reuse an old 
 
 Vite's built-in `build.license` generates frontend licence and copyright texts. The full build runs Vite before the notice generator validates and collects its output; missing or empty text refuses preparation. Native tests may use the resource directory containing only its tracked README, which is not a distribution. Both sets ship under `Contents/Resources/third-party-notices`; retain subdirectories and HTML relative links. Generated output stays out of Git. Third-party terms do not select a licence for Lintel original code, documentation or independent assets. Rights for third-party identity/assets such as Clawd still require separate confirmation.
 
+## Candidate first-use acceptance
+
+Use a Mac matching the candidate architecture and record the exact DMG, source revision, App version and macOS version. The following is a native procedure to execute; existing CLI or Chromium checks do not replace it.
+
+1. **Identify the tested package.** Mount the local candidate read-only and copy the App into a new test directory, preserving the DMG and existing installations. Test actual download/Gatekeeper behavior separately on a clean Mac. Record the original system message and stop if blocked; do not remove quarantine or disable security checks. Website download acceptance first requires authorization to publish downloads, then verifies that the downloaded bytes match this accepted candidate.
+2. **Prepare six synthetic originals.** In a separate child shell, follow [quickstart step 1](quickstart.en.md#1-open-a-separate-interactive-shell), creating only the fixture without continuing to CLI registration or submission. Retain the printed `ROOT`; never point at a real Claude root. Replace `APP` below with the absolute path of the copied candidate and launch from the same child shell. After quitting the App, use the same command to reopen it:
+
+   ```sh
+   APP="/path/to/test-copy/Lintel.app"
+   env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+     HOME="$ROOT/home" CFFIXED_USER_HOME="$ROOT/home" \
+     LINTEL_TEST_HOME="$ROOT/home" LINTEL_STATE_DIR="$ROOT/state" \
+     LINTEL_BROWSER_STATE="$ROOT/browser-state" TMPDIR="$ROOT" \
+     "$APP/Contents/MacOS/lintel-desktop"
+   ```
+
+   These variables isolate the specified HOME/state for this trial. They are not an OS sandbox and do not replace first-install acceptance on a clean Mac.
+3. **Register from an empty workspace.** Add an existing environment named `Synthetic native trial`, using the expanded absolute path of `$ROOT/claude-root` as its config directory. Register only; do not run Claude. Confirm that the selected host is this Mac and the environment is this fixture.
+4. **Preview exact selection.** Open Preserve work, choose Archive only and enable individual-file selection. Keep only `CLAUDE.md`, `projects/example/memory/MEMORY.md` and `projects/example/session.jsonl`, deselecting `NOT_SELECTED.md`. Use the absolute path of `$ROOT/carried.age` for output. Both capacity preflight and the approval plan must name exactly three files. No ciphertext should exist at preview time; settings and placeholder credentials must be excluded.
+5. **Approve once and query the original task.** Enter a passphrase used only for this synthetic trial and approve the current plan. Retain its original ID/hash. Wait for actual completion; acceptance is not completion. If uncertain, query the original ID without resubmission. The receipt must show archive-only with no new environment/root. Use the byte check in [quickstart step 6](quickstart.en.md#6-confirm-the-source-is-intact-and-no-root-was-created) to verify all six originals, including the unselected file.
+6. **Quit, reopen and read.** Fully quit the App and relaunch with the same HOME/state. Check the original task in Records & recovery, then choose Standalone encrypted package in Sessions & data, entering the absolute ciphertext path and the passphrase again. The index must contain exactly the three selected files; instruction, memory and raw session text must be readable. Do not approve import, launch or cleanup. Separately verify reading in an independent HOME/state with [quickstart step 7](quickstart.en.md#7-inspect--read-in-a-separate-independent-state). Reopening the same state is not an independent installation.
+7. **Record each result separately.** Record observed startup, registration, exact selection, preview, approval, original-task completion, quit/reopen, file-based package reading and six-file byte checks. Missing automation windows, failed input or screenshot errors mean unverified; retain the error without labeling the product successful or broken. Keep raw screenshots, fixture, state, passphrase and internal records local; never upload the entire candidate evidence directory.
+
 ## One record prepares three outputs
 
 [`app-release.mjs`](../scripts/app-release.mjs) is the local release-preparation entry. It creates no keys, signs nothing, uploads nothing, creates no GitHub Release and deploys no Pages site. Its input is a local `lintel.app-release/1` record. Inputs containing actual artifact paths stay outside Git or in ignored directories; public outputs contain no local paths.
