@@ -51,11 +51,17 @@
 .clawd.is-dragging{z-index:7;touch-action:none;user-select:none;-webkit-user-select:none}
 /* Hover adds a 3px lift; the drag rule must out-specify both `.clawd.is-held`
    and that hover state so the pointer, not the lift, owns the transform. */
-.clawd.is-dragging .clawd-pet,.clawd.is-dragging .clawd-pet:hover:not(:disabled){cursor:grabbing;transform:translate(var(--pet-x),var(--pet-y)) rotate(-4deg) scale(1.05,.95);transition:none}
+.clawd.is-dragging .clawd-pet,.clawd.is-dragging .clawd-pet:hover:not(:disabled){cursor:grabbing;transform:translate(var(--pet-x),var(--pet-y)) rotate(var(--pet-tilt,-4deg)) scale(1.05,.95);transition:none}
 .clawd.is-landing .clawd-pet,.clawd.is-landing .clawd-pet:hover:not(:disabled){animation:clawd-drop-settle .34s cubic-bezier(.3,.8,.35,1)}
 @keyframes clawd-drop-settle{0%{transform:translate(var(--pet-x),var(--pet-y)) scale(1.06,.9)}45%{transform:translate(var(--pet-x),var(--pet-y)) scale(.97,1.04)}100%{transform:translate(var(--pet-x),var(--pet-y))}}
 /* Shake feedback: a short wobble while held, paired with the stars scene and
    flustered eyes from Clawd.tsx. */
 .clawd.is-dizzy .clawd-pet,.clawd.is-dizzy .clawd-pet:hover:not(:disabled){animation:clawd-dizzy .5s ease-in-out 2}
 @keyframes clawd-dizzy{0%,100%{transform:translate(var(--pet-x),var(--pet-y)) rotate(-4deg) scale(1.05,.95)}25%{transform:translate(calc(var(--pet-x) - 5px),var(--pet-y)) rotate(-11deg) scale(1.05,.95)}55%{transform:translate(calc(var(--pet-x) + 5px),var(--pet-y)) rotate(7deg) scale(1.05,.95)}80%{transform:translate(calc(var(--pet-x) - 3px),var(--pet-y)) rotate(-7deg) scale(1.05,.95)}}
-@media(prefers-reduced-motion:reduce){.clawd.is-dragging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y))}.clawd.is-landing .clawd-pet,.clawd.is-dizzy .clawd-pet{animation:none}}
+/* Double-click twirl: one happy full spin of the sprite itself. */
+.clawd.is-spinning .clawd-scene{animation:clawd-spin .6s cubic-bezier(.3,.7,.3,1)}
+@keyframes clawd-spin{0%{transform:rotate(0) scale(1)}35%{transform:rotate(220deg) scale(1.06)}70%{transform:rotate(340deg) scale(.97)}100%{transform:rotate(360deg) scale(1)}}
+/* While hiding, the exposed feet fidget every so often — a hint of where it went. */
+.clawd-hideout svg{animation:feet-fidget 2.6s ease-in-out infinite}
+@keyframes feet-fidget{0%,72%,100%{transform:translateY(0)}80%{transform:translateY(-2px)}88%{transform:translateY(0)}94%{transform:translateY(-1px)}}
+@media(prefers-reduced-motion:reduce){.clawd.is-dragging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y))}.clawd.is-landing .clawd-pet,.clawd.is-dizzy .clawd-pet,.clawd.is-spinning .clawd-scene,.clawd-hideout svg{animation:none}}
