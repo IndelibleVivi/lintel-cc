@@ -63,18 +63,23 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
   const [flinging, setFlinging] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [landing, setLanding] = useState(false);
-  const drag = useRef<{ x: number; y: number; moved: boolean; lastX: number; lastY: number; lastTime: number; vx: number; vy: number; baseX: number; baseY: number; minX: number; maxX: number; minY: number; maxY: number } | null>(null);
+  const [dizzy, setDizzy] = useState(false);
+  const drag = useRef<{ x: number; y: number; moved: boolean; lastX: number; lastY: number; lastTime: number; vx: number; vy: number; baseX: number; baseY: number; minX: number; maxX: number; minY: number; maxY: number; shakeDir: number; shakes: number; dizzyDone: boolean } | null>(null);
+  // Absolute offset range reachable by a drag, measured at pointer-down; the
+  // post-fling hideout picks a random spot inside it.
+  const reach = useRef<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
   const clicks = useRef({ time: 0, count: 0 });
   const ignoreClick = useRef(false);
   const longPress = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const jumpTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const flightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const landTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => { clearTimeout(longPress.current); clearTimeout(jumpTimer.current); clearTimeout(flightTimer.current); clearTimeout(landTimer.current); }, []);
+  const dizzyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => { clearTimeout(longPress.current); clearTimeout(jumpTimer.current); clearTimeout(flightTimer.current); clearTimeout(landTimer.current); clearTimeout(dizzyTimer.current); }, []);
   const surprise = visit >= 0 ? surprises[visit % surprises.length] : null;
   const scene = chosenScene ?? surprise?.scene ?? scenes[mood];
   function react(next: Scene, key: string) { setChosenScene(next); setNoteKey(key); }
-  function comeBack() { clearTimeout(flightTimer.current); setHiding(false); setFlinging(false); setOffset({ x: 0, y: 0 }); clicks.current.count = 0; react('heart', 'clawd.okPetAgain'); }
+  function comeBack() { clearTimeout(flightTimer.current); setHiding(false); setFlinging(false); clicks.current.count = 0; react('heart', 'clawd.okPetAgain'); }
   function pet() {
     if (ignoreClick.current) { ignoreClick.current = false; return; }
     const now = performance.now();
@@ -102,7 +107,8 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     const self = button.getBoundingClientRect();
     const minX = frame ? frame.left + dragPad.x - self.left : 0, maxX = frame ? frame.right - dragPad.x - self.right : 0;
     const minY = frame ? frame.top + dragPad.top - self.top : 0, maxY = frame ? frame.bottom - dragPad.bottom - self.bottom : 0;
-    drag.current = { x: event.clientX, y: event.clientY, moved: false, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), vx: 0, vy: 0, baseX: offset.x, baseY: offset.y, minX: Math.min(minX, maxX), maxX: Math.max(minX, maxX), minY: Math.min(minY, maxY), maxY: Math.max(minY, maxY) };
+    drag.current = { x: event.clientX, y: event.clientY, moved: false, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), vx: 0, vy: 0, baseX: offset.x, baseY: offset.y, minX: Math.min(minX, maxX), maxX: Math.max(minX, maxX), minY: Math.min(minY, maxY), maxY: Math.max(minY, maxY), shakeDir: 0, shakes: 0, dizzyDone: false };
+    reach.current = { minX: offset.x + Math.min(minX, maxX), maxX: offset.x + Math.max(minX, maxX), minY: offset.y + Math.min(minY, maxY), maxY: offset.y + Math.max(minY, maxY) };
     ignoreClick.current = false; setHeld(true);
     clearTimeout(longPress.current);
     longPress.current = setTimeout(() => { ignoreClick.current = true; react('heart', 'clawd.thanksHug'); }, 520);
@@ -113,7 +119,8 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     const gesture = drag.current;
     if (!gesture) return;
     const now = performance.now(), elapsed = Math.max(1, now - gesture.lastTime);
-    gesture.vx = (event.clientX - gesture.lastX) / elapsed;
+    const stepX = event.clientX - gesture.lastX;
+    gesture.vx = stepX / elapsed;
     gesture.vy = (event.clientY - gesture.lastY) / elapsed;
     gesture.lastX = event.clientX; gesture.lastY = event.clientY; gesture.lastTime = now;
     const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
@@ -122,6 +129,23 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
       setDragging(true); react('heart', 'clawd.pickedUp');
     }
     if (!gesture.moved) return;
+    // Shaking Clawd back and forth (quick horizontal direction flips) dizzies
+    // it once per pick-up: stars scene, wobble animation, dizzy note.
+    if (!gesture.dizzyDone) {
+      const dir = stepX > 2 ? 1 : stepX < -2 ? -1 : 0;
+      if (dir !== 0) {
+        if (gesture.shakeDir !== 0 && dir !== gesture.shakeDir && Math.abs(gesture.vx) > .3) {
+          gesture.shakes += 1;
+          if (gesture.shakes >= 5) {
+            gesture.dizzyDone = true;
+            setDizzy(true); react('stars', 'clawd.dizzy');
+            clearTimeout(dizzyTimer.current);
+            dizzyTimer.current = setTimeout(() => setDizzy(false), 1050);
+          }
+        }
+        gesture.shakeDir = dir;
+      }
+    }
     // Keep the drag from starting a page scroll or a text selection.
     event.preventDefault();
     setOffset({ x: gesture.baseX + clamp(dx, gesture.minX, gesture.maxX), y: gesture.baseY + clamp(dy, gesture.minY, gesture.maxY) });
@@ -135,7 +159,14 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
       ignoreClick.current = true; setHeld(false); setFlinging(true);
       setOffset({ x: gesture.baseX + clamp(gesture.vx * 150, gesture.minX, gesture.maxX), y: gesture.baseY + clamp(gesture.vy * 110, gesture.minY, gesture.maxY) });
       react('fluster', 'clawd.launch');
-      flightTimer.current = setTimeout(() => { setFlinging(false); setHiding(true); setOffset({ x: 0, y: 0 }); react('fluster', 'clawd.landed'); }, 540);
+      // After the launch Clawd hides where it likes: a random reachable corner
+      // of home instead of always scurrying back to its usual spot.
+      flightTimer.current = setTimeout(() => {
+        setFlinging(false); setHiding(true);
+        const r = reach.current;
+        setOffset(r ? { x: r.minX + Math.random() * (r.maxX - r.minX), y: r.minY + Math.random() * (r.maxY - r.minY) } : { x: 0, y: 0 });
+        react('fluster', 'clawd.landed');
+      }, 540);
       return;
     }
     // A plain drag leaves Clawd where it was dropped and settles it upright.
@@ -145,8 +176,8 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
     }
     setHeld(false);
   }
-  const sprite = <svg className="clawd-scene" viewBox="0 0 120 80" shapeRendering="crispEdges" aria-hidden="true"><g transform="translate(20 26)"><Sprite sleeping={scene === 'sleep'} flustered={scene === 'fluster'}/></g><Decorations scene={scene}/></svg>;
-  return <div className={`clawd ${small ? 'clawd-small' : ''} clawd-${mood} scene-${scene} ${held ? 'is-held' : ''} ${dragging ? 'is-dragging' : ''} ${landing ? 'is-landing' : ''} ${jump ? 'is-jumping' : ''} ${hiding ? 'is-hiding' : ''} ${flinging ? 'is-flinging' : ''}`} style={{ '--pet-x': `${offset.x}px`, '--pet-y': `${offset.y}px`, '--look-x': `${look.x}px`, '--look-y': `${look.y}px` } as CSSProperties}>
+  const sprite = <svg className="clawd-scene" viewBox="0 0 120 80" shapeRendering="crispEdges" aria-hidden="true"><g transform="translate(20 26)"><Sprite sleeping={scene === 'sleep'} flustered={scene === 'fluster' || dizzy}/></g><Decorations scene={scene}/></svg>;
+  return <div className={`clawd ${small ? 'clawd-small' : ''} clawd-${mood} scene-${scene} ${held ? 'is-held' : ''} ${dragging ? 'is-dragging' : ''} ${landing ? 'is-landing' : ''} ${dizzy ? 'is-dizzy' : ''} ${jump ? 'is-jumping' : ''} ${hiding ? 'is-hiding' : ''} ${flinging ? 'is-flinging' : ''}`} style={{ '--pet-x': `${offset.x}px`, '--pet-y': `${offset.y}px`, '--look-x': `${look.x}px`, '--look-y': `${look.y}px` } as CSSProperties}>
     {interactive ? <><button className="clawd-pet" aria-label={t('clawd.pet')} aria-describedby="clawd-pet-instructions" disabled={hiding} onPointerDown={start} onPointerMove={move} onPointerUp={() => release()} onPointerCancel={() => release(true)} onLostPointerCapture={() => { if (drag.current) release(true); }} onPointerLeave={() => setLook({ x: 0, y: 0 })} onClick={pet} onKeyDown={event => { if (event.key === 'ArrowUp') { event.preventDefault(); leap(); } if (event.key === 'Escape') { release(true); setChosenScene(null); setNoteKey(''); setVisit(-1); } }} title={t('clawd.petTitle')}>{sprite}</button><span id="clawd-pet-instructions" className="sr-only">{t('clawd.petInstructions')}</span>{hiding && <button className="clawd-hideout" aria-label={t('clawd.hideout')} onClick={comeBack}><svg width="54" height="30" viewBox="0 0 54 30" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M21 17H25V24H21ZM29 17H33V24H29Z"/><path fill="var(--bg)" d="M3 0H50V19H3Z"/><path stroke="var(--line)" d="M2 19H51"/><path fill="currentColor" opacity=".35" d="M0 27H3V29H0ZM9 25H12V27H9Z"/></svg></button>}<ClawdFlightMenu scrollRef={scrollRef} onChoose={onChoose} actions={hiding ? <button onClick={comeBack}>{t('clawd.comeBack')}</button> : <><button onClick={() => react('tea', 'clawd.sip')}>{t('clawd.tea')}</button><button onClick={leap}>{t('clawd.jump')}</button><button onClick={() => react('moon', 'clawd.reachedMoon')}>{t('clawd.moon')}</button><button onClick={() => scene === 'sleep' ? react('flower', 'clawd.goodmorning') : react('sleep', 'clawd.goodnight')}>{t(scene === 'sleep' ? 'clawd.wake' : 'clawd.nap')}</button></>}/></> : sprite}
     {interactive && <span className={`clawd-caption ${surprise || noteKey ? 'revealed' : ''}`} role="status">{noteKey ? t(noteKey) : surprise ? t(surprise.key) : caption || t('clawd.captionDefault')}</span>}
     {!interactive && caption && <span className="clawd-caption revealed">{caption}</span>}

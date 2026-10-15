@@ -11,8 +11,8 @@
 .clawd-pocket{position:absolute;top:calc(100% + 8px);left:50%;width:288px;transform:translateX(-50%);border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--text);padding:12px;box-shadow:0 12px 36px #30241a20;animation:pocket-arrive .16s ease-out}
 .pocket-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px;padding-left:4px}
 .pocket-heading h2{font:12px/1.6 var(--sans);font-weight:600}
-.pocket-pet-actions{display:flex;gap:6px;padding:0 0 12px}
-.pocket-pet-actions button{flex:1;min-height:34px;padding:6px 9px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:transparent;font-weight:400}
+.pocket-pet-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 0 12px}
+.pocket-pet-actions button{min-height:34px;padding:6px 9px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:transparent;font-weight:400}
 .pocket-pet-actions button:hover:not(:disabled){background:var(--soft)}
 .pocket-destinations{border-top:1px solid var(--line);padding-top:7px}
 .pocket-destinations button{display:flex;width:100%;justify-content:flex-start;gap:10px;text-align:left;border:0;background:transparent;padding:7px 9px;border-radius:6px;font-size:12px;font-weight:400;min-height:38px}
@@ -32,8 +32,8 @@
 .scene-fluster .clawd-eyes{animation:none}
 .clawd.is-flinging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y)) rotate(35deg) scale(.6);opacity:.15;transition:transform .52s cubic-bezier(.14,.7,.32,1),opacity .5s}
 .clawd.is-hiding .clawd-pet{visibility:hidden;pointer-events:none}
-.clawd-hideout{position:absolute;bottom:0;right:1px;border:0;background:none;color:var(--accent);padding:3px;min-height:34px;cursor:pointer}
-.clawd-hideout:hover:not(:disabled){background:none;transform:translateY(-2px)}
+.clawd-hideout{position:absolute;bottom:0;right:1px;border:0;background:none;color:var(--accent);padding:3px;min-height:34px;cursor:pointer;transform:translate(var(--pet-x),var(--pet-y))}
+.clawd-hideout:hover:not(:disabled){background:none;transform:translate(var(--pet-x),calc(var(--pet-y) - 2px))}
 .clawd-hideout:focus-visible{outline:0;box-shadow:inset 0 -2px var(--accent);background:var(--accent-bg)}
 .clawd-pet:focus-visible,.clawd-flight button:focus-visible{outline:0;box-shadow:inset 0 -2px var(--accent);background:var(--accent-bg)}
 .clawd .clawd-caption{max-width:210px;white-space:normal;width:max-content;text-align:center}
@@ -54,4 +54,8 @@
 .clawd.is-dragging .clawd-pet,.clawd.is-dragging .clawd-pet:hover:not(:disabled){cursor:grabbing;transform:translate(var(--pet-x),var(--pet-y)) rotate(-4deg) scale(1.05,.95);transition:none}
 .clawd.is-landing .clawd-pet,.clawd.is-landing .clawd-pet:hover:not(:disabled){animation:clawd-drop-settle .34s cubic-bezier(.3,.8,.35,1)}
 @keyframes clawd-drop-settle{0%{transform:translate(var(--pet-x),var(--pet-y)) scale(1.06,.9)}45%{transform:translate(var(--pet-x),var(--pet-y)) scale(.97,1.04)}100%{transform:translate(var(--pet-x),var(--pet-y))}}
-@media(prefers-reduced-motion:reduce){.clawd.is-dragging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y))}.clawd.is-landing .clawd-pet{animation:none}}
+/* Shake feedback: a short wobble while held, paired with the stars scene and
+   flustered eyes from Clawd.tsx. */
+.clawd.is-dizzy .clawd-pet,.clawd.is-dizzy .clawd-pet:hover:not(:disabled){animation:clawd-dizzy .5s ease-in-out 2}
+@keyframes clawd-dizzy{0%,100%{transform:translate(var(--pet-x),var(--pet-y)) rotate(-4deg) scale(1.05,.95)}25%{transform:translate(calc(var(--pet-x) - 5px),var(--pet-y)) rotate(-11deg) scale(1.05,.95)}55%{transform:translate(calc(var(--pet-x) + 5px),var(--pet-y)) rotate(7deg) scale(1.05,.95)}80%{transform:translate(calc(var(--pet-x) - 3px),var(--pet-y)) rotate(-7deg) scale(1.05,.95)}}
+@media(prefers-reduced-motion:reduce){.clawd.is-dragging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y))}.clawd.is-landing .clawd-pet,.clawd.is-dizzy .clawd-pet{animation:none}}
