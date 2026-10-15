@@ -87,11 +87,16 @@ export function composeLandscape(index: number, found: boolean): LandscapeCell[]
   }
   const [x, y] = landscapes[index].clawd;
   // Clear space around the hero: textures must never fill the eyes or feet.
-  fill(x - 1, y - 1, 18, 6, ' ', 'sky');
-  fill(x + 2, y, 12, 4, '█', 'clawd');
+  fill(x - 1, y - 1, 18, 7, ' ', 'sky');
+  // The hero redrawn with its two signature horns: horn tips poke out past the
+  // head corners, full-width shoulder row, body, two pairs of feet.
+  text(x, y, '██            ██', 'clawd');
+  fill(x + 1, y + 1, 14, 1, '█', 'clawd');
   fill(x, y + 2, 16, 1, '█', 'clawd');
+  fill(x + 1, y + 3, 14, 1, '█', 'clawd');
+  fill(x + 2, y + 4, 12, 1, '█', 'clawd');
   point(x + 4, y + 1, '█', 'eye'); point(x + 11, y + 1, '█', 'eye');
-  for (const foot of [3, 5, 10, 12]) fill(x + foot, y + 4, 1, 1, '█', 'clawd');
+  for (const foot of [3, 5, 10, 12]) fill(x + foot, y + 5, 1, 1, '█', 'clawd');
   if (found) { point(x + 7, y - 3, '✦', 'light'); point(x + 15, y - 1, '+', 'light'); }
   return grid.flat();
 }
