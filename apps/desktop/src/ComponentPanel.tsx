@@ -44,7 +44,7 @@ export default function ComponentPanel({send=request,environment,onEntry,onJob}:
         {item.next_action!=='none'&&entryKeys[item.next_action]&&<button className="text-button" onClick={()=>onEntry(item.next_action)}>{t(entryKeys[item.next_action])}<Icon name="arrow" size={14}/></button>}
       </section>)}</div>
       <details className="component-records"><summary>{t('component.recordsSummary',{count:report.records.length})}</summary>
-        {report.records.map(record=><div key={record.id}><strong>{record.title}</strong><p className="small-print">{t('component.recordLine',{status:record.status,time:formatDateTime(record.created_at)})}</p>{record.coverage?.map((fact,i)=><p className="small-print" key={i}>{fact.scope} · {fact.state} · {fact.detail}</p>)}<button onClick={()=>onJob(record.id)}>{t('component.checkOriginalTask',{id:record.id})}</button></div>)}
+        {report.records.map(record=><div key={record.id}><strong>{presentText(record.title)}</strong><p className="small-print">{t('component.recordLine',{status:record.status,time:formatDateTime(record.created_at)})}</p>{record.coverage?.map((fact,i)=><p className="small-print" key={i}>{fact.scope} · {fact.state} · {presentText(fact.detail)}</p>)}<button onClick={()=>onJob(record.id)}>{t('component.checkOriginalTask',{id:record.id})}</button></div>)}
         {!report.records.length&&<p>{t('component.noRecords')}</p>}
         {(!report.records_complete||report.records_truncated)&&<Notice tone="warning">{t('component.recordsPartial')}</Notice>}
       </details>

@@ -42,3 +42,16 @@
 @keyframes pet-leap{0%,100%{transform:translateY(0)}18%{transform:scale(1.07,.87)}55%{transform:translateY(-35px) rotate(-6deg)}82%{transform:scale(1.08,.9)}}
 @media(max-width:760px){.clawd-pocket{width:270px;left:5px;transform:none}.clawd .clawd-caption{max-width:165px}}
 @media(prefers-reduced-motion:reduce){.clawd .clawd-pet,.clawd.is-flinging .clawd-pet,.clawd-pull-trigger>svg{transition:none}.clawd.is-jumping .clawd-scene,.clawd-pocket,.clawd:has(.clawd-flight.is-open)>.clawd-pet .clawd-scene{animation:none}.clawd:has(.clawd-flight.is-pulling)>.clawd-pet .clawd-scene{transform:none;transition:none}.clawd-pet .clawd-eyes{translate:none}}
+
+/* Dragging the home Clawd ------------------------------------------------
+   Picking the companion up follows the pointer within the home content area
+   (bounds are computed in Clawd.tsx), keeps the drop point, and settles it
+   upright. The extra tilt and squash are decoration only: reduced motion keeps
+   the drag itself and drops the flourish. */
+.clawd.is-dragging{z-index:7;touch-action:none;user-select:none;-webkit-user-select:none}
+/* Hover adds a 3px lift; the drag rule must out-specify both `.clawd.is-held`
+   and that hover state so the pointer, not the lift, owns the transform. */
+.clawd.is-dragging .clawd-pet,.clawd.is-dragging .clawd-pet:hover:not(:disabled){cursor:grabbing;transform:translate(var(--pet-x),var(--pet-y)) rotate(-4deg) scale(1.05,.95);transition:none}
+.clawd.is-landing .clawd-pet,.clawd.is-landing .clawd-pet:hover:not(:disabled){animation:clawd-drop-settle .34s cubic-bezier(.3,.8,.35,1)}
+@keyframes clawd-drop-settle{0%{transform:translate(var(--pet-x),var(--pet-y)) scale(1.06,.9)}45%{transform:translate(var(--pet-x),var(--pet-y)) scale(.97,1.04)}100%{transform:translate(var(--pet-x),var(--pet-y))}}
+@media(prefers-reduced-motion:reduce){.clawd.is-dragging .clawd-pet{transform:translate(var(--pet-x),var(--pet-y))}.clawd.is-landing .clawd-pet{animation:none}}

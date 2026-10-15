@@ -136,3 +136,22 @@ test('every projected backend phrase is present in a canonical source, not inven
   const canonical=['crates','apps/desktop/src-tauri/src','contracts'].flatMap(relative=>sourceText(path.join(root,relative))).join('\n');
   for(const phrase of Object.keys(PRESENTATION_KEYS))assert.ok(canonical.includes(phrase),`projection has no canonical source: ${phrase}`);
 });
+
+// Guard the specific regression this suite was extended for: core ships the
+// policy rule labels as canonical Chinese, so every place that renders a
+// backend display label must project it rather than print the raw value.
+// SettingsRows is the "Current configuration" list on Protection plan (and the
+// same rows are reused by DriftCheck), so it must go through present().
+test('backend display labels render through the presentation projection, not raw', () => {
+  const text = file => readFileSync(path.join(srcDir, file), 'utf8');
+  // SettingsRows is authored as a single-line component; scope the check to
+  // that declaration line so neighbouring functions cannot satisfy it.
+  const settingsRows = text('App.tsx').split('\n').find(line => line.startsWith('function SettingsRows'));
+  assert.ok(settingsRows, 'SettingsRows must exist in App.tsx');
+  assert.ok(/present\(setting\.label,\s*locale\)/.test(settingsRows),
+    'SettingsRows must project the backend setting label through present(setting.label, locale)');
+  // A bare {setting.label} render is exactly the bug: the theme labels came
+  // through untranslated in an English UI.
+  assert.ok(!/\{setting\.label\}/.test(settingsRows),
+    'SettingsRows must not render the raw backend setting.label');
+});

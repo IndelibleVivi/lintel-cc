@@ -18,6 +18,11 @@ const surprises: { scene: Scene; key: string }[] = [
   { scene: 'snack', key: 'clawd.surprise.snack' },
 ];
 const scenes: Record<ClawdMood, Scene> = { hello: 'idle', plan: 'book', pack: 'book', rest: 'sleep', done: 'stars', care: 'heart', work: 'tea' };
+// Movement past this many pixels counts as a drag instead of a tap.
+const dragThreshold = 6;
+// Room kept between Clawd and the home edges; the top clears its caption bubble.
+const dragPad = { x: 12, top: 54, bottom: 14 };
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 // Hand-drawn from the Clawd silhouette and its terminal appearance.
 // Fixed geometry avoids block-character font fallback changing the eyes or feet.
@@ -56,13 +61,16 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
   const [jump, setJump] = useState(false);
   const [hiding, setHiding] = useState(false);
   const [flinging, setFlinging] = useState(false);
-  const drag = useRef<{ x: number; y: number; moved: boolean; lastX: number; lastY: number; lastTime: number; vx: number; vy: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [landing, setLanding] = useState(false);
+  const drag = useRef<{ x: number; y: number; moved: boolean; lastX: number; lastY: number; lastTime: number; vx: number; vy: number; baseX: number; baseY: number; minX: number; maxX: number; minY: number; maxY: number } | null>(null);
   const clicks = useRef({ time: 0, count: 0 });
   const ignoreClick = useRef(false);
   const longPress = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const jumpTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const flightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => { clearTimeout(longPress.current); clearTimeout(jumpTimer.current); clearTimeout(flightTimer.current); }, []);
+  const landTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => { clearTimeout(longPress.current); clearTimeout(jumpTimer.current); clearTimeout(flightTimer.current); clearTimeout(landTimer.current); }, []);
   const surprise = visit >= 0 ? surprises[visit % surprises.length] : null;
   const scene = chosenScene ?? surprise?.scene ?? scenes[mood];
   function react(next: Scene, key: string) { setChosenScene(next); setNoteKey(key); }
@@ -82,42 +90,63 @@ export default function Clawd({ mood = 'hello', small = false, interactive = fal
   }
   function start(event: PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    clearTimeout(flightTimer.current); setFlinging(false);
-    drag.current = { x: event.clientX, y: event.clientY, moved: false, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), vx: 0, vy: 0 }; ignoreClick.current = false; setHeld(true);
+    const button = event.currentTarget;
+    button.setPointerCapture(event.pointerId);
+    clearTimeout(flightTimer.current); clearTimeout(landTimer.current);
+    setFlinging(false); setLanding(false);
+    // Freeze the reachable drag delta from the live home scroller so Clawd can
+    // never leave the main content area or hide behind the top edge. The delta
+    // bounds are measured against the button rect at pointer-down (which
+    // already includes the current offset).
+    const frame = (scrollRef?.current ?? button.closest('.main-content'))?.getBoundingClientRect();
+    const self = button.getBoundingClientRect();
+    const minX = frame ? frame.left + dragPad.x - self.left : 0, maxX = frame ? frame.right - dragPad.x - self.right : 0;
+    const minY = frame ? frame.top + dragPad.top - self.top : 0, maxY = frame ? frame.bottom - dragPad.bottom - self.bottom : 0;
+    drag.current = { x: event.clientX, y: event.clientY, moved: false, lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), vx: 0, vy: 0, baseX: offset.x, baseY: offset.y, minX: Math.min(minX, maxX), maxX: Math.max(minX, maxX), minY: Math.min(minY, maxY), maxY: Math.max(minY, maxY) };
+    ignoreClick.current = false; setHeld(true);
     clearTimeout(longPress.current);
     longPress.current = setTimeout(() => { ignoreClick.current = true; react('heart', 'clawd.thanksHug'); }, 520);
   }
   function move(event: PointerEvent<HTMLButtonElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     setLook({ x: Math.max(-2, Math.min(2, (event.clientX - bounds.x - bounds.width / 2) / 16)), y: Math.max(-1, Math.min(1, (event.clientY - bounds.y - bounds.height / 2) / 20)) });
-    if (!drag.current) return;
-    const now = performance.now(), elapsed = Math.max(1, now - drag.current.lastTime);
-    drag.current.vx = (event.clientX - drag.current.lastX) / elapsed;
-    drag.current.vy = (event.clientY - drag.current.lastY) / elapsed;
-    drag.current.lastX = event.clientX; drag.current.lastY = event.clientY; drag.current.lastTime = now;
-    const x = event.clientX - drag.current.x, y = event.clientY - drag.current.y;
-    if (Math.hypot(x, y) > 5) {
-      drag.current.moved = true; clearTimeout(longPress.current);
-      setOffset({ x: Math.max(-60, Math.min(80, x)), y: Math.max(-65, Math.min(45, y)) });
-      react('heart', 'clawd.pickedUp');
+    const gesture = drag.current;
+    if (!gesture) return;
+    const now = performance.now(), elapsed = Math.max(1, now - gesture.lastTime);
+    gesture.vx = (event.clientX - gesture.lastX) / elapsed;
+    gesture.vy = (event.clientY - gesture.lastY) / elapsed;
+    gesture.lastX = event.clientX; gesture.lastY = event.clientY; gesture.lastTime = now;
+    const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+    if (!gesture.moved && Math.hypot(dx, dy) > dragThreshold) {
+      gesture.moved = true; clearTimeout(longPress.current);
+      setDragging(true); react('heart', 'clawd.pickedUp');
     }
+    if (!gesture.moved) return;
+    // Keep the drag from starting a page scroll or a text selection.
+    event.preventDefault();
+    setOffset({ x: gesture.baseX + clamp(dx, gesture.minX, gesture.maxX), y: gesture.baseY + clamp(dy, gesture.minY, gesture.maxY) });
   }
   function release(cancelled = false) {
     clearTimeout(longPress.current);
     const gesture = drag.current;
-    if (!cancelled && gesture?.moved && performance.now() - gesture.lastTime < 120 && Math.hypot(gesture.vx, gesture.vy) > .65) {
-      ignoreClick.current = true; drag.current = null; setHeld(false); setFlinging(true);
-      setOffset({ x: Math.max(-125, Math.min(145, gesture.vx * 150)), y: Math.max(-95, Math.min(65, gesture.vy * 110)) });
+    drag.current = null; setDragging(false);
+    if (!gesture) { setHeld(false); return; }
+    if (!cancelled && gesture.moved && performance.now() - gesture.lastTime < 120 && Math.hypot(gesture.vx, gesture.vy) > .65) {
+      ignoreClick.current = true; setHeld(false); setFlinging(true);
+      setOffset({ x: gesture.baseX + clamp(gesture.vx * 150, gesture.minX, gesture.maxX), y: gesture.baseY + clamp(gesture.vy * 110, gesture.minY, gesture.maxY) });
       react('fluster', 'clawd.launch');
       flightTimer.current = setTimeout(() => { setFlinging(false); setHiding(true); setOffset({ x: 0, y: 0 }); react('fluster', 'clawd.landed'); }, 540);
       return;
     }
-    if (drag.current?.moved) { ignoreClick.current = true; if (!cancelled) react('flower', 'clawd.stableLand'); }
-    drag.current = null; setHeld(false); setOffset({ x: 0, y: 0 });
+    // A plain drag leaves Clawd where it was dropped and settles it upright.
+    if (gesture.moved) {
+      ignoreClick.current = true;
+      if (!cancelled) { react('flower', 'clawd.stableLand'); setLanding(true); landTimer.current = setTimeout(() => setLanding(false), 340); }
+    }
+    setHeld(false);
   }
   const sprite = <svg className="clawd-scene" viewBox="0 0 120 80" shapeRendering="crispEdges" aria-hidden="true"><g transform="translate(20 26)"><Sprite sleeping={scene === 'sleep'} flustered={scene === 'fluster'}/></g><Decorations scene={scene}/></svg>;
-  return <div className={`clawd ${small ? 'clawd-small' : ''} clawd-${mood} scene-${scene} ${held ? 'is-held' : ''} ${jump ? 'is-jumping' : ''} ${hiding ? 'is-hiding' : ''} ${flinging ? 'is-flinging' : ''}`} style={{ '--pet-x': `${offset.x}px`, '--pet-y': `${offset.y}px`, '--look-x': `${look.x}px`, '--look-y': `${look.y}px` } as CSSProperties}>
+  return <div className={`clawd ${small ? 'clawd-small' : ''} clawd-${mood} scene-${scene} ${held ? 'is-held' : ''} ${dragging ? 'is-dragging' : ''} ${landing ? 'is-landing' : ''} ${jump ? 'is-jumping' : ''} ${hiding ? 'is-hiding' : ''} ${flinging ? 'is-flinging' : ''}`} style={{ '--pet-x': `${offset.x}px`, '--pet-y': `${offset.y}px`, '--look-x': `${look.x}px`, '--look-y': `${look.y}px` } as CSSProperties}>
     {interactive ? <><button className="clawd-pet" aria-label={t('clawd.pet')} aria-describedby="clawd-pet-instructions" disabled={hiding} onPointerDown={start} onPointerMove={move} onPointerUp={() => release()} onPointerCancel={() => release(true)} onLostPointerCapture={() => { if (drag.current) release(true); }} onPointerLeave={() => setLook({ x: 0, y: 0 })} onClick={pet} onKeyDown={event => { if (event.key === 'ArrowUp') { event.preventDefault(); leap(); } if (event.key === 'Escape') { release(true); setChosenScene(null); setNoteKey(''); setVisit(-1); } }} title={t('clawd.petTitle')}>{sprite}</button><span id="clawd-pet-instructions" className="sr-only">{t('clawd.petInstructions')}</span>{hiding && <button className="clawd-hideout" aria-label={t('clawd.hideout')} onClick={comeBack}><svg width="54" height="30" viewBox="0 0 54 30" shapeRendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M21 17H25V24H21ZM29 17H33V24H29Z"/><path fill="var(--bg)" d="M3 0H50V19H3Z"/><path stroke="var(--line)" d="M2 19H51"/><path fill="currentColor" opacity=".35" d="M0 27H3V29H0ZM9 25H12V27H9Z"/></svg></button>}<ClawdFlightMenu scrollRef={scrollRef} onChoose={onChoose} actions={hiding ? <button onClick={comeBack}>{t('clawd.comeBack')}</button> : <><button onClick={() => react('tea', 'clawd.sip')}>{t('clawd.tea')}</button><button onClick={leap}>{t('clawd.jump')}</button><button onClick={() => react('moon', 'clawd.reachedMoon')}>{t('clawd.moon')}</button><button onClick={() => scene === 'sleep' ? react('flower', 'clawd.goodmorning') : react('sleep', 'clawd.goodnight')}>{t(scene === 'sleep' ? 'clawd.wake' : 'clawd.nap')}</button></>}/></> : sprite}
     {interactive && <span className={`clawd-caption ${surprise || noteKey ? 'revealed' : ''}`} role="status">{noteKey ? t(noteKey) : surprise ? t(surprise.key) : caption || t('clawd.captionDefault')}</span>}
     {!interactive && caption && <span className="clawd-caption revealed">{caption}</span>}
