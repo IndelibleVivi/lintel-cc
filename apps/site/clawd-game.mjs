@@ -350,7 +350,11 @@ const COPY = {
 };
 function resolveCopy(language) { return Object.hasOwn(COPY, language) ? COPY[language] : COPY['zh-CN']; }
 
-export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', language = 'zh-CN' } = {}) {
+// The optional App setting can only add reduced motion; the original system
+// preference always wins, so the default website mount is unchanged.
+export function effectiveReducedMotion(explicit, system) { return explicit === true || system === true; }
+
+export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', language = 'zh-CN', reducedMotion = false } = {}) {
   root.className = 'clawd-game';
   let copy = resolveCopy(language);
   root.innerHTML = `<div class="cg-topline"><span class="cg-topline-label">${copy.topline}</span><div><span class="cg-stars-label">✦ <b class="cg-stars">0</b></span><span><span class="cg-run-label">${copy.thisRun}</span> <b class="cg-score">00000</b></span><span><span class="cg-best-label">${copy.best}</span> <b class="cg-best">00000</b></span></div></div><div class="cg-board" tabindex="0" role="group" aria-label="${copy.boardAria}" aria-describedby="cg-instructions"><canvas aria-label="${copy.canvasAria}"></canvas><div class="cg-overlay"><p class="cg-message">${copy.emptyMessage}</p><p class="cg-submessage">${copy.emptySub}</p><button class="cg-start">${copy.emptyStart}</button></div><span class="cg-collect" aria-hidden="true"></span><label class="cg-hold"><span class="cg-hold-label">${copy.holdLabel}</span><progress max="100" value="0" aria-label="${copy.holdLabel}"></progress></label></div><div class="cg-controls"><div><button class="cg-jump"><span class="cg-jump-label">${copy.jumpLabel}</span> <span aria-hidden="true">↑</span></button><button class="cg-pause" disabled>${copy.pause}</button></div><p class="cg-status" role="status">${copy.emptyStatus}</p><span class="cg-keys" aria-hidden="true">${copy.keys}</span></div><p id="cg-instructions" class="cg-instructions"><span class="cg-instructions-text">${copy.instructions}</span><span class="cg-storage">${copy.storage}</span></p>`;
@@ -360,14 +364,16 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   const startButton = $('.cg-start'), pauseButton = $('.cg-pause'), status = $('.cg-status');
   // Initialise the visible width before accepting the first key. The observer's
   // first delivery is measurement, not a resize that should pause a new run.
-  let run = newRun(), best = 0, frame = 0, last = 0, width = Math.round(board.clientWidth) || 800, input = null;
+  let run = newRun(), best = 0, frame = 0, last = 0, width = Math.round(board.clientWidth) || 800, input = null, disposed = false;
   let currentLanguage = Object.hasOwn(COPY, language) ? language : 'zh-CN';
   let storageBroken = false;
   const key = scoreKey;
   const controller = new AbortController();
   const listen = (target, event, listener) => target.addEventListener(event, listener, { signal: controller.signal });
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const systemReduced = matchMedia('(prefers-reduced-motion: reduce)');
   const darkScheme = matchMedia('(prefers-color-scheme: dark)');
+  let explicitReducedMotion = reducedMotion === true;
+  const effectiveReduced = () => effectiveReducedMotion(explicitReducedMotion, systemReduced.matches);
   let palette;
   function setPalette() {
     const style = getComputedStyle(root); const value = name => style.getPropertyValue(name).trim();
@@ -432,24 +438,25 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
     ctx.fillRect(Math.round(x - size * 1.5), Math.round(y - size / 2), size * 3, size);
   }
   function draw() {
-    if (!palette) return;
+    if (!palette || disposed) return;
     const p = palette;
+    const reducedNow = effectiveReduced();
     // The original theme ink and stepped landscape remain the same through each place.
-    drawScenery(ctx, width, run, p, reduced.matches);
+    drawScenery(ctx, width, run, p, reducedNow);
     ctx.fillStyle = p.line; ctx.fillRect(0, GROUND, width, 1);
     for (const obstacle of run.obstacles) drawObstacle(ctx, obstacle, p);
     for (const star of run.stars) {
-      const bob = reduced.matches ? 0 : Math.sin(run.elapsed * 4 + star.x / 60) * 2;
+      const bob = reducedNow ? 0 : Math.sin(run.elapsed * 4 + star.x / 60) * 2;
       pixelStar(star.x, star.y + bob, star.value === 50 ? 6 : 4, p.night ? '#dec488' : '#9b762f');
       ctx.fillStyle = p.bg; ctx.fillRect(Math.round(star.x-1),Math.round(star.y+bob-1),2,2);
     }
-    if (!reduced.matches) for (const particle of run.particles) {
+    if (!reducedNow) for (const particle of run.particles) {
       ctx.globalAlpha = Math.min(1, particle.life * 3);
       ctx.fillStyle = particle.kind === 'star' ? (p.night ? '#dec488' : '#9b762f') : p.muted;
       ctx.fillRect(Math.round(particle.x),Math.round(particle.y),particle.kind === 'star' ? 3 : 2,2);
     }
     ctx.globalAlpha = 1;
-    const pose = clawdPose(run, reduced.matches);
+    const pose = clawdPose(run, reducedNow);
     // One connected silhouette: the body path already ends in four short legs, so there are no
     // separately drawn feet. Scaling around the feet keeps ordinary running anchored on GROUND.
     ctx.save(); ctx.translate(PLAYER_X+32,GROUND-run.y-pose.anchor);ctx.scale(.8*pose.scaleX,.8*pose.scaleY);ctx.translate(-40,-50);
@@ -536,10 +543,11 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   resize.observe(board);
   const themeChanges = new MutationObserver(setPalette);
   themeChanges.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-  listen(reduced,'change',draw);
+  listen(systemReduced,'change',draw);
   listen(darkScheme,'change',setPalette);
   sync();setPalette();
   const dispose = () => {
+    disposed = true;
     clearInput();cancelAnimationFrame(frame);
     controller.abort(); visibility.disconnect(); resize.disconnect(); themeChanges.disconnect();
     if (run.distance > 0) saveBest();
@@ -550,5 +558,10 @@ export function mountClawdGame(root, { scoreKey = 'lintel.site.clawd.best', lang
   // needs a live language switch); both keep a single mount implementation.
   dispose.setLanguage = applyLanguage;
   dispose.language = () => currentLanguage;
+  dispose.setReducedMotion = next => {
+    if (disposed) return;
+    explicitReducedMotion = next === true;
+    draw();
+  };
   return dispose;
 }

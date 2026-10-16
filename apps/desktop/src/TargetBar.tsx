@@ -34,6 +34,9 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
     return <div className="target-detail-path"><code>{value}</code><button className="icon-button" aria-label={t('label.copyFullPath')} onClick={() => void onCopy(value)}><Icon name="copy" size={14}/></button></div>;
   }
   return <div className="target-chrome"><header className="target-bar">
+    <button ref={trigger} className="target-details-toggle" aria-label={t('app.targetDetails')} title={t('app.targetDetails')} aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen(value => !value)}>
+      <svg className="target-terminal-mark" width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4.5 4.75 5 4.25-5 4.25"/><path className="target-cursor" d="M13 13.25h5"/></svg>
+    </button>
     <div className="target-context"><div className="target-line">
       <button className="host-switch" disabled={busy} onClick={onRemote} title={host}>{hostAlias ?? t('app.localLabel')}<Icon name="chevron" size={11}/></button>
       <span className="slash" aria-hidden="true">/</span>
@@ -45,10 +48,6 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
     {children}
     <button className="icon-button refresh-button" aria-label={t('app.recheckEnv')} disabled={busy || loading} onClick={onRefresh}><Icon name="refresh" size={16}/></button>
   </header>
-      <div className="target-details-container">
-        <button ref={trigger} className="target-details-toggle" aria-label={t('app.targetDetails')} title={t('app.targetDetails')} aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen(value => !value)}>
-          <svg className="target-terminal-mark" width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4.5 4.75 5 4.25-5 4.25"/><path className="target-cursor" d="M13 13.25h5"/></svg>
-        </button>
         {open && <section id={detailsId} className="target-details-panel" role="region" aria-label={t('app.targetDetails')}>
           <div className="target-details-heading"><strong>{t('app.currentTarget')}</strong><button className="icon-button" aria-label={t('app.close')} onClick={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}><Icon name="close" size={15}/></button></div>
           <dl><div><dt>{t('app.targetHost')}</dt><dd>{host}</dd></div>
@@ -59,6 +58,5 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
           </dl>
           <p className="target-runtime"><span className="status-dot"/>{t(hostAlias ? 'app.remoteWorkspace' : transport === 'native' ? 'app.localRunner' : transport === 'synthetic' ? 'app.syntheticRunner' : 'app.desktopUnavailable')}</p>
         </section>}
-      </div>
   </div>;
 }

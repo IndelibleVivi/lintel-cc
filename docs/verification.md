@@ -33,9 +33,11 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 这三个检查均不进入隐式默认组；`journey-client-control` 在 core/full 的 native CI 组，`recipe-test` 在 frontend 组，`client-control-ui` 在 browser 组，通过同一 canonical entrypoint 调用。它们不验证真实 Claude 的 exporter 行为、身份重新生成、个人账号、生产 SSH、安装或正式发行。规格见[客户端控制增强](specs/client-control.md)。
 
-顶栏与卡片收尾沿用这组检查：`client-control-ui` 在两种窗口尺寸／两套主题下核对单行页眉、顶栏下方的独立橙色终端入口、准确路径向下展开且不遮挡正文、清理文件完整路径、启动记录及逐条配方截图；`i18n-ui` 验默认收起、显式／Escape 关闭、modal 优先与焦点返回、外部点击保留布局、无额外 core 调用与 reduced-motion 静态光标。截图留在本地临时 fixture，不能单靠自动断言判定审美接受。
+顶栏与卡片收尾沿用这组检查：`client-control-ui` 在两种窗口尺寸／两套主题下核对单行页眉、主机选择器左侧的橙色终端入口、准确路径向下展开且不遮挡正文、清理文件完整路径、启动记录及逐条配方截图；`i18n-ui` 验默认收起、显式／Escape 关闭、modal 优先与焦点返回、外部点击保留布局、无额外 core 调用与 reduced-motion 静态光标。截图留在本地临时 fixture，不能单靠自动断言判定审美接受。
 
 合成操作包含三次独立加密备份。该项 CLI／UI 子进程给出有限 120 秒执行预算，其他命令维持原预算；UI 等待实际 core 回复，再检查原计划、回执与字节结果，不把固定 12 秒内弹窗出现当作 core 已完成。失败报告只增加命令名、是否成功和错误代码，保留原敏感值断言；没有更改生产加密或执行时限。
+
+`i18n-ui` 还核对三个独立动态偏好的默认值、分别切换、重开持久化、系统减少动态优先及零 core 调用。`clawd-app-ui` 在关闭界面动画后实际开始游戏，核对装饰背景像素静止、计分／跳跃／暂停／语言切换仍可用，保留单 RAF 与离开后清理。共享 runner 的 `site-game-test` 验显式减少动态只能叠加系统限制；网站不传 App 偏好，保留原默认。
 
 ## 独立试用接续
 

@@ -4,8 +4,12 @@ import App from './App';
 import { homeGreeting } from './homeGreetings';
 import { LanguageProvider, resolveInitialLanguage } from './i18n-provider';
 import { resolveLocale } from './i18n';
+import { applyMotionPreferences, readMotionPreferences } from './motion';
 import './styles.css';
 import './fonts';
+
+// Apply a saved quiet preference before the first App paint.
+applyMotionPreferences(readMotionPreferences());
 
 let greetingStorage: Storage | undefined;
 try { greetingStorage = window.localStorage; } catch { /* Optional persistence. */ }

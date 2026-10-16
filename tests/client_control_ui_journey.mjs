@@ -415,10 +415,11 @@ try{
   const rect=await targetPanel.boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width,'target details fit the workspace');
   const inlineDetails=await targetPanel.evaluate(panel=>{
    const header=document.querySelector('.target-bar').getBoundingClientRect(),trigger=document.querySelector('.target-details-toggle').getBoundingClientRect();
+   const host=document.querySelector('.host-switch').getBoundingClientRect();
    const box=panel.getBoundingClientRect(),main=document.querySelector('main').getBoundingClientRect();
-   return trigger.top>=header.bottom&&box.top>=trigger.bottom&&main.top>=box.bottom&&getComputedStyle(panel).position==='static';
+   return trigger.right<=host.left&&trigger.top>=header.top&&trigger.bottom<=header.bottom&&box.top>=header.bottom&&main.top>=box.bottom&&getComputedStyle(panel).position==='static';
   });
-  assert.ok(inlineDetails,'terminal trigger is below the toolbar; details expand downward in normal flow without covering the workspace');
+  assert.ok(inlineDetails,'terminal prompt precedes the host; details expand below the toolbar in normal flow without covering the workspace');
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('.target-cursor')).opacity==='1');
   await page.screenshot({path:path.join(fixture,`polish-target-${width}-${theme}.png`)});
   await page.keyboard.press('Escape');

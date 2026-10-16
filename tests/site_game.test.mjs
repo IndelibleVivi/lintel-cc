@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newRun, jump, pressJump, releaseJump, cancelJump, holdPower, advance, clawdPose, spawnStar, points, BODY, clawdBody, OBSTACLE_KINDS, OBSTACLE_BOUNDS, spawnObstacle, spawnInterval, isHard, PLACE_LENGTH, PLACES, scene, drawScenery } from '../apps/site/clawd-game.mjs';
+import { newRun, jump, pressJump, releaseJump, cancelJump, holdPower, advance, clawdPose, spawnStar, points, BODY, clawdBody, OBSTACLE_KINDS, OBSTACLE_BOUNDS, spawnObstacle, spawnInterval, isHard, PLACE_LENGTH, PLACES, scene, drawScenery, effectiveReducedMotion } from '../apps/site/clawd-game.mjs';
 
 // Current speed tuning used by independent reachability checks.
 const PX = 48, GROUND = 188, HEIGHT = 40, HIT_Y = 24;
@@ -254,6 +254,15 @@ test('short straight legs alternate while the chest stays level across frame rat
     assert.ok(lifts >= 3 && lifts <= 8, `the ${fps}fps ${speed}px/s gait has a calm cadence (${lifts} steps)`);
   }
   assert.equal(clawdBody(clawdPose(newRun()).legs), BODY, 'standing and film keep the canonical silhouette');
+});
+
+test('the optional reduced-motion setting can only add to the system preference', () => {
+  assert.equal(effectiveReducedMotion(false, false), false, 'default website mount keeps decorative motion');
+  assert.equal(effectiveReducedMotion(true, false), true, 'an explicit App setting turns decoration off');
+  assert.equal(effectiveReducedMotion(false, true), true, 'the system preference cannot be overridden');
+  assert.equal(effectiveReducedMotion(true, true), true, 'both sources together stay reduced');
+  // The website default and the App option both flow through the same mount.
+  assert.equal(effectiveReducedMotion(undefined, true), true, 'a missing option still honors the system preference');
 });
 
 test('ordinary grounded running arms no landing squash; only a real landing settles, and it is finite', () => {

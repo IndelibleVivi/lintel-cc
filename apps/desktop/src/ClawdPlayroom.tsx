@@ -36,7 +36,7 @@ function LandscapeAlbum() {
   </div>;
 }
 
-function Runner() {
+function Runner({ reducedMotion }: { reducedMotion: boolean }) {
   const { locale } = useI18n();
   const root = useRef<HTMLDivElement>(null);
   // The shared runner is mounted once; a language change relabels it live
@@ -44,20 +44,21 @@ function Runner() {
   const game = useRef<ReturnType<typeof mountClawdGame> | null>(null);
   useEffect(() => {
     if (!root.current) return;
-    const dispose = mountClawdGame(root.current, { scoreKey: 'lintel.clawd.runner.best', language: locale });
+    const dispose = mountClawdGame(root.current, { scoreKey: 'lintel.clawd.runner.best', language: locale, reducedMotion });
     game.current = dispose;
     return () => { game.current = null; dispose(); };
   }, []);
   useEffect(() => { game.current?.setLanguage?.(locale); }, [locale]);
+  useEffect(() => { game.current?.setReducedMotion?.(reducedMotion); }, [reducedMotion]);
   return <div ref={root}/>;
 }
 
-export default function ClawdPlayroom({ initialTab = 'landscapes' }: { initialTab?: Tab }) {
+export default function ClawdPlayroom({ initialTab = 'landscapes', reducedMotion = false }: { initialTab?: Tab; reducedMotion?: boolean }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>(initialTab);
   return <section className="clawd-playroom" aria-label={t('playroom.aria')}>
     <div className="cp-intro"><p>{t('playroom.intro')}</p><div className="cp-tabs" role="tablist" aria-label={t('playroom.tabsAria')} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 'landscapes' : event.key === 'End' ? 'runner' : tab === 'landscapes' ? 'runner' : 'landscapes'; setTab(next); event.currentTarget.querySelector<HTMLButtonElement>(`#cp-${next}-tab`)?.focus(); } }}><button role="tab" id="cp-landscapes-tab" tabIndex={tab === 'landscapes' ? 0 : -1} aria-selected={tab === 'landscapes'} aria-controls="cp-landscapes-panel" onClick={() => setTab('landscapes')}>{t('playroom.tabLandscapes')}</button><button role="tab" id="cp-runner-tab" tabIndex={tab === 'runner' ? 0 : -1} aria-selected={tab === 'runner'} aria-controls="cp-runner-panel" onClick={() => setTab('runner')}>{t('playroom.tabRunner')}</button></div></div>
     <div role="tabpanel" id="cp-landscapes-panel" aria-labelledby="cp-landscapes-tab" hidden={tab !== 'landscapes'}><LandscapeAlbum /></div>
-    {tab === 'runner' && <div role="tabpanel" id="cp-runner-panel" aria-labelledby="cp-runner-tab"><Runner /></div>}
+    {tab === 'runner' && <div role="tabpanel" id="cp-runner-panel" aria-labelledby="cp-runner-tab"><Runner reducedMotion={reducedMotion}/></div>}
   </section>;
 }

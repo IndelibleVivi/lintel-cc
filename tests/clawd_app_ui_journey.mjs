@@ -43,11 +43,19 @@ try{
   await page.goto(url);
   async function openGame(){await page.getByRole('button',{name:'陪它玩，打开 Clawd 的口袋',exact:true}).click();await page.getByRole('button',{name:'Clawd 跳一跳',exact:true}).click();await page.getByRole('group',{name:'Clawd 跳跃跑道'}).waitFor();}
   await page.locator('.language-switch select').selectOption('system');
+  await page.getByRole('button',{name:/本地工作空间/}).click();
+  const motionSettings=page.getByRole('dialog');
+  await motionSettings.getByRole('checkbox',{name:'界面动画',exact:true}).uncheck();
+  await motionSettings.getByRole('checkbox',{name:'Logo 光标慢闪',exact:true}).uncheck();
+  await page.keyboard.press('Escape');
   await openGame();
   const dialog=page.getByRole('dialog'),game=dialog.locator('.clawd-game');
   assert.equal(await game.count(),1);assert.equal(await game.locator('.cg-best').textContent(),'00123');
   await dialog.screenshot({path:path.join(output,'app-day.png')});
+  await game.locator('canvas').evaluate(canvas=>{window.__quietScenery=canvas.getContext('2d').getImageData(0,0,canvas.width,50).data;});
   await dialog.locator('.cg-jump').click();await page.waitForFunction(()=>Number(document.querySelector('.cg-score').textContent)>0);
+  await page.waitForFunction(()=>Number(document.querySelector('.cg-score').textContent)>15);
+  assert.ok(await game.locator('canvas').evaluate(canvas=>canvas.getContext('2d').getImageData(0,0,canvas.width,50).data.every((value,index)=>value===window.__quietScenery[index])),'quiet mode keeps decorative scenery still while the game continues');
   assert.equal(await game.getAttribute('data-state'),'running');
   assert.equal(await page.evaluate(()=>window.pendingAnimationFrames()),1);
   await page.keyboard.press('p');

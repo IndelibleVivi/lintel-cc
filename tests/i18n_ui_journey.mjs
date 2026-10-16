@@ -66,6 +66,8 @@ try{
   report.checks.push('first paint follows native en-US preference; html lang=en; menu push recorded');
   // The quiet toolbar keeps identity visible and reveals exact paths only on demand.
   const targetToggle=page.getByRole('button',{name:'Show target details',exact:true});
+  assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'none','the terminal cursor is still by default');
+  assert.equal(await page.locator('.brand-cursor').evaluate(node=>getComputedStyle(node).animationName),'brand-blink','the existing logo keeps its own default');
   assert.equal(await page.locator('.target-details-panel').count(),0);
   const beforeTargetCalls=coreCalls.length;
   await targetToggle.click();
@@ -88,12 +90,12 @@ try{
   assert.equal(await page.locator('.target-details-panel').count(),1,'Escape belongs to an open modal before the inline disclosure');
   await targetToggle.focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.locator('.target-details-panel').count(),0,'the lower-row trigger collapses its details');
+  assert.equal(await page.locator('.target-details-panel').count(),0,'the prompt trigger collapses its details');
   assert.equal(coreCalls.length,beforeTargetCalls,'target disclosure is local UI only');
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'none');
   await page.emulateMedia({reducedMotion:'no-preference'});
-  report.checks.push('one-line toolbar with separate lower-row terminal trigger: inline exact paths, explicit/Escape collapse and focus return, no core request, reduced-motion cursor static');
+  report.checks.push('one-line toolbar with orange prompt before the host: inline exact paths below, explicit/Escape collapse and focus return, no core request, default terminal cursor still');
   // (2) Manual override to zh-CN: instant rerender, menu push, no core side effects; greeting identity stable.
   const titleBefore=await page.locator('.home-title').innerText();
   const coreBefore=coreCalls.length;
@@ -226,6 +228,33 @@ try{
   assert.equal(await settings.locator('.language-switch select').count()>=1,true);
   assert.equal(await settings.locator('.language-switch select').inputValue(),'system');
   assert.equal(await settings.locator('.language-switch select option:checked').innerText(),'Follow system','settings retains the full selected preference mode');
+  const animationSwitch=settings.getByRole('checkbox',{name:'Interface animation',exact:true});
+  const logoSwitch=settings.getByRole('checkbox',{name:'Logo cursor blink',exact:true});
+  const terminalSwitch=settings.getByRole('checkbox',{name:'Terminal cursor blink',exact:true});
+  assert.equal(await animationSwitch.isChecked(),true);
+  assert.equal(await logoSwitch.isChecked(),true);
+  assert.equal(await terminalSwitch.isChecked(),false);
+  const beforeMotionCalls=coreCalls.length;
+  await terminalSwitch.check();
+  await logoSwitch.uncheck();
+  assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'brand-blink');
+  assert.equal(await page.locator('.brand-cursor').evaluate(node=>getComputedStyle(node).animationName),'none');
+  await animationSwitch.uncheck();
+  assert.equal(await settings.evaluate(node=>getComputedStyle(node).animationName),'none','interface transitions stop independently');
+  assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'brand-blink','turning off interface effects retains an independently enabled cursor');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'none','system reduction overrides enabled blink');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  assert.equal(coreCalls.length,beforeMotionCalls,'motion preferences issue no core operation');
+  await page.reload();await page.locator('.home-title').waitFor();
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('lintel.motion'))),{animations:false,logoBlink:false,terminalBlink:true});
+  assert.equal(await page.locator('html').getAttribute('data-motion'),'off','quiet choice applies after reload');
+  await page.getByRole('button',{name:/Local workspace/}).click();
+  await settings.getByRole('heading',{name:'Settings & modules',exact:true}).waitFor();
+  assert.equal(await animationSwitch.isChecked(),false);assert.equal(await logoSwitch.isChecked(),false);assert.equal(await terminalSwitch.isChecked(),true);
+  await page.screenshot({path:path.join(output,'motion-settings.png')});
+  await animationSwitch.check();await logoSwitch.check();await terminalSwitch.uncheck();
+  report.checks.push('three independent local motion preferences persist across reload; interface effects and both cursors remain separate; system reduced motion wins; no core call');
   await page.keyboard.press('Escape');
   // Help dialog.
   await page.getByRole('button',{name:'Help',exact:true}).click();
