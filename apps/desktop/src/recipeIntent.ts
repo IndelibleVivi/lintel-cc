@@ -62,7 +62,7 @@ function sanitize(id: RecipeId, value: Record<string, unknown>): RecipeIntent {
     const customSettings: CustomSettings = value.customSettings && typeof value.customSettings==='object' ? {} : { ...base.customSettings };
     if (value.customSettings && typeof value.customSettings === 'object') {
       for (const [key, choice] of Object.entries(value.customSettings as Record<string, unknown>)) {
-        if (recipeKeys.has(key) && key !== 'OTEL_EXPORTER_OTLP_HEADERS' && ['keep', 'disable', 'enable', 'remove', 'set'].includes(String(choice))) customSettings[key] = choice as CustomSettings[string];
+        if (recipeKeys.has(key) && ['keep', 'disable', 'enable', 'remove', 'set'].includes(String(choice)) && (key !== 'OTEL_EXPORTER_OTLP_HEADERS' || ['keep','disable','remove'].includes(String(choice)))) customSettings[key] = choice as CustomSettings[string];
       }
     }
     // Only finite ordinary values are portable defaults. Headers, receiver
@@ -99,6 +99,16 @@ export function readRecipe(id: RecipeId, hostAlias: string | null, environmentId
   return sanitize(id,{});
 }
 export function saveRecipe(id: RecipeId, hostAlias: string | null, environmentId: string, intent: RecipeIntent) {
-  saveTaskDraft(recipeKey(id, hostAlias, environmentId), sanitize(id,intent as unknown as Record<string, unknown>) as unknown as Record<string, unknown>);
+  const stored = sanitize(id, intent as unknown as Record<string, unknown>);
+  const key = recipeKey(id, hostAlias, environmentId);
+  saveTaskDraft(key, stored as unknown as Record<string, unknown>);
+  let saved = false;
+  try { saved = localStorage.getItem(key) === JSON.stringify(stored); } catch { /* Keep the live draft usable. */ }
+  // Report finite omitted field names, never their private values. The live
+  // draft is independent and must not be silently replaced by this projection.
+  const omittedKeys = intent.kind === 'policy' && stored.kind === 'policy'
+    ? Object.entries(intent.customSettings ?? {}).filter(([key, choice]) => recipeKeys.has(key) && choice !== 'keep' && stored.customSettings?.[key] !== choice).map(([key]) => key)
+    : [];
+  return { saved, omittedKeys };
 }
 export function defaultRecipe(id: RecipeId): RecipeIntent { return defaults[id]; }

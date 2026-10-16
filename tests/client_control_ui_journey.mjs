@@ -18,6 +18,7 @@ const home=path.join(fixture,'home'),state=path.join(fixture,'state');
 // Environment A is the default config root (home/.claude); environment B is a
 // separate root. All mutations stay inside these synthetic roots.
 const rootA=path.join(home,'.claude'),rootB=path.join(home,'second config 第二环境'),project=path.join(home,'selected project 项目');
+const rawDirectory=path.join(home,'api-records',...Array.from({length:10},(_,index)=>`synthetic API 正文目录 ${index}`));
 const password='synthetic-client-control-passphrase';
 const userId='SYNTHETIC_USER_ID_MUST_NOT_PERSIST_OR_LEAK_01';
 await mkdir(home);await mkdir(rootA,{recursive:true});await mkdir(rootB,{recursive:true});await mkdir(project,{recursive:true});
@@ -29,7 +30,7 @@ await mkdir(path.join(home,'.local/bin'),{recursive:true});await symlink(inert,p
 await mkdir(path.join(rootA,'debug'),{recursive:true});
 const debugFile=path.join(rootA,'debug','synthetic-debug.log');
 await writeFile(debugFile,'synthetic debug line\n');
-await writeFile(path.join(rootA,'settings.json'),JSON.stringify({env:{OTEL_LOG_USER_PROMPTS:'1',OTEL_EXPORTER_OTLP_ENDPOINT:'https://collector.invalid/v1'},synthetic_unrelated:'keep',synthetic_note:'before'},null,2));
+await writeFile(path.join(rootA,'settings.json'),JSON.stringify({env:{OTEL_LOG_USER_PROMPTS:'1',OTEL_EXPORTER_OTLP_ENDPOINT:'https://collector.invalid/v1',OTEL_LOG_RAW_API_BODIES:`file:${rawDirectory}`} ,synthetic_unrelated:'keep',synthetic_note:'before'},null,2));
 await writeFile(path.join(home,'.claude.json'),JSON.stringify({userID:userId,oauthAccount:{synthetic:true}},null,2));
 
 const actor={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:path.join(home,'.local/bin')};
@@ -63,6 +64,8 @@ function lastPlanId(command){const entry=[...coreResponses].reverse().find(item=
 async function waitForResult(command,previous){const deadline=Date.now()+(command==='execute'?125000:60000);while(Date.now()<deadline){const completed=coreResponses.filter(item=>item.command===command);if(completed.length>previous){assert.ok(completed.at(-1).envelope.ok,JSON.stringify(completed.at(-1).envelope.error));return completed.at(-1).envelope.data}await new Promise(resolve=>setTimeout(resolve,20))}throw new Error(`no completed ${command}`)}
 
 const L={envDetails:'环境详情',tabState:'本地状态',tabCompare:'变化与对照',reveal:'显示原始值',hide:'隐藏原始值',locate:'在 Finder 中定位',combineReduce:'同时减少正文记录',combineReset:'同时重置本地客户端标识',combinePreview:'预览合成计划',writersStopped:'已关闭目标的终端、IDE 与自动重启来源',approve:'批准并执行',previewPolicy:'预览变更',configRead:'读取',configReinspect:'重新观察',configPreviewEdit:'预览并应用',restoreInspect:'读取可恢复字段',restorePreview:'预览恢复',snapshotSave:'保存快照',snapshotCompare:'比较',snapshotPair:'并排对照',applyNormal:'将普通配置应用到目标环境',recipeApply:'应用配方',recipeSave:'保存为个人默认',recipeReduce:'减少正文记录'};
+
+async function revealPolicyRecipes(){const sheet=page.locator('.policy-alternatives');if(await sheet.count()&&!await sheet.evaluate(element=>element.open))await sheet.locator(':scope > summary').click()}
 
 const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/vite.js'),'preview','--host','127.0.0.1','--port','0','--strictPort'],{cwd:desktop,stdio:['ignore','pipe','pipe']});
 const report={fixture,runtime:'built App + real core; modeled native locale/clipboard/Finder only — not native WebKit, not a mock core',checks:[],passed:false};
@@ -300,11 +303,20 @@ try{
 
  // --- Recipe: save as personal default, then Run produces a FRESH plan id ---
  await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
+ await revealPolicyRecipes();
  const recipes=page.locator('.recipes');
  const reduceRow=recipes.locator('.recipe-row').filter({hasText:L.recipeReduce}).first();
  await reduceRow.getByRole('button',{name:L.recipeSave,exact:true}).click();
  const policyDock=page.locator('.workspace-actions .action-bar');
- async function previewPolicyId(){const previous=coreResponses.filter(item=>item.command==='plan_policy').length;await policyDock.getByRole('button',{name:L.previewPolicy,exact:true}).click();const plan=await waitForResult('plan_policy',previous);await dialog.locator('.plan-identity code.full-path').waitFor({state:'attached'});assert.ok(plan.id);await dialog.getByRole('button',{name:'返回调整',exact:true}).click();await dialog.waitFor({state:'hidden'});return plan.id}
+ async function previewPolicyId(check){
+  const previous=coreResponses.filter(item=>item.command==='plan_policy').length;
+  await policyDock.getByRole('button',{name:L.previewPolicy,exact:true}).click();
+  const plan=await waitForResult('plan_policy',previous);
+  await dialog.locator('.plan-identity code.full-path').waitFor({state:'attached'});assert.ok(plan.id);
+  if(check)await check(plan);
+  await dialog.getByRole('button',{name:'返回调整',exact:true}).click();await dialog.waitFor({state:'hidden'});
+  return plan.id;
+ }
  await reduceRow.getByRole('button',{name:L.recipeApply,exact:true}).click();
  const firstPlan=await previewPolicyId();
  await reduceRow.getByRole('button',{name:L.recipeApply,exact:true}).click();
@@ -357,6 +369,7 @@ try{
   await privateEditor.locator('.config-textarea').evaluate(element=>element.scrollIntoView({block:'center'}));
   await page.screenshot({path:path.join(fixture,`controls-json-${theme}.png`)});
   await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
+  await revealPolicyRecipes();
   const recipe=page.locator('.recipe-row').filter({hasText:L.recipeReduce}).first();
   await recipe.getByRole('button',{name:'编辑',exact:true}).click();
   await inspectFields(recipe);
@@ -367,13 +380,13 @@ try{
   await page.screenshot({path:path.join(fixture,`controls-recipe-${theme}.png`)});
   await page.locator('.preset').filter({hasText:'自定义'}).getByRole('radio').check();
   const rule=page.locator('.custom-policy-row[data-key="DISABLE_TELEMETRY"]');
-  await rule.locator(':scope > summary').click();
+  await rule.locator('.custom-policy-detail > summary').click();
   await inspectFields(rule);
   await rule.evaluate(element=>element.scrollIntoView({block:'start'}));
   await page.screenshot({path:path.join(fixture,`controls-policy-${theme}.png`)});
   const contentRule=page.locator('.custom-policy-row[data-key="OTEL_LOG_USER_PROMPTS"]');
-  await contentRule.locator(':scope > summary').click();
-  assert.ok((await contentRule.locator('.custom-policy-facts').innerText()).includes('https://collector.invalid/v1'),'content controls show the configured receiver rather than duplicating the impact text');
+  await contentRule.locator('.custom-policy-detail > summary').click();
+  assert.ok((await contentRule.locator('.policy-rule-information > .custom-policy-facts').innerText()).includes('https://collector.invalid/v1'),'content controls show the configured receiver rather than duplicating the impact text');
   await page.locator('.sidebar nav').getByRole('button',{name:'环境',exact:true}).click();
   if(await page.getByRole('tab').count()===0)await page.getByRole('button',{name:L.envDetails,exact:true}).click();
   await page.getByRole('tab',{name:L.tabState,exact:true}).click();
@@ -396,7 +409,8 @@ try{
   await scope.locator('.cleanup-file-path > summary').first().click();
   assert.ok((await scope.locator('.cleanup-file-full-path').first().innerText()).includes(home),'the exact path remains available on demand');
   await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
-  const recipes=page.locator('.recipes');
+  await revealPolicyRecipes();
+ const recipes=page.locator('.recipes');
   await recipes.locator('.surface-heading').scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(fixture,`polish-recipes-${width}-${theme}.png`)});
   for(let row=0;row<3;row++){
@@ -427,6 +441,164 @@ try{
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal overflow after disclosure');
  }
  report.checks.push('polish: compact target disclosure and exact root, cleanup path expansion, launch records and all recipe rows captured at 900/1120 in Day/Night');
+
+ {
+ // --- A person can edit one setting directly or explicitly select a batch. ---
+ await page.locator('.toast').waitFor({state:'hidden'});
+ await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
+ await page.locator('.preset').filter({hasText:'自定义'}).getByRole('radio').check();
+ // Re-observe a representative external configuration edit, confined to this fixture.
+ const reseeded=JSON.parse(await readFile(path.join(rootA,'settings.json'),'utf8'));
+ reseeded.env.OTEL_LOG_RAW_API_BODIES=`file:${rawDirectory}`;
+ await writeFile(path.join(rootA,'settings.json'),JSON.stringify(reseeded,null,2));
+ const beforeInspect=coreResponses.filter(item=>item.command==='inspect').length;
+ await page.getByRole('button',{name:'重新检查环境',exact:true}).click();
+ await waitForResult('inspect',beforeInspect);
+ const editor=page.locator('.custom-policy');
+ const row=key=>editor.locator(`.custom-policy-row[data-key="${key}"]`);
+ const choice=key=>row(key).locator('.policy-rule-choice select');
+ const previewButton=policyDock.getByRole('button',{name:L.previewPolicy,exact:true});
+ if(await editor.getByRole('button',{name:'撤销全部改动',exact:true}).count())await editor.getByRole('button',{name:'撤销全部改动',exact:true}).click();
+ assert.equal(await editor.locator('.policy-rule-selection').count(),0,'selection checkboxes are absent until the explicit bulk mode');
+ assert.equal(await editor.locator('.custom-policy-row').count(),27,'all current finite policy fields remain reachable');
+ assert.equal(await previewButton.isDisabled(),true,'an empty custom draft cannot produce an unexplained empty preview');
+ const originalSettings=await readFile(path.join(rootA,'settings.json'),'utf8');
+ await editor.getByRole('button',{name:'批量编辑',exact:true}).click();
+ const selectedKeys=['DISABLE_TELEMETRY','DISABLE_ERROR_REPORTING','OTEL_LOG_USER_PROMPTS'];
+ for(const key of selectedKeys)await row(key).locator('.policy-rule-selection').check();
+ const bulk=editor.locator('.policy-batch');
+ await bulk.getByRole('combobox').selectOption('disable');
+ await bulk.getByRole('button',{name:'更新 3 项草案',exact:true}).click();
+ for(const key of selectedKeys)assert.equal(await choice(key).inputValue(),'disable',`one bulk action retains ${key}, including early updates in the React batch`);
+ assert.equal(await editor.locator('.custom-policy-row.is-changed').count(),3);
+ for(const [width,height,theme] of [[1120,760,'light'],[900,640,'dark']]){
+  await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await bulk.evaluate(element=>element.scrollIntoView({block:'start'}));
+  await page.screenshot({path:path.join(fixture,`policy-batch-${width}-${theme}.png`)});
+ }
+ await page.setViewportSize({width:1120,height:760});await page.evaluate(()=>document.documentElement.dataset.theme='light');
+
+ await previewPolicyId();
+ const batchRequest=calls.filter(call=>call.command==='plan_policy').at(-1);
+ for(const key of selectedKeys)assert.equal(batchRequest.custom_settings[key],'disable','the same frozen plan receives every selected action');
+ assert.equal(batchRequest.environment_id,envA.id);
+ assert.equal(await readFile(path.join(rootA,'settings.json'),'utf8'),originalSettings,'a draft and plan preview cannot mutate the environment');
+ await row('OTEL_EXPORTER_OTLP_ENDPOINT').locator('.policy-rule-selection').check();
+ assert.equal(await bulk.getByRole('combobox').locator('option[value=enable]').count(),0,'a mixed selection offers only actions every selected rule supports');
+ await editor.getByRole('searchbox').fill('ERROR_REPORTING');
+ assert.ok((await bulk.innerText()).includes('其中 3 项在其他结果中'),'hidden selections stay explicit when filtering');
+ await bulk.getByRole('button',{name:'清空选择',exact:true}).click();
+ assert.equal(await bulk.getByRole('combobox').isDisabled(),true);
+ await editor.getByRole('searchbox').fill('');
+ await editor.getByRole('button',{name:'结束批量选择',exact:true}).click();
+ assert.equal(await editor.locator('.policy-rule-selection').count(),0);
+ await row('DISABLE_ERROR_REPORTING').getByRole('button',{name:'撤销此项',exact:true}).click();
+ assert.equal(await choice('DISABLE_ERROR_REPORTING').inputValue(),'keep');
+ assert.equal(await choice('DISABLE_TELEMETRY').inputValue(),'disable','undoing one item retains its neighboring draft');
+ await editor.getByRole('button',{name:'撤销全部改动',exact:true}).click();
+ assert.equal(await editor.locator('.custom-policy-row.is-changed').count(),0,'discarding all pending actions updates every row atomically');
+
+ for(const [key,invalidValue,validValue] of [['CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH','many','4096'],['OTEL_LOGS_EXPORTER','none,otlp','otlp,console']]){
+  await choice(key).selectOption('set');
+  const input=row(key).locator('.policy-value-editor input');await input.fill(invalidValue);
+  assert.equal(await input.getAttribute('aria-invalid'),'true');assert.equal(await previewButton.isDisabled(),true);
+  await input.fill(validValue);assert.equal(await input.getAttribute('aria-invalid'),'false');
+  await row(key).getByRole('button',{name:'撤销此项',exact:true}).click();
+ }
+ await choice('DISABLE_ERROR_REPORTING').selectOption('enable');
+ await previewPolicyId(async()=>{
+  const evidence=dialog.locator('.policy-evidence details').filter({has:page.getByText('本次自定义选择',{exact:true})});
+  await evidence.locator(':scope > summary').click();
+  const result=evidence.locator('.fact-row').filter({hasText:'错误回报'});
+  assert.equal(await result.locator('span').last().innerText(),'开启','the approval summary cannot mislabel enable as keep');
+ });
+ await row('DISABLE_ERROR_REPORTING').getByRole('button',{name:'撤销此项',exact:true}).click();
+
+ // An explicit custom value must be real request data, not a visual fallback.
+ const raw=row('OTEL_LOG_RAW_API_BODIES');
+ await choice('OTEL_LOG_RAW_API_BODIES').selectOption('file');
+ const rawInput=raw.locator('.policy-value-editor input');
+ assert.equal(await rawInput.inputValue(),rawDirectory,'directory mode asks for a path, not a file: command');
+ await previewPolicyId();
+ assert.equal(calls.filter(call=>call.command==='plan_policy').at(-1).custom_values.OTEL_LOG_RAW_API_BODIES,`file:${rawDirectory}`,'selecting the shown original value also explicitly submits it');
+ await rawInput.fill('');
+ assert.equal(await previewButton.isDisabled(),true,'missing custom values explain and block preview before a core error');
+ await rawInput.fill(` ${rawDirectory}`);
+ assert.equal(await previewButton.isDisabled(),true,'directory whitespace is explained before the core rejects it');
+ await rawInput.fill(`${rawDirectory}/next`);
+ await previewPolicyId();
+ assert.equal(calls.filter(call=>call.command==='plan_policy').at(-1).custom_values.OTEL_LOG_RAW_API_BODIES,`file:${rawDirectory}/next`);
+ assert.ok(!(await page.evaluate(()=>localStorage.getItem('lintel.drafts'))).includes(rawDirectory),'raw paths remain outside persisted drafts');
+ await choice('OTEL_LOG_RAW_API_BODIES').selectOption('enable');
+ assert.equal(await raw.locator('.policy-value-editor input').count(),0,'inline mode needs no implementation string or directory');
+ await previewPolicyId(async()=>{
+  const evidence=dialog.locator('.policy-evidence details').filter({has:page.getByText('本次自定义选择',{exact:true})});
+  await evidence.locator(':scope > summary').click();
+  const result=evidence.locator('.fact-row').filter({hasText:'原始 API 正文记录'});
+  assert.equal(await result.locator('span').last().innerText(),'内联记录');
+ });
+ assert.equal(calls.filter(call=>call.command==='plan_policy').at(-1).custom_settings.OTEL_LOG_RAW_API_BODIES,'enable');
+ await choice('OTEL_LOG_RAW_API_BODIES').selectOption('file');
+ await rawInput.fill(`${rawDirectory}/next`);
+ await revealPolicyRecipes();
+ await page.getByRole('button',{name:'把当前方案存为个人默认',exact:true}).click();
+ assert.ok((await page.locator('.recipe-save-feedback').innerText()).includes('原始 API 正文记录'),'saving explains the exact path-setting intent that cannot become a default');
+ assert.equal(await rawInput.inputValue(),`${rawDirectory}/next`,'saving a portable default never replaces the live draft');
+ await editor.getByRole('button',{name:'只看待改 · 1',exact:true}).click();
+ assert.equal(await editor.locator('.custom-policy-row').count(),1,'changes-only review retains the exact edited setting');
+ await editor.getByRole('button',{name:'只看待改 · 1',exact:true}).click();
+ await raw.locator('.custom-policy-detail > summary').click();
+ assert.ok((await raw.locator('.custom-policy-facts').first().innerText()).includes(rawDirectory),'full original API destination remains readable on demand');
+ for(const [width,height,theme] of [[900,640,'light'],[900,640,'dark'],[1120,760,'light'],[1120,760,'dark']]){
+  await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await page.locator('.main-content').evaluate(element=>element.scrollTo({top:0}));
+  await page.screenshot({path:path.join(fixture,`policy-overview-${width}-${theme}.png`)});
+  await editor.locator('.policy-editor-heading').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(fixture,`policy-editor-${width}-${theme}.png`)});
+  await raw.locator('.policy-rule-main').evaluate(element=>element.scrollIntoView({block:'start'}));
+  const bounds=await raw.locator('h4').boundingBox();
+  assert.ok(bounds.width>=180&&bounds.height<65,`API title keeps a readable width and normal lines at ${width}/${theme}`);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'long API values do not enlarge the workspace');
+  await page.screenshot({path:path.join(fixture,`policy-api-${width}-${theme}.png`)});
+ }
+ await page.locator('.target-bar .language-control select').selectOption('en');
+ assert.equal(await rawInput.inputValue(),`${rawDirectory}/next`,'language switching preserves the exact custom value');
+ await page.screenshot({path:path.join(fixture,'policy-api-english.png')});
+ await page.locator('.target-bar .language-control select').selectOption('zh-CN');
+ await page.locator('.policy-current-config > summary').click();
+ const rawReadback=page.locator('.policy-current-config .setting-row[data-key="OTEL_LOG_RAW_API_BODIES"]');
+ await rawReadback.locator(':scope > summary').click();
+ assert.ok((await rawReadback.locator('.setting-detail').innerText()).includes(rawDirectory),'the separate readback keeps the full value behind its bounded summary');
+ const readbackTitle=await rawReadback.locator(':scope > summary > span').first().boundingBox();
+ assert.ok(readbackTitle.width>=140&&readbackTitle.height<75,'readback title cannot collapse into a vertical strip');
+ assert.equal(await readFile(path.join(rootA,'settings.json'),'utf8'),originalSettings);
+ // A credential-bearing existing endpoint stays masked, but may be replaced
+ // with a plain endpoint through the same approved core path.
+ const maskedDocument=JSON.parse(originalSettings);
+ const credentialEndpoint='https://synthetic-private:credential@collector.invalid/v1';
+ maskedDocument.env.OTEL_EXPORTER_OTLP_ENDPOINT=credentialEndpoint;
+ await writeFile(path.join(rootA,'settings.json'),JSON.stringify(maskedDocument,null,2));
+ const maskedOriginal=await readFile(path.join(rootA,'settings.json'),'utf8');
+ const inspected=coreResponses.filter(item=>item.command==='inspect').length;
+ await page.getByRole('button',{name:'重新检查环境',exact:true}).click();await waitForResult('inspect',inspected);
+ await editor.getByRole('button',{name:'撤销全部改动',exact:true}).click();
+ const endpoint=row('OTEL_EXPORTER_OTLP_ENDPOINT');
+ assert.equal(await endpoint.locator('option[value=set]').count(),1,'masking the old endpoint must not remove the supported plain replacement action');
+ assert.equal(await endpoint.locator('option[value=disable]').count(),0,'a free value has one explicit removal operation, not two misleading outcomes');
+ await choice('OTEL_EXPORTER_OTLP_ENDPOINT').selectOption('set');
+ const endpointInput=endpoint.locator('.policy-value-editor input');
+ assert.equal(await endpointInput.inputValue(),'','a masked old value is never used as an editable fallback');
+ assert.equal(await endpointInput.isDisabled(),false);
+ assert.ok(!(await page.locator('body').textContent()).includes(credentialEndpoint));
+ await endpointInput.fill('https://synthetic-private:do-not-persist@collector.invalid/?token=synthetic');
+ assert.equal(await previewButton.isDisabled(),true,'credential-bearing replacement stays in the private editor, not an ordinary plan');
+ await endpointInput.fill('https://replacement.invalid:4318');
+ await previewPolicyId();
+ assert.equal(calls.filter(call=>call.command==='plan_policy').at(-1).custom_values.OTEL_EXPORTER_OTLP_ENDPOINT,'https://replacement.invalid:4318');
+ assert.equal(await readFile(path.join(rootA,'settings.json'),'utf8'),maskedOriginal,'plain replacement preview does not mutate the masked original');
+ assert.ok(!(await page.evaluate(()=>localStorage.getItem('lintel.drafts'))).includes('replacement.invalid'));
+ report.checks.push('policy redesign: direct editing, explicit bulk mode with common supported actions, all selected fields in one real-core plan, atomic reset, single-item undo, visible hidden-selection scope, missing-value guard, custom-value request binding, non-persistence, full long API paths and readable titles in both themes/sizes and English; draft and preview leave original settings unchanged');
+ }
  await page.setViewportSize({width:1120,height:760});
  assert.deepEqual(errors,[]);
  report.passed=true;

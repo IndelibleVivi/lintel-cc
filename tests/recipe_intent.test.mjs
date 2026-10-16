@@ -25,3 +25,22 @@ test('ordinary choices survive reloading and host scope; private values do not',
   assert.ok(!JSON.stringify([...saved.values()]).match(/secret@|private-header|file:\/synthetic/));
   assert.equal(recipe.readRecipe('reduce_content','another-synthetic-host','synthetic').keepRemoteControl,true);
 });
+
+test('saving reports omitted private values but retains safe removal intent',()=>{
+  const intent={kind:'policy',preset:'custom',keepRemoteControl:false,customSettings:{OTEL_EXPORTER_OTLP_HEADERS:'remove',OTEL_EXPORTER_OTLP_ENDPOINT:'set',OTEL_LOG_RAW_API_BODIES:'set'},customValues:{OTEL_EXPORTER_OTLP_ENDPOINT:'https://collector.invalid/v1',OTEL_LOG_RAW_API_BODIES:'file:/synthetic/not-a-default'}};
+  const result=recipe.saveRecipe('reduce_content',null,'omitted-fields',intent);
+  assert.equal(result.saved,true);
+  assert.deepEqual(result.omittedKeys,['OTEL_EXPORTER_OTLP_ENDPOINT','OTEL_LOG_RAW_API_BODIES']);
+  const loaded=recipe.readRecipe('reduce_content',null,'omitted-fields');
+  assert.equal(loaded.customSettings.OTEL_EXPORTER_OTLP_HEADERS,'remove');
+  assert.equal(loaded.customSettings.OTEL_EXPORTER_OTLP_ENDPOINT,'keep');
+  assert.equal(loaded.customSettings.OTEL_LOG_RAW_API_BODIES,'keep');
+  assert.equal(intent.customSettings.OTEL_LOG_RAW_API_BODIES,'set','the in-memory draft remains independent');
+  assert.ok(!JSON.stringify([...saved.values()]).includes('not-a-default'));
+});
+test('a storage failure is reported without altering the live intent',()=>{
+  const write=globalThis.localStorage.setItem;
+  globalThis.localStorage.setItem=()=>{throw new Error('synthetic storage unavailable')};
+  try{assert.equal(recipe.saveRecipe('reduce_content',null,'unavailable',{kind:'policy',preset:'custom',keepRemoteControl:false,customSettings:{DISABLE_ERROR_REPORTING:'disable'}}).saved,false)}
+  finally{globalThis.localStorage.setItem=write}
+});

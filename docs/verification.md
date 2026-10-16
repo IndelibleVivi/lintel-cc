@@ -31,6 +31,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 `recipe-test` 检查三类配方的准确 intent、按 host/environment 保存普通默认值、敏感值不持久化，以及每次仍需重新预览。`client-control-ui` 在 built App 中调用真实 core，核对合成批准、标识显隐／复制、独立备份读取恢复、高级 JSON 编辑与所选字段恢复、逐项接受语义基线、跨环境普通配置实际写入、配方新计划及 900×640／1120×760 的 Day/Night 布局，包括展开后的下拉／密码／数字／JSON 表单、配置接收端投影，以及长表单滚动时页眉与操作栏固定。locale、clipboard 与 Finder transport 使用明确建模的 native 边界；这是 Chromium 的真实 core UI 证据，不是原生 WebKit／Finder 或个人 profile 验收。
 
+保护方案重做还核对：普通行无需展开即可编辑，批量选择独立进入，混合类型只提供共同适用动作，多项动作进入同一真实 core 计划；整批撤销／逐项撤销、隐藏选择范围、空值与类型提示、API 内联／目录模式、遮蔽接收端的普通地址替换、预览中的开启／指定值表述、保存默认的省略字段反馈。900／1120 日夜与 English 目视长 API 原值，标题保有独立宽度；草案与预览不改变原文件。`recipe-test` 同时检查有限请求头移除意图、被排除的地址／目录字段报告与保存失败。
+
 这三个检查均不进入隐式默认组；`journey-client-control` 在 core/full 的 native CI 组，`recipe-test` 在 frontend 组，`client-control-ui` 在 browser 组，通过同一 canonical entrypoint 调用。它们不验证真实 Claude 的 exporter 行为、身份重新生成、个人账号、生产 SSH、安装或正式发行。规格见[客户端控制增强](specs/client-control.md)。
 
 顶栏与卡片收尾沿用这组检查：`client-control-ui` 在两种窗口尺寸／两套主题下核对单行页眉、主机选择器左侧的橙色终端入口、准确路径向下展开且不遮挡正文、清理文件完整路径、启动记录及逐条配方截图；`i18n-ui` 验默认收起、显式／Escape 关闭、modal 优先与焦点返回、外部点击保留布局、无额外 core 调用与 reduced-motion 静态光标。截图留在本地临时 fixture，不能单靠自动断言判定审美接受。

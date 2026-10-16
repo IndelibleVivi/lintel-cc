@@ -22,6 +22,7 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
   const { t } = useI18n();
   const [open, setOpen] = useState<RecipeId | null>(null);
   const [notice, setNotice] = useState<RecipeId | null>(null);
+  const [saveFailure, setSaveFailure] = useState<RecipeId | null>(null);
   function apply(id: RecipeId) {
     const intent = readRecipe(id, hostAlias, environmentId);
     if (intent.kind === 'policy') { onApplyPolicy(intent); onPolicy(); }
@@ -31,8 +32,9 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
   function save(id: RecipeId) {
     // Saving captures the neutral default intent for this host/environment; the
     // editable fields are the recipe's own controls, so no live draft is stored.
-    saveRecipe(id, hostAlias, environmentId, readRecipe(id, hostAlias, environmentId));
-    setNotice(id);
+    const result = saveRecipe(id, hostAlias, environmentId, readRecipe(id, hostAlias, environmentId));
+    setNotice(result.saved ? id : null);
+    setSaveFailure(result.saved ? null : id);
   }
   const targetLabel = (id: RecipeId) => t(recipeTargets[id] === 'policy' ? 'recipes.targetPolicy' : 'recipes.targetRebuild');
   return <section className="surface recipes" aria-label={t('recipes.aria')}>
@@ -67,6 +69,7 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
             : intent.kind === 'residue' ? <ResidueRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId}/>
             : <CleanupRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId}/>}
         </div>}
+        {saveFailure === id && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
         {notice === id && <p className="small-print recipe-notice" role="status">{t('recipes.savedDefault')}</p>}
       </div>;
     })}</div>
@@ -77,12 +80,14 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
 function PolicyRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
+  const [failed, setFailed] = useState(false);
   if (intent.kind !== 'policy') return null;
   function update(patch: Partial<PolicyRecipeIntent>) {
     const next = { ...intent, ...patch } as PolicyRecipeIntent;
-    setIntent(next); saveRecipe(id, hostAlias, environmentId, next);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
   }
   return <div className="recipe-fields">
+    {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
     <label className="field">{t('recipes.fieldPreset')}<select value={intent.preset} onChange={event => update({ preset: event.target.value as PolicyPreset })}><option value="preserve">{t('policy.preserve')}</option><option value="reduce">{t('policy.reduce')}</option><option value="custom">{t('policy.custom')}</option></select></label>
     <label className="checkbox-inline"><input type="checkbox" checked={intent.keepRemoteControl} onChange={event => update({ keepRemoteControl: event.target.checked })}/><span>{t('recipes.fieldKeepRemote')}</span></label>
     <label className="field">{t('recipes.fieldTrusted')}<select value={intent.trustedDevices ?? 'unknown'} onChange={event => update({ trustedDevices: event.target.value as TrustedDevices })}><option value="unknown">{t('app.trustedUnknown')}</option><option value="required">{t('app.trustedRequired')}</option><option value="not_required">{t('app.trustedNotRequired')}</option></select></label>
@@ -93,12 +98,14 @@ function PolicyRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; ho
 function ResidueRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
+  const [failed, setFailed] = useState(false);
   if (intent.kind !== 'residue') return null;
   function update(patch: Partial<ResidueRecipeIntent>) {
     const next = { ...intent, ...patch } as ResidueRecipeIntent;
-    setIntent(next); saveRecipe(id, hostAlias, environmentId, next);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
   }
   return <div className="recipe-fields">
+    {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
     <p className="small-print">{t('recipes.residueNote')}</p>
     <label className="checkbox-inline"><input type="checkbox" checked={intent.reduceContent} onChange={event => update({ reduceContent: event.target.checked })}/><span>{t('recipes.combineReduce')}</span></label>
     <label className="checkbox-inline"><input type="checkbox" checked={intent.resetIdentity} onChange={event => update({ resetIdentity: event.target.checked })}/><span>{t('recipes.combineReset')}</span></label>
@@ -108,12 +115,14 @@ function ResidueRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; h
 function CleanupRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
+  const [failed, setFailed] = useState(false);
   if (intent.kind !== 'cleanup') return null;
   function update(patch: Partial<CleanupRecipeIntent>) {
     const next = { ...intent, ...patch } as CleanupRecipeIntent;
-    setIntent(next); saveRecipe(id, hostAlias, environmentId, next);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
   }
   return <div className="recipe-fields">
+    {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
     <label className="field">{t('recipes.fieldRecipe')}<select value={intent.recipe} onChange={event => update({ recipe: event.target.value as CleanupRecipeIntent['recipe'] })}><option value="reset_client">{t('cleanup.reset')}</option><option value="retire">{t('cleanup.retire')}</option></select></label>
     <fieldset className="recipe-fields-group"><legend>{t('recipes.fieldCategories')}</legend>{(['instructions', 'memory', 'sessions'] as const).map(category => <label className="checkbox-inline" key={category}><input type="checkbox" checked={intent.categories.includes(category)} onChange={event => update({ categories: event.target.checked ? [...intent.categories, category] : intent.categories.filter(item => item !== category) })}/><span>{t(`category.${category}` as never)}</span></label>)}</fieldset>
     <label className="checkbox-inline"><input type="checkbox" checked={intent.activateInstructions} disabled={!intent.categories.includes('instructions')} onChange={event => update({ activateInstructions: event.target.checked })}/><span>{t('work.activateInstructions')}</span></label>
