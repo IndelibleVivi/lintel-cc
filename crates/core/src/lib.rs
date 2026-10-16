@@ -11,11 +11,15 @@ mod lifecycle_tests;
 mod network;
 mod package;
 mod policy;
+mod residue;
 mod service;
 mod session;
 mod settings;
 #[cfg(test)]
 mod settings_tests;
+mod snapshot;
+#[cfg(test)]
+mod snapshot_tests;
 mod storage;
 mod work;
 #[cfg(test)]
@@ -486,7 +490,7 @@ impl Engine {
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
-                let settings:Vec<Value>=policy::fields().map(|(key,label)|json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":path,"effect_timing":"next_launch","runtime_verified":false,"status":policy::setting_status(key,&doc["env"][key])})).collect();
+                let settings:Vec<Value>=policy::fields().map(|(key,label)|{let masked=key==policy::MASKED_KEY&&doc["env"][key].is_string();json!({"key":key,"label":label,"value":if masked{Value::Null}else{valstr(&doc["env"][key])},"masked":masked,"source":path,"effect_timing":"next_launch","runtime_verified":false,"status":policy::setting_status(key,&doc["env"][key])})}).collect();
                 let assets = work::summaries(Path::new(string(&e, "root")?))?;
                 Ok(
                     json!({"environment":e,"settings":settings,"assets":assets,"policy":policy::assessment(&doc,&e["product_evidence"],policy::trusted_devices(r)?),"warnings":self.warnings(&e)}),
@@ -693,7 +697,8 @@ impl Engine {
                 let mut changes = vec![];
                 for (key, label) in policy::fields() {
                     if base.get(key).is_some() && base[key] != valstr(&doc["env"][key]) {
-                        changes.push(json!({"key":key,"label":label,"value":valstr(&doc["env"][key]),"source":"user_settings","effect_timing":"next_launch","status":"changed"}))
+                        let masked = key == policy::MASKED_KEY;
+                        changes.push(json!({"key":key,"label":label,"value":if masked{Value::Null}else{valstr(&doc["env"][key])},"masked":masked,"source":"user_settings","effect_timing":"next_launch","status":"changed"}))
                     }
                 }
                 Ok(
@@ -731,6 +736,11 @@ impl Engine {
         let (_, doc, _) = self.settings(e)?;
         let mut b = json!({});
         for (key, _) in policy::fields() {
+            // The credential-carrying headers key is never persisted, so drift
+            // simply does not track it (snapshot v2 handles it masked).
+            if key == policy::MASKED_KEY {
+                continue;
+            }
             b[key] = valstr(&doc["env"][key])
         }
         save(&self.path("baselines", string(e, "id")?), &b)
