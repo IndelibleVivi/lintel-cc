@@ -127,6 +127,23 @@ class TransportTests(unittest.TestCase):
         self.assertNotIn("SYNTHETIC_APPROVAL_SECRET", state)
         self.assertEqual(json.loads(state)["status"], "completed")
 
+    def test_client_control_finite_readers_and_baselines(self):
+        requests = [
+            {'command': 'snapshot_accept', 'environment_id': 'synthetic', 'old_snapshot_id': 'old', 'new_snapshot_id': 'new', 'selected_changes': ['exact-change']},
+            {'command': 'residue_archive_inspect', 'job_id': 'original', 'archive_passphrase': 'synthetic-passphrase'},
+            {'command': 'plan_residue_restore', 'environment_id': 'synthetic', 'archive_path': '/synthetic/residue.age', 'archive_passphrase': 'synthetic-passphrase', 'selected_paths': ['/synthetic/debug/old.log']},
+            {'command': 'residue_inventory', 'environment_id': 'synthetic', 'offset': 1, 'expected_digest': 'a' * 64, 'limit': 2, 'extra_roots': ['/synthetic/extra'], 'since': 1, 'until': 100},
+            {'command': 'drift', 'environment_id': 'synthetic', 'lightweight': True},
+        ]
+        for request in requests:
+            self.assertEqual(ssh.validate_request(request), request)
+        for bad in [requests[0] | {'selected_changes': []}, requests[0] | {'selected_changes': 'all'},
+                    requests[1] | {'archive_path': '/synthetic/ambiguous.age'}, requests[2] | {'selected_paths': []},
+                    requests[3] | {'expected_digest': 'invalid'}, requests[3] | {'limit': 201},
+                    requests[3] | {'extra_roots': ['relative']}, requests[4] | {'lightweight': 1}]:
+            with self.assertRaises(ssh.ControllerError):
+                ssh.validate_request(bad)
+
     def test_archive_passphrase_stdin_only_and_lost_ack_queries_without_secret(self):
         secret = "SYNTHETIC_ARCHIVE_PASSPHRASE_ONLY"
         plan_id = "00000000-0000-4000-8000-000000000002"

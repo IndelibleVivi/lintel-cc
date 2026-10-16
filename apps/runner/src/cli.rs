@@ -13,8 +13,16 @@ pub const HELP: &str = concat!(
   "  lintel schema OPERATION                     JSON Schema envelope, no discovery\n",
   "  lintel context [--json]                      Readonly state/user/executable facts; no state made\n",
   "  lintel tasks [--json]                        The one finite six-task map; no state made\n",
-  "  lintel help [GROUP]                         Static help; GROUP ∈ env/policy/work/job/restore/remote/launch/session\n",
+  "  lintel help [GROUP]                         Static help; GROUP ∈ env/policy/config/data/snapshot/work/job/restore/remote/launch/session\n",
   "  lintel env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n",
+  "  lintel env residue ID | identity ID         Local metadata and masked identity presence\n",
+  "  lintel env compare ID --other-environment-id ID  Fresh local environment comparison\n",
+  "  lintel snapshot save|list|accept --environment ID  Sanitized observations and selected baseline\n",
+  "  lintel snapshot compare --environment ID --old-snapshot-id ID --new-snapshot-id ID\n",
+  "  lintel config inspect|read --environment ID --config-path PATH\n",
+  "  lintel config edit|apply|restore plan        Private documents/fields through JSON stdin\n",
+  "  lintel data clear|identity-reset|workflow|restore plan  Fresh finite plan; one approval\n",
+  "  lintel data archive inspect                  Independent encrypted residue manifest\n",
   "  lintel policy plan --environment ID --preset reduce --keep-remote-control\n",
   "  lintel plan show ID                         Read original frozen plan\n",
   "  lintel job show ID | wait ID --timeout 30s   Query only; timeout never resubmits\n",
@@ -200,12 +208,25 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
             "--writers-confirmed-stopped",
             "--official-logout",
             "--no-official-logout",
+            "--reveal",
+            "--archive-before-clear",
+            "--no-archive-before-clear",
+            "--reset-identity",
+            "--archive-only",
+            "--delete-work",
+            "--lightweight",
         ]
         .contains(&flag)
         {
             let key = match flag {
                 "--keep-remote-control" | "--no-keep-remote-control" => "keep_remote_control",
                 "--writers-confirmed-stopped" => "writers_confirmed_stopped",
+                "--reveal" => "reveal",
+                "--archive-before-clear" | "--no-archive-before-clear" => "archive_before_clear",
+                "--reset-identity" => "reset_identity",
+                "--archive-only" => "archive_only",
+                "--delete-work" => "delete_work",
+                "--lightweight" => "lightweight",
                 _ => "official_logout",
             };
             if request.get(key).is_some() {
@@ -245,10 +266,34 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
         let raw = &args[i + 1];
         request[&key] = if ["categories", "release_settings"].contains(&key.as_str()) {
             json!(raw.split(',').filter(|s| !s.is_empty()).collect::<Vec<_>>())
-        } else if key == "custom_settings" || key == "probe" {
+        } else if [
+            "custom_settings",
+            "custom_values",
+            "probe",
+            "selected_keys",
+            "selected_changes",
+            "selected_paths",
+            "residue_paths",
+            "identity_backup_paths",
+            "extra_roots",
+            "policy",
+        ]
+        .contains(&key.as_str())
+        {
             serde_json::from_str(raw)
                 .map_err(|_| error("invalid_argument", "该字段需要 JSON object"))?
-        } else if key == "offset" || key == "timeout_seconds" {
+        } else if [
+            "offset",
+            "limit",
+            "timeout_seconds",
+            "modified_after",
+            "since",
+            "until",
+            "min_bytes",
+            "max_bytes",
+        ]
+        .contains(&key.as_str())
+        {
             json!(raw
                 .parse::<u64>()
                 .map_err(|_| error("invalid_argument", &format!("{key} 需要非负整数")))?)
@@ -371,7 +416,10 @@ const GROUP_HELP: &[(&str, &str)] = &[
     ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
     ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
     ("network", "network inspect\n  network catalog\n  network probe [--ipv4-url HTTPS_URL --ipv6-url HTTPS_URL --proxy-url LOOPBACK_HTTP --timeout-seconds 10]\n  network ipv6 plan --service-id ID --mode off|link_local [同样的探测 flags] [--baseline-id ID]\n  network restore plan --job ID [--baseline-id ID]\n  network serve --config PATH [--test-telemetry ID,...]\n  inspect 离线读取宿主共享状态；catalog 只读静态 telemetry 目标；probe 显式访问 https://api.ipify.org 与 https://api6.ipify.org，可指定自己的 HTTPS 回显端点。IPv6 plan 会前测，批准后自动沿用同目标复测；macOS 可能申请系统网络配置授权。submit 需精确计划/hash，恢复另外批准。serve 是前台 NDJSON owner；Ctrl-C 只关闭自己的通道；--test-telemetry 要求冻结草案已显式阻止每个目录目标，否则拒绝启动，且从不连接目标。"),
-    ("env", "env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n  list/inspect/components 只读；components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
+    ("env", "env list | inspect ID | components ID [--project-cwd PATH] | residue ID | identity ID | compare ID --other-environment-id ID | create --name NAME | register --name NAME --root PATH\n  residue 只读已知位置元数据；identity 默认遮蔽；compare 使用一次性的本地比较材料，不保存快照。components 不运行认证或协调原任务；create/register 只建立或登记明确的配置目标。"),
+    ("snapshot", "snapshot save|list --environment ID\n  snapshot compare --environment ID --old-snapshot-id ID --new-snapshot-id ID\n  accept --selected-changes JSON_ARRAY --old-snapshot-id ID --new-snapshot-id ID 逐项接受为比较基线；不恢复文件。save 保存脱敏语义观察，list/compare 只读。原始身份、凭据、请求头不进入普通快照或比较响应。比较不能代替配置恢复计划；未读或截断区域明确标为未知。"),
+    ("config", "config inspect --environment ID [--project-cwd PATH]\n  config read --environment ID --config-path PATH\n  config edit|apply|restore plan：精确字段、目标 diff 与加密备份，document/口令只走 JSON stdin。\n  config restore inspect --environment ID --job ID：原任务可恢复字段，快照不是恢复材料。"),
+    ("data", "data clear|identity-reset|workflow plan\n  data archive inspect | data restore plan：JSON stdin 提供 job_id/archive_path 之一、archive_passphrase；restore 还需 environment_id 与 selected_paths。残留备份独立于工作包，只恢复缺失的准确原路径，不覆盖现有文件。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
     ("work", "work inventory --environment ID --categories instructions,memory,sessions [--offset N] [--expected-digest HEX]\n  work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  inventory 返回有界只读原件元数据清单（分页/摘要绑定同一次扫描）；preflight 只读元数据容量预检。archive/preserve plan 可用可重复 --path 精确选择所选类别内的原件，排除未选的大会话而不截断。session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
     ("job", "job show ID | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
@@ -516,12 +564,34 @@ pub fn run(args: &[String]) -> Value {
                 json!({"environment_id":word(2)}),
                 false,
             ),
+            "residue" | "identity" | "compare" if !word(2).is_empty() => named(
+                match word(1) { "residue" => "residue_inventory", "identity" => "identity_inspect", _ => "env_compare" },
+                &args[3..], json!({"environment_id":word(2)}), false,
+            ),
             "register" => named("register", &args[2..], json!({}), false),
             "create" => named("create_environment", &args[2..], json!({}), false),
             _ => error(
                 "invalid_argument",
-                "env list | inspect ID | components ID [--project-cwd PATH] | register | create",
+                "env list | inspect ID | components ID | residue ID | identity ID | compare ID --other-environment-id ID | register | create",
             ),
+        },
+        "snapshot" => match word(1) {
+            "save" | "list" | "compare" | "accept" => named(match word(1) { "save" => "snapshot_save", "list" => "snapshot_list", "accept"=>"snapshot_accept", _ => "snapshot_compare" }, &args[2..], json!({}), false),
+            _ => error("invalid_argument", "snapshot save|list|compare|accept --environment ID"),
+        },
+        "config" => match word(1) {
+            "inspect" | "read" => named(if word(1)=="inspect" {"config_inspect"} else {"config_read"}, &args[2..],json!({}),word(1)=="read"),
+            "edit" | "apply" | "restore" if word(2)=="plan" => named(match word(1){"edit"=>"plan_config_edit","apply"=>"plan_config_apply",_=>"plan_config_restore"},&args[3..],json!({}),true),
+            "restore" if word(2)=="inspect" => named("config_restore_inspect",&args[3..],json!({}),false),
+            _=>error("invalid_argument","config inspect|read | edit|apply|restore plan | restore inspect"),
+        },
+        "data" => match (word(1),word(2)) {
+            ("archive","inspect") => named("residue_archive_inspect",&args[3..],json!({}),true),
+            ("restore","plan") => named("plan_residue_restore",&args[3..],json!({}),true),
+            ("clear","plan") => named("plan_cleanup",&args[3..],json!({"recipe":"clear_residue","official_logout":false}),true),
+            ("identity-reset","plan") => named("plan_identity_reset",&args[3..],json!({}),true),
+            ("workflow","plan") => named("plan_client_workflow",&args[3..],json!({}),true),
+            _=>error("invalid_argument","data clear|identity-reset|workflow|restore plan | archive inspect"),
         },
         "policy" if word(1) == "plan" => named("plan_policy", &args[2..], json!({}), false),
         "restore" if word(1) == "plan" => named("plan_restore", &args[2..], json!({}), false),
@@ -764,10 +834,7 @@ mod telemetry_cli_tests {
         let response = dispatch(json!({"command":"telemetry_catalog"}));
         assert_eq!(response["ok"], true);
         assert_eq!(
-            response["data"]["destinations"]
-                .as_array()
-                .unwrap()
-                .len(),
+            response["data"]["destinations"].as_array().unwrap().len(),
             7
         );
     }

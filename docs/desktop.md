@@ -24,15 +24,17 @@ App 支持简体中文 / English，默认跟随系统。顶部入口只显示实
 
 ### 自定义保护
 
-“保护方案”的“自定义”打开逐项编辑。七项控制来自当前 core：产品指标、错误回报、主动反馈、质量调查、`DO_NOT_TRACK`、feature-flag 获取、非必要流量总开关。每项显示当前值与关闭语义，展开“来源与恢复”可查看准确变量、settings 路径、新启动要求和恢复边界。
+“保护方案”的“自定义”打开逐项编辑。当前 core 的 v5 规则识别 27 个字段，包含七项隐私开关（产品指标、错误回报、主动反馈、质量调查、`DO_NOT_TRACK`、feature-flag 获取、非必要流量总开关）以及 OTel 数据收集、内容记录、exporter／接收端、指标身份属性、调查改走自设 OTel 与 WebFetch 控制。列表可按关键词搜索并批量选择动作；每项显示当前设置、布尔语义、来源、接收端或落盘位置、官方默认、版本依据与主要功能影响，展开后还能看到准确变量、依赖字段与本地落盘目录。`OTEL_EXPORTER_OTLP_HEADERS` 只显示“已遮蔽（凭据）”，其值永不进入普通输出。
 
 - **保持原值：** 不添加、删除或改写该字段；未选项也保持。全选保持时，执行只记录核对结果，不重写 settings 文件或权限。
-- **关闭这一项：** 使用字符串 `"1"`；若当前取值已按该变量语义关闭，保留原值。例如 nonempty 变量的 `"false"` 仍会关闭，不能当作开启。
+- **开启这一项：** 关闭 DISABLE_* 类隐私开关即删除该字段，default_on 字段同样通过删除恢复默认开启（变更标 `restores_default`）。
+- **关闭这一项：** 按变量语义写关闭值：DISABLE_* 类开关（七个隐私开关与 `CLAUDE_CODE_DISABLE_WEB_FETCH`）写 `"1"`，正向内容／telemetry Boolean 写 `"0"`，default_on 写 `"false"`，exporter 写 `"none"`；自由取值字段只能移除。若当前取值已按该变量语义关闭，保留原值，例如 nonempty 变量的 `"false"` 仍会关闭，不能当作开启。
 - **移除本环境覆盖：** 删除当前配置根 user settings 中的准确 env 字段，可能重新开放对应流量。其他 shell、项目或组织来源仍可能影响运行，不能宣称功能已开启。
+- **设为指定值：** 仅在 `set` 动作下，用另一个 `custom_values` 通道给出合法字符串；core 按语义校验（内容长度上限、接收端地址、exporter selector、原始正文 `0`／`1`／`file:<目录>`）。遮蔽键不允许 `set`。
 
-预览显示准确修改和预计 Remote Control 条件；“保留 Remote Control”不会改写自定义明确选择。冲突仍需用户调整选择或接受影响。批准后回执保存本次选择，恢复先核对后续编辑。切换 preset 会保留自定义草案；切换主机或环境不会串用。旧 runner 未返回 `supported_presets: custom` 时显示更新提示并禁用自定义预览，保留已有草案；升级 runner 后重新检查即可。策略 v3 要求旧规则下的待执行计划重新预览；已完成任务与恢复仍保留。
+预览显示准确修改和预计 Remote Control 条件；“保留 Remote Control”不会改写自定义明确选择。冲突仍需用户调整选择或接受影响。批准后回执保存本次选择，恢复先核对后续编辑。切换 preset 会保留自定义草案；切换主机或环境不会串用。旧 runner 未返回 `supported_presets: custom` 时显示更新提示并禁用自定义预览，保留已有草案；升级 runner 后重新检查即可。规则升级到 v5 后，旧规则下的待执行计划须重新预览；已完成任务与恢复仍保留。
 
-同一表单可用于本机与 SSH 环境；远端仍经固定 JSON 请求和 durable submit。官方更新、WebFetch 安全预检查与 marketplace 自动安装控制没有加入这七项编辑器，见 [core 的准确范围](core.md)。
+同一表单可用于本机与 SSH 环境；远端仍经固定 JSON 请求和 durable submit。WebFetch 工具控制已作为 `CLAUDE_CODE_DISABLE_WEB_FETCH` 进入目录；官方更新与 marketplace 自动安装控制仍不在这份编辑器里，见 [core 的准确范围](core.md)。
 
 ## 清理、工作归档与迁入
 
@@ -59,6 +61,18 @@ App 支持简体中文 / English，默认跟随系统。顶部入口只显示实
 启动与原生续聊预览共用“启动来源核对”：root、明确 cwd 与有限上级候选、managed 文件／drop-ins，以及 hooks／MCP／helper／plugin 是否有声明。存在项和访问受限项直接显示，已检查未发现项可展开；没有提供该清单的旧 runner 不能在 App 批准新启动。认证文件与共享 profile 只查看元数据，Keychain、账号、Terminal shell、worktree 主 checkout 与实际加载保持未核验。选择前后来源变化需要新预览；原启动请求仍只查询。归档与迁入不自动启动或登录。
 
 启动请求报错时保留原 ID，先核对原启动请求。只有 core 读回未尝试的原计划时才能“重新核对启动目标”，保留稿件与 cwd，生成新 ID 并撤回旧审阅；已有 intent／结果仍只查询。
+
+## 本地数据、身份、变化与配方
+
+“环境详情 → 本地状态”的“本地数据与身份”面板按有限已知位置表（加你在计划中明确加入、最多 8 个的绝对目录）列出工作内容、运行残留、身份与登录材料、插件配置，只读路径、类别、大小与时间。可按类别、项目片段、时间和大小筛选并分页；默认只勾选可清理的运行残留，工作内容需另选，`unclassified` 位置不会默认删除，身份位置只报告存在性、从不进入清理目标。选中后可“仅精确清理”或“归档并清理”，后者先写独立 `lintel.residue/1` 加密备份再删除。这一面板的合成计划可把“减少正文记录”“重置本地客户端标识”与所选残留合成一份计划、一次批准。
+
+“身份与登录材料”只识别已核实的 `userID` 与账号痕迹 `oauthAccount`，默认只显示存在性；点“显示原始值”后才在本页内存读取 `userID`，可复制，但不写入 localStorage、普通快照、支持导出或日志。“重置本地客户端标识”先对完整原始客户端状态及你明确选中的备份加密保全，再移除 `userID` 并逐值保留其他键；它不注销、不清凭据，是否由客户端重新生成按重新检查的结果展示。已有的 `lintel.residue/1` 备份可用“读取与恢复残留备份”独立解锁与按原路径恢复，已有文件不覆盖，也不作为工作 import。
+
+“环境详情 → 变化与对照”的“变化与对照”面板保存脱敏语义快照并比较两份快照或两个已登记环境，可按新增／删除／修改筛选；“接受所选当前值”只形成比较基线，不是恢复来源。跨环境“将普通配置应用到目标环境”只复制已识别普通字段、显示目标 diff，登录凭据与本地身份不随之复制。轻量变化检查在打开环境或经 Lintel 启动时只读有限配置来源并在有变化或读取不完整时留下提示，没有常驻 watcher。
+
+“高级配置编辑”对明确选择的 user／project-local JSON 配置提供严格校验、逐字段遮蔽 diff 与原任务恢复：写入复用现有计划链，批准前复查摘要，写前生成 age 加密 `lintel.config/1` 备份，恢复只改原任务字段并保留后续无关编辑，凭据值与未识别键默认遮蔽。
+
+“保护方案”和“清理重建”页内的“快捷配方”面板提供三条可编辑配方：“减少正文记录”关闭已知内容记录字段并保留指标，“清理运行残留”使用本地数据视图当前选中的残留，“保住工作并重建”归档并迁入选中的工作内容。配方只保存方案与有限字段选择等非秘密意图，切换主机或环境后草稿与原任务绑定不漂移；每次运行都按当前主机与环境重新生成计划，绝不重放旧审批。
 
 ## 浏览器与网络
 
@@ -159,7 +173,7 @@ npm run desktop:build
 
 ## 本轮页面与组件索引
 
-六任务的用户名称、说明、操作与帮助锚点由 `contracts/task-catalog.json` 维护；App 首页／帮助与 CLI 直接消费。`ArchivePanel.tsx` 是唯一资料阅读器，索引、阅读和交接稿按窗口排列；`LaunchPanel.tsx` 承担独立 cwd、审阅快照、复制和启动结果；`AgentPanel.tsx` 只投影有限操作元数据；`PlanReview.tsx` 展示冻结落点；`TaskOutcome.tsx` 分开所选结果与覆盖，兼容原始回执。`ComponentPanel.tsx` 读取 core 的有限组件投影，`WorkCapacity.tsx` 读取元数据容量预检；二者均按精确目标处理结果。`taskDrafts.ts` 保存按主机／环境隔离的非秘密草案。`homeGreetings.ts` 维护 56 句原创时段问候和日期／整分钟／稀有彩蛋；`main.tsx` 在 React mount 前选择本次问候，特殊日期只在当天首次打开出现，localStorage 仅记最后显示的特殊日期。`ui.tsx` 的 `WorkspaceActions` 将保护、保全和清理操作挂载到正文之外的唯一底栏，随内容滚动位置不变；侧栏帮助和设置不参与环境列表滚动。
+六任务的用户名称、说明、操作与帮助锚点由 `contracts/task-catalog.json` 维护；App 首页／帮助与 CLI 直接消费。`ArchivePanel.tsx` 是唯一资料阅读器，索引、阅读和交接稿按窗口排列；`LaunchPanel.tsx` 承担独立 cwd、审阅快照、复制和启动结果；`AgentPanel.tsx` 只投影有限操作元数据；`PlanReview.tsx` 展示冻结落点；`TaskOutcome.tsx` 分开所选结果与覆盖，兼容原始回执。`ComponentPanel.tsx` 读取 core 的有限组件投影，`WorkCapacity.tsx` 读取元数据容量预检；二者均按精确目标处理结果。`ResiduePanel.tsx` 拥有“本地数据与身份”、身份显示／复制、配方合成与 Finder 定位入口，`ResidueArchivePanel.tsx` 只读 `lintel.residue/1` 备份，`SnapshotPanel.tsx` 拥有快照保存／对照／接受与并排比较，`ConfigEditor.tsx` 拥有高级配置读取／diff／恢复，`Recipes.tsx` 与 `recipeIntent.ts` 只保存三条配方的非秘密意图，`local_files.rs` 处理用户点击的本地 Finder 定位。`taskDrafts.ts` 保存按主机／环境隔离的非秘密草案。`homeGreetings.ts` 维护 56 句原创时段问候和日期／整分钟／稀有彩蛋；`main.tsx` 在 React mount 前选择本次问候，特殊日期只在当天首次打开出现，localStorage 仅记最后显示的特殊日期。`ui.tsx` 的 `WorkspaceActions` 将保护、保全和清理操作挂载到正文之外的唯一底栏，随内容滚动位置不变；侧栏帮助和设置不参与环境列表滚动。
 
 图形／颜色／字型身份继续由[视觉语言](visual-language.md)管理。Selen 可继续精修光学间距、字型、细线、阴影与动效；按钮接线、完整状态、窗口适配和键盘语义是已经接入的产品合同，不能退回示意页。实际 Chromium、native WebKit、Terminal 与真实客户端各层证据见[本轮 18 项验收](specs/product-baseline-status.md)。
 

@@ -24,29 +24,35 @@
 
 示例 ID/hash 必须换成执行器返回值；不要从示例执行真实 mutation。`plan_policy` 冻结规则版本、配置文件快照、根目录身份与具体字段。预览后文件改变、目录替换、错误 approval 会拒绝执行。core 使用严格 JSON 解析，重复键和损坏 JSON 不会被静默标准化后覆盖。
 
-计划冻结的是 settings.json 的**原始字节快照**与根身份，前置条件随动作实际读写范围生成：不修改 settings 的计划（重建、清理、迁入）在 settings 损坏或含重复键时仍可预览与执行，原字节保持不变；策略修改与字段恢复仍要求 settings 可完整解析。策略规则为 `claude-privacy-v3-2026-10-03`：`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 按非空字符串生效，`"0"`、`"false"` 也会关闭；反馈、调查、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 按标准 boolean 字符串解析，`0/false/no/off` 不生效。已识别 env 键只接受字符串值；未核验的 boolean 写法标为不确定。规则、作用范围、产品证据和功能影响由同一个 core 模型返回，GUI 不自行推断。
+计划冻结的是 settings.json 的**原始字节快照**与根身份，前置条件随动作实际读写范围生成：不修改 settings 的计划（重建、清理、迁入）在 settings 损坏或含重复键时仍可预览与执行，原字节保持不变；策略修改与字段恢复仍要求 settings 可完整解析。策略规则为 `claude-privacy-v5-2026-10-16`，共 27 个已识别字段：前七个隐私开关中，`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 按非空字符串生效，`"0"`、`"false"` 也会关闭；反馈、调查、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK` 按标准 boolean 字符串解析，`0/false/no/off` 不生效。其余 OTel 字段各有自己的已核验语义：OTel 内容与开关字段按 boolean 解析，`OTEL_METRICS_INCLUDE_ACCOUNT_UUID`、`OTEL_METRICS_INCLUDE_SESSION_ID` 是 default_on（缺省即开启，`0/false/no/off` 表示排除），exporter 按有限 selector 取值（`none` 关闭导出），接收端等 value 字段按是否设置表示配置存在性，`OTEL_LOG_RAW_API_BODIES` 另有 `0`／`1`／`file:<目录>` 语义。已识别 env 键只接受字符串值；未核验的 boolean 写法标为不确定。规则、作用范围、产品证据和功能影响由同一个 core 模型返回，GUI 不自行推断。
 
 程序先按 PATH 定位；非交互 PATH 未包含用户原生安装时，静态检查当前用户的 `~/.local/bin/claude`。不扫描其他用户或执行 shell 初始化。版本只从定位到的原生 `claude/versions/<version>` 路径或 Claude Code npm `package.json` 静态识别；不会运行 Claude 或查询账号。不认识的安装方式、版本家族或 prerelease 保留未知。`discover`、`inspect` 和计划都会重新识别；执行前程序路径/版本证据变化会要求重新预览，不把最新官方文档当作本机版本。
 
-环境概览（`inspect`）返回下述七个已识别 env 键的当前字符串值、settings 路径、状态和 `effect_timing: next_launch`；每项 `runtime_verified: false`，配置状态不构成运行时效果证明。工作内容统计只读文件元数据，不读取内容、不计算 digest、不受归档准入上限影响；扫描超出预算或部分条目不可读时按类别标记 `complete: false`，而不是让无关的设置检查整体失败。
+环境概览（`inspect`）返回 27 个已识别 env 键的当前字符串值、settings 路径、状态和 `effect_timing: next_launch`；每项 `runtime_verified: false`，配置状态不构成运行时效果证明。遮蔽键（`OTEL_EXPORTER_OTLP_HEADERS`）只报告 `masked: true` 与 `value: null`，其值不会进入普通检查、计划、回执或快照输出；显式高级编辑的 `config_read` 则在私密交互通道返回所选文件原文。工作内容统计只读文件元数据，不读取内容、不计算 digest、不受归档准入上限影响；扫描超出预算或部分条目不可读时按类别标记 `complete: false`，而不是让无关的设置检查整体失败。
 
 | 方案 | 当前精确修改 |
 | --- | --- |
 | `preserve` | 设置 `DISABLE_ERROR_REPORTING=1`、`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1`；保留指标与主动反馈的当前值 |
 | `reduce` | 上述两项加 `DISABLE_TELEMETRY=1`、`DISABLE_FEEDBACK_COMMAND=1` |
-| `custom` | `custom_settings` 按字段选择 `keep` / `disable` / `remove`；缺少字段视为 `keep` |
+| `custom` | `custom_settings` 按字段选择 `keep` / `disable` / `enable` / `remove` / `set`；缺少字段视为 `keep`；`set` 的取值另由 `custom_values` 给出 |
 | `keep_remote_control=true` | `preserve` / `reduce` 根据版本与 Trusted Devices 条件判断是否可同时关闭 telemetry；`custom` 只记录意图并评估准确 diff，不覆盖明确选择 |
 | `release_settings` | `preserve` / `reduce` 用户选中的冲突字段进入明确的 `after:null` 删除差异；批准准确计划后才移除，可按字段恢复 |
+
+`preserve` / `reduce` 只作用于上表中的四个隐私开关与显式 `release_settings`；OTel 全部字段只能通过 `custom` 选择，不会被预设暗中打开或关闭。
 
 自定义方案的请求示例：
 
 ```json
-{"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"custom","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DO_NOT_TRACK":"keep","DISABLE_GROWTHBOOK":"remove"},"keep_remote_control":true,"trusted_devices":"not_required"}
+{"command":"plan_policy","environment_id":"00000000-0000-4000-8000-000000000001","preset":"custom","custom_settings":{"DISABLE_ERROR_REPORTING":"disable","DO_NOT_TRACK":"keep","OTEL_LOGS_EXPORTER":"set","CLAUDE_CODE_DISABLE_WEB_FETCH":"remove"},"custom_values":{"OTEL_LOGS_EXPORTER":"none"},"keep_remote_control":true,"trusted_devices":"not_required"}
 ```
 
-`custom_settings` 只接受 `DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`DISABLE_FEEDBACK_COMMAND`、`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` 七个键。`keep` 保留当前字符串原值；`disable` 在现值按该键语义已关闭时保留原值，否则写字符串 `"1"`；`remove` 明确删除该 user settings 的键，不保证功能开启，缺失键不产生改动。缺省 `custom_settings` 等于空对象。空 diff 执行保留文件原始字节、权限与文件是否存在，仍更新 drift baseline，receipt 记录完成且 `restorable: false`。`custom_settings` 不可用于其他 preset，`null`、数组、未知键、嵌套对象和未知 action 均拒绝；`custom` 不接受非空 `release_settings`，请用 `remove` 表达删除。
+`custom_settings` 接受 v5 目录中的全部 27 个键，与 `policy.rs` 的 `catalog()` 顺序一致：七个隐私开关（`DISABLE_TELEMETRY`、`DISABLE_ERROR_REPORTING`、`DISABLE_FEEDBACK_COMMAND`、`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`、`DO_NOT_TRACK`、`DISABLE_GROWTHBOOK`、`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`），以及 OTel 与其余字段（`CLAUDE_CODE_ENABLE_TELEMETRY`、`OTEL_LOG_USER_PROMPTS`、`OTEL_LOG_ASSISTANT_RESPONSES`、`OTEL_LOG_TOOL_CONTENT`、`OTEL_LOG_TOOL_DETAILS`、`OTEL_LOG_RAW_API_BODIES`、`OTEL_LOG_MANAGED_SETTINGS`、`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`、`OTEL_LOGS_EXPORTER`、`OTEL_TRACES_EXPORTER`、`OTEL_METRICS_EXPORTER`、`OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_HEADERS`、`OTEL_METRICS_INCLUDE_ACCOUNT_UUID`、`OTEL_METRICS_INCLUDE_SESSION_ID`、`OTEL_METRICS_INCLUDE_VERSION`、`OTEL_METRICS_INCLUDE_ENTRYPOINT`、`OTEL_METRICS_INCLUDE_REPOSITORY`、`CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL`、`CLAUDE_CODE_DISABLE_WEB_FETCH`）。`keep` 保留当前字符串原值；`disable` 在现值按该键语义已关闭时保留原值，否则写该变量的关闭值（DISABLE_* 类开关——七个隐私开关与 `CLAUDE_CODE_DISABLE_WEB_FETCH`——写 `"1"`，正向内容／telemetry Boolean 写 `"0"`，default_on 写 `"false"`，exporter 写 `"none"`，其余自由取值字段只能移除）；`enable` 打开（default_on 字段通过删除该键恢复默认开启，并在变更上标 `restores_default: true`）；`remove` 明确删除该 user settings 的键，不保证功能开启，缺失键不产生改动。缺省 `custom_settings` 等于空对象。
 
-修改位置是已登记 root 的 `settings.json` 中的 `env`。`preserve` / `reduce` 默认不新增总禁用开关；`custom` 可明确选择七个字段中的任意一项。所有改动均进入同一字段 diff、准确批准、读回与恢复路径。不通配清除 OTel，不修改代理、AWS/Google 设置、JSON permissions、hooks 或 MCP；写入沿用私有文件模式，保留已有读权限并移除 group/other 写权限。配置读回不代表既有进程生效；界面标记下一次新启动。项目、组织服务端策略、IDE、服务入口与实际认证来源尚未完整探测。检测到已知本地 managed-settings 文件时，拒绝用低层设置覆盖。
+`set` 的取值不走 action 通道，而是 `custom_values: {"<字段>": "<字符串>"}`：它只适用于 action 恰为 `set` 的字段，两者必须成对出现（有 `set` 无值、有值无 `set` 都拒绝），且只在 `preset: "custom"` 下接受。core 会按字段语义校验取值（内容长度上限必须是纯数字、接收端地址不能含空白、exporter 只能取各自允许的 selector、原始正文只接受 `0`／`1`／`file:<目录>`），并拒绝含控制字符或换行的值。遮蔽键 `OTEL_EXPORTER_OTLP_HEADERS` 只允许 `keep` / `disable` / `remove`：它通常承载接收端凭据，策略编辑器不接受新的凭据值，不能写、不能替换，也不接受 `custom_values` 条目；违反时返回 `masked_setting_not_writable`。若策略改动会移除或替换已有遮蔽值，Engine 自动转入同一 `config_edit` 路径：先用口令加密保全完整配置，再写入；普通 diff 不带原值，恢复通过原任务选择字段。七个隐私开关与其余已识别字段一样接受 `keep` / `disable` / `enable` / `remove` / `set` 五个 action；`disable`／`enable` 的方向由该开关的 DISABLE_* 语义决定。空 diff 执行保留文件原始字节、权限与文件是否存在，仍更新 drift baseline，receipt 记录完成且 `restorable: false`。`custom_settings` 不可用于其他 preset，`null`、数组、未知键、嵌套对象和未知 action 均拒绝；`custom` 不接受非空 `release_settings`，请用 `remove` 表达删除。
+
+每一行的行为、当前设置、来源、接收端或落盘位置、主要功能影响与版本依据由同一个 core 规则模型返回（`inspect.policy.rules`，含 `category`、`semantics`、`sources`、`default_state`、`impact`、`version_floor`、`depends_on`）；GUI 不自行推断。冲突定位列出实际来源路径，允许选择可写的 user／project-local 等合法位置，但不会把 GUI 进程的环境变量当作另一个终端或 IDE 的实际启动环境。`OTEL_EXPORTER_OTLP_HEADERS` 只报 `masked: true`，其值永不进入普通输出；`OTEL_EXPORTER_OTLP_ENDPOINT` 若 URL 自带凭据（`user:pass@host`、`?query`、`#fragment`）也按凭据处理。
+
+修改位置是已登记 root 的 `settings.json` 中的 `env`。`preserve` / `reduce` 默认不新增总禁用开关；`custom` 可明确选择 27 个字段中的任意一项。所有改动均进入同一字段 diff、准确批准、读回与恢复路径。不通配清除 OTel，不修改代理、AWS/Google 设置、JSON permissions、hooks 或 MCP；写入沿用私有文件模式，保留已有读权限并移除 group/other 写权限。配置读回不代表既有进程生效；界面标记下一次新启动。项目、组织服务端策略、IDE、服务入口与实际认证来源尚未完整探测。检测到已知本地 managed-settings 文件时，拒绝用低层设置覆盖。
 
 ## Remote Control 版本与既有配置
 
@@ -125,6 +131,20 @@ flowchart TD
 
 `work_inventory` 按原始路径排序并有界分页，只读取元数据；`complete` 表示整次扫描是否完整，与 `next_offset` 独立。分页摘要绑定完整观察，后续页必须核对 `expected_digest`，变化拒绝 `stale_inventory`。它不授予执行。`work_preflight`／`plan_archive`／`plan_preserve` 的 additive `selected_paths` 是有限精确原件集合；省略保持旧整类调用。静态类别由 operations 与 core 共用，路径、数量／实际 JSON 编码大小及祖先 guard 分别验证。精确模式只核对选中原件，未选 oversized／非普通项不会被读取；正式 plan 冻结 exact paths、source device/inode/owner/ctime 与完整正文 manifest，同字节替换也必须重新预览，读取前后及接受前复查。它不提供对外部 writer 的 OS CAS。public `work_selection` 只投影 mode／paths；保全新根仍使用原冻结 target／mapping。内部身份不写入 lintel.work/1；旧类别计划、cleanup/reset/import 和包原件格式保持兼容。
 
+## 本地数据、身份、快照与配置编辑
+
+这几组操作复用同一计划／批准／job／receipt 链，不新建第二个执行器。全部观察只读元数据或有限静态来源，不运行 Claude、不执行 hooks、不访问公网；写入仅发生在已批准的计划内。
+
+`residue_inventory`（`residue.rs`）按有限已知位置表与调用者明确给出的 `extra_roots`（最多 8 个绝对目录）扫描本地数据。已知位置分 `work`／`residue`／`identity`／`config`，版本相关位置标 `unclassified`；表外区域是“未覆盖”而非“不存在”。结果只含路径、类别、归属、大小与修改时间，`class`／`category`／`project`／时间／大小可筛选，`offset`＋`limit`（≤200）分页且绑定一次 `expected_digest`，变化返回 `stale_inventory`。`complete` 表示整次观察是否完整，与分页独立；达到深度／条目／行预算、读失败、跳过特殊或不安全项都会保留缺口，不当作空目录。默认仅把可清理的 `residue` 作为清理候选；`unclassified` 只在当前预览显式选中时才可能进入，`work` 需要 `delete_work`，身份位置只报存在性、从不成为清理目标。
+
+`identity_inspect`（`client_data.rs`）只识别已核实的持久标识字段 `userID` 与账号痕迹 `oauthAccount`，默认只返回存在性与持久性，不返回字段值。`reveal: true` 才把 `userID` 原值放进本次响应（`reveal_scope: private_response_only`），`oauthAccount` 始终只报存在；原值不写入计划、job、receipt、snapshot 或 Agent 元数据。
+
+`snapshot_save`／`snapshot_list`／`snapshot_compare`／`env_compare`（`snapshot.rs`、`comparison_control.rs`）保存脱敏语义快照并比较：外发设置、配置来源、hooks／MCP／插件声明、身份同异与残留统计。请求头、带认证信息的接收端与原值不进入快照；身份比较材料只在本地私有 state 内，比较只给相同／改变／未知，不同盐域不能据此判定身份变化，即时 `env_compare` 用一次临时盐、不保存快照或持久盐。缺失／损坏／不可读的配置标为覆盖不足而非“关闭”，遮蔽值的相等性保持未知。`snapshot_accept` 逐项接受所选差异为比较基线，语义是“接受当前值”，**不是恢复来源**，也不是一份同时刻完整观测；恢复原值仍须来源明确的原任务或加密备份和新批准。`drift` 的 `lightweight: true` 只在打开环境或经 Lintel 启动时读有限配置来源，返回 `configuration_sources_only` 状态；没有常驻 watcher，残留与身份由显式完整对照读取。语义基线建立后，`accept_drift` 拒绝覆盖它，返回 `semantic_baseline_selection_required`，请用逐项 `snapshot_accept`。
+
+`config_inspect`／`config_read`／`plan_config_edit`／`plan_config_apply`／`config_restore_inspect`／`plan_config_restore`（`config_control.rs`）编辑目标环境明确选中的用户可写配置文件。`source_scope` 把文件归到 `user`／`project`／`project_local`／`project_mcp`／`explicit_user_config`，managed 与身份文件只读、拒绝写入。`plan_config_edit` 需要严格 JSON `document` 与读取时的 `expected_digest`，把差异算成逐字段 diff；`public_change` 对未识别键或凭据值（`masked_setting`）只报 `masked: true` 且 `before`／`after` 为 `null`，即显式高级编辑才可能读到原文，普通输出只显示遮蔽。执行写前先把当前配置以 age 加密备份为 `lintel.config/1`（`config_archive_path`），发布后逐字节读回；`plan_config_restore` 只处理原任务改过的字段、要求现值仍等于原写入值（否则 `restore_conflict`），保留无关后续编辑；`plan_config_apply` 只复制已识别的普通配置、拒绝跨环境复制身份与接收端凭据。`plan_client_workflow` 把配置修改、残留清理与标识重置合成为一份 `client_workflow` 计划，一次批准、一个原 job；同一文件不能属于两个步骤（`overlapping_actions`），每步各自完成或跳过，中断后只查询原 ID。
+
+`plan_cleanup` 的 `clear_residue` recipe 与独立 `plan_identity_reset` 各自精确处理所选原件：`clear_residue` 需要非空 `residue_paths`，可选先写独立 `lintel.residue/1` 加密备份再删除，逐文件复查身份，单文件失败不阻塞其余；`identity_reset` 只移除已核实的 `userID`（可选显式 `identity_backup_paths`），先加密保全再移除，其他键逐值保留，**不注销、不清凭据**。`residue_archive_inspect`／`plan_residue_restore` 是这两个备份的有限读／恢复入口：`lintel.residue/1` 独立于工作包，只按包内记录的原路径选择恢复、已有文件不覆盖（`restore_conflict`），不是工作 import。
+
 ## 有限清理与认证
 
 `cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；只新增 `identity_observed` 布尔值，不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。
@@ -159,7 +179,7 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 
 `export_support` 使用白名单，只含平台、版本、计数与能力信息；不包含目录、环境名、配置正文、令牌、会话或目的地主机。它不自动上传。
 
-验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py`、`python3 tests/policy_journey.py`、`python3 tests/work_preservation_journey.py` 与 `python3 tests/portable_work_journey.py` 均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询、加密迁移，以及本次新增的 archive-only 不新建环境、output_path 冻结/拒绝覆盖、跨独立 home/state 的包读取与迁入、stale/错误口令/损坏包拒绝、preserve 完成而旧 reset 仍 partial、canonical reset 顺序、logout 假失败保留产物与结构化 error 跨 Engine 持久、`plan_show` 不泄露秘密；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、七项 inspect、自定义选择/空改动/回执冻结/字段恢复和外部编辑拒绝，portable work journey 跨独立进程验证包携带、只读清单、显式路径迁入与 accepted 后失败码持久。版本探测使用 inert executable，不运行 Claude。
+验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py`、`python3 tests/policy_journey.py`、`python3 tests/work_preservation_journey.py`、`python3 tests/portable_work_journey.py` 与新增的 `python3 tests/client_control_journey.py`（独立选择项 `journey-client-control`）均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询、加密迁移，以及此前新增的 archive-only 不新建环境、output_path 冻结/拒绝覆盖、跨独立 home/state 的包读取与迁入、stale/错误口令/损坏包拒绝、preserve 完成而旧 reset 仍 partial、canonical reset 顺序、logout 假失败保留产物与结构化 error 跨 Engine 持久、`plan_show` 不泄露秘密；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、27 项 inspect 状态、自定义选择/显式取值/空改动/回执冻结/字段恢复和外部编辑拒绝，portable work journey 跨独立进程验证包携带、只读清单、显式路径迁入与 accepted 后失败码持久。client-control journey 用全新 CLI 进程验证残留清单／遮蔽身份／脱敏快照／即时对照、非法或未配对请求拒绝、损坏记录不隐藏邻居、原值不进入普通输出，并确认观察不执行客户端、不创建 mutation job；core 单元回归另覆盖私密配置备份／恢复／重放、跨环境 apply 排除私密材料、残留清除与标识重置逐文件重查、`lintel.residue/1` 读／恢复与占用拒绝。版本探测使用 inert executable，不运行 Claude。
 
 
 独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以系统原子不覆盖 rename 发布（不会替换已出现的文件）；临时名在同一操作中消失，不产生发布后的双链接清理窗口，再读回核验。import 在预览和正文写入前核对整批实际目标的祖先：path guard 拒绝非目录／链接，批准 root 内的现有目录必须属于当前执行器 UID，实际权限须允许访问和在最近现有父目录写入。已知错误分别为 `path_unreadable`、`wrong_owner`、`migration_destination_unwritable`，在整批正文写入前拒绝；Lintel 不更改已有权限。共同迁入路径只将新建父目录设为 `0700`，已有目标根和父目录权限保留，文件为 `0600`。macOS 使用 renameatx_np(RENAME_EXCL)，Linux 使用 renameat2(RENAME_NOREPLACE)；目标文件系统或内核不支持时返回 atomic_publication_unsupported，保留原数据与原任务，不退回 hard link 或覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。

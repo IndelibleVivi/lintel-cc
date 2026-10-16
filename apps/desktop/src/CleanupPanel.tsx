@@ -16,7 +16,8 @@ const recipeKeys: Record<Recipe, { title: string; description: string }> = {
   retire: { title: 'cleanup.retire', description: 'cleanup.retireDetail' },
 };
 const classDefs = [['instructions','category.instructions','cleanup.classInstructions'],['memory','category.memory','cleanup.classMemory'],['sessions','category.sessions','cleanup.classSessions']] as const;
-export default function CleanupPanel({ send = request, environment, refreshKey, onPlan, onBrowser, onWork,hostAlias=null }: {hostAlias?:string|null; send?: typeof request; environment: Environment; refreshKey?: number; onPlan: (plan: Plan) => void; onBrowser: () => void; onWork: () => void }) {
+type CleanupSeed = { key: string; intent: { recipe: 'repair_login' | 'reset_client' | 'retire'; categories: string[]; activateInstructions: boolean } };
+export default function CleanupPanel({ send = request, environment, refreshKey, onPlan, onBrowser, onWork, hostAlias = null, seed }: {hostAlias?:string|null; send?: typeof request; environment: Environment; refreshKey?: number; onPlan: (plan: Plan) => void; onBrowser: () => void; onWork: () => void; seed?: CleanupSeed | null }) {
   const { t } = useI18n();
   const draftKey='lintel.cleanup-draft:'+JSON.stringify([hostAlias,environment.id]);
   const initial=readTaskDraft(draftKey,{recipe:'repair_login',categories:['instructions','memory','sessions'],activateInstructions:false});
@@ -32,6 +33,8 @@ export default function CleanupPanel({ send = request, environment, refreshKey, 
   const alive=useRef(true);const actionLock=useRef(false);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
   useEffect(()=>saveTaskDraft(draftKey,{recipe,categories,activateInstructions}),[draftKey,recipe,categories,activateInstructions]);
+  // A recipe seeds the current draft once for this host/environment generation.
+  useEffect(()=>{ if(!seed)return; setRecipe(seed.intent.recipe); setCategories(seed.intent.categories); setActivateInstructions(seed.intent.activateInstructions); setError(null); },[seed?.key]);
   async function run(name: string, action: () => Promise<void>) { if(actionLock.current)return;actionLock.current=true;setBusy(name); setError(null); try { await action(); } catch (err) { if(alive.current)setError(asError(err)); } finally { actionLock.current=false;if(alive.current)setBusy(''); } }
   async function inspect() { const found=await send('cleanup_inspect', { environment_id: environment.id });if(alive.current)setInspection(found); }
   useEffect(() => { void run('inspect', inspect); }, [environment.id, refreshKey]);

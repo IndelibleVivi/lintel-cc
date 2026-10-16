@@ -127,6 +127,8 @@ CHECKS: List[Check] = [
     _check("i18n-coverage-test", "every desktop source translation key resolves in both zh-CN/en catalogs (node:test, no deps)", "i18n",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/i18n_coverage.test.mjs"), tools=("node",),
            explicit_only=True),
+    _check("recipe-test", "fresh recipe intent, host scope and non-secret personal defaults", "js",
+           *(NODE or "node", "--experimental-strip-types", "--test", "tests/recipe_intent.test.mjs"), tools=("node",), explicit_only=True),
     _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
            *(NODE or "node", "--test", "tests/app_release.test.mjs"), tools=("node", "python3")),
     _check("rust-notices-test", "Rust distribution notice graph, exact upstream evidence and fail-closed text admission", "js",
@@ -143,6 +145,10 @@ CHECKS: List[Check] = [
            *(NODE or "node", "tests/i18n_ui_journey.mjs"), tools=("node",),
            paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
            loopback=True, independent=True, reason="built App in isolated Chromium with synthetic invoke; not native WebKit"),
+    _check("client-control-ui", "built App client controls, private config, residue/identity, comparison and fresh recipes through real core", "independent",
+           *(NODE or "node", "tests/client_control_ui_journey.mjs"), tools=("node", "cargo", "npm"),
+           paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"),
+           build=_CARGO_BUILD_RUNNER + ([NPM or "npm", "--prefix", "apps/desktop", "run", "build"],), loopback=True, independent=True, reason="real core with synthetic home in Chromium; native locale/clipboard/Finder modeled, not WebKit"),
     _check("python-ssh-test", "platform/ssh Python controller tests (fake SSH, synthetic)",
            "python", PYTHON, "-m", "unittest", "discover", "-s", "platform/ssh/tests", "-v"),
     _check("desktop-typecheck", "desktop TypeScript typecheck (tsc --noEmit)", "desktop",
@@ -221,6 +227,7 @@ CHECKS: List[Check] = [
 ]
 
 CHECKS.append(_check("journey-network", "finite network CLI admission/defaults and synthetic-home host boundary", "journey", PYTHON, "tests/network_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER))
+CHECKS.append(_check("journey-client-control", "client controls, private snapshots and environment comparison through fresh CLI processes", "journey", PYTHON, "tests/client_control_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER, explicit_only=True))
 CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and target request contracts (synthetic transport)", "python", PYTHON, "tests/shared_remote_journey.py", tools=("cargo",), paths=(ROOT / "tests/shared_remote_journey.py",)))
 
 # Synthetic end-to-end journeys sharing the runner-build prerequisite.

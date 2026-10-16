@@ -321,6 +321,29 @@ memory are kept as data; there is **no claim that a conversation can be
 resumed**. See the portable-work section of the
 [Agent CLI guide](agents.en.md#portable-work).
 
+## 10. Read local data, identity and snapshots (optional)
+
+The same synthetic environment also exercises the current source's local observation paths. They read metadata or finite static sources only, never run Claude and never create a mutation job:
+
+```sh
+lintel env residue "$ID" --json          # metadata inventory of the known-location table (path/class/size/mtime)
+lintel env identity "$ID" --json         # presence of userID / oauthAccount only by default
+lintel snapshot save --environment "$ID" --json   # store a sanitized semantic snapshot, return snapshot_id
+lintel snapshot list --environment "$ID" --json
+```
+
+`env residue` covers only the known-location table plus the `extra_roots` you name explicitly; anything outside it is not covered, and depth/entry limits or read failures keep the gap explicit. `env identity` masks the raw value by default; only `--reveal` places the `userID` value in this response, and it never enters a persistent record. Then take a second `snapshot_id` with `snapshot save` and compare two snapshots or two registered environments:
+
+```sh
+SNAP_A='<first-returned-snapshot-id>'
+SNAP_B='<second-returned-snapshot-id>'
+OTHER_ID='<another-registered-environment-id>'
+lintel snapshot compare --environment "$ID" --old-snapshot-id "$SNAP_A" --new-snapshot-id "$SNAP_B" --json
+lintel env compare "$ID" --other-environment-id "$OTHER_ID" --json
+```
+
+Comparison returns same/changed/unknown only; identity comparison material stays in private local state, and different salt domains cannot attest a change. An immediate `env compare` uses one temporary salt and saves neither a snapshot nor a persistent salt. To edit an explicitly chosen user/project-local configuration or review residue clearing/identity reset, see the [operator guide](operator-guide.en.md#recovery) and the [core and CLI contract](core.en.md#local-data-identity-snapshots-and-configuration-editing).
+
 ---
 
 ## Want to use the App instead?

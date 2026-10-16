@@ -103,6 +103,57 @@ Named execute 与有限远端新提交的 `approval` 必须是原计划返回的
 
 普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。专用 `launch` 是交互进程接管入口，启动失败诊断写 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。
 
+## 本地清单与脱敏快照
+
+当前源码的本地观察入口共用 core；远端先通过目标 runner 的 `describe`／`schema` 核对支持，旧 runner 不会因 App 升级自动具备新命令。
+
+```sh
+lintel env residue '<environment-id>'
+lintel env identity '<environment-id>'
+lintel env compare '<environment-id>' --other-environment-id '<other-environment-id>'
+lintel snapshot save --environment '<environment-id>'
+lintel snapshot list --environment '<environment-id>'
+lintel snapshot compare --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>'
+```
+
+`residue_inventory` 只读已知位置的文件元数据；表外区域未覆盖，达到深度／数量上限或读失败明确保留缺口。`identity_inspect` 默认只返回已识别字段的存在性。上面六个命令也支持 `lintel call OPERATION` 的 JSON stdin，并进入共享有限 SSH 请求合同；完整请求字段以当前 runner 的 schema 为准。
+
+`snapshot_save` 保存不可覆盖的脱敏观察，返回快照 ID 和公开摘要；`snapshot_list` 最多展示 200 份记录、一次最多检查 2,000 个目录项，`scan_complete` 与逐项错误说明覆盖，损坏记录不隐藏其余快照。快照保留普通设置、有限声明与残留统计；请求头、带认证信息的接收端和原始身份不进入快照。身份比较材料仅在本地私有 state 内，比较响应只给相同／改变／未知；盐域不一致时不能据此判定身份变化。即时 `env_compare` 使用同一次临时盐，不保存快照或持久盐。
+
+缺失、损坏或读取失败的配置不能当作“关闭”；对应区域标为未完成，其余独立观察继续返回。遮蔽值的相等性也保持未知。脱敏快照用于比较，配置恢复仍须来源明确的原任务或加密备份和新批准，不能用摘要还原正文。普通命令沿用现有 state／锁行为，这些观察不启动 Claude、执行 hooks 或访问公网。
+
+`lintel snapshot accept --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>' --selected-changes '["<returned-change-id>"]'` 只将 `snapshot compare` 返回的所选 `changes[].id` 接受为比较基线，不改配置。它会重新核对当前所选值；陈旧观察与遮蔽值不能被接受。形成语义基线后，旧的 `accept_drift` 返回 `semantic_baseline_selection_required`，应继续用逐项 `snapshot accept`；旧字段基线仅为尚未迁入语义基线的调用方保留。
+
+### 高级配置、本地数据与配方的可写入口
+
+下列命名入口都进入同一计划／批准／job／receipt 链，只有明确批准后才写入；秘密（归档口令）仍只经 JSON stdin，不放 argv。
+
+```sh
+lintel config inspect --environment '<environment-id>' [--project-cwd /abs/project]
+lintel config read --environment '<environment-id>' --config-path /abs/settings.json   # 返回该文件当前 JSON 正文与摘要
+lintel config edit plan --environment '<environment-id>' --config-path /abs/settings.json   # stdin: {"document":"<JSON 文本>","expected_digest":"<当前摘要>"}
+lintel config apply plan --environment '<environment-id>' --source-environment-id '<other-id>' --selected-keys '["OTEL_LOG_USER_PROMPTS"]'
+lintel config restore inspect --environment '<environment-id>' --job '<original-job-id>'
+lintel config restore plan --environment '<environment-id>' --job '<original-job-id>' --selected-keys '["/env/OTEL_LOG_USER_PROMPTS"]'
+lintel data clear plan --environment '<environment-id>' --writers-confirmed-stopped   # stdin: {"residue_paths":[...],"archive_before_clear":true,"delete_work":false}
+lintel data identity-reset plan --environment '<environment-id>'   # stdin: {"writers_confirmed_stopped":true,"identity_backup_paths":[...]}
+lintel data workflow plan --environment '<environment-id>'   # stdin: {"writers_confirmed_stopped":true,"policy":{...},"reset_identity":true,"residue_paths":[...]}
+```
+
+`plan_config_edit` 需要严格 JSON `document` 与读取时的 `expected_digest`，把差异算成逐字段 diff；未识别键或凭据值（`OTEL_EXPORTER_OTLP_HEADERS`、带凭据的接收端 URL）在预览中只报 `masked: true`、`before`／`after` 为 `null`。执行写前生成独立 age 加密 `lintel.config/1` 备份（`config_archive_path`）并读回；`plan_config_restore` 只处理原任务改过的字段、要求现值仍等于原写入值（否则 `restore_conflict`），保留无关后续编辑。`config_inspect` 读取有限配置来源并遮蔽公开值，不读取身份／凭据文件正文；显式 `config_read` 返回所选配置原文，应只在私密终端／编辑器使用，勿将响应存入普通日志。managed 与身份文件不能作为高级编辑写入目标。
+
+`plan_cleanup` 的 `clear_residue` 需要非空 `residue_paths`，两种操作均需 `writers_confirmed_stopped: true`。清理按 `archive_before_clear` 选择先备份或直接删除；`archive_only: true` 可只归档而不删除。`plan_identity_reset` 始终先将完整原始客户端状态及所选备份加密保全为 `lintel.residue/1`，再只移除 `userID`，不注销、不清凭据。备份可能包含敏感原文，仅以密文保管；可独立读取清单与恢复：
+
+```sh
+# 字段全部经 stdin；秘密仍只经 stdin，不放 argv
+python3 -c 'import getpass,json; print(json.dumps({"job_id":"<original-job-id>","archive_passphrase":getpass.getpass("Passphrase: ")}))' |
+  lintel call residue_archive_inspect
+python3 -c 'import getpass,json; print(json.dumps({"environment_id":"<id>","job_id":"<original-job-id>","selected_paths":["/abs/original"],"archive_passphrase":getpass.getpass("Passphrase: ")}))' |
+  lintel call plan_residue_restore
+```
+
+`lintel.residue/1` 与工作包分开：有效原环境绑定才允许新恢复计划，旧的无绑定材料仍可读清单；只按包内记录的原路径恢复，已有文件不覆盖（`restore_conflict`），不是工作 import。`plan_client_workflow` 把配置修改、残留清理与标识重置合成一份计划、一次批准；同一文件不能属于两个步骤（`overlapping_actions`），中断后只查原 ID。App 侧对应“本地数据与身份”“变化与对照”“高级配置编辑”和三条“快捷配方”，详见 [桌面指南](desktop.md) 与 [操作指南](operator-guide.md#recovery)。
+
 ## 完整的计划、批准、查询与恢复
 
 以下 ID/hash 是占位，必须使用**当前主机、当前目标**返回值。先登记准确配置根或从 inventory 选择目标；不得用项目代码目录替代 Claude config root。
@@ -120,7 +171,7 @@ lintel job submit --plan <restore-plan-id> --approval <restore-plan-hash>
 lintel job wait <restore-plan-id> --timeout 30s
 ```
 
-`policy plan` 必须显式选择 `--keep-remote-control` 或 `--no-keep-remote-control`。需要 Trusted Devices 条件时传 `--trusted-devices required|not_required|unknown`。custom 使用 `--preset custom --custom-settings '{"DISABLE_TELEMETRY":"disable"}'`；只能对当前 schema 中的七项选择 keep/disable/remove，非 custom 不接受 custom_settings，custom 不接受非空 release_settings。版本/策略/目标变更使批准失效，重新核对并预览。
+`policy plan` 必须显式选择 `--keep-remote-control` 或 `--no-keep-remote-control`。需要 Trusted Devices 条件时传 `--trusted-devices required|not_required|unknown`。custom 使用 `--preset custom --custom-settings '{"DISABLE_TELEMETRY":"disable"}'`；按当前 schema 对 27 个字段选择 keep/enable/disable/remove/set；遮蔽键只允许 keep/disable/remove，set 还需配对 custom_values，非 custom 不接受 custom_settings，custom 不接受非空 release_settings。版本/策略/目标变更使批准失效，重新核对并预览。
 
 计划生成会保存冻结计划；不会修改目标 settings。`plan show` 不刷新旧计划，而是读回其公共范围。批准必须匹配该计划的 hash，并来自当前任务对这些动作的既有用户授权；没有通用 `--yes`。后续外部编辑会拒绝恢复；不要把冲突当作强制覆盖理由。
 

@@ -9,11 +9,29 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / 'target/debug/lintel'
-FIELDS = {
+# The v5 catalog: the seven privacy switches, then the OTel telemetry, content,
+# exporter and identity-attribute family.
+SWITCHES = {
     'DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING', 'DISABLE_FEEDBACK_COMMAND',
     'CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY', 'DO_NOT_TRACK', 'DISABLE_GROWTHBOOK',
     'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',
 }
+OTEL_KEYS = {
+    'CLAUDE_CODE_ENABLE_TELEMETRY', 'OTEL_LOG_USER_PROMPTS', 'OTEL_LOG_ASSISTANT_RESPONSES',
+    'OTEL_LOG_TOOL_CONTENT', 'OTEL_LOG_TOOL_DETAILS', 'OTEL_LOG_RAW_API_BODIES',
+    'OTEL_LOG_MANAGED_SETTINGS', 'CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH', 'OTEL_LOGS_EXPORTER',
+    'OTEL_TRACES_EXPORTER', 'OTEL_METRICS_EXPORTER', 'OTEL_EXPORTER_OTLP_ENDPOINT',
+    'OTEL_EXPORTER_OTLP_HEADERS', 'OTEL_METRICS_INCLUDE_ACCOUNT_UUID',
+    'OTEL_METRICS_INCLUDE_SESSION_ID', 'OTEL_METRICS_INCLUDE_VERSION',
+    'OTEL_METRICS_INCLUDE_ENTRYPOINT', 'OTEL_METRICS_INCLUDE_REPOSITORY',
+    'CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL', 'CLAUDE_CODE_DISABLE_WEB_FETCH',
+}
+FIELDS = SWITCHES | OTEL_KEYS
+# Names of the mask: whose values are credentials Lintel never records.
+MASKED_KEY = 'OTEL_EXPORTER_OTLP_HEADERS'
+# Absent fields whose documented default is "on": an absent key means the default
+# is in effect, which the observation reports as `configured`.
+DEFAULT_ON = {'OTEL_METRICS_INCLUDE_ACCOUNT_UUID', 'OTEL_METRICS_INCLUDE_SESSION_ID'}
 
 
 def run():
@@ -83,10 +101,15 @@ def run():
             'DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING',
             'DISABLE_FEEDBACK_COMMAND', 'CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY')}}))
         states = {s['key']: s['status'] for s in request('inspect', environment_id=eid)['settings']}
-        assert states == {'DISABLE_TELEMETRY': 'configured', 'DISABLE_ERROR_REPORTING': 'configured',
-                          'DISABLE_FEEDBACK_COMMAND': 'unchanged', 'CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY': 'unchanged',
-                          'DO_NOT_TRACK': 'unchanged', 'DISABLE_GROWTHBOOK': 'unchanged',
-                          'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': 'unchanged'}
+        assert set(states) == FIELDS
+        # Nonempty semantics is on for any nonempty spelling; standard booleans are
+        # not. An absent field follows its documented default, so the two default-on
+        # metrics fields read as configured while the other v5 families do not.
+        assert {key for key, status in states.items() if status == 'configured'} == {
+            'DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING',
+            'OTEL_METRICS_INCLUDE_ACCOUNT_UUID', 'OTEL_METRICS_INCLUDE_SESSION_ID'}
+        assert all(states[key] == 'unchanged' for key in FIELDS - DEFAULT_ON
+                   - {'DISABLE_TELEMETRY', 'DISABLE_ERROR_REPORTING'})
         pending = request('plan_policy', environment_id=eid, preset='reduce', keep_remote_control=True,
                           trusted_devices='not_required')
         assert pending['policy']['remote_control']['status'] == 'configuration_compatible'
@@ -119,7 +142,7 @@ def run():
         assert all(s['source'] == str(settings) and s['effect_timing'] == 'next_launch'
                    and s['runtime_verified'] is False for s in observation['settings'])
         assert observation['policy']['supported_presets'] == ['preserve', 'reduce', 'custom']
-        assert observation['policy']['rule_version'] == 'claude-privacy-v3-2026-10-03'
+        assert observation['policy']['rule_version'] == 'claude-privacy-v5-2026-10-16'
         # A subset keep, an already-disabled nonempty value and an absent remove produce a true noop.
         noop = request('plan_policy', environment_id=eid, preset='custom', custom_settings={
             'DISABLE_ERROR_REPORTING': 'keep', 'DISABLE_TELEMETRY': 'disable',
@@ -135,14 +158,50 @@ def run():
             {'preset': 'custom', 'custom_settings': []},
             {'preset': 'custom', 'custom_settings': {'UNKNOWN': 'disable'}},
             {'preset': 'custom', 'custom_settings': {'DISABLE_TELEMETRY': {'action': 'disable'}}},
-            {'preset': 'custom', 'custom_settings': {'DISABLE_TELEMETRY': 'enable'}},
+            # Unsupported actions and unpaired set values remain invalid.
+            {'preset': 'custom', 'custom_settings': {'DISABLE_TELEMETRY': 'toggle'}},
+            {'preset': 'custom', 'custom_settings': {'DISABLE_TELEMETRY': 'set'}},
+            # The OTel family admits all five, but set/enable stay typed per field.
+            {'preset': 'custom', 'custom_settings': {'OTEL_LOGS_EXPORTER': 'set'}},
+            {'preset': 'custom', 'custom_settings': {'OTEL_LOG_USER_PROMPTS': 'set'},
+             'custom_values': {'OTEL_LOG_USER_PROMPTS': '1'}},
+            {'preset': 'custom', 'custom_settings': {'OTEL_LOGS_EXPORTER': 'set'},
+             'custom_values': {'OTEL_LOGS_EXPORTER': 'prometheus'}},
+            {'preset': 'custom', 'custom_settings': {'OTEL_LOGS_EXPORTER': 'set'},
+             'custom_values': {'OTEL_LOGS_EXPORTER': ''}},
+            {'preset': 'custom', 'custom_values': {'OTEL_LOGS_EXPORTER': 'none'}},
+            {'preset': 'custom', 'custom_settings': {'OTEL_LOGS_EXPORTER': 'set'}, 'custom_values': {}},
+            {'preset': 'reduce', 'custom_values': {'OTEL_LOGS_EXPORTER': 'none'}},
+            # The credential-bearing field is never writable and never valued.
+            {'preset': 'custom', 'custom_settings': {'OTEL_EXPORTER_OTLP_HEADERS': 'set'},
+             'custom_values': {'OTEL_EXPORTER_OTLP_HEADERS': 'x'}},
+            {'preset': 'custom', 'custom_values': {'OTEL_EXPORTER_OTLP_HEADERS': 'x'}},
             {'preset': 'custom', 'release_settings': ['DISABLE_TELEMETRY'], 'keep_remote_control': True},
             {'preset': 'preserve', 'custom_settings': {}},
             {'preset': 'reduce', 'custom_settings': {'DISABLE_TELEMETRY': 'keep'}},
         ]
         for fields in invalid:
-            assert request('plan_policy', good=False, environment_id=eid, **fields)['code'] == 'invalid_request', fields
+            choices = fields.get('custom_settings')
+            values = fields.get('custom_values')
+            masked_write = (isinstance(choices, dict) and choices.get('OTEL_EXPORTER_OTLP_HEADERS') in ('set', 'enable')
+                            or isinstance(values, dict) and 'OTEL_EXPORTER_OTLP_HEADERS' in values)
+            expected_code = 'masked_setting_not_writable' if masked_write else 'invalid_request'
+            actual = request('plan_policy', good=False, environment_id=eid, **fields)['code']
+            assert actual == expected_code, (fields, actual, expected_code)
         assert settings.read_bytes() == original_bytes
+        # A v5 `set` writes the explicit value and stays restorable field by field.
+        otel = request('plan_policy', environment_id=eid, preset='custom', keep_remote_control=False,
+                       custom_settings={'OTEL_LOGS_EXPORTER': 'set'}, custom_values={'OTEL_LOGS_EXPORTER': 'none'})
+        assert [(c['key'], c['before'], c['after']) for c in otel['changes']] == [('OTEL_LOGS_EXPORTER', None, 'none')]
+        otel_receipt = request('execute', plan_id=otel['id'], approval=otel['hash'])
+        assert otel_receipt['status'] == 'completed'
+        assert json.loads(settings.read_text())['env']['OTEL_LOGS_EXPORTER'] == 'none'
+        otel_restore = request('plan_restore', job_id=otel_receipt['id'])
+        assert request('execute', plan_id=otel_restore['id'], approval=otel_restore['hash'])['status'] == 'completed'
+        assert 'OTEL_LOGS_EXPORTER' not in json.loads(settings.read_text())['env']
+        assert json.loads(settings.read_text()) == original, 'A set/restore round trip changed unrelated settings'
+        assert settings.stat().st_mode & 0o777 == 0o640
+        original_bytes = settings.read_bytes()
         choices = {'DISABLE_TELEMETRY': 'disable', 'DISABLE_ERROR_REPORTING': 'disable',
                    'DISABLE_FEEDBACK_COMMAND': 'disable', 'DO_NOT_TRACK': 'remove',
                    'DISABLE_GROWTHBOOK': 'remove'}
@@ -187,7 +246,7 @@ def run():
         assert unknown['environment']['product_version'] is None
         assert unknown['policy']['remote_control']['status'] == 'blocked', 'Unknown version must not hide the retained GrowthBook blocker'
         assert not marker.exists(), 'version discovery must never run the target executable'
-        print('PASS: static version identity, old/new/unknown matrix, seven-field inspect, explicit release, custom actions/validation/noop/receipt/restore, external edits, stale product, distinct value semantics')
+        print('PASS: static version identity, old/new/unknown matrix, 27-field v5 inspect, explicit release, custom actions/values/validation/noop/receipt/restore, external edits, stale product, distinct value semantics')
 
 
 if __name__ == '__main__':

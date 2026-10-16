@@ -279,28 +279,59 @@ fn tui() {
                         show(&inspected);
                         continue;
                     }
-                    println!("只选择当前配置根的字段：keep 保持原值，disable 关闭，remove 移除覆盖（可能重新开放流量）。需新启动；稍后显示准确 diff 并再次批准。");
+                    println!("只选择当前配置根的字段：keep 保持原值，disable 关闭，enable 打开，set 写入指定值，remove 移除覆盖（可能重新开放流量）。需新启动；稍后显示准确 diff 并再次批准。");
                     let mut choices = serde_json::Map::new();
+                    let mut values = serde_json::Map::new();
+                    let schema = lintel_operations::schema("plan_policy").unwrap();
                     for rule in inspected["data"]["policy"]["rules"].as_array().unwrap() {
+                        let key = rule["key"].as_str().unwrap();
+                        // Use the same finite action contract as the named CLI.
+                        // A masked current value does not turn an ordinary field
+                        // into the separately protected credential-header field.
+                        let actions: Vec<&str> = schema["properties"]["custom_settings"]
+                            ["properties"][key]["enum"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|value| value.as_str().unwrap())
+                            .collect();
                         println!(
                             "{} · {} · 当前 {}",
                             rule["label"].as_str().unwrap(),
-                            rule["key"].as_str().unwrap(),
+                            key,
                             rule["value"]
                         );
                         let action = loop {
-                            let action = read_line("keep / disable / remove [keep]: ");
+                            let action = read_line(&format!("{} [keep]: ", actions.join(" / ")));
                             if action.is_empty() {
                                 break "keep".to_string();
                             }
-                            if ["keep", "disable", "remove"].contains(&action.as_str()) {
+                            if actions.contains(&action.as_str()) {
                                 break action;
                             }
-                            println!("请输入 keep / disable / remove。");
+                            println!("请输入 {}。", actions.join(" / "));
                         };
-                        choices.insert(rule["key"].as_str().unwrap().to_string(), json!(action));
+                        if action == "set" {
+                            // The core carries the value in a separate channel, so it
+                            // can never be applied without naming this field and action.
+                            let value = loop {
+                                let value = read_line("set 写入的值（非空、不含换行）: ");
+                                if !value.is_empty() {
+                                    break value;
+                                }
+                                println!("set 需要非空字符串值。");
+                            };
+                            values.insert(key.to_string(), json!(value));
+                        }
+                        choices.insert(key.to_string(), json!(action));
                     }
                     request["custom_settings"] = choices.into();
+                    // An empty object is not the same request as an absent one: the
+                    // core refuses a nonempty-required empty map, so only send it
+                    // when a `set` action actually produced a value.
+                    if !values.is_empty() {
+                        request["custom_values"] = values.into();
+                    }
                 }
                 request
             }

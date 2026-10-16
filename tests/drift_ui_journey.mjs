@@ -18,6 +18,7 @@ let browser,page;
 function drift(label){return {status:'drift',changes:[{key:'DO_NOT_TRACK',label,value:label,status:'drift',source:'synthetic',effect_timing:'next_launch'}]};}
 async function core(alias,payload){
   calls.push({alias,...payload});
+  if(payload.command==='drift'&&payload.lightweight)return {ok:true,data:{status:'unchanged',changes:[]}};
   if(payload.command==='drift')return new Promise(resolve=>waiting.push({alias,payload,resolve}));
   if(payload.command==='accept_drift'&&holdAccept)await new Promise(resolve=>pendingAccept=resolve);
   const data={discover:{environments,capabilities:[]},jobs:{jobs:[]},inspect:{settings:[],assets:[],warnings:[]},accept_drift:{status:'accepted'}}[payload.command];

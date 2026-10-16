@@ -25,6 +25,14 @@ executed check fails. `deferred` and `skipped` checks never count as passes.
 
 The table below lists the equivalent raw commands; [开发与文档](../README.md#开发与文档) points to this entrypoint.
 
+## 客户端控制增强
+
+`python3 tests/verify.py --checks journey-client-control --require-passed` 通过真实 CLI 子进程、独立合成 HOME/state 和两个配置根核对有限清单、默认遮蔽身份、同环境快照及双环境对照；也实际执行加密配置编辑、原任务的所选字段恢复、一次批准的配置＋身份＋残留合成操作，以及独立 `lintel.residue/1` 原路径恢复。它验证后续无关字段保留、身份重置不注销、未选原件不变、目标环境绑定、原 ID 不重放及口令不进入持久回执。观察阶段不运行 inert Claude、不产生 mutation job；后续 mutation 阶段只改合成原件。
+
+`recipe-test` 检查三类配方的准确 intent、按 host/environment 保存普通默认值、敏感值不持久化，以及每次仍需重新预览。`client-control-ui` 在 built App 中调用真实 core，核对合成批准、标识显隐／复制、独立备份读取恢复、高级 JSON 编辑与所选字段恢复、逐项接受语义基线、跨环境普通配置实际写入、配方新计划及 900×640／1120×760 的 Day/Night 布局，包括展开后的下拉／密码／数字／JSON 表单、配置接收端投影，以及长表单滚动时页眉与操作栏固定。locale、clipboard 与 Finder transport 使用明确建模的 native 边界；这是 Chromium 的真实 core UI 证据，不是原生 WebKit／Finder 或个人 profile 验收。
+
+这三个检查均不进入隐式默认组；`journey-client-control` 在 core/full 的 native CI 组，`recipe-test` 在 frontend 组，`client-control-ui` 在 browser 组，通过同一 canonical entrypoint 调用。它们不验证真实 Claude 的 exporter 行为、身份重新生成、个人账号、生产 SSH、安装或正式发行。规格见[客户端控制增强](specs/client-control.md)。
+
 ## 独立试用接续
 
 2026-10-15 将外部 Linux 六文件合成试用中的相关断言合入既有 `journey-agent-cli`，不另建检查入口。该 journey 现在通过 named CLI 核对：无 state 的静态发现；四件清单中精确选择三件的预检／归档；同一原任务 ID 的完成／查询；全部六份源文件逐字节不变；另一份 HOME／state 的独立包清单、SHA-256 与指令正文；独立读者没有源归档记录；输出及双方持久 JSON 不含测试口令，正常读取／完成不留解密 staging。既有选择性迁入、保全、等待超时及恢复场景继续保留。named CLI helper 使用临时 cwd；所有子进程使用显式合成 HOME／state 与有限环境，不继承调用者凭据、代理或 test hooks，需要的故障屏障由该旅程自行明确注入。

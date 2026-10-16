@@ -24,8 +24,12 @@ const DECLARATION_FLAGS: [(&str, &str); 4] = [
 // Keys owned by the residue section shape itself.
 const RESIDUE_RESERVED: [&str; 2] = ["totals", "scan_complete"];
 
-fn masked(key: &str) -> bool {
+fn masked(key: &str, value: &Value) -> bool {
     MASKED_KEYS.contains(&key)
+        || (key == "OTEL_EXPORTER_OTLP_ENDPOINT"
+            && value
+                .as_str()
+                .is_some_and(|text| text.contains(['@', '?', '#'])))
 }
 
 /// One switch: the current string value (or null), its finite rule status and,
@@ -35,9 +39,12 @@ fn settings_entry(key: &str, env: Option<&Value>) -> Value {
     let absent = Value::Null;
     let value = raw.unwrap_or(&absent);
     let mut entry = json!({"value": valstr(value), "status": policy::setting_status(key, value)});
-    if masked(key) && raw.is_some() {
+    if masked(key, value) && raw.is_some() {
         entry["value"] = Value::Null;
         entry["masked"] = json!(true);
+    }
+    if raw.is_some() && !value.is_string() {
+        entry["uninterpretable"] = json!(true);
     }
     entry
 }
@@ -108,7 +115,7 @@ fn identity_digest<'a>(identity_binding: Option<&'a Value>) -> Option<&'a str> {
 
 fn identity(identity_binding: Option<&Value>) -> Value {
     let digest = identity_digest(identity_binding);
-    json!({"userID": {
+    json!({"comparison_scope": identity_binding.and_then(|binding| binding.get("comparison_scope")), "userID": {
         "digest": digest,
         "state": if digest.is_some() { "observed" } else { "unknown" },
     }})
@@ -130,9 +137,9 @@ fn residue_summary(residue: &Value) -> Value {
         entry.0 += location["file_count"].as_u64().unwrap_or(0);
         entry.1 += location["total_bytes"].as_u64().unwrap_or(0);
     }
-    let counted = categories
-        .values()
-        .fold((0u64, 0u64), |sum, entry| (sum.0 + entry.0, sum.1 + entry.1));
+    let counted = categories.values().fold((0u64, 0u64), |sum, entry| {
+        (sum.0 + entry.0, sum.1 + entry.1)
+    });
     let totals = residue.get("totals");
     let mut out = Map::new();
     for (category, (count, bytes)) in &categories {
@@ -200,6 +207,36 @@ fn digest_of(snapshot: &Value) -> Option<&str> {
         .filter(|digest| !digest.is_empty())
 }
 
+fn identity_verdict<'a>(a: &Value, b: &Value, different: &'a str) -> &'a str {
+    // Missing scopes retain compatibility for the original injected snapshot
+    // format. A bound snapshot cannot be compared against another salt domain
+    // (or an unbound legacy observation) as if a changed salt were a changed ID.
+    if a["identity"]["comparison_scope"] != b["identity"]["comparison_scope"] {
+        return "unknown";
+    }
+    let compared = crate::residue::identity_compare(
+        &json!({"digests":{"userID":digest_of(a)}}),
+        &json!({"digests":{"userID":digest_of(b)}}),
+    );
+    match compared["userID"].as_str() {
+        Some("same") => "same",
+        Some("changed") => different,
+        _ => "unknown",
+    }
+}
+
+fn complete_startup(snapshot: &Value) -> bool {
+    coverage_flag(snapshot, "startup")
+        && snapshot["coverage"]["startup_complete"] == true
+        && snapshot["coverage"]["declarations_incomplete"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+}
+
+fn complete_residue(snapshot: &Value) -> bool {
+    coverage_flag(snapshot, "residue") && snapshot["residue"]["scan_complete"] == true
+}
+
 fn declaration_key(item: &Value) -> (String, String) {
     (
         item["scope"].as_str().unwrap_or("").to_string(),
@@ -259,7 +296,7 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
     });
     let settings_covered = coverage_flag(old, "settings") && coverage_flag(new, "settings");
     let startup_covered = coverage_flag(old, "startup") && coverage_flag(new, "startup");
-    let residue_covered = coverage_flag(old, "residue") && coverage_flag(new, "residue");
+    let residue_covered = complete_residue(old) && complete_residue(new);
     // Undecidable coverage, not a change: it only decides the status when no
     // substantive change was found at all.
     let mut undecided = !(settings_covered
@@ -267,6 +304,7 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
         && residue_covered
         && coverage_flag(old, "identity")
         && coverage_flag(new, "identity"));
+    undecided |= !complete_startup(old) || !complete_startup(new);
     let mut changes = vec![];
 
     let mut settings_changes = 0usize;
@@ -274,9 +312,8 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
     for (key, label) in ordered_settings_keys(old, new) {
         let left = old["settings"].get(&key).filter(|entry| entry.is_object());
         let right = new["settings"].get(&key).filter(|entry| entry.is_object());
-        let masked_pair =
-            left.is_some_and(|entry| entry["masked"] == true)
-                || right.is_some_and(|entry| entry["masked"] == true);
+        let masked_pair = left.is_some_and(|entry| entry["masked"] == true)
+            || right.is_some_and(|entry| entry["masked"] == true);
         let mut item = json!({"area": "settings", "key": key, "label": label});
         if rule_changed {
             item["reinterpreted_under_new_rules"] = json!(true);
@@ -294,6 +331,11 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
             (None, None) => "unchanged",
             (None, Some(_)) => "added",
             (Some(_), None) => "removed",
+            (Some(left), Some(right))
+                if left["uninterpretable"] == true || right["uninterpretable"] == true =>
+            {
+                "uncertain"
+            }
             (Some(left), Some(right)) if masked_pair => {
                 match (left["masked"] == true, right["masked"] == true) {
                     (true, false) if right["value"].is_null() => "removed",
@@ -309,7 +351,8 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
             (Value::Null, Value::Null)
         } else {
             (
-                left.map(|entry| entry["value"].clone()).unwrap_or(Value::Null),
+                left.map(|entry| entry["value"].clone())
+                    .unwrap_or(Value::Null),
                 right
                     .map(|entry| entry["value"].clone())
                     .unwrap_or(Value::Null),
@@ -320,6 +363,7 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
         }
         if state == "uncertain" {
             uncertain_settings += 1;
+            undecided = true;
         }
         if masked_pair {
             item["masked"] = json!(true);
@@ -358,6 +402,14 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
             let key = left.or(right).map(declaration_key).unwrap_or_default();
             let mut item = json!({"area": "declarations", "scope": key.0, "path": key.1});
             match (left, right) {
+                (Some(_), None) if !complete_startup(new) => {
+                    item["state"] = json!("incomplete");
+                    undecided = true;
+                }
+                (None, Some(_)) if !complete_startup(old) => {
+                    item["state"] = json!("incomplete");
+                    undecided = true;
+                }
                 (Some(left), None) => {
                     item["state"] = json!("disappeared");
                     item["old"] = left.clone();
@@ -371,6 +423,21 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
                     declaration_changes += 1;
                 }
                 (Some(left), Some(right)) => {
+                    if DECLARATION_FLAGS
+                        .iter()
+                        .any(|(_, name)| left[name].is_null() || right[name].is_null())
+                    {
+                        item["state"] = json!("incomplete");
+                        item["old"] = left.clone();
+                        item["new"] = right.clone();
+                        if left["state"] != right["state"] {
+                            item["observation_change"] =
+                                json!({"from":left["state"],"to":right["state"]});
+                        }
+                        undecided = true;
+                        changes.push(item);
+                        continue;
+                    }
                     // A source state change is reported through the same finite
                     // flag list, so a source can never silently change meaning.
                     let mut flags = vec![];
@@ -404,11 +471,7 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
         }
     }
 
-    let identity_state = match (digest_of(old), digest_of(new)) {
-        (Some(left), Some(right)) if left == right => "same",
-        (Some(_), Some(_)) => "changed",
-        _ => "unknown",
-    };
+    let identity_state = identity_verdict(old, new, "changed");
     if identity_state == "unknown" {
         undecided = true;
     }
@@ -426,8 +489,10 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
             let right = new["residue"]
                 .get(&category)
                 .filter(|entry| entry.is_object());
-            let count = |entry: Option<&Value>| entry.and_then(|e| e["count"].as_i64()).unwrap_or(0);
-            let bytes = |entry: Option<&Value>| entry.and_then(|e| e["bytes"].as_i64()).unwrap_or(0);
+            let count =
+                |entry: Option<&Value>| entry.and_then(|e| e["count"].as_i64()).unwrap_or(0);
+            let bytes =
+                |entry: Option<&Value>| entry.and_then(|e| e["bytes"].as_i64()).unwrap_or(0);
             let (old_count, new_count) = (count(left), count(right));
             let (old_bytes, new_bytes) = (bytes(left), bytes(right));
             let state = match (left, right) {
@@ -453,6 +518,59 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
         }
     }
 
+    // Additive source-aware semantics. Legacy snapshots cannot attest sources.
+    if old.get("configuration_sources").is_some() || new.get("configuration_sources").is_some() {
+        let covered = coverage_flag(old, "configuration_sources")
+            && coverage_flag(new, "configuration_sources");
+        if !covered {
+            undecided = true;
+            changes.push(
+                json!({"area":"settings","subject":"configuration_sources","state":"incomplete"}),
+            );
+        } else {
+            let mut left = BTreeMap::new();
+            let mut right = BTreeMap::new();
+            for (snapshot, rows) in [(old, &mut left), (new, &mut right)] {
+                for row in snapshot["configuration_sources"]["settings"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                {
+                    if row["scope"] == "user" {
+                        continue;
+                    }
+                    rows.insert(
+                        (
+                            row["source"].as_str().unwrap_or(""),
+                            row["key"].as_str().unwrap_or(""),
+                        ),
+                        row,
+                    );
+                }
+            }
+            let keys: std::collections::BTreeSet<_> =
+                left.keys().chain(right.keys()).copied().collect();
+            for key in keys {
+                let a = left.get(&key);
+                let b = right.get(&key);
+                let hidden = a.is_some_and(|r| r["masked"] == true)
+                    || b.is_some_and(|r| r["masked"] == true);
+                let state = match (a, b) {
+                    (None, Some(_)) => "added",
+                    (Some(_), None) => "removed",
+                    (Some(_), Some(_)) if hidden => "uncertain",
+                    (Some(a), Some(b)) if a["value"] == b["value"] => "unchanged",
+                    _ => "changed",
+                };
+                if state == "uncertain" {
+                    undecided = true;
+                } else if state != "unchanged" {
+                    settings_changes += 1;
+                }
+                changes.push(json!({"area":"settings","key":key.1,"path":key.0,"source":key.0,"label":key.1,"state":state,"masked":hidden,"old":if hidden{Value::Null}else{a.map(|r|r["value"].clone()).unwrap_or(Value::Null)},"new":if hidden{Value::Null}else{b.map(|r|r["value"].clone()).unwrap_or(Value::Null)},"reinterpreted_under_new_rules":rule_changed}));
+            }
+        }
+    }
     let substantive = settings_changes + declaration_changes + residue_changes + identity_changes;
     let status = if substantive > 0 {
         "changed"
@@ -482,6 +600,9 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
             "两侧快照的设置、来源声明、身份摘要与残留统计均未发现变化；{uncertain_settings} 项遮蔽值只能按可见值比较。"
         ),
     };
+    for row in &mut changes {
+        row["id"] = json!(crate::comparison_control::change_id(row));
+    }
     json!({"status": status, "rule_change": rule_change, "changes": changes, "summary": summary})
 }
 
@@ -490,19 +611,14 @@ pub(crate) fn compare(old: &Value, new: &Value) -> Value {
 /// finite declaration alignment and both residue sections. No digest is ever
 /// published.
 pub(crate) fn compare_pair(a: &Value, b: &Value) -> Value {
-    let identity = match (digest_of(a), digest_of(b)) {
-        (Some(left), Some(right)) if left == right => "same",
-        (Some(_), Some(_)) => "different",
-        _ => "unknown",
-    };
+    let identity = identity_verdict(a, b, "different");
     let mut settings = Map::new();
     let mut masked_settings = false;
     for (key, _) in ordered_settings_keys(a, b) {
         let left = a["settings"].get(&key).filter(|entry| entry.is_object());
         let right = b["settings"].get(&key).filter(|entry| entry.is_object());
-        let masked_pair =
-            left.is_some_and(|entry| entry["masked"] == true)
-                || right.is_some_and(|entry| entry["masked"] == true);
+        let masked_pair = left.is_some_and(|entry| entry["masked"] == true)
+            || right.is_some_and(|entry| entry["masked"] == true);
         masked_settings |= masked_pair;
         // A masked entry never republishes its value, whatever the caller left
         // in the snapshot; the visible comparison then sees two nulls.
@@ -512,7 +628,16 @@ pub(crate) fn compare_pair(a: &Value, b: &Value) -> Value {
                 .map(|entry| entry["value"].clone())
                 .unwrap_or(Value::Null)
         };
-        let same = left.is_some() && right.is_some() && value(left) == value(right);
+        let same = if masked_pair
+            || !coverage_flag(a, "settings")
+            || !coverage_flag(b, "settings")
+            || left.is_some_and(|entry| entry["uninterpretable"] == true)
+            || right.is_some_and(|entry| entry["uninterpretable"] == true)
+        {
+            Value::Null
+        } else {
+            json!(left.is_some() && right.is_some() && value(left) == value(right))
+        };
         let mut entry = json!({"a": value(left), "b": value(right), "same": same});
         if masked_pair {
             entry["masked"] = json!(true);
@@ -560,6 +685,8 @@ pub(crate) fn compare_pair(a: &Value, b: &Value) -> Value {
         "settings": settings,
         "declarations": {"only_a": only_a, "only_b": only_b, "both": both},
         "residue": {"a": a["residue"], "b": b["residue"]},
+        "configuration_sources":{"a":a["configuration_sources"],"b":b["configuration_sources"]},
+        "coverage": {"a":a["coverage"],"b":b["coverage"]},
         "note": note,
     })
 }

@@ -23,6 +23,8 @@
 
 完整目标仍在 [SPEC](SPEC.md)；[产品基线](specs/product-baseline.md)、[18 项基线证据](specs/product-baseline-status.md)、[完整验收](ACCEPTANCE.md) 和[验证指南](verification.md) 分别拥有目标、证据和检查入口。[当前状态](current-state.md) 是当前候选／资源／运行证据的短表，[候选历史](candidate-history.md) 保存早期观察；历史通过不自动成为当前交付声明。
 
+[客户端控制增强 mini spec](specs/client-control.md) 定义本轮外发控制、本地数据与身份、快照对照恢复、快捷配方的补充实施目标；实现与验收状态仍以当前状态和验证证据为准。
+
 [视觉语言](visual-language.md) 管理身份与可编辑资产；[官网托管](site-hosting.md) 管理明确授权后的 preview／production 上传与读回。官网与 App／CLI 的执行路径独立，合成网站示例不产生真实计划或回执。源码 push、构建候选、安装、App Release、feed 与网站部署是分别核对的结果。
 
 协议、规格、验证与开发者证据尚未完整翻译。英文读者可从 English hub 找到对应中文权威文件及语言标签。源码可见性不构成通用复用许可；原创材料的公开许可尚未选定，第三方权利保持原状。

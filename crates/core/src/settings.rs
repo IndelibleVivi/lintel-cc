@@ -38,9 +38,18 @@ impl Engine {
             {
                 return Err(err("plan_changed", "保存的计划与写入意图不一致"));
             }
+            let plan = if plan["kind"] == "client_workflow" {
+                crate::client_workflow::config_step(&plan)
+                    .ok_or_else(|| err("invalid_plan", "配置步骤缺失"))?
+            } else {
+                plan
+            };
             let environment = self.settings_plan_environment(&plan)?;
-            let current =
-                snapshot(&Path::new(string(&environment, "root")?).join("settings.json"))?;
+            let current = if plan["kind"] == "config_edit" {
+                self.config_plan_settings(&environment, &plan)?.2
+            } else {
+                snapshot(&Path::new(string(&environment, "root")?).join("settings.json"))?
+            };
             if current == job["settings_write"]["after"] {
                 Ok("written")
             } else if current == job["settings_write"]["before"] {

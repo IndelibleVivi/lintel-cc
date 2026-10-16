@@ -292,7 +292,7 @@ fn write_atomic(
 // One admission budget for persisted plans, jobs and registry records. A
 // successful write must remain readable through `load`; content capacity alone
 // does not bound the expanded paths and mappings in a frozen work plan.
-const STATE_JSON_LIMIT: u64 = 16 * 1024 * 1024;
+pub(crate) const STATE_JSON_LIMIT: u64 = 16 * 1024 * 1024;
 pub fn save(path: &Path, value: &Value) -> Result<()> {
     let bytes = serde_json::to_vec_pretty(value)?;
     if bytes.len() as u64 > STATE_JSON_LIMIT {

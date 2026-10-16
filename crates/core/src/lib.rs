@@ -3,15 +3,21 @@ mod archive;
 #[cfg(test)]
 mod baseline_tests;
 mod cleanup;
+mod client_data;
+mod client_workflow;
+mod comparison_control;
 mod components;
+mod config_control;
 mod context;
 mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
 mod network;
+mod observe;
 mod package;
 mod policy;
 mod residue;
+mod residue_archive;
 mod service;
 mod session;
 mod settings;
@@ -434,16 +440,33 @@ impl Engine {
         actions: Value,
         extra: Value,
     ) -> Result<Value> {
+        let mut extra = extra;
+        if matches!(kind, "launch" | "resume") {
+            extra["lightweight_changes"] = self
+                .dispatch(&json!({"command":"drift","environment_id":e["id"],"lightweight":true}))
+                .unwrap_or_else(
+                    |error| json!({"status":"incomplete","changes":[],"error":{"code":error.code}}),
+                );
+        }
         // Freeze the raw settings bytes and root identity without parsing:
         // plans that never write settings (rebuild/cleanup/import) must not be
         // gated on a parseable settings file. Settings-writing plans parse
         // separately in their dispatch arm before calling this.
         let root = PathBuf::from(string(e, "root")?);
         guard(&root)?;
-        let snap = snapshot(&root.join("settings.json"))?;
+        let settings_path = if kind == "config_edit" {
+            PathBuf::from(string(&extra, "config_path")?)
+        } else {
+            root.join("settings.json")
+        };
+        let snap = snapshot(&settings_path)?;
         let rm = fs::metadata(&root)?;
         use std::os::unix::fs::MetadataExt;
         let mut warnings = self.warnings(e);
+        if kind == "config_edit" {
+            warnings[0] =
+                "只修改预览内明确选择的配置来源；静态配置、真实加载与运行效果分别核对。".into();
+        }
         if extra["policy"]["keep_remote_control"] == true {
             warnings.push(
                 extra["policy"]["remote_control"]["summary"]
@@ -452,7 +475,8 @@ impl Engine {
                     .into(),
             );
         }
-        if extra["policy"].is_object()
+        if kind != "config_edit"
+            && extra["policy"].is_object()
             && changes
                 .as_array()
                 .is_some_and(|v| v.iter().any(|change| change["after"].is_null()))
@@ -487,10 +511,16 @@ impl Engine {
             "register" => self.register(string(r, "name")?, Path::new(string(r, "root")?), false),
             "create_environment" => self.create(string(r, "name")?, None),
             "inspect_components" => self.inspect_components(r),
+            "config_inspect" => self.config_inspect(r),
+            "config_read" => self.config_read(r),
+            "plan_config_edit" => self.plan_config_edit(r),
+            "plan_config_apply" => self.plan_config_apply(r),
+            "config_restore_inspect" => self.config_restore_inspect(r),
+            "plan_config_restore" => self.plan_config_restore(r),
             "inspect" => {
                 let e = policy::environment(self.env(r)?, self.executable());
                 let (path, doc, _) = self.settings(&e)?;
-                let settings:Vec<Value>=policy::fields().map(|(key,label)|{let masked=key==policy::MASKED_KEY&&doc["env"][key].is_string();json!({"key":key,"label":label,"value":if masked{Value::Null}else{valstr(&doc["env"][key])},"masked":masked,"source":path,"effect_timing":"next_launch","runtime_verified":false,"status":policy::setting_status(key,&doc["env"][key])})}).collect();
+                let settings:Vec<Value>=policy::fields().map(|(key,label)|{let masked=config_control::masked_setting(key,&doc["env"][key]);json!({"key":key,"label":label,"value":if masked{Value::Null}else{valstr(&doc["env"][key])},"masked":masked,"source":path,"effect_timing":"next_launch","runtime_verified":false,"status":policy::setting_status(key,&doc["env"][key])})}).collect();
                 let assets = work::summaries(Path::new(string(&e, "root")?))?;
                 Ok(
                     json!({"environment":e,"settings":settings,"assets":assets,"policy":policy::assessment(&doc,&e["product_evidence"],policy::trusted_devices(r)?),"warnings":self.warnings(&e)}),
@@ -528,11 +558,25 @@ impl Engine {
                 Ok(report)
             }
             "plan_policy" => {
+                if r.get("config_path").is_some() {
+                    return self.plan_config_policy(r);
+                }
                 let e = policy::environment(self.env(r)?, self.executable());
                 self.block_managed(&e)?;
                 let (path, doc, _) = self.settings(&e)?;
                 let preset = string(r, "preset")?;
                 let (changes, assessment) = policy::plan(&doc, &e["product_evidence"], r, &path)?;
+                // A masked public diff cannot carry restoration bytes. Use the
+                // existing encrypted configuration path before changing such a
+                // field, preserving the exact original for selected restoration.
+                if changes
+                    .as_array()
+                    .is_some_and(|items| items.iter().any(|change| change["masked"] == true))
+                {
+                    let mut request = r.clone();
+                    request["config_path"] = json!(path);
+                    return self.plan_config_policy(&request);
+                }
                 let p = self.plan(
                     &e,
                     "policy",
@@ -545,8 +589,8 @@ impl Engine {
                     vec![
                         "登录与凭据",
                         "会话、指令与记忆",
-                        "更新与 WebFetch 安全检查",
-                        "通用代理与自设 OTel",
+                        "未选择的配置字段与通用代理",
+                        "其他环境与运行中的客户端会话",
                     ],
                     json!([{"id":"settings","label":"应用明确的外发设置并读回","reversible":true}]),
                     json!({"preset":preset,"product":e["product_evidence"],"policy":assessment}),
@@ -574,6 +618,21 @@ impl Engine {
                 if old["hash"] != digest(&serde_json::to_vec(&unhashed)?) {
                     return Err(err("plan_changed", "保存的计划已变化，无法据此恢复"));
                 }
+                let old = if old["kind"] == "client_workflow" {
+                    client_workflow::config_step(&old)
+                        .ok_or_else(|| err("not_restorable", "组合没有配置步骤"))?
+                } else {
+                    old
+                };
+                if old["kind"] == "config_edit" {
+                    let selected: Vec<_> = old["extra"]["config_patches"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|patch| patch["key"].clone())
+                        .collect();
+                    return self.plan_config_restore(&json!({"environment_id":old["environment_id"],"job_id":jid,"selected_keys":selected}));
+                }
                 let e = self.settings_plan_environment(&old)?;
                 let (path, doc, _) = self.settings(&e)?;
                 let mut changes = vec![];
@@ -581,6 +640,9 @@ impl Engine {
                     .as_array()
                     .ok_or_else(|| err("invalid_plan", "计划损坏"))?
                 {
+                    if c["masked"] == true {
+                        return Err(err("not_restorable","原保护任务没有记录遮蔽原值，不能把空值当作恢复材料；请使用加密配置备份或重新编辑"));
+                    }
                     let k = string(c, "key")?;
                     if valstr(&doc["env"][k]) != c["after"] {
                         return Err(err(
@@ -618,8 +680,19 @@ impl Engine {
             "plan_service_quiesce" => self.plan_service_quiesce(r),
             "plan_service_resume" => self.plan_service_resume(r),
             "cleanup_inspect" => self.cleanup_inspect(r),
+            "residue_inventory" => self.residue_inventory(r),
+            "identity_inspect" => self.identity_inspect(r),
+            "snapshot_save" => self.snapshot_save(r),
+            "snapshot_list" => self.snapshot_list(r),
+            "snapshot_compare" => self.snapshot_compare(r),
+            "snapshot_accept" => self.snapshot_accept(r),
+            "env_compare" => self.env_compare(r),
             "auth_probe" => self.auth_probe(r),
             "plan_cleanup" => self.plan_cleanup(r),
+            "plan_identity_reset" => self.plan_identity_reset(r),
+            "plan_client_workflow" => self.plan_client_workflow(r),
+            "residue_archive_inspect" => self.residue_archive_inspect(r),
+            "plan_residue_restore" => self.plan_residue_restore(r),
             "reactivate_environment" => {
                 let e = self.env(r)?;
                 let mut all = self.inventory()?;
@@ -688,6 +761,9 @@ impl Engine {
             }
             "drift" => {
                 let e = self.env(r)?;
+                if let Some(result) = self.semantic_drift(&e)? {
+                    return Ok(result);
+                }
                 let (_, doc, _) = self.settings(&e)?;
                 let p = self.path("baselines", string(&e, "id")?);
                 if !p.exists() {
@@ -697,7 +773,7 @@ impl Engine {
                 let mut changes = vec![];
                 for (key, label) in policy::fields() {
                     if base.get(key).is_some() && base[key] != valstr(&doc["env"][key]) {
-                        let masked = key == policy::MASKED_KEY;
+                        let masked = config_control::masked_setting(key, &doc["env"][key]);
                         changes.push(json!({"key":key,"label":label,"value":if masked{Value::Null}else{valstr(&doc["env"][key])},"masked":masked,"source":"user_settings","effect_timing":"next_launch","status":"changed"}))
                     }
                 }
@@ -707,7 +783,41 @@ impl Engine {
             }
             "accept_drift" => {
                 let e = self.env(r)?;
-                self.baseline(&e)?;
+                if self.snapshot_baseline_id(&e)?.is_some() {
+                    return Err(err("semantic_baseline_selection_required", "此环境已使用逐项语义基线；请保存新快照并通过 snapshot_accept 选择准确差异，旧字段 baseline 不会覆盖它"));
+                }
+                if let Some(keys) = r.get("selected_keys") {
+                    let list = keys
+                        .as_array()
+                        .filter(|k| !k.is_empty())
+                        .ok_or_else(|| err("invalid_selection", "请选择至少一个字段"))?;
+                    let (_, doc, _) = self.settings(&e)?;
+                    let path = self.path("baselines", string(&e, "id")?);
+                    let mut base = if path.exists() {
+                        load(&path)?
+                    } else {
+                        json!({})
+                    };
+                    let mut seen = std::collections::HashSet::new();
+                    for key in list {
+                        let key = key
+                            .as_str()
+                            .filter(|k| {
+                                policy::fields().any(|(known, _)| known == *k) && seen.insert(*k)
+                            })
+                            .ok_or_else(|| err("invalid_selection", "字段无效或重复"))?;
+                        if config_control::masked_setting(key, &doc["env"][key]) {
+                            return Err(err(
+                                "private_setting_not_trackable",
+                                "遮蔽值不能作为普通 baseline 值保存",
+                            ));
+                        }
+                        base[key] = valstr(&doc["env"][key]);
+                    }
+                    save(&path, &base)?;
+                } else {
+                    self.baseline(&e)?;
+                }
                 Ok(json!({"status":"accepted"}))
             }
             "launch_context" => {
@@ -738,7 +848,7 @@ impl Engine {
         for (key, _) in policy::fields() {
             // The credential-carrying headers key is never persisted, so drift
             // simply does not track it (snapshot v2 handles it masked).
-            if key == policy::MASKED_KEY {
+            if config_control::masked_setting(key, &doc["env"][key]) {
                 continue;
             }
             b[key] = valstr(&doc["env"][key])
@@ -763,6 +873,9 @@ impl Engine {
         if jp.exists() {
             return self.dispatch(&json!({"command":"job","job_id":pid}));
         }
+        if p.get("internal_parent_id").is_some() {
+            return Err(err("internal_plan", "组合步骤只能通过原组合计划批准与执行"));
+        }
         // Host-scoped network plans carry no Claude environment, root or
         // settings snapshot. Handle them on their own finite path before any
         // environment/settings assumption, and never weaken unknown kinds.
@@ -775,8 +888,9 @@ impl Engine {
         // existing original jobs query-only above this new-intent admission.
         match p["kind"].as_str() {
             Some(
-                "policy" | "restore" | "rebuild" | "preserve" | "archive" | "cleanup" | "import"
-                | "service_quiesce" | "service_resume",
+                "residue_restore" | "client_workflow" | "policy" | "restore" | "config_edit"
+                | "rebuild" | "preserve" | "archive" | "cleanup" | "import" | "service_quiesce"
+                | "service_resume",
             ) => {}
             _ => {
                 return Err(err(
@@ -802,14 +916,15 @@ impl Engine {
         // Settings-writing plans still require a fully parsed document.
         let (path, mut doc, snap) = match p["kind"].as_str() {
             Some(
-                "rebuild" | "preserve" | "archive" | "cleanup" | "import" | "service_quiesce"
-                | "service_resume",
+                "residue_restore" | "client_workflow" | "rebuild" | "preserve" | "archive"
+                | "cleanup" | "import" | "service_quiesce" | "service_resume",
             ) => {
                 let path = root.join("settings.json");
                 let snap = snapshot(&path)?;
                 (path, Value::Null, snap)
             }
             Some("policy" | "restore") => self.settings(&e)?,
+            Some("config_edit") => self.config_plan_settings(&e, &p)?,
             _ => {
                 return Err(err(
                     "invalid_plan_kind",
@@ -863,12 +978,34 @@ impl Engine {
                 work::check_output_path(&p)?;
             }
         } else if p["kind"] == "cleanup" {
-            self.block_managed(&e)?;
-            self.check_cleanup(&e, &p, r)?;
+            match p["extra"]["recipe"].as_str() {
+                Some(client_data::CLEAR_RESIDUE_RECIPE) => self.check_residue_clear(&p, r)?,
+                Some(client_data::IDENTITY_RESET_RECIPE) => self.check_identity_reset(&p, r)?,
+                _ => {
+                    self.block_managed(&e)?;
+                    self.check_cleanup(&e, &p, r)?;
+                }
+            }
         } else if p["kind"] == "import" {
             work::check_passphrase(r)?;
         } else if p["kind"] == "service_quiesce" || p["kind"] == "service_resume" {
             self.check_service_plan(&p)?;
+        } else if p["kind"] == "residue_restore" {
+            self.check_residue_restore(&p, r)?;
+        } else if p["kind"] == "client_workflow" {
+            self.check_client_workflow(&e, &p, r)?;
+        } else if p["kind"] == "config_edit" {
+            if p["extra"]["archive_passphrase_required"] == true {
+                work::check_passphrase(r)?;
+            }
+            if p["extra"]["policy"].is_object() && p["rule_version"] != RULE {
+                return Err(err("rule_changed", "策略规则已变化，请重新预览"));
+            }
+            if p["extra"]["policy"].is_object()
+                && p["extra"]["policy"]["product"] != policy::product(self.executable().as_deref())
+            {
+                return Err(err("stale_product", "产品版本在预览后改变，请重新预览"));
+            }
         } else {
             self.block_managed(&e)?;
         }
@@ -889,6 +1026,15 @@ impl Engine {
         j["status"] = json!("executing");
         save(&jp, &j)?;
         let result = (|| -> Result<()> {
+            if p["kind"] == "residue_restore" {
+                return self.execute_residue_restore(&e, &p, r, &mut j, &jp);
+            }
+            if p["kind"] == "client_workflow" {
+                return self.execute_client_workflow(&e, &p, r, &mut j, &jp);
+            }
+            if p["kind"] == "config_edit" {
+                return self.execute_config_edit(&e, &p, r, &mut j, &jp);
+            }
             if p["kind"] == "service_quiesce" || p["kind"] == "service_resume" {
                 return self.execute_service(&p, &mut j, &jp);
             }
@@ -920,7 +1066,15 @@ impl Engine {
                 return Ok(());
             }
             if p["kind"] == "cleanup" {
-                return self.cleanup(&e, &p, r, &mut j, &jp);
+                return match p["extra"]["recipe"].as_str() {
+                    Some(client_data::CLEAR_RESIDUE_RECIPE) => {
+                        self.clear_residue(&e, &p, r, &mut j, &jp)
+                    }
+                    Some(client_data::IDENTITY_RESET_RECIPE) => {
+                        self.identity_reset(&e, &p, r, &mut j, &jp)
+                    }
+                    _ => self.cleanup(&e, &p, r, &mut j, &jp),
+                };
             }
             if p["kind"] == "import" {
                 return self.import_work(&e, &p, r, &mut j, &jp);
@@ -1326,6 +1480,31 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
 }
 
 fn public_plan(mut p: Value) -> Result<Value> {
+    if p["extra"]["lightweight_changes"].is_object() {
+        p["lightweight_changes"] = p["extra"]["lightweight_changes"].clone();
+    }
+    if p["kind"] == "residue_restore" {
+        p["residue_restore"] = json!({"files":p["extra"]["manifest"]});
+    }
+    if p["kind"] == "client_workflow" {
+        p["workflow"] = json!(p["extra"]["workflow"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .cloned()
+            .map(public_plan)
+            .collect::<Result<Vec<_>>>()?);
+        p["file_count"] = p["extra"]["file_count"].clone();
+    }
+    if p["extra"]["recipe"] == client_data::CLEAR_RESIDUE_RECIPE {
+        p["residue_selection"] = json!({"files":p["extra"]["files"].as_array().map(|files|files.iter().map(|f|json!({"path":f["path"],"bytes":f["bytes"]})).collect::<Vec<_>>()),"archive_before_clear":p["extra"]["archive_before_clear"]});
+    }
+    if p["extra"]["recipe"] == client_data::IDENTITY_RESET_RECIPE {
+        p["identity_reset"] = json!({"path":p["extra"]["identity"]["path"],"remove_keys":["userID"],"retained_keys":p["extra"]["identity"]["retained_keys"],"backup_paths":p["extra"]["backups"].as_array().map(|files|files.iter().map(|f|f["path"].clone()).collect::<Vec<_>>()),"logout":false});
+    }
+    if p["kind"] == "config_edit" {
+        p["configuration"] = json!({"path":p["extra"]["config_path"],"scope":p["extra"]["config_scope"],"field_count":p["extra"]["config_patches"].as_array().map_or(0,Vec::len),"private_values_masked":true});
+    }
     if p["kind"] == "import" {
         // `import_manifest` keeps its historical relative `destination` (the
         // path inside the frozen root) for existing callers. The absolute final
@@ -1377,7 +1556,17 @@ fn public_plan(mut p: Value) -> Result<Value> {
     }
     if p["extra"]["archive_passphrase_required"] == true {
         p["archive_passphrase_required"] = json!(true);
-        p["file_count"] = json!(p["extra"]["manifest"].as_array().map_or(0, Vec::len));
+        p["file_count"] = json!(if p["kind"] == "client_workflow" {
+            p["extra"]["file_count"].as_u64().unwrap_or(0) as usize
+        } else if p["kind"] == "config_edit" {
+            1
+        } else if p["extra"]["recipe"] == client_data::CLEAR_RESIDUE_RECIPE {
+            p["extra"]["files"].as_array().map_or(0, Vec::len)
+        } else if p["extra"]["recipe"] == client_data::IDENTITY_RESET_RECIPE {
+            1 + p["extra"]["backups"].as_array().map_or(0, Vec::len)
+        } else {
+            p["extra"]["manifest"].as_array().map_or(0, Vec::len)
+        });
     }
     // Publish the finite work-selection description (mode + exact paths) so the
     // App and CLI show exactly what was chosen; the private extra stays hidden.
@@ -1472,7 +1661,10 @@ mod telemetry_catalog_tests {
     fn telemetry_catalog_is_static_state_free_and_rejects_unknown_fields() {
         let response = handle_request(json!({"command":"telemetry_catalog"}));
         assert_eq!(response["ok"], true);
-        assert_eq!(response["data"]["schema"], "lintel.telemetry-destinations/1");
+        assert_eq!(
+            response["data"]["schema"],
+            "lintel.telemetry-destinations/1"
+        );
         assert_eq!(
             response["data"]["destinations"]
                 .as_array()

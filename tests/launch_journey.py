@@ -90,11 +90,13 @@ with tempfile.TemporaryDirectory(prefix='lintel-launch-') as tmp:
                         'DISABLE_FEEDBACK_COMMAND': 'false', 'DISABLE_GROWTHBOOK': 'true',
                         'UNRELATED': 'keep'}, 'permissions': {'allow': ['Read']}}
     settings.write_text(json.dumps(original))
-    # Seven canonical core controls in display order. Invalid action must re-prompt,
+    # All canonical controls in display order. Invalid action must re-prompt,
     # never silently preserve or apply a different choice. Approval remains separate.
-    output = terminal(['tui'], (f"4\n{environment['id']}\ncustom\nn\n\n"
-                               "keep\nkeep\ninvalid\ndisable\nkeep\nkeep\nremove\nkeep\napply\nq\n").encode())
-    assert '自定义保护' in output and '请输入 keep / disable / remove' in output
+    actions=[]
+    for rule in request(dict(command='inspect',environment_id=environment['id']))['policy']['rules']:
+        actions.append({'DISABLE_FEEDBACK_COMMAND':'invalid\ndisable','DISABLE_GROWTHBOOK':'remove'}.get(rule['key'],'keep'))
+    output = terminal(['tui'], (f"4\n{environment['id']}\ncustom\nn\n\n"+'\n'.join(actions)+"\napply\nq\n").encode())
+    assert '自定义保护' in output and '请输入 keep / disable / enable / remove / set' in output
     written = json.loads(settings.read_text())
     assert written['env']['DISABLE_FEEDBACK_COMMAND'] == '1'
     assert 'DISABLE_GROWTHBOOK' not in written['env']

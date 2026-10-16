@@ -3,7 +3,7 @@ use crate::{err, Result};
 use serde_json::{json, Map, Value};
 use std::path::Path;
 
-pub(crate) const RULE: &str = "claude-privacy-v4-2026-10-16";
+pub(crate) const RULE: &str = "claude-privacy-v5-2026-10-16";
 pub(crate) const FLAGS: [(&str, &str); 4] = [
     ("DISABLE_TELEMETRY", "产品指标"),
     ("DISABLE_ERROR_REPORTING", "错误回报"),
@@ -90,10 +90,27 @@ const ANY_SOURCES: Sources = Sources {
 pub(crate) const MASKED_KEY: &str = "OTEL_EXPORTER_OTLP_HEADERS";
 const CONTENT_LIMIT_KEY: &str = "CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH";
 /// Documented exporter selector tokens. Logs and traces use otlp/console/none;
-/// metrics additionally allows prometheus. Each field admits only its own set so
-/// a plan cannot record a selector the product would ignore.
+/// metrics additionally allows prometheus. A value may name several exporters as
+/// a comma-separated list (for example `otlp,console`); each field admits only
+/// its own tokens so a plan cannot record a selector the product would ignore.
+/// `none` disables the signal and is exclusive: mixing it with another selector
+/// would record a value whose meaning is not the verified one.
 const SIGNAL_EXPORTER_TOKENS: &[&str] = &["otlp", "console", "none"];
 const METRICS_EXPORTER_TOKENS: &[&str] = &["otlp", "prometheus", "console", "none"];
+
+/// True when this value must never be echoed by the assessment, a plan change or
+/// any other ordinary output: the OTLP request-header always, and an exporter
+/// endpoint whose URL itself carries credentials or query material
+/// (`user:pass@host`, `?query`, `#fragment`). Such a value can only be supplied
+/// to the product from its owning source or through the private advanced editor,
+/// never through a plain plan payload.
+pub(crate) fn credential_bearing(key: &str, value: &Value) -> bool {
+    key == MASKED_KEY
+        || (key == "OTEL_EXPORTER_OTLP_ENDPOINT"
+            && value
+                .as_str()
+                .is_some_and(|text| text.contains(['@', '?', '#'])))
+}
 
 const CATALOG: &[FieldRule] = &[
     FieldRule {
@@ -312,7 +329,7 @@ const CATALOG: &[FieldRule] = &[
         semantics: Semantics::Value,
         sources: OTEL_SOURCES,
         default_state: "unset",
-        impact: "OTLP 请求头，通常承载接收端认证凭据；去向由 OTEL_EXPORTER_OTLP_ENDPOINT 决定。该值属于凭据：Lintel 一律遮蔽，不读取、不显示、也不写入任何计划输出。",
+        impact: "OTLP 请求头，通常承载接收端认证凭据；去向由 OTEL_EXPORTER_OTLP_ENDPOINT 决定。该值通常属于凭据：普通保护方案一律遮蔽，不显示原值，也不写入普通计划输出；修改此值需要明确选择来源的私有高级编辑。",
         version_floor: None,
         depends_on: &[],
     },
@@ -429,22 +446,45 @@ fn validate_custom_value(rule: &FieldRule, text: &str) -> Result<()> {
                     "接收端地址不能含空白；请给出完整 URL（例如 https://collector.example:4318）",
                 ));
             }
+            // A URL that carries credentials or query/fragment material is never
+            // written through a plain plan payload: the change list is also the
+            // plan output, so such a value could not be applied without printing
+            // it. Refuse it here and route the user to the private advanced
+            // editor, which keeps the raw value out of every ordinary surface.
+            if credential_bearing("OTEL_EXPORTER_OTLP_ENDPOINT", &json!(text)) {
+                return Err(err(
+                    "credential_endpoint_not_writable",
+                    "该地址包含凭据或查询材料（@ / ? / #），Lintel 不会把它放进变更清单或普通计划输出。请在该值的归属来源中设置，或改用私有高级编辑。",
+                ));
+            }
         }
         "OTEL_LOGS_EXPORTER" | "OTEL_TRACES_EXPORTER" | "OTEL_METRICS_EXPORTER" => {
-            // Prometheus is documented for metrics only; admitting it for logs
-            // or traces would write a selector the product ignores.
+            // The product admits a comma-separated list of exporters. Prometheus
+            // is documented for metrics only, so admitting it for logs or traces
+            // would write a selector the product ignores. `none` disables the
+            // signal and cannot be combined with any other selector.
             let allowed: &[&str] = if rule.key == "OTEL_METRICS_EXPORTER" {
                 METRICS_EXPORTER_TOKENS
             } else {
                 SIGNAL_EXPORTER_TOKENS
             };
-            if !allowed.contains(&text) {
+            let tokens: Vec<&str> = text.split(',').collect();
+            let invalid = tokens.iter().any(|token| !allowed.contains(token));
+            let none_mixed = tokens.contains(&"none") && tokens.len() > 1;
+            let duplicated = {
+                let mut seen = tokens.clone();
+                seen.sort_unstable();
+                let before = seen.len();
+                seen.dedup();
+                seen.len() != before
+            };
+            if invalid || none_mixed || duplicated {
                 return Err(err(
                     "invalid_request",
                     if rule.key == "OTEL_METRICS_EXPORTER" {
-                        "metrics exporter 只能取 otlp / prometheus / console / none"
+                        "metrics exporter 只能取 otlp / prometheus / console / none 的逗号组合；none 不能与其他选择混用"
                     } else {
-                        "logs/traces exporter 只能取 otlp / console / none"
+                        "logs/traces exporter 只能取 otlp / console / none 的逗号组合；none 不能与其他选择混用"
                     },
                 ));
             }
@@ -458,6 +498,22 @@ fn validate_custom_value(rule: &FieldRule, text: &str) -> Result<()> {
                 return Err(err(
                     "invalid_request",
                     "原始正文记录只能取 0 / 1 / file:<本地目录>；目录不能为空或含首尾空白",
+                ));
+            }
+        }
+        // A privacy switch `set` must carry a spelling the verified semantics
+        // actually read. The nonempty family takes any nonempty string (that is
+        // its documented meaning), but the boolean family must be one of the
+        // documented on/off spellings — an arbitrary unknown like "maybe" would
+        // be recorded while `disabled()` reads it as uncertain.
+        _ if rule.category == "privacy_switch" => {
+            if rule.semantics == Semantics::Boolean
+                && !["1", "true", "yes", "on", "0", "false", "no", "off"]
+                    .contains(&text.to_ascii_lowercase().as_str())
+            {
+                return Err(err(
+                    "invalid_request",
+                    "该开关的取值必须是已核验的 on/off 写法（1/true/yes/on 或 0/false/no/off）",
                 ));
             }
         }
@@ -575,7 +631,8 @@ pub(crate) fn disabled(key: &str, value: &Value) -> Option<bool> {
         // DefaultOn: empty means the default (on) is in effect.
         Semantics::DefaultOn => match s.to_ascii_lowercase().as_str() {
             "" | "1" | "true" | "yes" | "on" => Some(true),
-            "0" | "false" => Some(false),
+            // The documented off spellings: any of these excludes the signal.
+            "0" | "false" | "no" | "off" => Some(false),
             _ => None,
         },
         // RawApiBodies: empty means the default (off). `file:<dir>` records
@@ -687,11 +744,14 @@ pub(crate) fn assessment(doc: &Value, product: &Value, trusted: &str) -> Value {
         .map(|r| {
             let raw = &doc["env"][r.key];
             // Credential-bearing values are never echoed: presence is reported,
-            // the value is not.
-            let masked = r.key == MASKED_KEY;
+            // the value is not. This covers the OTLP header always and an
+            // exporter endpoint whose URL itself carries credentials or query
+            // material.
+            let masked = credential_bearing(r.key, raw);
             let mut item = json!({
                 "key":r.key,"label":r.label,
                 "value":if masked { Value::Null } else { raw.clone() },
+                "signal_enabled":match disabled(r.key,raw){None=>Value::Null,Some(v) if matches!(r.category,"privacy_switch"|"webfetch")=>json!(!v),Some(_) if r.key.ends_with("_EXPORTER")=>json!(raw.as_str().unwrap_or("otlp")!="none"),Some(v) if r.semantics!=Semantics::Value=>json!(v),_=>Value::Null},
                 "disabled":disabled(r.key,raw),
                 "semantics":r.semantics.as_str(),
                 "scope":"registered_root_user_settings","effect_timing":"next_launch",
@@ -779,21 +839,11 @@ pub(crate) fn plan(
                     "该字段通常承载接收端凭据；本工具不记录其值，因此不能写入或替换它，也不能把它放进变更清单。可用的动作是 keep、remove 或 disable（等同移除），新值请在该值的归属来源中提供。",
                 ));
             }
-            // The verified privacy switches keep their historical action set; a
-            // DISABLE_* flag's "enable" would be ambiguous (on means off), so it
-            // is still refused instead of being redefined here.
-            if rule.category == "privacy_switch" {
-                if !action
-                    .as_str()
-                    .is_some_and(|s| ["keep", "disable", "remove"].contains(&s))
-                {
-                    return Err(err(
-                        "invalid_request",
-                        "既有隐私开关的 action 必须是 keep / disable / remove",
-                    ));
-                }
-                continue;
-            }
+            // The verified privacy switches now admit the same five actions as
+            // the OTel family: `enable` turns the protective DISABLE_* flag off
+            // so the feature is on, and `set` writes an explicit legal string.
+            // Every action's direction is carried by `disabled()` below, not by
+            // redefining the variable's meaning here.
             let action = action
                 .as_str()
                 .filter(|s| ["keep", "disable", "enable", "remove", "set"].contains(s));
@@ -811,6 +861,7 @@ pub(crate) fn plan(
             }
             if action == "set"
                 && !matches!(rule.semantics, Semantics::Value | Semantics::RawApiBodies)
+                && rule.category != "privacy_switch"
             {
                 return Err(err(
                     "invalid_request",
@@ -962,6 +1013,17 @@ pub(crate) fn plan(
                 Value::Null
             }
             "disable" => match rule.semantics {
+                // `disabled()` reports the variable's truth value. For a
+                // positive content/telemetry flag, disabling means false; the
+                // historical DISABLE_* controls have the opposite direction.
+                Semantics::Boolean
+                    if rule.category != "privacy_switch" && rule.category != "webfetch" =>
+                {
+                    if state == Some(false) && present {
+                        continue;
+                    }
+                    json!("0")
+                }
                 Semantics::DefaultOn => {
                     if state == Some(false) {
                         continue;
@@ -969,10 +1031,16 @@ pub(crate) fn plan(
                     json!("false")
                 }
                 Semantics::RawApiBodies => {
-                    if state != Some(true) {
+                    if state == Some(false) && present {
                         continue;
                     }
                     json!("0")
+                }
+                Semantics::Value if key.ends_with("_EXPORTER") => {
+                    if doc["env"][key] == "none" {
+                        continue;
+                    }
+                    json!("none")
                 }
                 // A free value has no "off" spelling; removing the key is the
                 // only state that stops it.
@@ -990,6 +1058,19 @@ pub(crate) fn plan(
                 }
             },
             "enable" => match rule.semantics {
+                // A privacy switch is a DISABLE_* flag: `enable` removes the
+                // disabling flag so the feature is on. Removal is the only
+                // honest write for the nonempty family, where "0"/"false" still
+                // take effect, and for the boolean family it simply deletes the
+                // key that would otherwise disable the feature.
+                _ if matches!(rule.category, "privacy_switch" | "webfetch") => {
+                    // Already enabled (the DISABLE_* flag is absent or not taking
+                    // effect) is a no-op.
+                    if state == Some(false) || !present {
+                        continue;
+                    }
+                    Value::Null
+                }
                 // Default-on fields are enabled by the absence of the key.
                 Semantics::DefaultOn => {
                     if state == Some(true) {
@@ -1019,14 +1100,25 @@ pub(crate) fn plan(
             change["restores_default"] = json!(true);
             change["label"] = json!(format!("{label}（删除该键，恢复默认开启）"));
         }
-        if key == MASKED_KEY {
-            // The value is never recorded. The deletion is real, the original
-            // bytes are not, so say so instead of implying a restore.
+        if credential_bearing(key, &doc["env"][key]) {
+            // The prior value is never published in this diff. The Engine
+            // routes these changes through encrypted config preservation. The
+            // *after* value is a separate fact and is masked only when it too is
+            // credential-bearing — otherwise a real write (for example replacing
+            // a credential URL with a plain endpoint) would be swallowed into a
+            // deletion.
             change["before"] = Value::Null;
-            change["after"] = Value::Null;
             change["masked"] = json!(true);
-            change["note"] =
-                json!("该字段的当前值不会被 Lintel 记录，因此也无法据此恢复；移除后需要由该值的归属来源重新提供。");
+            change["note"] = json!(
+                "该字段的先前值不进入普通 diff；执行前通过加密配置保全，恢复使用原任务的所选字段。"
+            );
+        }
+        if credential_bearing(key, &value) {
+            // Defensive: a value we would publish is itself credential-bearing.
+            // A `set` cannot reach here (a credential endpoint is refused and the
+            // header cannot be written), so this only guards a removal spelling.
+            change["after"] = Value::Null;
+            change["after_masked"] = json!(true);
         }
         changes.push(change);
         if value.is_null() {
@@ -1063,7 +1155,11 @@ mod tests {
                 .iter()
                 .find(|b| b["key"] == "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC")
                 .unwrap();
-            assert_eq!(rule["collateral"].as_array().unwrap().len(), 1, "{spelling}");
+            assert_eq!(
+                rule["collateral"].as_array().unwrap().len(),
+                1,
+                "{spelling}"
+            );
             assert_eq!(rule["collateral"][0]["effect"], "additional_impacts");
             assert_eq!(
                 disabled("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", &json!(spelling)),
@@ -1113,7 +1209,8 @@ mod tests {
     }
     #[test]
     fn otel_semantics_matrix_covers_every_new_family() {
-        // DefaultOn: absent means enabled; only "false"/"0" exclude it.
+        // DefaultOn: absent means enabled; every documented off spelling
+        // (0/false/no/off) excludes it.
         for key in [
             "OTEL_METRICS_INCLUDE_ACCOUNT_UUID",
             "OTEL_METRICS_INCLUDE_SESSION_ID",
@@ -1124,6 +1221,10 @@ mod tests {
                 (json!("false"), Some(false)),
                 (json!("FALSE"), Some(false)),
                 (json!("0"), Some(false)),
+                (json!("no"), Some(false)),
+                (json!("No"), Some(false)),
+                (json!("off"), Some(false)),
+                (json!("OFF"), Some(false)),
                 (json!("1"), Some(true)),
                 (json!("true"), Some(true)),
                 (json!("YES"), Some(true)),
@@ -1532,8 +1633,10 @@ mod tests {
             json!([]),
             json!({"UNKNOWN":"disable"}),
             json!({"DISABLE_TELEMETRY":{"action":"disable"}}),
-            json!({"DISABLE_TELEMETRY":"enable"}),
             json!({"DISABLE_TELEMETRY":true}),
+            // An unknown action is still refused now that the privacy switches
+            // admit the full five-action set.
+            json!({"DISABLE_TELEMETRY":"toggle"}),
         ] {
             let error = plan(
                 &json!({}),
@@ -1564,15 +1667,16 @@ mod tests {
                 &json!({"preset":"custom","keep_remote_control":keep,"release_settings":["DISABLE_TELEMETRY"]}),
                 Path::new("/synthetic/settings.json")).unwrap_err().code, "invalid_request");
         }
-        // The extended action set is admitted only where its semantics are
-        // defined; the original privacy switches keep their three actions.
+        // Actions are admitted only where their semantics are defined. The
+        // privacy switches now take enable/set too, so only the genuinely
+        // meaningless combinations stay refused.
         for choices in [
             json!({"OTEL_METRICS_INCLUDE_VERSION":"set"}),
             json!({"OTEL_LOGS_EXPORTER":"enable"}),
             json!({"CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH":"enable"}),
             json!({"CLAUDE_CODE_ENABLE_TELEMETRY":"set"}),
-            json!({"DISABLE_TELEMETRY":"enable"}),
             json!({"DO_NOT_TRACK":"set"}),
+            json!({"DISABLE_TELEMETRY":"set"}),
         ] {
             let error = plan(
                 &json!({}),
@@ -1636,6 +1740,217 @@ mod tests {
         }
     }
     #[test]
+    fn exporter_selectors_admit_verified_comma_lists_and_refuse_none_mixing() {
+        // A comma-separated list is the documented spelling; each token must
+        // belong to the signal's own set.
+        for (key, value) in [
+            ("OTEL_LOGS_EXPORTER", "otlp,console"),
+            ("OTEL_TRACES_EXPORTER", "console,otlp"),
+            ("OTEL_METRICS_EXPORTER", "otlp,prometheus"),
+            ("OTEL_METRICS_EXPORTER", "prometheus,console"),
+            ("OTEL_LOGS_EXPORTER", "none"),
+        ] {
+            let request = json!({"preset":"custom",
+                "custom_settings":{key:"set"},"custom_values":{key:value}});
+            assert!(
+                plan(
+                    &json!({}),
+                    &json!({"version":"2.1.283"}),
+                    &request,
+                    Path::new("/synthetic/settings.json")
+                )
+                .is_ok(),
+                "{key}: {value}"
+            );
+        }
+        for (key, value) in [
+            // `none` is exclusive; it cannot be combined with another selector.
+            ("OTEL_LOGS_EXPORTER", "none,otlp"),
+            ("OTEL_METRICS_EXPORTER", "otlp,none"),
+            // Prometheus is documented for metrics only.
+            ("OTEL_LOGS_EXPORTER", "prometheus"),
+            ("OTEL_TRACES_EXPORTER", "otlp,prometheus"),
+            // Unknown tokens and duplication are refused.
+            ("OTEL_LOGS_EXPORTER", "otlp,sidecar"),
+            ("OTEL_METRICS_EXPORTER", "otlp,otlp"),
+            ("OTEL_LOGS_EXPORTER", "otlp,"),
+            ("OTEL_LOGS_EXPORTER", "otlp, otlp"),
+        ] {
+            let request = json!({"preset":"custom",
+                "custom_settings":{key:"set"},"custom_values":{key:value}});
+            assert_eq!(
+                plan(
+                    &json!({}),
+                    &json!({"version":"2.1.283"}),
+                    &request,
+                    Path::new("/synthetic/settings.json")
+                )
+                .unwrap_err()
+                .code,
+                "invalid_request",
+                "{key}: {value}"
+            );
+        }
+    }
+    #[test]
+    fn credential_endpoint_is_masked_never_set_and_plain_replacement_still_writes() {
+        let credential_url = "https://user:token@collector.example:4318";
+        // A credential-bearing endpoint in the current document is masked in the
+        // assessment, exactly like the OTLP header.
+        let doc = json!({"env":{
+            "OTEL_EXPORTER_OTLP_ENDPOINT":credential_url,
+            "UNRELATED":"keep",
+        }});
+        let a = assessment(&doc, &json!({"version":"2.1.283"}), "not_required");
+        assert!(!a.to_string().contains("token@collector.example"));
+        let endpoint = a["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["key"] == "OTEL_EXPORTER_OTLP_ENDPOINT")
+            .unwrap();
+        assert!(endpoint["value"].is_null());
+        assert_eq!(endpoint["masked"], true);
+        // The raw value cannot be carried through custom_values.
+        let set_credential = json!({"preset":"custom",
+            "custom_settings":{"OTEL_EXPORTER_OTLP_ENDPOINT":"set"},
+            "custom_values":{"OTEL_EXPORTER_OTLP_ENDPOINT":credential_url}});
+        assert_eq!(
+            plan(
+                &doc,
+                &json!({"version":"2.1.283"}),
+                &set_credential,
+                Path::new("/synthetic/settings.json")
+            )
+            .unwrap_err()
+            .code,
+            "credential_endpoint_not_writable"
+        );
+        // Replacing a credential URL with a plain endpoint is a real write: the
+        // before is masked, but the after must not be swallowed into a deletion.
+        let plain = "https://collector.example:4318";
+        let replace = json!({"preset":"custom",
+            "custom_settings":{"OTEL_EXPORTER_OTLP_ENDPOINT":"set"},
+            "custom_values":{"OTEL_EXPORTER_OTLP_ENDPOINT":plain}});
+        let (changes, policy) = plan(
+            &doc,
+            &json!({"version":"2.1.283"}),
+            &replace,
+            Path::new("/synthetic/settings.json"),
+        )
+        .unwrap();
+        assert!(
+            !changes.to_string().contains("token@collector.example"),
+            "{changes}"
+        );
+        assert!(!policy.to_string().contains("token@collector.example"));
+        let change = changes
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["key"] == "OTEL_EXPORTER_OTLP_ENDPOINT")
+            .unwrap();
+        assert!(change["before"].is_null());
+        assert_eq!(change["masked"], true);
+        assert_eq!(change["after"], plain);
+        assert!(change.get("after_masked").is_none());
+        // Removing the credential endpoint is the one honest mutation and never
+        // discloses the value it replaced.
+        let remove = json!({"preset":"custom",
+            "custom_settings":{"OTEL_EXPORTER_OTLP_ENDPOINT":"remove"}});
+        let (changes, _) = plan(
+            &doc,
+            &json!({"version":"2.1.283"}),
+            &remove,
+            Path::new("/synthetic/settings.json"),
+        )
+        .unwrap();
+        assert!(!changes.to_string().contains("token@collector.example"));
+        let change = changes
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["key"] == "OTEL_EXPORTER_OTLP_ENDPOINT")
+            .unwrap();
+        assert!(change["before"].is_null());
+        assert!(change["after"].is_null());
+        assert_eq!(change["masked"], true);
+    }
+    #[test]
+    fn privacy_switches_admit_enable_and_a_verified_set_spelling() {
+        // `enable` on a DISABLE_* flag removes the disabling key; both the
+        // nonempty and the boolean families do it by deletion.
+        let doc = json!({"env":{
+            "DISABLE_TELEMETRY":"1",
+            "DISABLE_FEEDBACK_COMMAND":"1",
+            "UNRELATED":"keep",
+        }});
+        let (changes, _) = plan(
+            &doc,
+            &json!({"version":"2.1.283"}),
+            &json!({"preset":"custom","custom_settings":{
+                "DISABLE_TELEMETRY":"enable",
+                "DISABLE_FEEDBACK_COMMAND":"enable",
+            }}),
+            Path::new("/synthetic/settings.json"),
+        )
+        .unwrap();
+        let by_key = |key: &str| {
+            changes
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|c| c["key"] == key)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(by_key("DISABLE_TELEMETRY")["after"], Value::Null);
+        assert_eq!(by_key("DISABLE_FEEDBACK_COMMAND")["after"], Value::Null);
+        // `enable` on an already-enabled switch is a no-op.
+        let enabled = json!({"env":{"DISABLE_TELEMETRY":""}});
+        let (changes, _) = plan(
+            &enabled,
+            &json!({"version":"2.1.283"}),
+            &json!({"preset":"custom","custom_settings":{"DISABLE_TELEMETRY":"enable"}}),
+            Path::new("/synthetic/settings.json"),
+        )
+        .unwrap();
+        assert!(changes.as_array().unwrap().is_empty(), "{changes}");
+        // `set` writes an explicit documented spelling for a boolean switch.
+        let (changes, _) = plan(
+            &json!({}),
+            &json!({"version":"2.1.283"}),
+            &json!({"preset":"custom","custom_settings":{"DO_NOT_TRACK":"set"},
+                "custom_values":{"DO_NOT_TRACK":"off"}}),
+            Path::new("/synthetic/settings.json"),
+        )
+        .unwrap();
+        assert_eq!(changes[0]["key"], "DO_NOT_TRACK");
+        assert_eq!(changes[0]["after"], "off");
+        // An unverified spelling is refused for the boolean family; the nonempty
+        // family keeps its documented "any nonempty string" reading.
+        assert_eq!(
+            plan(
+                &json!({}),
+                &json!({"version":"2.1.283"}),
+                &json!({"preset":"custom","custom_settings":{"DO_NOT_TRACK":"set"},
+                    "custom_values":{"DO_NOT_TRACK":"maybe"}}),
+                Path::new("/synthetic/settings.json")
+            )
+            .unwrap_err()
+            .code,
+            "invalid_request"
+        );
+        assert!(plan(
+            &json!({}),
+            &json!({"version":"2.1.283"}),
+            &json!({"preset":"custom","custom_settings":{"DISABLE_TELEMETRY":"set"},
+                "custom_values":{"DISABLE_TELEMETRY":"surprise"}}),
+            Path::new("/synthetic/settings.json")
+        )
+        .is_ok());
+    }
+    #[test]
     fn custom_otel_actions_produce_exact_changes_and_never_leak_the_credential() {
         let secret = "Bearer synthetic-secret-do-not-print";
         let doc = json!({"env":{
@@ -1688,10 +2003,10 @@ mod tests {
         let raw = by_key("OTEL_LOG_RAW_API_BODIES");
         assert_eq!(raw["before"], "1");
         assert_eq!(raw["after"], "file:/synthetic/otel-bodies");
-        // A free value with no "off" spelling is disabled by removal.
+        // Exporters have a documented off spelling. Removal would restore otlp.
         let logs = by_key("OTEL_LOGS_EXPORTER");
         assert_eq!(logs["before"], "console");
-        assert!(logs["after"].is_null());
+        assert_eq!(logs["after"], "none");
         // An exporter is set by naming its documented token.
         let traces = by_key("OTEL_TRACES_EXPORTER");
         assert!(traces["before"].is_null());
@@ -1768,6 +2083,54 @@ mod tests {
             .code,
             "masked_setting_not_writable"
         );
+    }
+
+    #[test]
+    fn disable_positive_recording_flags_actually_turns_them_off() {
+        let keys = [
+            "CLAUDE_CODE_ENABLE_TELEMETRY",
+            "OTEL_LOG_USER_PROMPTS",
+            "OTEL_LOG_ASSISTANT_RESPONSES",
+            "OTEL_LOG_TOOL_CONTENT",
+            "OTEL_LOG_TOOL_DETAILS",
+            "OTEL_LOG_MANAGED_SETTINGS",
+            "CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL",
+        ];
+        for key in keys {
+            for current in [Value::Null, json!("0"), json!("1"), json!("unknown")] {
+                let doc = if current.is_null() {
+                    json!({})
+                } else {
+                    json!({"env":{key:current}})
+                };
+                let (changes, _) = plan(
+                    &doc,
+                    &json!({"version":"2.1.285"}),
+                    &json!({"preset":"custom","custom_settings":{key:"disable"}}),
+                    Path::new("/synthetic/settings.json"),
+                )
+                .unwrap();
+                if current == "0" {
+                    assert!(changes.as_array().unwrap().is_empty());
+                } else {
+                    assert_eq!(changes[0]["after"], "0", "{key} {current}");
+                }
+            }
+        }
+        for key in [
+            "OTEL_LOGS_EXPORTER",
+            "OTEL_TRACES_EXPORTER",
+            "OTEL_METRICS_EXPORTER",
+        ] {
+            let (changes, _) = plan(
+                &json!({}),
+                &json!({"version":"2.1.285"}),
+                &json!({"preset":"custom","custom_settings":{key:"disable"}}),
+                Path::new("/synthetic/settings.json"),
+            )
+            .unwrap();
+            assert_eq!(changes[0]["after"], "none");
+        }
     }
     #[test]
     fn custom_otel_actions_are_noops_when_already_in_the_requested_state() {

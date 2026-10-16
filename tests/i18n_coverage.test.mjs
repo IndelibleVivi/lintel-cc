@@ -38,6 +38,8 @@ const KEY_ROOTS = new Set([
   'time','resources','category','planReview','service','launchPanel','startup','failure','outcome','coverage',
   'launchRecords','workFiles','capacity','component','customPolicy','net','netPanel','netPlan','netReceipt',
   'ipnet','telemetry','updates','remote','api','package','agentPanel','bpanel','bhost','bext','greeting',
+  'residue','residueArchive','snapshot','identity','config',
+  'recipes',
 ]);
 
 test('every literal t() key (single and double quoted) in apps/desktop/src exists in both catalogs', () => {

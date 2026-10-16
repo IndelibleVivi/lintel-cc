@@ -288,6 +288,29 @@ exit
 digest 与目标文件状态，同名内容不覆盖。会话与记忆保留为资料，**不宣称可以
 续聊**。完整流程见 [Agent CLI 指南的 portable work 一节](agents.md#portable-work)。
 
+## 10. 只读观察本地数据、标识与快照（可选）
+
+同一份合成环境还能用来确认当前源码的本地观察路径，它们都只读元数据或有限静态来源，不执行 Claude、不创建 mutation job：
+
+```sh
+lintel env residue "$ID" --json          # 已知位置表的元数据清单（路径/类别/大小/时间）
+lintel env identity "$ID" --json         # 默认只报告 userID / oauthAccount 的存在性
+lintel snapshot save --environment "$ID" --json   # 保存一份脱敏语义快照并返回 snapshot_id
+lintel snapshot list --environment "$ID" --json
+```
+
+`env residue` 只覆盖已知位置表加你显式给出的 `extra_roots`；表外区域是“未覆盖”，达到深度／条目上限或读失败会保留缺口。`env identity` 默认遮蔽原值，加 `--reveal` 才会把 `userID` 原值放进本次响应（不会写入任何持久记录）。再用 `snapshot save` 得到第二个 `snapshot_id`，可以比较两份快照或两个已登记环境：
+
+```sh
+SNAP_A='<first-returned-snapshot-id>'
+SNAP_B='<second-returned-snapshot-id>'
+OTHER_ID='<another-registered-environment-id>'
+lintel snapshot compare --environment "$ID" --old-snapshot-id "$SNAP_A" --new-snapshot-id "$SNAP_B" --json
+lintel env compare "$ID" --other-environment-id "$OTHER_ID" --json
+```
+
+比较只给相同／改变／未知；身份比较材料留在本地私有 state，不同盐域不能据此判定身份变化。即时 `env compare` 使用一次性临时盐，不保存快照或持久盐。想进一步编辑明确选择的 user／project-local 配置或查看残留清理／标识重置，见 [操作指南](operator-guide.md#recovery) 与 [core 与 CLI 合同](core.md)。
+
 ---
 
 ## 还想继续用 App？

@@ -94,6 +94,7 @@ _OWNER_DIR_RULES: Tuple[Tuple[str, str], ...] = (
     (AREA_APP_UI, "tests/*_ui_journey.mjs"),
     (AREA_APP_UI, "tests/home_greetings.test.mjs"),
     (AREA_APP_UI, "tests/i18n*.test.mjs"),
+    (AREA_APP_UI, "tests/recipe_intent.test.mjs"),
     (AREA_CORE, "tests/**"),
 )
 
@@ -173,7 +174,7 @@ SELFTEST_CHECKS: Tuple[str, ...] = ("__verify_self_test__", "__ci_plan_test__")
 
 FRONTEND_CHECKS: Tuple[str, ...] = (
     "js-engine-test", "site-game-test", "home-greetings-test", "i18n-test",
-    "i18n-coverage-test", "app-release-test", "rust-notices-test",
+    "i18n-coverage-test", "recipe-test", "app-release-test", "rust-notices-test",
     "python-ssh-test", "linux-vm-control-test", "desktop-typecheck", "desktop-build",
 )
 NATIVE_CHECKS: Tuple[str, ...] = (
@@ -181,7 +182,7 @@ NATIVE_CHECKS: Tuple[str, ...] = (
     "shared-remote-journey", "journey-network", "journey-agent-cli",
     "journey-product-baseline", "journey-agent-adapters", "journey-components",
     "journey-cli", "journey-submission", "journey-execution-admission",
-    "journey-launch", "journey-policy",
+    "journey-launch", "journey-policy", "journey-client-control",
 )
 HEAVY_CHECKS: Tuple[str, ...] = (
     "journey-portable-work", "journey-work-preservation", "journey-large-work",
@@ -191,7 +192,7 @@ HEAVY_CHECKS: Tuple[str, ...] = (
 APP_UI_CHECKS: Tuple[str, ...] = (
     "browser-smoke", "browser-pairing-ui", "service-ui", "remote-task-ui", "work-ui",
     "components-ui", "baseline-ui", "archive-wait-ui", "drift-ui", "network-ui",
-    "telemetry-ui", "app-update-ui", "clawd-app-ui", "i18n-ui",
+    "telemetry-ui", "app-update-ui", "clawd-app-ui", "i18n-ui", "client-control-ui",
 )
 SITE_UI_CHECKS: Tuple[str, ...] = ("site-ui",)
 RUNNER_CHECKS: Tuple[str, ...] = ("linux-ssh-runtime", "cli-candidate")
@@ -295,7 +296,7 @@ PROFILES: Dict[str, Profile] = {
         (
             _job("control", SELFTEST_CHECKS, LINUX_ONLY),
             _job("frontend", ("desktop-typecheck", "desktop-build", "home-greetings-test",
-                              "i18n-test", "i18n-coverage-test"),
+                              "i18n-test", "i18n-coverage-test", "recipe-test"),
                  LINUX_ONLY),
             _job("native", (), LINUX_ONLY),
             _job("heavy", (), LINUX_ONLY),

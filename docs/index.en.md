@@ -24,6 +24,7 @@ Start with the [quickstart](quickstart.en.md): select synthetic originals in a d
 The following authority/evidence surfaces remain **in Chinese**:
 
 - [SPEC](SPEC.md) retains the full product target. [Product baseline](specs/product-baseline.md), [18 baseline checks](specs/product-baseline-status.md), [full acceptance](ACCEPTANCE.md), [evidence index](acceptance-status.json) and [verification guide](verification.md) own targets, evidence and check entries.
+- [Client control enhancement mini spec (Chinese)](specs/client-control.md) defines this increment's outbound controls, local data and identity operations, snapshot comparison and restoration, and editable recipes. Implementation and acceptance remain separate facts in current-state and verification evidence.
 - [Current state](current-state.md) is the concise current candidate/resource/runtime-evidence table. [Candidate history](candidate-history.md) preserves earlier observations; historical passes are not current delivery claims.
 - [Visual language](visual-language.md) owns identity/editable assets. [Site hosting](site-hosting.md) owns separately authorized preview/production upload and readback. The [site source README](../apps/site/README.md) explains website development.
 - [Protocol](../contracts/protocol.md), [research](RESEARCH.md), remaining leaf specifications, platform notes and developer evidence retain their existing language. Machine identifiers/JSON contracts retain their exact bytes.

@@ -98,6 +98,57 @@ env list/discover may register roots/save inventory; job may persist interruptio
 
 Ordinary stdout is one envelope, ok:false nonzero, stderr diagnostics. Launch takes interactive process control with stderr failures. network serve is the explicit long-running NDJSON exception. ok:true is request success; data.status/steps/coverage/error determine task completion.
 
+## Local inventory and sanitized snapshots
+
+These source-level observations share core. For SSH, check the target runner's `describe` and `schema` first; upgrading the App does not upgrade an older runner.
+
+```sh
+lintel env residue '<environment-id>'
+lintel env identity '<environment-id>'
+lintel env compare '<environment-id>' --other-environment-id '<other-environment-id>'
+lintel snapshot save --environment '<environment-id>'
+lintel snapshot list --environment '<environment-id>'
+lintel snapshot compare --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>'
+```
+
+`residue_inventory` reads metadata at known locations. Uncovered locations, scan limits and read failures remain explicit. `identity_inspect` returns recognized field presence by default. All six commands also support `lintel call OPERATION` with JSON stdin and the shared finite SSH contract; the current runner's schema defines the accepted fields.
+
+`snapshot_save` stores an immutable sanitized observation and returns its ID and public summary. `snapshot_list` displays up to 200 records and inspects up to 2,000 directory entries per call; `scan_complete` and item errors state coverage. One damaged record does not hide readable neighbors. Snapshots retain ordinary settings, finite declarations and residue counts. Headers, credential-bearing collector addresses and raw identities are excluded. Identity comparison material stays in private local state; responses expose only same/changed/unknown, and different salt domains cannot attest identity changes. Immediate `env_compare` shares one temporary salt and saves neither a snapshot nor a persistent salt.
+
+Missing, malformed or unreadable configuration never becomes an off verdict: that area is incomplete while independent observations remain available. Hidden values cannot attest equality. Sanitized snapshots support comparison; restoration still needs the original task or an encrypted backup and a new approval. A digest cannot reconstruct content. Ordinary state/lock behavior remains; these observations do not start Claude, run hooks or contact public endpoints.
+
+`lintel snapshot accept --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>' --selected-changes '["<returned-change-id>"]'` accepts only selected `changes[].id` values returned by `snapshot compare` as a comparison baseline, without editing configuration. It rechecks the current selected values; stale observations and masked values cannot be accepted. Once a semantic baseline exists, legacy `accept_drift` returns `semantic_baseline_selection_required`; continue with per-item `snapshot accept`. Legacy field baselines remain only for callers that have not adopted a semantic baseline.
+
+### Writable advanced configuration, local data and recipe entries
+
+The named entries below all use the same plan/approval/job/receipt chain and write only after an explicit approval; secrets (archive passphrases) still travel only through JSON stdin, never argv.
+
+```sh
+lintel config inspect --environment '<environment-id>' [--project-cwd /abs/project]
+lintel config read --environment '<environment-id>' --config-path /abs/settings.json
+lintel config edit plan --environment '<environment-id>' --config-path /abs/settings.json   # stdin: {"document":"<JSON text>","expected_digest":"<current digest>"}
+lintel config apply plan --environment '<environment-id>' --source-environment-id '<other-id>' --selected-keys '["OTEL_LOG_USER_PROMPTS"]'
+lintel config restore inspect --environment '<environment-id>' --job '<original-job-id>'
+lintel config restore plan --environment '<environment-id>' --job '<original-job-id>' --selected-keys '["/env/OTEL_LOG_USER_PROMPTS"]'
+lintel data clear plan --environment '<environment-id>' --writers-confirmed-stopped   # stdin: {"residue_paths":[...],"archive_before_clear":true,"delete_work":false}
+lintel data identity-reset plan --environment '<environment-id>'   # stdin: {"writers_confirmed_stopped":true,"identity_backup_paths":[...]}
+lintel data workflow plan --environment '<environment-id>'   # stdin: {"writers_confirmed_stopped":true,"policy":{...},"reset_identity":true,"residue_paths":[...]}
+```
+
+`plan_config_edit` needs a strict JSON `document` plus the read-time `expected_digest` and computes a per-field diff; an unrecognized or credential value (`OTEL_EXPORTER_OTLP_HEADERS`, a credential-bearing receiver URL) is only `masked: true` with `before`/`after` null. Execution seals an independent age `lintel.config/1` backup (`config_archive_path`) before writing and reads it back; `plan_config_restore` touches only the fields the original task changed and requires the current value to still equal the written value (else `restore_conflict`), preserving unrelated later edits. `config_inspect` reads finite configuration sources and masks public values without reading identity/credential-file bodies. Explicit `config_read` returns the selected configuration text; use a private terminal/editor and keep its response out of ordinary logs. Managed and identity files cannot be advanced-edit write targets.
+
+`plan_cleanup`'s `clear_residue` needs non-empty `residue_paths`; both operations require `writers_confirmed_stopped: true`. Clearing uses `archive_before_clear` to select a backup before deletion or direct deletion; `archive_only: true` archives without deletion. `plan_identity_reset` always encrypts the complete original client state and selected backups into `lintel.residue/1` before removing only `userID`, without logging out or clearing credentials. The backup can contain sensitive original text; keep it encrypted. Its manifest and restoration open independently:
+
+```sh
+# every field comes through stdin; secrets never travel in argv
+python3 -c 'import getpass,json; print(json.dumps({"job_id":"<original-job-id>","archive_passphrase":getpass.getpass("Passphrase: ")}))' |
+  lintel call residue_archive_inspect
+python3 -c 'import getpass,json; print(json.dumps({"environment_id":"<id>","job_id":"<original-job-id>","selected_paths":["/abs/original"],"archive_passphrase":getpass.getpass("Passphrase: ")}))' |
+  lintel call plan_residue_restore
+```
+
+`lintel.residue/1` is separate from the work package: a valid original-environment binding is required for a new restore plan, while older unbound material remains manifest-readable. It restores only the recorded original paths and refuses to overwrite an existing file (`restore_conflict`), never as a work import. `plan_client_workflow` composes configuration edits, residue clearing and identity reset into one plan and one approval; a file cannot belong to two steps (`overlapping_actions`), and an interruption is queried by the original ID only. The App side is Local data and identity, Changes and comparison, Advanced configuration editing and the three quick recipes; see the [desktop guide](desktop.en.md) and [operator guide](operator-guide.en.md#recovery).
+
 ## Complete preview, approval, query and restoration
 
 Use returned IDs/hash from **current host/target**, registering exact config root, never project code directory:
@@ -115,7 +166,7 @@ lintel job submit --plan <restore-plan-id> --approval <restore-plan-hash>
 lintel job wait <restore-plan-id> --timeout 30s
 ```
 
-Policy must explicitly choose keep/no-keep Remote Control, optional declared trusted-devices required/not_required/unknown. Custom uses --preset custom --custom-settings '{"DISABLE_TELEMETRY":"disable"}', only seven schema fields/actions. Noncustom rejects custom_settings; custom rejects nonempty release_settings. Version/policy/target changes invalidate approval.
+Policy must explicitly choose keep/no-keep Remote Control, optional declared trusted-devices required/not_required/unknown. Custom uses --preset custom --custom-settings '{"DISABLE_TELEMETRY":"disable"}', 27 schema fields with keep/enable/disable/remove/set; masked keys admit only keep/disable/remove, and set requires paired custom_values. Noncustom rejects custom_settings; custom rejects nonempty release_settings. Version/policy/target changes invalidate approval.
 
 Plans persist frozen previews without settings edits; plan show reads public frozen scope without refresh. Approval needs exact hash and existing user authority for those actions, no generic --yes. Restoration preserves later edits/refuses conflicts, never forced overwrite.
 

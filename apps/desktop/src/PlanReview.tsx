@@ -5,12 +5,24 @@ import { present } from './i18n-presentation';
 
 const categoryKeys: Record<string, string> = { instructions: 'category.instructions', memory: 'category.memory', sessions: 'category.sessions' };
 
+function FrozenTargets({plan}:{plan:Plan}) {
+  const {t,locale}=useI18n();
+  return <>
+    {plan.configuration&&<section className="frozen-destination"><h4>{t('config.file')}</h4><code>{plan.configuration.path}</code><p>{plan.configuration.scope}</p></section>}
+    {plan.residue_selection&&<section className="frozen-destination"><h4>{t('residue.selectedCount',{count:plan.residue_selection.files.length})}</h4><p>{t(plan.residue_selection.archive_before_clear?'planReview.encryptedFirst':'planReview.withoutBackup')}</p><ul>{plan.residue_selection.files.map(file=><li key={file.path}><code>{file.path}</code> · {formatBytes(file.bytes)}</li>)}</ul></section>}
+    {plan.identity_reset&&<section className="frozen-destination"><h4>{t('identity.title')}</h4><code>{plan.identity_reset.path}</code><p>{t('planReview.identityFields',{keys:plan.identity_reset.remove_keys.join(', ')})}</p><p>{t('planReview.retainedFields',{keys:plan.identity_reset.retained_keys.join(', ')})}</p><p>{t('residue.combineResetIdentityDetail')}</p><ul>{plan.identity_reset.backup_paths.map(path=><li key={path}><code>{path}</code></li>)}</ul></section>}
+    {plan.residue_restore&&<section className="frozen-destination"><h4>{t('planReview.restoreOriginal')}</h4><p>{t('residueArchive.restoreNote')}</p><ul>{plan.residue_restore.files.map(file=><li key={file.path}><code>{file.destination}</code> · {formatBytes(file.bytes)}</li>)}</ul></section>}
+    {plan.workflow&&<section className="frozen-destination"><h4>{t('residue.combinedPreview')}</h4><ol>{plan.workflow.map(step=><li key={step.id}><strong>{present(step.title,locale)}</strong><FrozenTargets plan={step}/></li>)}</ol></section>}
+  </>;
+}
+
 export default function PlanReview({ plan }: { plan: Plan }) {
   const { t, locale } = useI18n();
   const p = (value: string | null | undefined) => present(value, locale);
   const target=plan.planned_target;
   const manifest = target ? { files:target.files,package:plan.import_manifest?.package ?? null } : plan.import_manifest;
   return <>
+    <FrozenTargets plan={plan}/>
     {plan.work_selection&&<section className="work-selection-review" aria-label={t('planReview.selectionAria')}><h4>{t(plan.work_selection.mode==='paths'?'planReview.exactOnly':'planReview.wholeCategory')}</h4><p>{t(plan.work_selection.mode==='paths'?'planReview.exactNote':'planReview.wholeNote')}</p>{plan.work_selection.paths&&<ul>{plan.work_selection.paths.map(path=><li key={path}><code>{path}</code></li>)}</ul>}</section>}
     {target && <section className="frozen-destination"><span className="eyebrow">{t(target.create?'planReview.newEnv':'planReview.registeredEnv')}</span><h4>{t('planReview.finalRoot')}</h4><code>{target.new_root}</code><p>{t('planReview.rootNote')}</p></section>}
     {manifest && <section className="import-review" aria-label={t('planReview.importAria')}>
@@ -27,7 +39,7 @@ export default function PlanReview({ plan }: { plan: Plan }) {
     <div className="plan-columns">
       <section><h4>{t('planReview.configFields')} <span>{t('planReview.changeCount',{count:plan.changes.length})}</span></h4>
         {plan.changes.length ? <div className="change-list">{plan.changes.map((change, index) => <div className="change" key={`${change.key}-${index}`}>
-          <strong>{p(change.label)}</strong><div className="change-values"><code>{change.before ?? t('planReview.notSet')}</code><Icon name="arrow" size={13}/><code>{change.after ?? t('planReview.removeItem')}</code></div>
+          <strong>{p(change.label)}</strong><div className="change-values"><code>{change.masked && change.before_present!==false ? '••••••' : change.before ?? t('planReview.notSet')}</code><Icon name="arrow" size={13}/><code>{change.masked && (change.after_present===true || change.after!==null) ? '••••••' : change.after ?? t('planReview.removeItem')}</code></div>
           <details><summary>{t('planReview.viewSource')}</summary><code className="full-path">{change.key}</code><code className="full-path">{change.path}</code></details>
         </div>)}</div> : <p className="muted">{t(manifest ? 'planReview.onlyFiles' : 'planReview.noFieldChanges')}</p>}
       </section>

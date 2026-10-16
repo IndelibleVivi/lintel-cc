@@ -6,7 +6,10 @@ use std::{
     path::{Component, Path},
 };
 
-const SETTINGS: &[&str] = &[
+/// The seven verified privacy switches. They keep their historical action set
+/// (`keep`/`disable`/`remove`): `enable` would be ambiguous because "on" means
+/// the signal is off, and `set` has no meaning for a boolean switch.
+const SWITCHES: &[&str] = &[
     "DISABLE_TELEMETRY",
     "DISABLE_ERROR_REPORTING",
     "DISABLE_FEEDBACK_COMMAND",
@@ -15,6 +18,60 @@ const SETTINGS: &[&str] = &[
     "DISABLE_GROWTHBOOK",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
 ];
+/// The remaining v4 keys: the OTel telemetry/content/exporter/identity family,
+/// the survey-over-OTel route and the WebFetch switch. They admit the full
+/// five-action set.
+const OTEL_KEYS: &[&str] = &[
+    "CLAUDE_CODE_ENABLE_TELEMETRY",
+    "OTEL_LOG_USER_PROMPTS",
+    "OTEL_LOG_ASSISTANT_RESPONSES",
+    "OTEL_LOG_TOOL_CONTENT",
+    "OTEL_LOG_TOOL_DETAILS",
+    "OTEL_LOG_RAW_API_BODIES",
+    "OTEL_LOG_MANAGED_SETTINGS",
+    "CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH",
+    "OTEL_LOGS_EXPORTER",
+    "OTEL_TRACES_EXPORTER",
+    "OTEL_METRICS_EXPORTER",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_HEADERS",
+    "OTEL_METRICS_INCLUDE_ACCOUNT_UUID",
+    "OTEL_METRICS_INCLUDE_SESSION_ID",
+    "OTEL_METRICS_INCLUDE_VERSION",
+    "OTEL_METRICS_INCLUDE_ENTRYPOINT",
+    "OTEL_METRICS_INCLUDE_REPOSITORY",
+    "CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL",
+    "CLAUDE_CODE_DISABLE_WEB_FETCH",
+];
+
+/// The credential-bearing key. The core refuses `set`/`enable` and any
+/// `custom_values` entry for it (`masked_setting_not_writable`); the schema
+/// admits only the actions whose mutation never has to carry its value.
+const MASKED_KEY: &str = "OTEL_EXPORTER_OTLP_HEADERS";
+
+/// Actions every non-privacy-switch field admits. The core additionally refuses
+/// field/action combinations the product would ignore (`enable` on a free-value
+/// field, `set` on a boolean), which the schema deliberately does not restate.
+const ACTIONS: &[&str] = &["keep", "disable", "enable", "remove", "set"];
+/// The masked key shares the switch action set for the same reason: its value is
+/// never recorded, so it can be kept, removed or disabled, never written.
+const SWITCH_ACTIONS: &[&str] = &["keep", "disable", "remove"];
+
+fn action_list(key: &str) -> &'static [&'static str] {
+    if key == MASKED_KEY {
+        SWITCH_ACTIONS
+    } else {
+        ACTIONS
+    }
+}
+
+/// The v5 recognized env keys: the privacy switches first, then the OTel family,
+/// matching `crates/core/src/policy.rs` `catalog()` order. The list is duplicated
+/// here because this crate is the static contract for named/finite transports and
+/// must not open a home, state or executable.
+fn settings() -> impl Iterator<Item = &'static str> {
+    SWITCHES.iter().chain(OTEL_KEYS.iter()).copied()
+}
 
 fn text() -> Value {
     json!({"type":"string","minLength":1,"maxLength":4096})
@@ -154,6 +211,26 @@ pub fn valid_selected_paths(value: &Value) -> bool {
             && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 512 * 1024)
     })
 }
+
+/// Explicit absolute residue paths inside the observed root. The core still
+/// re-derives the location class and on-disk identity; this only rejects a
+/// malformed or over-budget selection before it reaches the core or a transport.
+pub fn valid_residue_paths(value: &Value) -> bool {
+    value.as_array().is_some_and(|items| {
+        let mut seen = HashSet::new();
+        !items.is_empty()
+            && items.len() <= 1000
+            && items.iter().all(|item| {
+                item.as_str().is_some_and(|path| {
+                    path.starts_with('/')
+                        && path.len() <= 4096
+                        && !path.chars().any(char::is_control)
+                        && seen.insert(path)
+                })
+            })
+            && serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= 512 * 1024)
+    })
+}
 /// Static work-path categories shared by strict transports and core content admission.
 /// This function inspects a relative path only, never a filesystem or credential.
 pub fn work_path_category(relative: &Path) -> Option<&'static str> {
@@ -216,7 +293,14 @@ fn is_reference_instructions(relative: &Path) -> bool {
 fn property(name: &str) -> Value {
     match name {
         "approval" => plan_hash_schema(),
-        "environment_id" | "plan_id" | "job_id" | "baseline_id" => {
+        "environment_id"
+        | "plan_id"
+        | "job_id"
+        | "baseline_id"
+        | "other_environment_id"
+        | "old_snapshot_id"
+        | "new_snapshot_id"
+        | "source_environment_id" => {
             json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096})
         }
         "ipv4_url" | "ipv6_url" => {
@@ -226,7 +310,15 @@ fn property(name: &str) -> Value {
         "service_id" => json!({"type":"string","minLength":1,"maxLength":128}),
         "proxy_binding" => json!({"type":"string","minLength":1,"maxLength":128}),
         "probe" => network_probe_fields(),
-        "keep_remote_control" | "writers_confirmed_stopped" | "official_logout" => {
+        "keep_remote_control"
+        | "writers_confirmed_stopped"
+        | "official_logout"
+        | "reveal"
+        | "archive_only"
+        | "lightweight"
+        | "delete_work"
+        | "archive_before_clear"
+        | "reset_identity" => {
             json!({"type":"boolean"})
         }
         "categories" => {
@@ -236,8 +328,31 @@ fn property(name: &str) -> Value {
         // whole-category behavior. Non-empty unique canonical relative paths;
         // string-level limits are enforced here, category and on-disk identity
         // by the core. The validator additionally bounds encoded bytes to 512 KiB.
+        "selected_keys" | "selected_changes" => {
+            json!({"type":"array","minItems":1,"maxItems":4096,"uniqueItems":true,"items":text()})
+        }
+        "identity_backup_paths" | "extra_roots" => {
+            json!({"type":"array","maxItems":if name=="extra_roots"{8}else{1000},"uniqueItems":true,"items":property("config_path")})
+        }
+        "document" => json!({"type":"string","maxLength":1048576,"writeOnly":true}),
+        "policy" => {
+            let mut p = schema("plan_policy").unwrap();
+            p["required"] = json!(["preset", "keep_remote_control"]);
+            p["properties"].as_object_mut().unwrap().remove("command");
+            p["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("environment_id");
+            p
+        }
         "selected_paths" => {
             json!({"type":"array","minItems":1,"maxItems":10000,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":4096}})
+        }
+        // Explicit absolute paths inside the observed config root whose residue
+        // this cleanup may remove. Additive and only read by `clear_residue`; the
+        // core re-derives the location class and on-disk identity.
+        "residue_paths" => {
+            json!({"type":"array","minItems":1,"maxItems":1000,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":4096,"pattern":"^/","description":"配置目录内的准确绝对路径；执行器另行复查所属位置类别"}})
         }
         "trusted_devices" => choice(&["unknown", "required", "not_required"]),
         "preset" => choice(&["preserve", "reduce", "custom"]),
@@ -252,11 +367,25 @@ fn property(name: &str) -> Value {
             json!({"type":"array","items":choice(&["DISABLE_TELEMETRY","DO_NOT_TRACK","DISABLE_GROWTHBOOK","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]),"uniqueItems":true})
         }
         "custom_settings" => {
-            let properties: Map<String, Value> = SETTINGS
-                .iter()
-                .map(|key| (key.to_string(), choice(&["keep", "disable", "remove"])))
+            let properties: Map<String, Value> = settings()
+                .map(|key| (key.to_string(), choice(action_list(key))))
                 .collect();
             json!({"type":"object","properties":properties,"additionalProperties":false})
+        }
+        // Explicit values are a separate custom-only channel so a value can never
+        // be applied without naming the field and the `set` action it belongs to.
+        // The masked key is absent by construction: it cannot carry a value.
+        "custom_values" => {
+            let properties: Map<String, Value> = settings()
+                .filter(|key| *key != MASKED_KEY)
+                .map(|key| {
+                    (
+                        key.to_string(),
+                        json!({"type":"string","minLength":1,"maxLength":4096}),
+                    )
+                })
+                .collect();
+            json!({"type":"object","properties":properties,"additionalProperties":false,"description":"仅与 action=set 配对；值为要写入该字段的字符串"})
         }
         // Independent per-category activation choices for a migration. Absent
         // keys keep their legacy default; this is a finite object, not a free map.
@@ -279,14 +408,19 @@ fn property(name: &str) -> Value {
                 "required":["path","digest"],"dependentRequired":{"block_index":["offset"]},"additionalProperties":false}}},"additionalProperties":false,"description":"有界来源元数据；offset 是原文件字节位置，block_index 是原行内容块序号，index 保留旧页内序号。不含正文或秘密；旧引用不虚构精确位置。"})
         }
         "request_id" => json!({"type":"string","format":"uuid","minLength":1,"maxLength":4096}),
+        "limit" => json!({"type":"integer","minimum":1,"maximum":200}),
+        "modified_after" | "since" | "until" | "min_bytes" | "max_bytes" => {
+            json!({"type":"integer","minimum":0})
+        }
+        "class" => choice(&["work", "residue", "identity", "config", "unclassified"]),
         "offset" => json!({"type":"integer","minimum":0,"maximum":9007199254740991i64}),
         "expected_digest" => {
             json!({"type":"string","pattern":"^[a-f0-9]{64}$","minLength":64,"maxLength":64})
         }
-        "root" | "archive_path" | "output_path" => {
+        "root" | "archive_path" | "output_path" | "config_path" => {
             json!({"type":"string","pattern":"^/","description":"目标主机上的准确绝对路径；执行器另行复查实际文件与 ownership"})
         }
-        "project_cwd" => {
+        "project_cwd" | "other_project_cwd" => {
             json!({"type":"string","pattern":"^/","description":"目标主机上独立于配置 root 的项目工作目录；执行端复查存在、可访问与身份，不为启动创建或修改"})
         }
         "proxy_url" => json!({"type":"string","description":"只接受 loopback HTTP 地址"}),
@@ -329,16 +463,47 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
             &["environment_id", "categories"],
             &["offset", "expected_digest"],
         ),
-        "drift"
-        | "accept_drift"
-        | "cleanup_inspect"
+        "accept_drift" => (&["environment_id"], &["selected_keys"]),
+        "identity_inspect" => (&["environment_id"], &["reveal"]),
+        "residue_inventory" => (&["environment_id"], &["extra_roots","expected_digest","offset","limit","category","class","project","modified_after","since","until","min_bytes","max_bytes"]),
+        "config_inspect" => (&["environment_id"], &["project_cwd"]),
+        "config_read" => (&["environment_id","config_path"], &[]),
+        "plan_config_edit" => (&["environment_id","config_path","document","expected_digest"],&[]),
+        "plan_config_apply" => (&["environment_id","source_environment_id","selected_keys"], &["config_path"]),
+        "config_restore_inspect" => (&["environment_id","job_id"], &[]),
+        "plan_config_restore" => (&["environment_id","job_id","selected_keys"], &[]),
+        "plan_client_workflow" => (&["environment_id","writers_confirmed_stopped"], &["policy","residue_paths","archive_before_clear","reset_identity","identity_backup_paths","extra_roots","delete_work"]),
+        "drift" => (&["environment_id"], &["lightweight"]),
+        "residue_archive_inspect" => (&["archive_passphrase"], &["job_id","archive_path"]),
+        "plan_residue_restore" => (&["environment_id","selected_paths","archive_passphrase"], &["job_id","archive_path"]),
+        "cleanup_inspect"
         | "auth_probe"
         | "reactivate_environment"
-        | "launch_context" => (&["environment_id"], &[]),
+        | "launch_context"
+        // Bounded read-only observations: residue inventory, salted identity
+        // presence, and the local snapshot record set.
+        | "snapshot_list" => (&["environment_id"], &[]),
+        "snapshot_save" => (&["environment_id"], &["project_cwd"]),
+        "snapshot_accept" => (&["environment_id","old_snapshot_id","new_snapshot_id","selected_changes"], &[]),
+        "snapshot_compare" => (
+            &["environment_id", "old_snapshot_id", "new_snapshot_id"],
+            &[],
+        ),
+        "env_compare" => (&["environment_id", "other_environment_id"], &["project_cwd", "other_project_cwd"]),
+        "plan_identity_reset" => (
+            &["environment_id", "writers_confirmed_stopped"],
+            &["identity_backup_paths"],
+        ),
         "launch" => (&["environment_id"], &["proxy_url"]),
         "plan_policy" => (
             &["environment_id", "preset", "keep_remote_control"],
-            &["trusted_devices", "release_settings", "custom_settings"],
+            &[
+                "trusted_devices",
+                "release_settings",
+                "custom_settings",
+                "custom_values",
+                "config_path",
+            ],
         ),
         "plan_reset" => (&["environment_id", "recipe", "categories"], &[]),
         "plan_archive" => (
@@ -356,7 +521,7 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
                 "writers_confirmed_stopped",
                 "official_logout",
             ],
-            &["categories", "activate"],
+            &["categories", "activate", "residue_paths", "archive_before_clear", "archive_only", "extra_roots", "delete_work"],
         ),
         "plan_launch" => (
             &["environment_id", "project_cwd", "mode"],
@@ -407,6 +572,22 @@ pub const COMMANDS: &[&str] = &[
     "inspect_components",
     "work_preflight",
     "work_inventory",
+    "residue_inventory",
+    "identity_inspect",
+    "snapshot_save",
+    "snapshot_list",
+    "snapshot_compare",
+    "snapshot_accept",
+    "env_compare",
+    "config_inspect",
+    "config_read",
+    "plan_config_edit",
+    "plan_config_apply",
+    "config_restore_inspect",
+    "plan_config_restore",
+    "plan_client_workflow",
+    "residue_archive_inspect",
+    "plan_residue_restore",
     "plan_policy",
     "plan_reset",
     "plan_archive",
@@ -414,6 +595,7 @@ pub const COMMANDS: &[&str] = &[
     "cleanup_inspect",
     "auth_probe",
     "plan_cleanup",
+    "plan_identity_reset",
     "reactivate_environment",
     "service_inspect",
     "plan_service_quiesce",
@@ -456,7 +638,7 @@ pub fn schema(command: &str) -> Option<Value> {
     if command == "plan_cleanup" {
         properties.insert(
             "recipe".into(),
-            choice(&["repair_login", "reset_client", "retire"]),
+            choice(&["repair_login", "reset_client", "retire", "clear_residue"]),
         );
         properties
             .get_mut("categories")
@@ -465,10 +647,23 @@ pub fn schema(command: &str) -> Option<Value> {
             .unwrap()
             .remove("minItems");
     }
+    // A reset the user must first confirm no writer can race: the literal `true`
+    // is part of the schema so an unconfirmed request is refused before the core.
+    if command == "plan_identity_reset" {
+        properties.insert(
+            "writers_confirmed_stopped".into(),
+            json!({"type":"boolean","const":true}),
+        );
+    }
+    if command == "plan_residue_restore" {
+        properties.insert("selected_paths".into(), property("residue_paths"));
+    }
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
     let mut value = json!({"$schema":"https://json-schema.org/draft/2020-12/schema","title":command,"type":"object","properties":properties,"required":required,"additionalProperties":false});
     if [
+        "residue_archive_inspect",
+        "plan_residue_restore",
         "archive_inspect",
         "archive_read",
         "session_read",
@@ -489,7 +684,10 @@ pub fn schema(command: &str) -> Option<Value> {
         value["allOf"] = json!([{"if":{"properties":{"preset":{"const":"custom"}}},"then":{"properties":{"release_settings":{"maxItems":0}}},"else":{"not":{"required":["custom_settings"]}}}]);
     }
     if command == "plan_cleanup" {
-        value["allOf"] = json!([{"if":{"properties":{"recipe":{"const":"repair_login"}}},"then":{},"else":{"required":["categories"],"properties":{"categories":{"minItems":1}}}}]);
+        value["allOf"] = json!([
+            {"if":{"properties":{"recipe":{"const":"clear_residue"}}},"then":{"required":["residue_paths"],"properties":{"official_logout":{"const":false}}}},
+            {"if":{"properties":{"recipe":{"enum":["reset_client","retire"]}}},"then":{"required":["categories"],"properties":{"categories":{"minItems":1}}}}
+        ]);
     }
     if [
         "plan_launch",
@@ -563,6 +761,7 @@ fn check_property(value: &Value, schema: &Value) -> bool {
         && schema
             .get("enum")
             .is_none_or(|values| values.as_array().unwrap().contains(value))
+        && schema.get("const").is_none_or(|expected| expected == value)
         && schema
             .get("minimum")
             .is_none_or(|min| value.as_i64().is_some_and(|v| v >= min.as_i64().unwrap()))
@@ -600,9 +799,11 @@ pub fn validate(request: &Value) -> Result<(), String> {
         let prop = s["properties"]
             .get(key)
             .ok_or_else(|| format!("未支持的字段 {key}"))?;
-        // The exact-path validator handles typed items, count, uniqueness and
+        // The exact-path validators handle typed items, count, uniqueness and
         // encoding together without the generic O(n²) uniqueItems scan.
-        if key != "selected_paths" && !check_property(value, prop) {
+        if !["selected_paths", "residue_paths"].contains(&key.as_str())
+            && !check_property(value, prop)
+        {
             return Err(format!("字段 {key} 的类型或取值无效"));
         }
         if key == "unit" && !valid_service_unit(value.as_str().unwrap()) {
@@ -611,15 +812,32 @@ pub fn validate(request: &Value) -> Result<(), String> {
         if key == "approval" && !valid_plan_hash(value.as_str().unwrap()) {
             return Err("approval 需要原计划返回的 64 位小写 hex hash".into());
         }
-        if ["root", "archive_path", "output_path", "project_cwd"].contains(&key.as_str())
+        if [
+            "root",
+            "archive_path",
+            "output_path",
+            "project_cwd",
+            "other_project_cwd",
+            "config_path",
+        ]
+        .contains(&key.as_str())
             && !value.as_str().unwrap().starts_with('/')
         {
             return Err(format!("{key} 需要绝对路径"));
         }
-        if key == "selected_paths" && !valid_selected_paths(value) {
+        if key == "selected_paths"
+            && !(if command == "plan_residue_restore" {
+                valid_residue_paths(value)
+            } else {
+                valid_selected_paths(value)
+            })
+        {
             return Err(
                 "selected_paths 需要非空、唯一、相对、无 . / .. 或控制字符的精确原件路径".into(),
             );
+        }
+        if key == "residue_paths" && !valid_residue_paths(value) {
+            return Err("residue_paths 需要非空、唯一、绝对、无控制字符的配置目录内路径".into());
         }
     }
     if matches!(command, "network_probe" | "plan_network_ipv6")
@@ -643,7 +861,10 @@ pub fn validate(request: &Value) -> Result<(), String> {
             }
         }
     }
-    if let Some(paths) = request["selected_paths"].as_array() {
+    if let Some(paths) = request["selected_paths"]
+        .as_array()
+        .filter(|_| command != "plan_residue_restore")
+    {
         for path in paths {
             let category = work_path_category(Path::new(path.as_str().unwrap()))
                 .ok_or("selected_paths 不属于受支持工作类别")?;
@@ -655,7 +876,7 @@ pub fn validate(request: &Value) -> Result<(), String> {
             }
         }
     }
-    if command == "work_inventory"
+    if matches!(command, "work_inventory" | "residue_inventory")
         && request["offset"].as_u64().is_some_and(|offset| {
             offset > 9007199254740991 || (offset > 0 && request.get("expected_digest").is_none())
         })
@@ -682,6 +903,17 @@ pub fn validate(request: &Value) -> Result<(), String> {
             return Err("需要且只允许一个 job_id 或替代来源 ID/path".into());
         }
     }
+    if command == "plan_client_workflow" {
+        if request["writers_confirmed_stopped"] != true {
+            return Err("需要确认写入者已停止".into());
+        }
+        if let Some(policy) = request.get("policy") {
+            let mut p = policy.clone();
+            p["command"] = json!("plan_policy");
+            p["environment_id"] = request["environment_id"].clone();
+            validate(&p)?;
+        }
+    }
     if command == "plan_policy" {
         if request.get("custom_settings").is_some() && request["preset"] != "custom" {
             return Err("非 custom 方案不接受 custom_settings".into());
@@ -693,14 +925,52 @@ pub fn validate(request: &Value) -> Result<(), String> {
         {
             return Err("custom 不接受非空 release_settings".into());
         }
+        // `custom_values` is the only channel that carries a value, and it is
+        // meaningful only next to the `set` action that names the field — both
+        // directions: a value without its action, and an action without its value,
+        // are refused here. The core re-derives the same rule, including the
+        // masked-key refusal and the per-field value syntax.
+        let choices = request.get("custom_settings").and_then(Value::as_object);
+        if let Some(values) = request.get("custom_values") {
+            if request["preset"] != "custom" {
+                return Err("custom_values 只适用于 custom 方案".into());
+            }
+            let Some(values) = values.as_object().filter(|v| !v.is_empty()) else {
+                return Err("custom_values 必须是非空的字段取值对象".into());
+            };
+            for (key, value) in values {
+                if key == MASKED_KEY {
+                    return Err("该字段通常承载接收端凭据；Lintel 不记录也不写入它的值".into());
+                }
+                if choices.and_then(|c| c.get(key)).and_then(Value::as_str) != Some("set") {
+                    return Err("custom_values 只允许用于 action 为 set 的字段".into());
+                }
+                if !value.as_str().is_some_and(|text| !text.is_empty()) {
+                    return Err("set 需要非空字符串值".into());
+                }
+            }
+        }
+        if let Some(choices) = choices {
+            for (key, action) in choices {
+                if action.as_str() == Some("set") && request["custom_values"].get(key).is_none() {
+                    return Err("set 动作需要在 custom_values 中给出该字段的取值".into());
+                }
+            }
+        }
     }
     if command == "plan_cleanup"
-        && request["recipe"] != "repair_login"
+        && matches!(request["recipe"].as_str(), Some("reset_client" | "retire"))
         && !request["categories"]
             .as_array()
             .is_some_and(|categories| !categories.is_empty())
     {
-        return Err("reset_client/retire 需要至少一种工作类别".into());
+        return Err("重建或退役配方需要至少一种工作类别".into());
+    }
+    if command == "plan_cleanup"
+        && request["recipe"] == "clear_residue"
+        && (!valid_residue_paths(&request["residue_paths"]) || request["official_logout"] != false)
+    {
+        return Err("清理运行残留需要明确的非空原件列表，且不执行注销".into());
     }
     // Activation is only meaningful for the instruction position this round.
     // memory/sessions cannot be registered as active native sessions; asking to
@@ -732,6 +1002,19 @@ pub fn describe(command: &str) -> Option<Value> {
         "inspect_components" => "read_finite_component_sources_and_original_records",
         "work_preflight" => "read_selected_work_metadata_only",
         "work_inventory" => "read_selected_work_metadata_inventory",
+        "residue_inventory" => "read_known_local_location_metadata_only",
+        "identity_inspect" => "read_documented_identity_presence_or_explicit_private_userID",
+        "snapshot_save" => "read_settings_startup_residue_and_identity_for_a_local_snapshot",
+        "snapshot_list" | "snapshot_compare" => "read_local_snapshot_records_only",
+        "env_compare" => "read_two_local_environment_snapshots_only",
+        "config_inspect" => "read_finite_configuration_sources_without_secret_values",
+        "config_read" => "private_explicit_config_document_read",
+        "config_restore_inspect" => "read_original_config_field_recovery_availability",
+        "plan_config_edit" | "plan_config_apply" | "plan_config_restore" => {
+            "read_explicit_configuration_for_frozen_field_plan"
+        }
+        "plan_client_workflow" => "freeze_selected_configuration_residue_and_identity_steps",
+        "plan_identity_reset" => "read_identity_material_for_frozen_plan",
         "plan_archive" | "plan_preserve" | "plan_reset" | "plan_cleanup" => {
             "read_selected_work_for_frozen_plan"
         }
@@ -755,6 +1038,11 @@ pub fn describe(command: &str) -> Option<Value> {
         "inspect_components" => "read_original_records_without_reconciliation",
         "work_preflight" => "readonly_metadata_scan_no_state_written",
         "work_inventory" => "readonly_metadata_scan_no_state_written",
+        "residue_inventory" => "readonly_metadata_scan_no_state_written",
+        "identity_inspect" => "readonly_presence_observation_no_state_written",
+        "snapshot_accept" => "write_selected_semantic_baseline_without_restoration_authority",
+        "snapshot_save" => "write_immutable_sanitized_snapshot_and_private_comparison_salt",
+        "snapshot_list" | "snapshot_compare" | "env_compare" => "read_local_snapshot_records_only",
         "accept_drift" => "write_baseline",
         "execute" => "persist_receipt_and_recovery",
         "launch_request" | "resume_request" => "persist_original_launch_intent_and_result",
@@ -1141,11 +1429,11 @@ mod tests {
             .contains(&json!("categories")));
         assert!(schema["properties"]["categories"]["minItems"].is_null());
         assert_eq!(
-            schema["allOf"][0]["else"]["required"],
+            schema["allOf"][1]["then"]["required"],
             json!(["categories"])
         );
         assert_eq!(
-            schema["allOf"][0]["else"]["properties"]["categories"]["minItems"],
+            schema["allOf"][1]["then"]["properties"]["categories"]["minItems"],
             1
         );
     }
@@ -1302,6 +1590,192 @@ mod tests {
             validate(&bad).is_err(),
             "activating an unavailable session position must be refused"
         );
+    }
+
+    #[test]
+    fn v5_custom_contract_exposes_all_27_keys_five_actions_and_set_values() {
+        let settings = schema("plan_policy").unwrap()["properties"]["custom_settings"].clone();
+        assert_eq!(
+            settings["additionalProperties"], false,
+            "custom_settings stays a finite map"
+        );
+        let actions = settings["properties"].as_object().unwrap();
+        assert_eq!(actions.len(), 27, "the v5 catalog has 27 recognized keys");
+        // The privacy switches keep their historical action set; the OTel family
+        // admits the full five. The core re-derives the field/action pairing.
+        for key in SWITCHES {
+            assert_eq!(
+                actions[*key]["enum"],
+                json!(["keep", "disable", "enable", "remove", "set"]),
+                "{key}"
+            );
+        }
+        for key in OTEL_KEYS.iter().filter(|key| **key != MASKED_KEY) {
+            assert_eq!(
+                actions[*key]["enum"],
+                json!(["keep", "disable", "enable", "remove", "set"]),
+                "{key}"
+            );
+        }
+        // The masked key can be kept, disabled or removed, never written.
+        assert_eq!(
+            actions[MASKED_KEY]["enum"],
+            json!(["keep", "disable", "remove"])
+        );
+        // The value channel is finite too, and the masked key is absent from it by
+        // construction: a value can never be applied without naming `set`.
+        let values = schema("plan_policy").unwrap()["properties"]["custom_values"].clone();
+        assert_eq!(values["additionalProperties"], false);
+        assert_eq!(values["properties"].as_object().unwrap().len(), 26);
+        assert!(values["properties"].get(MASKED_KEY).is_none());
+        let id = "00000000-0000-4000-8000-000000000001";
+        let set = json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,
+            "custom_settings":{"OTEL_LOGS_EXPORTER":"set"},"custom_values":{"OTEL_LOGS_EXPORTER":"none"}});
+        assert!(validate(&set).is_ok(), "{set}");
+        for bad in [
+            json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,"custom_values":{"OTEL_LOGS_EXPORTER":"none"}}),
+            json!({"command":"plan_policy","environment_id":id,"preset":"preserve","keep_remote_control":false,"custom_values":{"OTEL_LOGS_EXPORTER":"none"}}),
+            json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,"custom_settings":{},"custom_values":{}}),
+            json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,"custom_settings":{},"custom_values":{"OTEL_EXPORTER_OTLP_HEADERS":"x"}}),
+            json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,"custom_settings":{},"custom_values":{"UNKNOWN":"x"}}),
+            json!({"command":"plan_policy","environment_id":id,"preset":"custom","keep_remote_control":true,"custom_settings":{},"custom_values":{"OTEL_LOGS_EXPORTER":1}}),
+        ] {
+            assert!(validate(&bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn bounded_observation_and_snapshot_operations_are_finite() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        for command in [
+            "residue_inventory",
+            "identity_inspect",
+            "snapshot_save",
+            "snapshot_list",
+        ] {
+            assert!(COMMANDS.contains(&command));
+            assert!(validate(&json!({"command":command,"environment_id":id})).is_ok());
+            for bad in [
+                json!({"command":command}),
+                json!({"command":command,"environment_id":"synthetic"}),
+                json!({"command":command,"environment_id":id,"extra":true}),
+                json!({"command":command,"environment_id":id,"salt":"caller-chosen"}),
+            ] {
+                assert!(validate(&bad).is_err(), "{bad}");
+            }
+        }
+        let other = "00000000-0000-4000-8000-000000000002";
+        assert!(validate(&json!({"command":"snapshot_compare","environment_id":id,"old_snapshot_id":id,"new_snapshot_id":other})).is_ok());
+        assert!(validate(
+            &json!({"command":"snapshot_compare","environment_id":id,"old_snapshot_id":id})
+        )
+        .is_err());
+        assert!(validate(
+            &json!({"command":"env_compare","environment_id":id,"other_environment_id":other})
+        )
+        .is_ok());
+        assert!(validate(&json!({"command":"env_compare","environment_id":id})).is_err());
+        assert!(validate(
+            &json!({"command":"env_compare","environment_id":id,"other_environment_id":"synthetic"})
+        )
+        .is_err());
+        // Residue and identity observations are metadata/presence only: no
+        // operation description may claim a write.
+        for command in ["residue_inventory", "identity_inspect", "snapshot_list"] {
+            let described = describe(command).unwrap();
+            assert_eq!(described["requires_plan"], false, "{command}");
+            assert_eq!(described["effects"]["external"], "none", "{command}");
+        }
+    }
+
+    #[test]
+    fn identity_reset_requires_the_literal_writer_confirmation() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        let confirmed = json!({"command":"plan_identity_reset","environment_id":id,"writers_confirmed_stopped":true});
+        assert!(validate(&confirmed).is_ok(), "{confirmed}");
+        assert_eq!(
+            schema("plan_identity_reset").unwrap()["properties"]["writers_confirmed_stopped"]
+                ["const"],
+            true
+        );
+        for bad in [
+            json!({"command":"plan_identity_reset","environment_id":id,"writers_confirmed_stopped":false}),
+            json!({"command":"plan_identity_reset","environment_id":id,"writers_confirmed_stopped":"true"}),
+            json!({"command":"plan_identity_reset","environment_id":id,"writers_confirmed_stopped":1}),
+            json!({"command":"plan_identity_reset","environment_id":id}),
+        ] {
+            assert!(validate(&bad).is_err(), "{bad}");
+        }
+        assert_eq!(
+            describe("plan_identity_reset").unwrap()["effects"]["external"],
+            "none"
+        );
+    }
+
+    #[test]
+    fn client_control_strict_contract_carries_private_readers_and_selected_baselines() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        let accepted = json!({"command":"snapshot_accept","environment_id":id,"old_snapshot_id":id,"new_snapshot_id":id,"selected_changes":["synthetic-change"]});
+        assert!(validate(&accepted).is_ok());
+        for selection in [json!([]), json!("all"), json!([1]), json!(["dup", "dup"])] {
+            let mut bad = accepted.clone();
+            bad["selected_changes"] = selection;
+            assert!(validate(&bad).is_err(), "{bad}");
+        }
+        for command in ["residue_archive_inspect", "plan_residue_restore"] {
+            let mut request = json!({"command":command,"archive_path":"/synthetic/residue.age","archive_passphrase":"synthetic-long-password"});
+            if command == "plan_residue_restore" {
+                request["environment_id"] = json!(id);
+                request["selected_paths"] = json!(["/synthetic/debug/original"]);
+            }
+            assert!(validate(&request).is_ok(), "{request}");
+            request["job_id"] = json!(id);
+            assert!(validate(&request).is_err(), "ambiguous source: {request}");
+        }
+        assert!(
+            validate(&json!({"command":"residue_inventory","environment_id":id,"offset":1}))
+                .is_err()
+        );
+        assert!(validate(&json!({"command":"residue_inventory","environment_id":id,"offset":1,"expected_digest":"a".repeat(64)})).is_ok());
+        assert!(
+            validate(&json!({"command":"drift","environment_id":id,"lightweight":true})).is_ok()
+        );
+    }
+
+    #[test]
+    fn residue_clear_is_an_explicit_absolute_path_selection() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        assert!(
+            schema("plan_cleanup").unwrap()["properties"]["recipe"]["enum"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("clear_residue"))
+        );
+        let base = json!({"command":"plan_cleanup","environment_id":id,"recipe":"clear_residue","writers_confirmed_stopped":true,"official_logout":false});
+        assert!(validate(&base).is_err(), "clear needs an exact selection");
+        let mut with_paths = base.clone();
+        with_paths["residue_paths"] = json!(["/synthetic/root/debug"]);
+        assert!(validate(&with_paths).is_ok());
+        let mut logout = with_paths.clone();
+        logout["official_logout"] = json!(true);
+        assert!(validate(&logout).is_err());
+        for bad in [
+            json!([]),
+            json!([""]),
+            json!(["relative/dir"]),
+            json!(["dup", "dup"]),
+            json!(["/a\nb"]),
+            json!(["猫".repeat(2000).as_str()]),
+        ] {
+            let mut request = base.clone();
+            request["residue_paths"] = bad.clone();
+            assert!(validate(&request).is_err(), "{bad}");
+        }
+        // `residue_paths` belongs to the cleanup plan only.
+        assert!(validate(
+            &json!({"command":"work_preflight","environment_id":id,"categories":["sessions"],"residue_paths":["/a"]})
+        )
+        .is_err());
     }
 
     #[test]

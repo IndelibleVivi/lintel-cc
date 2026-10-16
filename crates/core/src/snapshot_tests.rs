@@ -55,9 +55,9 @@ fn residue(locations: Value, files: u64, bytes: u64, complete: bool) -> Value {
 fn full_residue() -> Value {
     residue(
         json!([
-            location("instructions","file",2,120),
-            location("sessions","file",3,4096),
-            location("sessions","directory",1,0),
+            location("instructions", "file", 2, 120),
+            location("sessions", "file", 3, 4096),
+            location("sessions", "directory", 1, 0),
         ]),
         6,
         4216,
@@ -90,7 +90,14 @@ fn capture_of(
     residue_view: Option<&Value>,
     identity: Option<&Value>,
 ) -> Value {
-    capture(ENV, Some("2.1.283"), settings, startup_view, residue_view, identity)
+    capture(
+        ENV,
+        Some("2.1.283"),
+        settings,
+        startup_view,
+        residue_view,
+        identity,
+    )
 }
 
 fn full_capture() -> Value {
@@ -190,9 +197,15 @@ fn capture_covers_every_section_and_masks_a_forwarded_header() {
         expected.len()
     );
     assert_eq!(snapshot["settings"]["DISABLE_TELEMETRY"]["value"], "1");
-    assert_eq!(snapshot["settings"]["DISABLE_TELEMETRY"]["status"], "configured");
+    assert_eq!(
+        snapshot["settings"]["DISABLE_TELEMETRY"]["status"],
+        "configured"
+    );
     // This key's installed rule is nonempty-means-disabled: "0" is configured.
-    assert_eq!(snapshot["settings"]["DISABLE_ERROR_REPORTING"]["status"], "configured");
+    assert_eq!(
+        snapshot["settings"]["DISABLE_ERROR_REPORTING"]["status"],
+        "configured"
+    );
     assert_eq!(snapshot["settings"]["DO_NOT_TRACK"]["status"], "configured");
     // An undocumented boolean spelling is uncertain, never "configured".
     assert_eq!(
@@ -226,8 +239,14 @@ fn capture_covers_every_section_and_masks_a_forwarded_header() {
     assert_eq!(declarations[2]["mcp"], false);
     assert_eq!(snapshot["identity"]["userID"]["digest"], DIGEST);
     assert_eq!(snapshot["identity"]["userID"]["state"], "observed");
-    assert_eq!(snapshot["residue"]["instructions"], json!({"count":2,"bytes":120}));
-    assert_eq!(snapshot["residue"]["sessions"], json!({"count":4,"bytes":4096}));
+    assert_eq!(
+        snapshot["residue"]["instructions"],
+        json!({"count":2,"bytes":120})
+    );
+    assert_eq!(
+        snapshot["residue"]["sessions"],
+        json!({"count":4,"bytes":4096})
+    );
     assert_eq!(snapshot["residue"]["totals"], full_residue()["totals"]);
     assert_eq!(snapshot["residue"]["scan_complete"], true);
     assert_eq!(snapshot["coverage"]["settings"], true);
@@ -294,7 +313,10 @@ fn capture_marks_unreadable_sources_without_claiming_a_flag() {
         .as_array()
         .unwrap();
     assert_eq!(incomplete.len(), 2);
-    assert_eq!(incomplete[0]["path"], "/synthetic/managed/managed-settings.json");
+    assert_eq!(
+        incomplete[0]["path"],
+        "/synthetic/managed/managed-settings.json"
+    );
     assert_eq!(incomplete[0]["content_state"], "unknown");
     assert_eq!(incomplete[1]["state"], "observed_directory");
     // A truncated/limited scan is not a complete candidate scan.
@@ -306,17 +328,23 @@ fn capture_marks_unreadable_sources_without_claiming_a_flag() {
 fn capture_residue_never_lets_a_category_take_a_section_key() {
     let summary = residue(
         json!([
-            location("instructions","file",1,10),
-            location("totals","file",99,999),
-            location("scan_complete","file",99,999),
+            location("instructions", "file", 1, 10),
+            location("totals", "file", 99, 999),
+            location("scan_complete", "file", 99, 999),
         ]),
         1,
         10,
         true,
     );
     let snapshot = capture_of(&switches(), None, Some(&summary), None);
-    assert_eq!(snapshot["residue"]["instructions"], json!({"count":1,"bytes":10}));
-    assert_eq!(snapshot["residue"]["totals"], json!({"file_count":1,"total_bytes":10}));
+    assert_eq!(
+        snapshot["residue"]["instructions"],
+        json!({"count":1,"bytes":10})
+    );
+    assert_eq!(
+        snapshot["residue"]["totals"],
+        json!({"file_count":1,"total_bytes":10})
+    );
     assert_eq!(snapshot["residue"]["scan_complete"], true);
     assert_eq!(snapshot["residue"].as_object().unwrap().len(), 3);
 }
@@ -326,13 +354,17 @@ fn capture_without_reported_totals_uses_the_category_sum() {
     let summary = json!({"schema":"lintel.residue/1",
         "locations":[location("sessions","file",2,64)],"scan_complete":false});
     let snapshot = capture_of(&switches(), None, Some(&summary), None);
-    assert_eq!(snapshot["residue"]["totals"], json!({"file_count":2,"total_bytes":64}));
+    assert_eq!(
+        snapshot["residue"]["totals"],
+        json!({"file_count":2,"total_bytes":64})
+    );
     assert_eq!(snapshot["residue"]["scan_complete"], false);
 }
 
 #[test]
 fn compare_identical_snapshot_is_unchanged() {
-    let report = compare(&full_capture(), &full_capture());
+    let known = without_header(&full_capture());
+    let report = compare(&known, &known);
     assert_eq!(report["status"], "unchanged", "{report}");
     assert!(report["rule_change"].is_null());
     for item in report["changes"].as_array().unwrap() {
@@ -350,7 +382,95 @@ fn compare_identical_snapshot_is_unchanged() {
         .is_none());
     let summary = report["summary"].as_str().unwrap();
     assert!(summary.contains("未发现变化"), "{summary}");
-    assert!(summary.contains("遮蔽值"), "{summary}");
+    assert!(!summary.contains("遮蔽值"), "{summary}");
+}
+
+#[test]
+fn compare_hidden_or_incomplete_observations_never_attest_complete_equality() {
+    let hidden = full_capture();
+    assert_eq!(compare(&hidden, &hidden)["status"], "incomplete");
+    assert!(
+        compare_pair(&hidden, &hidden)["settings"]["OTEL_EXPORTER_OTLP_HEADERS"]["same"].is_null()
+    );
+    let known = without_header(&hidden);
+    let mut partial = known.clone();
+    partial["residue"]["scan_complete"] = json!(false);
+    partial["residue"]["instructions"] = json!({"count":0,"bytes":0});
+    let report = compare(&known, &partial);
+    assert_eq!(report["status"], "incomplete");
+    assert!(report["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["area"] == "residue" && item["state"] == "incomplete"));
+    partial = known.clone();
+    partial["coverage"]["startup_complete"] = json!(false);
+    assert_eq!(compare(&known, &partial)["status"], "incomplete");
+}
+
+#[test]
+fn identity_digests_from_different_salt_domains_are_unknown() {
+    let mut a = full_capture();
+    let mut b = full_capture();
+    a["identity"]["comparison_scope"] = json!("synthetic-scope-a");
+    b["identity"]["comparison_scope"] = json!("synthetic-scope-b");
+    b["identity"]["userID"]["digest"] = json!(OTHER_DIGEST);
+    assert_eq!(identity_item(&compare(&a, &b))["state"], "unknown");
+    assert_eq!(compare_pair(&a, &b)["identity"]["userID"], "unknown");
+    b["identity"]["comparison_scope"] = json!("synthetic-scope-a");
+    assert_eq!(identity_item(&compare(&a, &b))["state"], "changed");
+}
+
+#[test]
+fn incomplete_declarations_do_not_become_absence_or_equality() {
+    let known = without_header(&full_capture());
+    let mut partial = known.clone();
+    partial["coverage"]["startup_complete"] = json!(false);
+    partial["declarations"].as_array_mut().unwrap().remove(0);
+    let report = compare(&known, &partial);
+    assert_eq!(
+        declaration_item(&report, "/synthetic/user/settings.json")["state"],
+        "incomplete"
+    );
+    assert_eq!(report["status"], "incomplete");
+    let mut unknown = known.clone();
+    unknown["declarations"][0]["hooks"] = Value::Null;
+    assert_eq!(
+        declaration_item(
+            &compare(&unknown, &unknown),
+            "/synthetic/user/settings.json"
+        )["state"],
+        "incomplete"
+    );
+    unknown["settings"]["OTEL_LOG_USER_PROMPTS"]["value"] = json!("1");
+    assert_eq!(compare(&known, &unknown)["status"], "changed");
+}
+
+#[test]
+fn exporter_credentials_and_unknown_typed_values_stay_private_or_uncertain() {
+    let settings = json!({"env":{"OTEL_EXPORTER_OTLP_ENDPOINT":"https://synthetic-user:synthetic-password@collector.example.invalid/v1?token=synthetic-token", "OTEL_LOG_USER_PROMPTS":true}});
+    let snap = capture_of(
+        &settings,
+        Some(&full_startup()),
+        Some(&full_residue()),
+        Some(&binding(DIGEST)),
+    );
+    assert_eq!(
+        snap["settings"]["OTEL_EXPORTER_OTLP_ENDPOINT"]["masked"],
+        true
+    );
+    for text in [
+        snap.to_string(),
+        compare(&snap, &snap).to_string(),
+        compare_pair(&snap, &snap).to_string(),
+    ] {
+        assert!(!text.contains("synthetic-password"));
+        assert!(!text.contains("synthetic-token"));
+    }
+    assert_eq!(
+        settings_item(&compare(&snap, &snap), "OTEL_LOG_USER_PROMPTS")["state"],
+        "uncertain"
+    );
 }
 
 #[test]
@@ -385,7 +505,10 @@ fn compare_settings_change_removed_added_and_uncertain() {
     assert_eq!(uncertain["state"], "changed");
     assert_eq!(uncertain["old"], "1");
     assert_eq!(uncertain["new"], "other");
-    assert_eq!(settings_item(&report, "DISABLE_ERROR_REPORTING")["state"], "unchanged");
+    assert_eq!(
+        settings_item(&report, "DISABLE_ERROR_REPORTING")["state"],
+        "unchanged"
+    );
     assert_eq!(
         declaration_item(&report, "/synthetic/user/settings.json")["state"],
         "unchanged"
@@ -416,7 +539,10 @@ fn compare_rule_version_change_is_not_file_drift() {
     drifted["settings"]["DISABLE_TELEMETRY"]["value"] = json!(Value::Null);
     let report = compare(&old, &drifted);
     assert_eq!(report["status"], "changed");
-    assert_eq!(settings_item(&report, "DISABLE_TELEMETRY")["state"], "changed");
+    assert_eq!(
+        settings_item(&report, "DISABLE_TELEMETRY")["state"],
+        "changed"
+    );
     assert_eq!(
         settings_item(&report, "DISABLE_TELEMETRY")["reinterpreted_under_new_rules"],
         true
@@ -430,13 +556,16 @@ fn compare_declarations_appeared_disappeared_and_flags_changed() {
     let old = full_capture();
 
     let mut with_managed = full_startup();
-    with_managed["sources"].as_array_mut().unwrap().push(observed_source(
-        "managed",
-        "/synthetic/managed/managed-settings.json",
-        false,
-        false,
-        false,
-    ));
+    with_managed["sources"]
+        .as_array_mut()
+        .unwrap()
+        .push(observed_source(
+            "managed",
+            "/synthetic/managed/managed-settings.json",
+            false,
+            false,
+            false,
+        ));
     let appeared_report = compare(&old, &recapture_startup(&old, &with_managed));
     assert_eq!(appeared_report["status"], "changed");
     let item = declaration_item(&appeared_report, "/synthetic/managed/managed-settings.json");
@@ -448,8 +577,13 @@ fn compare_declarations_appeared_disappeared_and_flags_changed() {
     assert_eq!(item["new"]["hooks"], false);
 
     let mut without_project = source_set(true, true, false, false);
-    without_project.as_array_mut().unwrap().push(json!({"path":"/synthetic/managed/other.json","scope":"managed","state":"not_found"}));
-    let disappeared_report = compare(&old, &recapture_startup(&old, &startup(without_project, true, false)));
+    without_project.as_array_mut().unwrap().push(
+        json!({"path":"/synthetic/managed/other.json","scope":"managed","state":"not_found"}),
+    );
+    let disappeared_report = compare(
+        &old,
+        &recapture_startup(&old, &startup(without_project, true, false)),
+    );
     let item = declaration_item(&disappeared_report, "/synthetic/project/settings.json");
     assert_eq!(item["state"], "disappeared");
     assert_eq!(item["old"]["plugins"], true);
@@ -468,25 +602,21 @@ fn compare_declarations_appeared_disappeared_and_flags_changed() {
     assert_eq!(flags[1]["from"], false);
     assert_eq!(flags[1]["to"], true);
 
-    // An unreadable source cannot attest a flag: the flag moves to null and the
-    // source state change is reported through the same finite flag list.
+    // An unreadable source cannot attest a declaration change. Preserve the
+    // read-state transition separately instead of counting null as a new flag.
     let mut limited = source_set(true, true, false, false);
     limited.as_array_mut().unwrap()[0]["state"] = json!("access_limited");
     limited.as_array_mut().unwrap()[0]["content_state"] = json!("unknown");
-    let limited_report = compare(&old, &recapture_startup(&old, &startup(limited, true, true)));
+    let limited_report = compare(
+        &old,
+        &recapture_startup(&old, &startup(limited, true, true)),
+    );
     let item = declaration_item(&limited_report, "/synthetic/user/settings.json");
-    assert_eq!(item["state"], "flags_changed");
-    for flag in item["flags"].as_array().unwrap() {
-        if flag["flag"] == "state" {
-            assert_eq!(flag["from"], "observed");
-            assert_eq!(flag["to"], "access_limited");
-        }
-    }
-    assert!(item["flags"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|flag| flag["flag"] == "hooks" && flag["to"].is_null()));
+    assert_eq!(item["state"], "incomplete");
+    assert_eq!(item["observation_change"]["from"], "observed");
+    assert_eq!(item["observation_change"]["to"], "access_limited");
+    assert!(item["new"]["hooks"].is_null());
+    assert!(item["flags"].is_null());
 }
 
 #[test]
@@ -507,7 +637,12 @@ fn compare_identity_has_exactly_three_branches() {
     assert_eq!(changed["status"], "changed");
     assert_eq!(identity_item(&changed)["state"], "changed");
 
-    let unknown = capture_of(&settings_with_header(), Some(&full_startup()), Some(&full_residue()), None);
+    let unknown = capture_of(
+        &settings_with_header(),
+        Some(&full_startup()),
+        Some(&full_residue()),
+        None,
+    );
     let report = compare(&old, &unknown);
     assert_eq!(identity_item(&report)["state"], "unknown");
     assert_eq!(report["status"], "incomplete");
@@ -564,7 +699,12 @@ fn compare_residue_reports_signed_deltas() {
 #[test]
 fn compare_without_a_section_is_incomplete_not_changed() {
     let old = full_capture();
-    let bare = capture_of(&settings_with_header(), None, Some(&full_residue()), Some(&binding(DIGEST)));
+    let bare = capture_of(
+        &settings_with_header(),
+        None,
+        Some(&full_residue()),
+        Some(&binding(DIGEST)),
+    );
     let report = compare(&old, &bare);
     assert_eq!(report["status"], "incomplete");
     let declarations = report["changes"]
@@ -587,7 +727,12 @@ fn compare_without_a_section_is_incomplete_not_changed() {
     }
     assert_eq!(identity_item(&report)["state"], "same");
 
-    let mut no_identity = capture_of(&settings_with_header(), Some(&full_startup()), Some(&full_residue()), None);
+    let mut no_identity = capture_of(
+        &settings_with_header(),
+        Some(&full_startup()),
+        Some(&full_residue()),
+        None,
+    );
     no_identity["environment_id"] = old["environment_id"].clone();
     let report = compare(&old, &no_identity);
     assert_eq!(report["status"], "incomplete");
@@ -605,7 +750,10 @@ fn compare_settings_coverage_gap_marks_items_incomplete() {
     unread["coverage"]["settings"] = json!(false);
     let report = compare(&old, &unread);
     assert_eq!(report["status"], "incomplete");
-    assert_eq!(settings_item(&report, "DISABLE_TELEMETRY")["state"], "incomplete");
+    assert_eq!(
+        settings_item(&report, "DISABLE_TELEMETRY")["state"],
+        "incomplete"
+    );
     // Only the uncovered area is undecided.
     assert_eq!(
         declaration_item(&report, "/synthetic/user/settings.json")["state"],
@@ -617,7 +765,10 @@ fn compare_settings_coverage_gap_marks_items_incomplete() {
     drifted["residue"]["instructions"] = json!({"count":8,"bytes":300});
     let report = compare(&old, &drifted);
     assert_eq!(report["status"], "changed");
-    assert_eq!(settings_item(&report, "DISABLE_TELEMETRY")["state"], "incomplete");
+    assert_eq!(
+        settings_item(&report, "DISABLE_TELEMETRY")["state"],
+        "incomplete"
+    );
     assert_eq!(residue_item(&report, "instructions")["count_delta"], 6);
 }
 
@@ -628,13 +779,16 @@ fn compare_pair_aligns_identity_settings_and_declarations() {
     b["settings"]["DISABLE_TELEMETRY"]["value"] = Value::Null;
     b["settings"]["DO_NOT_TRACK"]["value"] = json!("1");
     b["declarations"].as_array_mut().unwrap().remove(1);
-    b["declarations"].as_array_mut().unwrap().push(observed_source(
-        "managed",
-        "/synthetic/managed/managed-settings.json",
-        false,
-        false,
-        false,
-    ));
+    b["declarations"]
+        .as_array_mut()
+        .unwrap()
+        .push(observed_source(
+            "managed",
+            "/synthetic/managed/managed-settings.json",
+            false,
+            false,
+            false,
+        ));
     b["residue"]["instructions"] = json!({"count":1,"bytes":60});
     let report = compare_pair(&a, &b);
     assert_eq!(report["identity"]["userID"], "same");
@@ -656,8 +810,14 @@ fn compare_pair_aligns_identity_settings_and_declarations() {
         report["declarations"]["both"][0]["path"],
         "/synthetic/user/settings.json"
     );
-    assert_eq!(report["residue"]["a"]["instructions"], json!({"count":2,"bytes":120}));
-    assert_eq!(report["residue"]["b"]["instructions"], json!({"count":1,"bytes":60}));
+    assert_eq!(
+        report["residue"]["a"]["instructions"],
+        json!({"count":2,"bytes":120})
+    );
+    assert_eq!(
+        report["residue"]["b"]["instructions"],
+        json!({"count":1,"bytes":60})
+    );
     assert!(report["note"].as_str().unwrap().contains("不推断账号"));
 }
 
@@ -672,14 +832,24 @@ fn compare_pair_identity_has_three_branches_and_never_publishes_a_digest() {
         Some(&full_residue()),
         Some(&binding(OTHER_DIGEST)),
     );
-    assert_eq!(compare_pair(&a, &different)["identity"]["userID"], "different");
+    assert_eq!(
+        compare_pair(&a, &different)["identity"]["userID"],
+        "different"
+    );
 
     let unknown = capture(OTHER_ENV, None, &switches(), None, None, None);
     assert_eq!(compare_pair(&a, &unknown)["identity"]["userID"], "unknown");
     assert_eq!(compare_pair(&unknown, &a)["identity"]["userID"], "unknown");
 
     // An empty digest map is an unobserved identity, not a shared one.
-    let empty = capture(OTHER_ENV, None, &switches(), None, None, Some(&json!({"digests":{}})));
+    let empty = capture(
+        OTHER_ENV,
+        None,
+        &switches(),
+        None,
+        None,
+        Some(&json!({"digests":{}})),
+    );
     assert_eq!(compare_pair(&empty, &a)["identity"]["userID"], "unknown");
 
     for (left, right) in [(&a, &a), (&a, &different), (&a, &unknown), (&unknown, &a)] {

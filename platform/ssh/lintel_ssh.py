@@ -36,13 +36,79 @@ REQUEST_FIELDS = {
 }
 OPTIONAL_FIELDS = {
     "inspect": {"trusted_devices": str},
-    "plan_policy": {"trusted_devices": str, "release_settings": list, "custom_settings": dict},
+    "plan_policy": {"trusted_devices": str, "release_settings": list, "custom_settings": dict,
+                    "custom_values": dict},
 }
+REQUEST_FIELDS.update({
+    'residue_inventory': {'environment_id': str}, 'identity_inspect': {'environment_id': str},
+    'snapshot_save': {'environment_id': str}, 'snapshot_list': {'environment_id': str},
+    'snapshot_compare': {'environment_id': str, 'old_snapshot_id': str, 'new_snapshot_id': str},
+    'snapshot_accept': {'environment_id': str, 'old_snapshot_id': str, 'new_snapshot_id': str, 'selected_changes': list},
+    'residue_archive_inspect': {'archive_passphrase': str},
+    'plan_residue_restore': {'environment_id': str, 'archive_passphrase': str, 'selected_paths': list},
+    'env_compare': {'environment_id': str, 'other_environment_id': str},
+    'config_inspect': {'environment_id': str}, 'config_read': {'environment_id': str, 'config_path': str},
+    'plan_config_edit': {'environment_id': str, 'config_path': str, 'document': str, 'expected_digest': str},
+    'plan_config_apply': {'environment_id': str, 'source_environment_id': str, 'selected_keys': list},
+    'config_restore_inspect': {'environment_id': str, 'job_id': str},
+    'plan_config_restore': {'environment_id': str, 'job_id': str, 'selected_keys': list},
+    'plan_identity_reset': {'environment_id': str, 'writers_confirmed_stopped': bool},
+    'plan_client_workflow': {'environment_id': str, 'writers_confirmed_stopped': bool},
+    'plan_cleanup': {'environment_id': str, 'recipe': str, 'writers_confirmed_stopped': bool, 'official_logout': bool},
+    'accept_drift': {'environment_id': str},
+})
+OPTIONAL_FIELDS.update({
+    'residue_inventory': {'extra_roots': list, 'expected_digest': str, 'offset': int, 'limit': int, 'category': str, 'class': str, 'project': str, 'modified_after': int, 'since': int, 'until': int, 'min_bytes': int, 'max_bytes': int},
+    'identity_inspect': {'reveal': bool}, 'snapshot_save': {'project_cwd': str},
+    'env_compare': {'project_cwd': str, 'other_project_cwd': str}, 'config_inspect': {'project_cwd': str},
+    'plan_config_apply': {'config_path': str}, 'plan_identity_reset': {'identity_backup_paths': list},
+    'plan_client_workflow': {'policy': dict, 'residue_paths': list, 'archive_before_clear': bool, 'reset_identity': bool, 'identity_backup_paths': list, 'extra_roots': list, 'delete_work': bool},
+    'plan_cleanup': {'categories': list, 'activate': dict, 'residue_paths': list, 'archive_before_clear': bool, 'archive_only': bool, 'extra_roots': list, 'delete_work': bool},
+    'residue_archive_inspect': {'job_id': str, 'archive_path': str},
+    'plan_residue_restore': {'job_id': str, 'archive_path': str},
+    'drift': {'lightweight': bool},
+    'accept_drift': {'selected_keys': list},
+})
+OPTIONAL_FIELDS['plan_policy']['config_path'] = str
+
+# The v5 recognized env keys, in the core policy catalog order. Kept as a literal
+# set here because this controller never reads the runner's home or state.
 POLICY_KEYS = {"DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING", "DISABLE_FEEDBACK_COMMAND",
                "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY", "DO_NOT_TRACK", "DISABLE_GROWTHBOOK",
-               "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+               "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "CLAUDE_CODE_ENABLE_TELEMETRY",
+               "OTEL_LOG_USER_PROMPTS", "OTEL_LOG_ASSISTANT_RESPONSES",
+               "OTEL_LOG_TOOL_CONTENT", "OTEL_LOG_TOOL_DETAILS",
+               "OTEL_LOG_RAW_API_BODIES", "OTEL_LOG_MANAGED_SETTINGS",
+               "CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH", "OTEL_LOGS_EXPORTER",
+               "OTEL_TRACES_EXPORTER", "OTEL_METRICS_EXPORTER",
+               "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS",
+               "OTEL_METRICS_INCLUDE_ACCOUNT_UUID", "OTEL_METRICS_INCLUDE_SESSION_ID",
+               "OTEL_METRICS_INCLUDE_VERSION", "OTEL_METRICS_INCLUDE_ENTRYPOINT",
+               "OTEL_METRICS_INCLUDE_REPOSITORY",
+               "CLAUDE_CODE_ENABLE_FEEDBACK_SURVEY_FOR_OTEL", "CLAUDE_CODE_DISABLE_WEB_FETCH"}
+# The verified privacy switches keep their historical action set; every other
+# recognized key admits the full five. The masked key cannot carry a value, so
+# `set`/`enable` are never admissible for it.
+POLICY_SWITCH_ACTIONS = {"keep", "disable", "remove"}
+POLICY_ACTIONS = {"keep", "disable", "enable", "remove", "set"}
+POLICY_SWITCHES = {"DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING",
+                   "DISABLE_FEEDBACK_COMMAND", "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY",
+                   "DO_NOT_TRACK", "DISABLE_GROWTHBOOK",
+                   "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+MASKED_KEY = "OTEL_EXPORTER_OTLP_HEADERS"
 REMOTE_KEYS = {"DISABLE_TELEMETRY", "DO_NOT_TRACK", "DISABLE_GROWTHBOOK",
                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"}
+
+
+def policy_actions(key: str) -> set:
+    """The admissible actions for one recognized key, or an empty set for a key
+    the v4 catalog does not model. The core re-derives this, including the
+    per-field value syntax, so this stays a syntax-level guard."""
+    if key not in POLICY_KEYS:
+        return set()
+    if key == MASKED_KEY:
+        return POLICY_SWITCH_ACTIONS
+    return POLICY_ACTIONS
 
 
 class ControllerError(Exception):
@@ -106,8 +172,43 @@ def validate_request(payload: dict) -> dict:
     for key, expected in (fields | {k: v for k, v in optional.items() if k in payload}).items():
         if type(payload[key]) is not expected:
             raise ControllerError("invalid_request", "A request field has the wrong type.")
-        if expected is str and (not payload[key] or len(payload[key]) > 1024):
+        if expected is str and (not payload[key] or len(payload[key]) > (1024 * 1024 if key == "document" else 4096)):
             raise ControllerError("invalid_request", "A request field has an invalid length.")
+    for key in ('residue_paths', 'identity_backup_paths', 'extra_roots', 'selected_paths'):
+        if key in payload and (len(payload[key]) > (8 if key == 'extra_roots' else 1000) or len(set(map(str,payload[key]))) != len(payload[key]) or not all(type(p) is str and p.startswith('/') and len(p)<=4096 and not any(ord(c)<32 for c in p) and '..' not in p.split('/') for p in payload[key])):
+            raise ControllerError('invalid_request', 'Explicit paths must be unique, bounded absolute paths.')
+    for key in ('selected_keys', 'selected_changes'):
+        if key in payload and (not payload[key] or len(payload[key])>4096 or not all(type(k) is str and k and len(k)<=4096 for k in payload[key]) or len(set(payload[key]))!=len(payload[key])):
+            raise ControllerError('invalid_request', 'Choose a finite nonempty set of exact configuration keys or changes.')
+    if payload['command'] in {'residue_archive_inspect', 'plan_residue_restore'}:
+        if ('job_id' in payload) == ('archive_path' in payload) or len(payload['archive_passphrase']) < 12:
+            raise ControllerError('invalid_request', 'Choose exactly one original job or archive path and a passphrase of at least 12 characters.')
+        if payload['command'] == 'plan_residue_restore' and not payload['selected_paths']:
+            raise ControllerError('invalid_request', 'Choose at least one exact original archive entry.')
+    if payload['command'] == 'residue_inventory':
+        for key in ('offset', 'modified_after', 'since', 'until', 'min_bytes', 'max_bytes'):
+            if key in payload and not 0 <= payload[key] <= 9007199254740991:
+                raise ControllerError('invalid_request', 'Inventory numbers must be finite nonnegative integers.')
+        if 'limit' in payload and not 1 <= payload['limit'] <= 200:
+            raise ControllerError('invalid_request', 'Inventory pages contain between 1 and 200 rows.')
+        if payload.get('offset', 0) > 0 and 'expected_digest' not in payload:
+            raise ControllerError('invalid_request', 'Later pages need the original metadata digest.')
+        if 'class' in payload and payload['class'] not in {'work', 'residue', 'identity', 'config', 'unclassified'}:
+            raise ControllerError('invalid_request', 'Unknown inventory class.')
+    if 'expected_digest' in payload and not re.fullmatch(r'[a-f0-9]{64}', payload['expected_digest']):
+        raise ControllerError('invalid_request', 'Use the original lowercase metadata digest.')
+    for key in ('config_path', 'project_cwd', 'other_project_cwd', 'archive_path'):
+        if key in payload and (not payload[key].startswith('/') or '..' in payload[key].split('/') or any(ord(c)<32 for c in payload[key])):
+            raise ControllerError('invalid_request', 'Choose an exact absolute target-host path.')
+    if payload['command'] in {'plan_identity_reset','plan_client_workflow','plan_cleanup'} and payload['writers_confirmed_stopped'] is not True:
+        raise ControllerError('invalid_request', 'Confirm that target writers are stopped before planning.')
+    if payload['command']=='plan_client_workflow' and 'policy' in payload:
+        validate_request(dict(payload['policy'], command='plan_policy', environment_id=payload['environment_id']))
+    if payload['command']=='plan_cleanup':
+        if payload['recipe'] not in {'repair_login','reset_client','retire','clear_residue'}:
+            raise ControllerError('invalid_request', 'Unsupported cleanup recipe.')
+        if payload['recipe']=='clear_residue' and (not payload.get('residue_paths') or payload['official_logout']):
+            raise ControllerError('invalid_request', 'Residue clear needs exact paths and never logs out.')
     if payload.get("trusted_devices", "unknown") not in {"unknown", "required", "not_required"}:
         raise ControllerError("invalid_request", "The Trusted Devices condition is invalid.")
     if payload["command"] == "plan_policy" and payload["preset"] not in {"preserve", "reduce", "custom"}:
@@ -115,8 +216,21 @@ def validate_request(payload: dict) -> dict:
     if "release_settings" in payload and not all(type(v) is str and v in REMOTE_KEYS for v in payload["release_settings"]):
         raise ControllerError("invalid_request", "Only known Remote Control fields can be released.")
     if "custom_settings" in payload:
-        if payload["preset"] != "custom" or not all(k in POLICY_KEYS and type(v) is str and v in {"keep", "disable", "remove"} for k, v in payload["custom_settings"].items()):
-            raise ControllerError("invalid_request", "Custom choices must use known policy keys and keep/disable/remove.")
+        if payload["preset"] != "custom" or not all(
+                type(v) is str and v in policy_actions(k) for k, v in payload["custom_settings"].items()):
+            raise ControllerError("invalid_request", "Custom choices must use known policy keys and their documented actions.")
+    # `custom_values` is the only value-carrying channel and needs its `set`
+    # action; the masked key is never writable. The runner re-derives both rules.
+    choices = payload.get("custom_settings") or {}
+    if "custom_values" in payload:
+        values = payload["custom_values"]
+        if payload["preset"] != "custom" or not isinstance(values, dict) or not values or not all(
+                type(v) is str and v and k in POLICY_KEYS and k != MASKED_KEY
+                and choices.get(k) == "set" for k, v in values.items()):
+            raise ControllerError("invalid_request", "Custom values need a known key, a nonempty string and the set action.")
+    if any(v == "set" and k not in (payload.get("custom_values") or {})
+           for k, v in choices.items()):
+        raise ControllerError("invalid_request", "A set action needs its value in custom_values.")
     if payload.get("preset") == "custom" and payload.get("release_settings"):
         raise ControllerError("invalid_request", "Use explicit remove choices in a custom policy.")
     if payload["command"] == "plan_reset":

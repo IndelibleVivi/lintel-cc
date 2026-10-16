@@ -84,7 +84,10 @@ fn seed(fixture: &Fixture) -> PathBuf {
         )
         .as_bytes(),
     );
-    write(&root.join(".claude.json.backup"), b"{\"synthetic\":\"backup\"}");
+    write(
+        &root.join(".claude.json.backup"),
+        b"{\"synthetic\":\"backup\"}",
+    );
 
     // More than the listed-row cap, so the location must report truncation while
     // its aggregates stay real.
@@ -136,9 +139,9 @@ fn inventory_covers_only_the_known_table_with_metadata() {
     assert_eq!(debug["skipped_unsafe"], 0);
     assert_eq!(debug["truncated"], false);
     assert_eq!(debug["entries"].as_array().unwrap().len(), 2);
-    // Listed largest first.
-    assert_eq!(debug["entries"][0]["bytes"], 10);
-    assert_eq!(debug["entries"][1]["bytes"], 5);
+    // Canonical pages use stable path order.
+    assert_eq!(debug["entries"][0]["bytes"], 5);
+    assert_eq!(debug["entries"][1]["bytes"], 10);
     assert!(debug["newest_mtime"].as_i64().unwrap() > 0);
 
     // An empty location is a complete observation, not an absence.
@@ -152,8 +155,8 @@ fn inventory_covers_only_the_known_table_with_metadata() {
     let snaps = location(&report, "shell_snapshots");
     assert_eq!(snaps["file_count"], 105);
     assert_eq!(snaps["total_bytes"], 105);
-    assert_eq!(snaps["entries"].as_array().unwrap().len(), MAX_LISTED);
-    assert_eq!(snaps["truncated"], true);
+    assert_eq!(snaps["entries"].as_array().unwrap().len(), 105);
+    assert_eq!(snaps["truncated"], false);
 
     // Hard links are skipped as unsafe, and counted.
     let backups = location(&report, "config_backups");
@@ -227,7 +230,10 @@ fn inventory_never_leaks_content_or_covers_unknown_paths() {
     assert!(!text.contains(SYNTHETIC_USER_ID), "{text}");
     assert!(!text.contains(SYNTHETIC_SECRET), "{text}");
     assert!(!text.contains("synthetic memory"), "content leaked");
-    assert!(!text.contains("SYNTHETIC_ONLY"), "credential content leaked");
+    assert!(
+        !text.contains("SYNTHETIC_ONLY"),
+        "credential content leaked"
+    );
     // A directory outside the table is not covered and not reported.
     assert!(!text.contains("unknown-dir"), "{text}");
     for location in report["locations"].as_array().unwrap() {
@@ -236,6 +242,37 @@ fn inventory_never_leaks_content_or_covers_unknown_paths() {
             root.join("unknown-dir").to_string_lossy().as_ref()
         );
     }
+}
+
+#[test]
+fn overlapping_explicit_roots_do_not_duplicate_totals_or_reclassify_identity() {
+    let fixture = fixture();
+    write(&fixture.root.join("debug/a.log"), b"synthetic");
+    write(&fixture.root.join(".credentials.json"), b"synthetic-secret");
+    write(
+        &fixture.root.join(".claude.json"),
+        b"{\"userID\":\"synthetic\"}",
+    );
+    let known = inventory(&fixture.home, &fixture.root).unwrap();
+    let overlapping = inventory_request(
+        &fixture.home,
+        &fixture.root,
+        &json!({"extra_roots":[fixture.root,fixture.root.join("debug")]}),
+    )
+    .unwrap();
+    assert_eq!(known["totals"], overlapping["totals"]);
+    assert_eq!(overlapping["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(overlapping["rows"][0]["class"], "residue");
+    save(
+        &fixture.root.join("settings.json"),
+        &json!({"env":{"OTEL_LOG_RAW_API_BODIES":"file:relative-body-dir"}}),
+    )
+    .unwrap();
+    let report = inventory(&fixture.home, &fixture.root).unwrap();
+    assert_eq!(
+        report["coverage"]["additional_sources"]["raw_body"]["state"],
+        "relative_directory_unsupported"
+    );
 }
 
 #[test]
@@ -255,10 +292,16 @@ fn identity_observation_masks_values_and_binds_them_privately() {
     let public = &observed["public"];
     assert_eq!(public["schema"], "lintel.identity/1");
     assert_eq!(public["state"], "observed");
-    assert_eq!(public["path"], root.join(".claude.json").to_string_lossy().as_ref());
+    assert_eq!(
+        public["path"],
+        root.join(".claude.json").to_string_lossy().as_ref()
+    );
     let fields = public["fields"].as_array().unwrap();
     assert_eq!(fields.len(), IDENTITY_KEYS.len());
-    let user = fields.iter().find(|field| field["key"] == "userID").unwrap();
+    let user = fields
+        .iter()
+        .find(|field| field["key"] == "userID")
+        .unwrap();
     assert_eq!(user["present"], true);
     assert_eq!(user["persistence"], "persistent_across_sessions");
     assert_eq!(user["storage"], "client_state");
@@ -277,7 +320,10 @@ fn identity_observation_masks_values_and_binds_them_privately() {
     let all_text = serde_json::to_string(&observed).unwrap();
     assert!(!public_text.contains(SYNTHETIC_USER_ID), "{public_text}");
     assert!(!public_text.contains(SYNTHETIC_SECRET), "{public_text}");
-    assert!(!public_text.contains("synthetic@example.invalid"), "{public_text}");
+    assert!(
+        !public_text.contains("synthetic@example.invalid"),
+        "{public_text}"
+    );
     assert!(!all_text.contains(SYNTHETIC_USER_ID), "{all_text}");
     assert!(!all_text.contains(SYNTHETIC_SECRET), "{all_text}");
 
@@ -319,7 +365,8 @@ fn identity_observation_reports_not_found_malformed_and_too_large() {
         format!("{{\"userID\":\"{SYNTHETIC_USER_ID}\",\"userID\":\"other\"}}").as_bytes(),
     );
     assert_eq!(
-        identity_observation(&duplicated.home, &duplicated.root, "salt").unwrap()["public"]["state"],
+        identity_observation(&duplicated.home, &duplicated.root, "salt").unwrap()["public"]
+            ["state"],
         "unknown"
     );
 
@@ -342,7 +389,10 @@ fn identity_observation_reports_not_found_malformed_and_too_large() {
     // A symlinked client-state file is refused rather than followed.
     let linked = fixture();
     let outside = linked.home.join("outside.json");
-    write(&outside, format!("{{\"userID\":\"{SYNTHETIC_USER_ID}\"}}").as_bytes());
+    write(
+        &outside,
+        format!("{{\"userID\":\"{SYNTHETIC_USER_ID}\"}}").as_bytes(),
+    );
     std::os::unix::fs::symlink(&outside, linked.root.join(".claude.json")).unwrap();
     let observed = identity_observation(&linked.home, &linked.root, "salt").unwrap();
     assert_eq!(observed["public"]["state"], "unreadable");
@@ -468,4 +518,258 @@ fn inventory_skips_foreign_owner_entries() {
         fs::Permissions::from_mode(0o600),
     )
     .unwrap();
+}
+
+// ---- request-driven paged inventory ---------------------------------------
+
+fn row_paths(report: &Value) -> Vec<String> {
+    report["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["path"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn inventory_request_pages_deterministically_without_losing_rows() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    let first = inventory_request(&fixture.home, &root, &json!({"limit": 3})).unwrap();
+    assert_eq!(first["limit"], 3);
+    assert_eq!(first["offset"], 0);
+    let total = first["matched_rows"].as_u64().unwrap();
+    assert!(total > 3, "fixture too small to test paging: {total}");
+    assert_eq!(first["rows"].as_array().unwrap().len(), 3);
+    assert_eq!(first["page_complete"], false);
+    let next = first["next_offset"].as_u64().unwrap();
+    assert_eq!(next, 3);
+
+    // Walk every page and prove the union is exactly the total with no repeats:
+    // the order is stable, so the pages never overlap or drop a row.
+    let mut seen: Vec<String> = row_paths(&first);
+    let mut offset = next;
+    loop {
+        let page = inventory_request(
+            &fixture.home,
+            &root,
+            &json!({"limit": 3, "offset": offset,"expected_digest":first["digest"]}),
+        )
+        .unwrap();
+        assert_eq!(page["matched_rows"].as_u64().unwrap(), total);
+        seen.extend(row_paths(&page));
+        if page["page_complete"] == true {
+            assert!(page["next_offset"].is_null());
+            break;
+        }
+        offset = page["next_offset"].as_u64().unwrap();
+    }
+    let unique: std::collections::HashSet<&String> = seen.iter().collect();
+    assert_eq!(
+        unique.len(),
+        total as usize,
+        "paging repeated or dropped a row: {seen:?}"
+    );
+    let mut sorted = seen.clone();
+    sorted.sort();
+    assert_eq!(seen, sorted);
+}
+
+#[test]
+fn inventory_request_filters_by_class_category_path_time_and_size() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    let work = inventory_request(
+        &fixture.home,
+        &root,
+        &json!({"class": "work", "category": "sessions"}),
+    )
+    .unwrap();
+    assert!(work["matched_rows"].as_u64().unwrap() >= 1);
+    assert!(row_paths(&work).iter().all(|p| p.contains("projects")));
+
+    let scoped = inventory_request(
+        &fixture.home,
+        &root,
+        &json!({"project": "projects/example"}),
+    )
+    .unwrap();
+    assert!(scoped["matched_rows"].as_u64().unwrap() >= 2);
+    assert!(row_paths(&scoped)
+        .iter()
+        .all(|p| p.contains("projects/example")));
+
+    let large = inventory_request(&fixture.home, &root, &json!({"min_bytes": 6})).unwrap();
+    assert!(large["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|row| row["bytes"].as_u64().unwrap() >= 6));
+    assert!(row_paths(&large)
+        .iter()
+        .all(|p| !p.ends_with("debug/a.log")));
+
+    // A future `since` matches nothing but still reports a real zero total.
+    let future = inventory_request(&fixture.home, &root, &json!({"since": 4102444800i64})).unwrap();
+    assert_eq!(future["matched_rows"], 0);
+    assert!(future["rows"].as_array().unwrap().is_empty());
+    // A mistyped filter is refused rather than silently widened.
+    assert_eq!(
+        inventory_request(&fixture.home, &root, &json!({"class": 7}))
+            .unwrap_err()
+            .code,
+        "invalid_filter"
+    );
+}
+
+#[test]
+fn inventory_request_reports_raw_body_directory_without_echoing_the_value() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    let dump = root.join("otel-bodies");
+    write(&dump.join("index.jsonl"), b"{\"body_ref\":\"synthetic\"}\n");
+    write(
+        &root.join("settings.json"),
+        format!(
+            "{{\"env\":{{\"OTEL_LOG_RAW_API_BODIES\":\"file:{}\",\"OTEL_EXPORTER_OTLP_HEADERS\":\"syn-secret-header\"}}}}",
+            dump.to_string_lossy()
+        )
+        .as_bytes(),
+    );
+    let report = inventory_request(&fixture.home, &root, &json!({})).unwrap();
+    let raw_body = &report["coverage"]["additional_sources"]["raw_body"];
+    assert_eq!(raw_body["key"], RAW_BODY_KEY);
+    assert_eq!(raw_body["configured"], true);
+    assert_eq!(raw_body["present"], true);
+    assert_eq!(raw_body["value_echoed"], false);
+    assert_eq!(raw_body["directory"], dump.to_string_lossy().as_ref());
+    // The configured directory is observed as a residue location, and no secret
+    // from the same settings document appears anywhere in the report.
+    let text = serde_json::to_string(&report).unwrap();
+    assert!(!text.contains("syn-secret-header"), "{text}");
+    assert!(report["locations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|location| location["category"] == "raw_body_dump"));
+    assert!(row_paths(&report)
+        .iter()
+        .any(|p| p.ends_with("otel-bodies/index.jsonl")));
+}
+
+#[test]
+fn inventory_request_reports_a_bare_inline_value_as_unconfigured() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    write(
+        &root.join("settings.json"),
+        b"{\"env\":{\"OTEL_LOG_RAW_API_BODIES\":\"1\"}}",
+    );
+    let report = inventory_request(&fixture.home, &root, &json!({})).unwrap();
+    let raw_body = &report["coverage"]["additional_sources"]["raw_body"];
+    assert_eq!(raw_body["configured"], false);
+    assert!(raw_body["directory"].is_null());
+    assert!(report["locations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|location| location["category"] != "raw_body_dump"));
+}
+
+#[test]
+fn inventory_request_accepts_explicit_roots_and_validates_them() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    let extra = fixture.home.join("elsewhere");
+    write(&extra.join("cache/blob.bin"), b"explicit bytes");
+    let report = inventory_request(
+        &fixture.home,
+        &root,
+        &json!({"extra_roots": [extra.to_string_lossy()], "class": "unclassified"}),
+    )
+    .unwrap();
+    let row = report["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["origin"] == "request_extra_root")
+        .unwrap();
+    assert_eq!(report["matched_rows"], 1);
+    assert_eq!(row["class"], "unclassified");
+    assert_eq!(row["adapter"], "unclassified");
+    assert_eq!(
+        row["path"],
+        extra.join("cache/blob.bin").to_string_lossy().as_ref()
+    );
+
+    // A relative, non-directory, duplicated or over-limit list is refused.
+    assert_eq!(
+        inventory_request(
+            &fixture.home,
+            &root,
+            &json!({"extra_roots": ["relative/dir"]})
+        )
+        .unwrap_err()
+        .code,
+        "invalid_extra_roots"
+    );
+    assert_eq!(
+        inventory_request(
+            &fixture.home,
+            &root,
+            &json!({"extra_roots": [root.join("debug/a.log").to_string_lossy()]})
+        )
+        .unwrap_err()
+        .code,
+        "invalid_extra_roots"
+    );
+    assert_eq!(
+        inventory_request(
+            &fixture.home,
+            &root,
+            &json!({"extra_roots": [extra.to_string_lossy(), extra.to_string_lossy()]})
+        )
+        .unwrap_err()
+        .code,
+        "invalid_extra_roots"
+    );
+    let many: Vec<String> = (0..9).map(|n| format!("/tmp/synthetic-{n}")).collect();
+    assert_eq!(
+        inventory_request(&fixture.home, &root, &json!({"extra_roots": many}))
+            .unwrap_err()
+            .code,
+        "invalid_extra_roots"
+    );
+}
+
+#[test]
+fn inventory_request_rejects_bad_paging_and_reports_coverage_independently() {
+    let fixture = fixture();
+    let root = seed(&fixture);
+    assert_eq!(
+        inventory_request(&fixture.home, &root, &json!({"limit": 0}))
+            .unwrap_err()
+            .code,
+        "invalid_limit"
+    );
+    assert_eq!(
+        inventory_request(&fixture.home, &root, &json!({"limit": 201}))
+            .unwrap_err()
+            .code,
+        "invalid_limit"
+    );
+    let first = inventory_request(&fixture.home, &root, &json!({"limit": 2})).unwrap();
+    assert_eq!(
+        inventory_request(&fixture.home, &root, &json!({"limit": 2, "offset": 100000}))
+            .unwrap_err()
+            .code,
+        "invalid_offset"
+    );
+    // The seed truncates shell-snapshots (row cap) and session-env (depth), so
+    // coverage is false even though this small page returned successfully.
+    assert_eq!(first["coverage"]["scan_complete"], false);
+    assert!(!first["coverage"]["truncated_locations"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }

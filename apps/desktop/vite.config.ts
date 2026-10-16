@@ -20,7 +20,7 @@ function fixtureBridge(): Plugin {
   if (!fixture || !path.resolve(fixture).startsWith(path.join(tmpdir(), 'lintel-ui-fixture-'))) {
     throw new Error('Fixture mode must be started through npm run dev:synthetic.');
   }
-  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'telemetry_catalog', 'work_preflight', 'work_inventory', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
+  const allowed = new Set(['discover', 'register', 'create_environment', 'inspect', 'inspect_components', 'config_inspect', 'config_read', 'plan_config_edit', 'plan_config_apply', 'config_restore_inspect', 'plan_config_restore', 'plan_client_workflow', 'residue_inventory', 'identity_inspect', 'plan_identity_reset', 'residue_archive_inspect', 'plan_residue_restore', 'snapshot_accept', 'snapshot_save', 'snapshot_list', 'snapshot_compare', 'env_compare', 'telemetry_catalog', 'work_preflight', 'work_inventory', 'plan_policy', 'plan_reset', 'plan_archive', 'plan_preserve', 'plan_show', 'plan_restore', 'execute', 'jobs', 'job', 'drift', 'accept_drift', 'launch', 'export_support', 'archive_inspect', 'archive_read', 'plan_import', 'cleanup_inspect', 'plan_cleanup', 'reactivate_environment', 'context', 'session_read', 'plan_launch', 'plan_resume', 'launch_request']);
   return {
     name: 'lintel-explicit-synthetic-bridge',
     configureServer(server) {
@@ -44,9 +44,15 @@ function fixtureBridge(): Plugin {
           if (payload.command === 'register' && (typeof payload.root !== 'string' || !path.resolve(payload.root).startsWith(home + path.sep))) {
             res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '合成预览只能登记此临时测试目录中的环境。真实路径请使用桌面应用。' } })); return;
           }
-          for (const key of ['output_path', 'archive_path', 'project_cwd']) {
+          for (const key of ['output_path', 'archive_path', 'project_cwd', 'other_project_cwd', 'config_path']) {
             if (payload[key] !== undefined && (typeof payload[key] !== 'string' || ![home, realpathSync(home)].some(base => path.resolve(String(payload[key])).startsWith(base + path.sep)))) {
               res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: false, error: { code: 'FIXTURE_SCOPE', message: '测试空间只允许读取或另存此合成 home 内的工作包。' } })); return;
+            }
+          }
+          for (const key of ['residue_paths', 'identity_backup_paths', 'extra_roots']) {
+            const paths=payload[key];
+            if (paths!==undefined && (!Array.isArray(paths) || paths.some(value=>typeof value!=='string'||![home,realpathSync(home)].some(base=>path.resolve(value).startsWith(base+path.sep))))) {
+              res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:false,error:{code:'FIXTURE_SCOPE',message:'只能选择当前合成 home 内的准确文件或目录。'}}));return;
             }
           }
           const child = spawn(runner, ['request'], { env: { ...process.env, HOME: home, LINTEL_TEST_HOME: home, LINTEL_STATE_DIR: path.join(fixture, 'state') }, stdio: ['pipe', 'pipe', 'pipe'] });

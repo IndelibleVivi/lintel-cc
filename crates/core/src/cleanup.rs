@@ -146,7 +146,7 @@ impl Engine {
             .collect()
     }
 
-    fn known_writers(&self, e: &Value) -> Result<Vec<Value>> {
+    pub(crate) fn known_writers(&self, e: &Value) -> Result<Vec<Value>> {
         #[cfg(test)]
         {
             let _ = e;
@@ -235,9 +235,18 @@ impl Engine {
     }
 
     pub(crate) fn plan_cleanup(&self, r: &Value) -> Result<Value> {
+        let recipe = string(r, "recipe")?;
+        // The local-data/identity recipes own their own freeze/projection; they
+        // never read settings and never include logout, so they branch before
+        // the shared client-state recipe below.
+        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
+            return self.plan_clear_residue(r);
+        }
+        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
+            return self.plan_identity_reset(r);
+        }
         let e = self.env(r)?;
         self.block_managed(&e)?;
-        let recipe = string(r, "recipe")?;
         if !["repair_login", "reset_client", "retire"].contains(&recipe) {
             return Err(err("unsupported_recipe", "未知清理配方"));
         }
@@ -335,6 +344,13 @@ impl Engine {
     }
 
     pub(crate) fn check_cleanup(&self, e: &Value, p: &Value, r: &Value) -> Result<()> {
+        let recipe = string(&p["extra"], "recipe")?;
+        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
+            return self.check_residue_clear(p, r);
+        }
+        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
+            return self.check_identity_reset(p, r);
+        }
         if p["extra"]["official_logout"] == true {
             self.check_auth_scope()?;
         }
@@ -388,6 +404,14 @@ impl Engine {
         journal: &Path,
     ) -> Result<()> {
         let recipe = string(&p["extra"], "recipe")?;
+        // Exact residue clearing and the identity reset are their own finite
+        // steps; neither archives work content, creates a new root, or logs out.
+        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
+            return self.clear_residue(e, p, r, j, journal);
+        }
+        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
+            return self.identity_reset(e, p, r, j, journal);
+        }
         let files = p["extra"]["files"].as_array().unwrap();
         // Step 1: write the encrypted state backup for the mixed client-state
         // files. This is a prerequisite for reset_client/retire and is always
@@ -521,16 +545,48 @@ impl Engine {
     }
 }
 
+/// Bounded snapshot of one path: identity (device/inode/owner/mode) plus a
+/// digest of its bytes read under an explicit limit. Shared by the residue clear
+/// (larger originals) and the standard cleanup paths, so both bind a later
+/// removal to the same fields.
+pub(crate) fn bounded_snapshot(path: &Path, limit: u64) -> Result<Value> {
+    use std::os::unix::fs::MetadataExt;
+    guard(path)?;
+    if !path.exists() {
+        return Ok(Value::Null);
+    }
+    let m = fs::metadata(path)?;
+    if m.uid() != unsafe { libc::geteuid() } || m.nlink() != 1 {
+        return Err(err("unsafe_file", "文件所有者或硬链接状态不受支持"));
+    }
+    let bytes = read(path, limit)?;
+    Ok(
+        json!({"digest":digest(&bytes),"inode":m.ino(),"device":m.dev(),"mode":m.mode(),"owner":m.uid()}),
+    )
+}
+
 // Bind removal to the object moved out of the client path, not whatever later
 // occupies that path. A replaced file is restored without overwriting new state.
 pub(crate) fn quarantine_remove(path: &Path, expected: &Value, directory: &Path) -> Result<()> {
+    quarantine_remove_bounded(path, expected, directory, 8 * 1024 * 1024)
+}
+
+/// The same quarantine removal with a caller-chosen read limit for the
+/// post-rename verification. Used by the residue clear, whose exact originals
+/// can be larger than the standard state-file bound.
+pub(crate) fn quarantine_remove_bounded(
+    path: &Path,
+    expected: &Value,
+    directory: &Path,
+    limit: u64,
+) -> Result<()> {
     use std::os::unix::fs::DirBuilderExt;
     fs::DirBuilder::new().mode(0o700).create(directory)?;
     let held = directory.join("state");
     fs::rename(path, &held)?;
     fs::File::open(directory)?.sync_all()?;
     fs::File::open(path.parent().unwrap())?.sync_all()?;
-    let observed = snapshot(&held);
+    let observed = bounded_snapshot(&held, limit);
     if !matches!(&observed, Ok(actual) if actual == expected) {
         // hard_link is no-replace. If a writer created another file meanwhile,
         // retain both; the receipt contains the private recovery directory.

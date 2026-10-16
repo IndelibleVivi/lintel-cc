@@ -7,6 +7,7 @@ mod bundled_browser_host;
 mod cli_inspector;
 mod locale;
 mod locale_menu;
+mod local_files;
 mod network;
 mod remote;
 mod resources;
@@ -160,6 +161,7 @@ fn main() {
             remote_request,
             app_updates::app_update_request,
             resources::open_resource,
+            local_files::reveal_local_item,
             cli_inspector::inspect_cli,
             app_preferred_languages,
             app_set_language
