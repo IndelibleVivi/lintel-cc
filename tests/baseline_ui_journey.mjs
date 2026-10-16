@@ -259,6 +259,7 @@ try{
  await writeFile(path.join(state,'launches',requested.request_id+'.json'),JSON.stringify({request_id:requested.request_id,status:'launch_intent',mode:'interactive',root,project_cwd:project,executable:inert,recorded_at:'2026-10-05T12:00:00Z'}));
  await page.locator('.sidebar nav').getByRole('button',{name:'记录与恢复',exact:true}).click();
  const launchRecords=page.locator('.launch-records');await launchRecords.getByRole('button').filter({hasText:requested.request_id}).click();
+ await launchRecords.locator('.launch-record-detail').waitFor();await launchRecords.locator('.launch-record-query').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(fixture,'launch-records-populated.png')});
  await launchRecords.getByRole('button',{name:'把原启动请求交给 Agent',exact:true}).click();
  await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();
  const launchPacket=JSON.parse(await page.getByLabel('Agent 操作交接包').inputValue());

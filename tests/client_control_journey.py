@@ -28,17 +28,17 @@ def run():
         env = dict(os.environ, HOME=str(home), LINTEL_TEST_HOME=str(home),
                    LINTEL_STATE_DIR=str(state), PATH=str(bindir))
 
-        def invoke(argv, fields=None, good=True):
+        def invoke(argv, fields=None, good=True, timeout=45):
             result = subprocess.run([str(BINARY), *argv], env=env,
                                     input=json.dumps(fields) if fields is not None else '',
-                                    text=True, capture_output=True, timeout=45)
+                                    text=True, capture_output=True, timeout=timeout)
             assert result.stdout.strip(), (argv, result.returncode, result.stderr)
             response = json.loads(result.stdout)
             assert response['ok'] is good, (argv, response, result.stderr)
             return response['data'] if good else response['error']
 
-        def request(command, good=True, **fields):
-            return invoke(['request'], dict(command=command, **fields), good)
+        def request(command, good=True, timeout=45, **fields):
+            return invoke(['request'], dict(command=command, **fields), good, timeout)
 
         roots = [home / 'environment-a', home / 'environment-b']
         ids = []
@@ -147,7 +147,11 @@ def run():
         password = 'synthetic-client-control-passphrase'
 
         def execute(plan):
-            result = request('execute', plan_id=plan['id'], approval=plan['hash'], archive_passphrase=password)
+            # A composite publishes three independently encrypted backups. Keep
+            # observations/single-step writes at 45s; allow the combined KDF work
+            # a finite 120s budget without weakening production cryptography.
+            result = request('execute', plan_id=plan['id'], approval=plan['hash'], archive_passphrase=password,
+                             timeout=120 if plan['kind'] == 'client_workflow' else 45)
             assert result['status'] == 'completed', result
             return result
 

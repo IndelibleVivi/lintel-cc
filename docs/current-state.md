@@ -1,13 +1,14 @@
 # 当前状态
 
-2026-10-16 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 App／未签名 DMG 仍为 2026-10-13 构建的 clean `878482fa14f656776ef99b995c6f177ac52921d3`，包含最新共享跑道、双语入口、cleanup metadata-only 修复、完整第三方许可与 clean-checkout notices 接线修复。两个 Linux musl runner 和 native browser host 已在该轮重新构建；DMG 只读挂载与资源字节核对通过。新包隔离 HOME／state 的实际 release WebKit 首屏和原生设置已观察；完整语言／游戏操作对应 10-13 同日产品代码未变的 `cdb0ba8` 候选，分别留存。未安装到 Applications、无 Developer ID／公证、无公开二进制或 feed 激活。
+2026-10-17 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 App／未签名 DMG 仍为 2026-10-13 构建的 clean `878482fa14f656776ef99b995c6f177ac52921d3`，包含最新共享跑道、双语入口、cleanup metadata-only 修复、完整第三方许可与 clean-checkout notices 接线修复。两个 Linux musl runner 和 native browser host 已在该轮重新构建；DMG 只读挂载与资源字节核对通过。新包隔离 HOME／state 的实际 release WebKit 首屏和原生设置已观察；完整语言／游戏操作对应 10-13 同日产品代码未变的 `cdb0ba8` 候选，分别留存。未安装到 Applications、无 Developer ID／公证、无公开二进制或 feed 激活。
 
-官网生产仍是 clean `c80a783` 的独立静态 payload，简中／English、六项能力场景、共享跑道与概念短片保持已验证版本，本轮未重新部署。独立三平台 CLI 发行候选仍为 `bb9fa824`，10-13 构建的 macOS CLI 仅用于当轮 release 大工作包复验。10-15 接续合成回归与现成候选的原生首用验收；10-16 新增客户端控制源码，尚未重建 App／发行候选或更新已有安装。A01–A18 与完整 SPEC／G01–G04 的未验收范围继续保留。
+官网生产仍是 clean `c80a783` 的独立静态 payload，简中／English、六项能力场景、共享跑道与概念短片保持已验证版本，本轮未重新部署。独立三平台 CLI 发行候选仍为 `bb9fa824`，10-13 构建的 macOS CLI 仅用于当轮 release 大工作包复验。10-15 接续合成回归与现成候选的原生首用验收；10-16 新增客户端控制源码，10-17 收紧顶栏、配方与记录／范围卡片。独立合成试玩与正式发行候选分别记录，未更新已有安装。A01–A18 与完整 SPEC／G01–G04 的未验收范围继续保留。
 
 ## 当前交付与证据
 
 | 对象 | 当前事实与验收边界 |
 | --- | --- |
+| 2026-10-17 App 界面收尾 | 单行顶栏保留主机／环境，慢闪 `>_` 展开准确路径、ID 与客户端；外观图标保留可访问名称。快捷配方把主应用与次级编辑／保存分层；会话启动记录与本地范围统一字号／间距，文件完整路径按需展开。两尺寸 Day／Night 实际 Chromium 截图已目视；准确路径／复制、键盘关闭、reduced motion 与层级通过合成检查。独立原生试玩的更新另行核对；正式 `878482f` App／DMG 未重建，用户审美接受不由测试推定 |
 | 2026-10-16 客户端控制增强源码 | 已接通 [客户端控制增强 mini spec](specs/client-control.md) 的四组能力：v5 规则 `claude-privacy-v5-2026-10-16` 的 27 个字段、五类动作／按字段限制、凭据遮蔽与显式高级 JSON 编辑；有限本地数据清单（已知位置＋明确 `extra_roots`、分页摘要、独立 `lintel.residue/1` 加密备份／精确清理／原环境原路径恢复、`userID` 按需显示／复制／加密保全后重置且不注销）；脱敏语义快照、逐项接受比较基线、打开环境／Lintel 启动时的轻量配置检查；三条可编辑配方，每次重新预览。App／CLI／有限 SSH 使用同一 core 与计划／批准／原 job 链；观察和基线接受不创建 mutation job。**本机证据：**workspace Rust、独立 desktop Rust（50 passed／2 既有 ignored）、真实 CLI 合成旅程、有限 SSH、catalog／配方／TypeScript／frontend build 通过；built App＋真实 core 的一次合成批准、所选原字段恢复、独立残留备份恢复、语义接受、跨环境实际写入、新配方 ID 与 900×640／1120×760 Day／Night 通过。展开的下拉／口令／数字／JSON 表单已目视，长表单保留固定页眉与操作栏；相邻 baseline／drift／i18n UI 通过。**边界：**这是源码与 Chromium 合成 HOME 的验收，native locale／clipboard／Finder 为明确建模，未做本轮真实 WebKit／Finder、Claude exporter／身份重新生成、真实账号／生产 SSH 验收。没有重建／安装 App 发行候选、Release／feed 或网站部署；新增三个独立检查不改变隐式默认组，命令见 [验证说明](verification.md#客户端控制增强) |
 | 2026-10-15 独立试用接续 | 已完整核对提供的 10-14 Linux 试用报告与六文件脚本：报告基于 `eb9bdd6`，记录非 systemd x86_64 Linux 上精确三件归档、原 ID 完成、六份源文件不变、独立 state 读包，以及 portable-work／execution-admission 回归通过；原云主机与 fixture 本轮未复核，属于报告证据。现将精确选择、独立 inspect/read、全部原件字节、口令／暂存清理断言合入既有 `journey-agent-cli`，不新增检查入口或更改默认组。当前本机 Darwin arm64 实跑结果见 [验证说明](verification.md#独立试用接续)；没有产品行为或候选二进制变更 |
 | 2026-10-15 原生首用复核 | 同一 `878482f` DMG 只读取出、原 SHA256SUMS 核对通过；macOS 26.5.2 arm64／全新合成 HOME／state 的真实 release WebKit 已完成登记、精确三件选择／预检／预览、一次批准归档与 completed 回执。六份源 bytes 不变，只有一个原 job／一个环境，无新 root。原生 Quit 后重开，Records 保留原 ID completed；从独立文件入口重新解锁并阅读指令／记忆／会话，结构化与 raw JSONL 均已观察。另一独立 HOME／state 的 CLI 对同一密文核对三份完整 bytes／摘要，无源归档 job；口令未进入隔离持久文件，正常结束无解密 staging，测试 App 已退出。早期 AX／无窗口失败保留，后续经 LaunchServices、明确窗口／截图绑定及经用户允许的前台操作完成。双语 [首用程序](app-updates.md#候选首次使用验收) 已对齐；真实下载／quarantine／Gatekeeper、干净 Mac 首装、签名／公证仍独立未验收 |
@@ -42,6 +43,8 @@
 发行准备的 clean-checkout 回归：`4a5a635` 的 [run 38343526714](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38343526714) 原生 macOS job 因不存在的 frontend notice 资源失败，其余该 job 的 14 项检查通过。资源现统一从带 tracked README 的 notices 目录收集，完整 App 构建仍先生成 frontend 并拒绝缺失正文；本机临时移开 dist 与全部 generated notices 后，原生 48 项通过、2 项既有 ignored，9 项 notices 回归通过。该修正不把原 run 标绿，也不把只含 README 的开发目录当作发行包。clean `878482f` 的 [run 38344346775](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38344346775) 已核对 exact SHA completed/success：两平台 frontend／native／browser UI／runner CLI／heavy work、controller、隔离 Linux VM 与最终 aggregate 全部通过。此 CI 覆盖源码与一次性测试环境，不替代生产主机、签名或真实下载首装。
 
 [基线验收记录](specs/product-baseline-status.md) 保存 A01–A18 的逐项证据与未验证条件；[候选历史](candidate-history.md) 保存此前候选的资源／CI／runtime 观察。历史 Linux VM 与 browser runtime 证据仍限定于当时源码和一次性环境，不证明这轮新增路径已验收。
+
+客户端控制源码 `8c3af4328b177428726108b4790897ff8be1646e` 的 [full run 38912008173](https://github.com/IndelibleVivi/lintel-cc/actions/runs/38912008173) 为 completed/failure：Ubuntu 的合成操作 CLI 在 45 秒子进程预算耗尽，客户端控制 UI 在 12 秒弹窗等待到期，aggregate 正确拒绝；该 run 不标为通过。当前测试对三次独立加密保全提供有限 120 秒执行预算，UI 等实际 core 回复后继续核对原 ID／字节与回执，并保留有限错误代码诊断；本机合成 CLI 与 UI 已通过，Ubuntu 修正后结果仍需由新 CI 验证。
 
 ## App 简中 / English 源码更新
 
@@ -96,7 +99,7 @@ GitHub Actions 仍是主要 CI owner；`tests/ci_plan.py` 按改动选择 `docs`
 ## 完整目标仍缺少
 
 1. **真实认证与写入者控制：** Keychain/共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。官方注销已加入观察主体与状态绑定，并拒绝缺失主体的预览；同账号 Keychain 内部 token 更新如果不反映到 CLI 状态，仍无法识别。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。官方 auth 命令仅有合成 CLI 证据，不能宣称生产注销已验收。
-2. **完整外发策略与强约束：** 七项自定义已接入；更多取舍、入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
+2. **完整外发策略与强约束：** v5 的 27 个字段与逐项编辑已接入；真实客户端入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
 3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、符合既有条件的 system/user manager 严格 logout 后续跑、原任务完成与 reboot 后核对。setsid 不保证 logout 存活，托管路径也不保证 reboot 续跑；生产 VPS 安装与任务实跑、aarch64 runtime、其他 supervisor 和完整 G03 仍未验收。
 4. **浏览器旅程：** 独立 Chromium 临时测试 profile 已完成真实持久安装／onStartup 两阶段清理；仍需正式 Chrome、Edge、Firefox 与 AdsPower 的安装、配对与清理验收。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。
 5. **发行与维护：** App updater 与本地 release／feed／首装资料准备已接通源码，未激活实际发行；真实首装／升级、正式签名/公证仍未验收。菜单栏、定时漂移、签名规则更新、卸载与性能预算继续保留。

@@ -64,6 +64,29 @@ try{
   assert.equal(menuCalls.at(-1),'en','native menu language pushed on first resolve');
   assert.equal(await page.evaluate(()=>window.__firstHome[0].lang),'en','document language precedes the first App content');
   report.checks.push('first paint follows native en-US preference; html lang=en; menu push recorded');
+  // The quiet toolbar keeps identity visible and reveals exact paths only on demand.
+  const targetToggle=page.getByRole('button',{name:'Show target details',exact:true});
+  assert.equal(await page.locator('.target-details-panel').count(),0);
+  const beforeTargetCalls=coreCalls.length;
+  await targetToggle.click();
+  const targetPanel=page.getByRole('region',{name:'Show target details',exact:true});
+  assert.ok((await targetPanel.innerText()).includes(environment.root));
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.target-details-panel').count(),0);
+  assert.equal(await targetToggle.evaluate(node=>node===document.activeElement),true,'Escape returns focus to the terminal cursor');
+  await targetToggle.click();
+  await targetPanel.getByRole('button',{name:'Copy full path',exact:true}).last().focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('.target-details-panel').count(),0,'tabbing out dismisses the nonmodal details');
+  await targetToggle.focus();
+  await page.keyboard.press('Enter');
+  await page.locator('.sidebar .brand').click();
+  assert.equal(await page.locator('.target-details-panel').count(),0,'outside pointer dismisses target details');
+  assert.equal(coreCalls.length,beforeTargetCalls,'target disclosure is local UI only');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  report.checks.push('one-line target toolbar: exact paths on demand, outside/Escape dismissal and focus return, no core request, reduced-motion cursor static');
   // (2) Manual override to zh-CN: instant rerender, menu push, no core side effects; greeting identity stable.
   const titleBefore=await page.locator('.home-title').innerText();
   const coreBefore=coreCalls.length;
@@ -212,7 +235,7 @@ try{
   for(const theme of ['light','dark']){
     await page.getByRole('button',{name:theme==='light'?'Light Day':'Dark Night',exact:true}).click();
     const geometry=await page.locator('.target-bar').evaluate(node=>({height:node.getBoundingClientRect().height,select:node.querySelector('.language-switch').getBoundingClientRect().width,context:node.querySelector('.target-context').getBoundingClientRect().width}));
-    assert.ok(geometry.height<100,'language control must not turn the toolbar into a tall form');
+    assert.ok(geometry.height<=60,'language control must not turn the toolbar into a tall form');
     assert.ok(geometry.select>=44&&geometry.select<=80,'minimal language face retains a usable hit area');
     assert.ok(geometry.context>200,'target context remains readable at 900px');
     await page.screenshot({path:path.join(output,`i18n-en-900-${theme}.png`)});

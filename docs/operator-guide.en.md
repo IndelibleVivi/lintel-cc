@@ -35,6 +35,8 @@ Home quietly centers Clawd/original time greetings. Explicit Start a task opens 
 
 **Environment** is primarily a registered Claude Code configuration directory, not project code or a credential-isolated account container. Overview → Configuration sources and verification scope shows root; Launch and sources shows executable/root. Confirm host/name/full path together.
 
+The toolbar keeps the host and environment name visible. Click the slow-blinking `>_` to view the full root, environment ID and client path, with path-copy controls; Escape or outside interaction closes it. Collapsed paths do not change exact target review in approval previews.
+
 **Browser profile** is independently authorized on this App's Mac. SSH never turns it/local proxy into VPS components. Root/profile do not automatically establish identity isolation.
 
 Components inspects finite root sources/static CLI/auth locations/exact recorded services. Optional target-host absolute cwd and Refresh components checks project/local/MCP without creating/starting. Account unknown, Desktop/IDE unsupported, browser independent. Recorded units refresh; unverified stays unknown, old pause is not live state. Check original task queries only this host's original ID.
@@ -228,6 +230,8 @@ Choose exact scope. Network errors/failed responses are not automatically bans; 
 | Retire | Exact state plus disabled Lintel launch entry, originals retained | Not uninstall/whole-root deletion/deleted-credential recovery |
 
 Repair targets .credentials.json; others also previewed .claude.json, differing default/dedicated roots. No whole-machine Claude cleaner.
+
+Local-scope rows initially show a filename and presence. Expand a row for the full path and confirm the exact target before preview.
 
 1. Confirm host/environment/root, choose recipe.
 2. Close target terminals/IDE/restarters; systemd requires §5.3 independent pause.

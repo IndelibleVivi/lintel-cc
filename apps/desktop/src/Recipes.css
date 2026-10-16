@@ -1,0 +1,65 @@
+/* Quick recipes (Client control enhancement, spec D).
+   This file is the only active owner of the .recipes/.recipe-row family after
+   the old block was removed from styles.css. It keeps the semantic hooks the
+   UI journeys rely on (.recipes, .recipe-row, .recipe-copy, .recipe-actions,
+   .recipe-edit, .recipe-fields) while giving the three cards a clear reading
+   order: name and detail first, target/config summary next, the single primary
+   apply action on the right, and secondary edit/save kept on their own row. */
+
+.recipes{padding-bottom:4px}
+.recipes>.recipes-intro{margin:0;padding:15px 20px 14px;border-bottom:1px solid var(--line);line-height:1.75;font-size:12.5px;overflow-wrap:anywhere}
+
+.recipe-list{display:flex;flex-direction:column}
+
+.recipe-row{display:flex;flex-direction:column;gap:0;padding:18px 20px;border-bottom:1px solid var(--line)}
+.recipe-row:last-child{border-bottom:0}
+.recipe-row.other-scope{background:color-mix(in srgb,var(--soft) 40%,transparent)}
+
+.recipe-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 22px;align-items:start}
+.recipe-copy{display:flex;flex-direction:column;gap:7px;min-width:0}
+.recipe-copy strong{font-size:14.5px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
+.recipe-copy p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.75;overflow-wrap:anywhere}
+
+.recipe-meta{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:2px}
+.recipe-chip{display:inline-flex;align-items:center;min-height:22px;padding:1px 9px;border:1px solid var(--line);border-radius:999px;background:var(--soft);color:var(--muted);font-size:11.5px;line-height:1.5;white-space:nowrap}
+.recipe-chip.recipe-target.scope{border-color:color-mix(in srgb,var(--accent) 38%,var(--line));background:var(--accent-bg);color:var(--accent-strong)}
+
+.recipe-apply-col{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:138px}
+.recipe-apply{justify-content:space-between;min-height:40px;padding-inline:15px;font-size:13px}
+.recipe-apply:not(.primary){background:var(--paper)}
+
+.recipe-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin-top:13px}
+.recipe-actions .text-button{font-size:12.5px;min-height:30px;display:inline-flex;gap:6px}
+.recipe-edit-toggle svg{color:var(--muted);transition:transform .16s}
+.recipe-edit-toggle[aria-expanded=true] svg{transform:rotate(90deg)}
+.recipe-save{margin-left:auto}
+
+.recipe-edit{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.recipe-edit>.small-print{margin-bottom:2px;line-height:1.75}
+
+.recipe-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:15px 20px;align-items:end;margin-top:15px}
+.recipe-fields>.small-print{grid-column:1/-1;margin:0}
+.recipe-fields .field{margin-top:0;min-width:0}
+.recipe-fields .field select{min-height:40px}
+
+.recipe-fields-group{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px 20px;border:1px solid var(--line);border-radius:8px;padding:12px 14px 14px;margin:0;min-width:0}
+.recipe-fields-group legend{padding:0 6px;font-size:12px;color:var(--muted)}
+.recipe-fields>.checkbox-inline{min-height:38px;font-size:13px}
+
+.recipe-notice{margin:0;padding:12px 0 2px;color:var(--accent);line-height:1.7}
+
+.recipes-note{padding:0 20px 18px}
+.recipes-note .notice{margin-top:0}
+
+@media(max-width:760px){
+  .recipe-head{grid-template-columns:minmax(0,1fr)}
+  .recipe-apply-col{flex-direction:row;min-width:0}
+  .recipe-apply{flex:1 1 auto}
+  .recipe-save{margin-left:0}
+  .recipe-chip{white-space:normal}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .recipes *{transition:none!important;animation:none!important}
+  .recipe-edit-toggle[aria-expanded=true] svg{transform:none}
+}

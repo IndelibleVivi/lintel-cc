@@ -3,6 +3,7 @@ import { Icon, Notice } from './ui';
 import { useI18n } from './i18n-provider';
 import { RECIPE_IDS, recipeTargets, readRecipe, saveRecipe, type RecipeId, type RecipeIntent, type PolicyRecipeIntent, type ResidueRecipeIntent, type CleanupRecipeIntent } from './recipeIntent';
 import type { PolicyPreset, TrustedDevices } from './types';
+import './Recipes.css';
 
 // Quick recipes factor the three ordinary journeys into editable intent. A
 // recipe never replays an old approval: applying it seeds the current draft (or
@@ -36,21 +37,29 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
   const targetLabel = (id: RecipeId) => t(recipeTargets[id] === 'policy' ? 'recipes.targetPolicy' : 'recipes.targetRebuild');
   return <section className="surface recipes" aria-label={t('recipes.aria')}>
     <div className="surface-heading"><div><h2>{t('recipes.title')}</h2><span className="small-label">{t('recipes.subtitle')}</span></div></div>
-    <p className="padded small-print">{t('recipes.intro')}</p>
+    <p className="small-print recipes-intro">{t('recipes.intro')}</p>
     <div className="recipe-list">{RECIPE_IDS.map(id => {
       const intent = readRecipe(id, hostAlias, environmentId);
       const matchesScope = recipeTargets[id] === scope;
-      return <div className={`recipe-row ${matchesScope ? '' : 'other-scope'}`} key={id}>
-        <div className="recipe-copy"><strong>{t(`recipes.name.${id}` as never)}</strong><p>{t(`recipes.detail.${id}` as never)}</p>
-          <span className="small-label">{targetLabel(id)}</span>
-          {intent.kind === 'policy' && <span className="small-label">{t('recipes.intentPolicy', { count: Object.keys(intent.customSettings ?? {}).filter(key => (intent.customSettings ?? {})[key] !== 'keep').length })}</span>}
-          {intent.kind === 'residue' && <span className="small-label">{t('recipes.intentResidue')}</span>}
-          {intent.kind === 'cleanup' && <span className="small-label">{t('recipes.intentCleanup', { count: intent.categories.length })}</span>}
+      return <div className={`recipe-row ${matchesScope ? 'current-scope' : 'other-scope'}`} key={id}>
+        <div className="recipe-head">
+          <div className="recipe-copy">
+            <strong>{t(`recipes.name.${id}` as never)}</strong>
+            <p>{t(`recipes.detail.${id}` as never)}</p>
+            <div className="recipe-meta">
+              <span className={`recipe-chip recipe-target${matchesScope ? ' scope' : ''}`}>{targetLabel(id)}</span>
+              {intent.kind === 'policy' && <span className="recipe-chip">{t('recipes.intentPolicy', { count: Object.keys(intent.customSettings ?? {}).filter(key => (intent.customSettings ?? {})[key] !== 'keep').length })}</span>}
+              {intent.kind === 'residue' && <span className="recipe-chip">{t('recipes.intentResidue')}</span>}
+              {intent.kind === 'cleanup' && <span className="recipe-chip">{t('recipes.intentCleanup', { count: intent.categories.length })}</span>}
+            </div>
+          </div>
+          <div className="recipe-apply-col">
+            <button className={`recipe-apply${matchesScope ? ' primary' : ''}`} disabled={disabled} onClick={() => apply(id)}>{t('recipes.apply')}<Icon name="arrow" size={14}/></button>
+          </div>
         </div>
         <div className="recipe-actions">
-          <button disabled={disabled} onClick={() => apply(id)}>{t('recipes.apply')}<Icon name="arrow" size={14}/></button>
-          <button className="text-button" disabled={disabled} aria-expanded={open === id} onClick={() => setOpen(open === id ? null : id)}>{open === id ? t('recipes.hideEdit') : t('recipes.edit')}</button>
-          <button className="text-button" disabled={disabled} onClick={() => save(id)}>{t('recipes.saveDefault')}</button>
+          <button className="text-button recipe-edit-toggle" disabled={disabled} aria-expanded={open === id} onClick={() => setOpen(open === id ? null : id)}><Icon name="chevron" size={12}/>{open === id ? t('recipes.hideEdit') : t('recipes.edit')}</button>
+          <button className="text-button recipe-save" disabled={disabled} onClick={() => save(id)}>{t('recipes.saveDefault')}</button>
         </div>
         {open === id && <div className="recipe-edit">
           <p className="small-print">{t('recipes.editNote')}</p>
@@ -61,7 +70,7 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
         {notice === id && <p className="small-print recipe-notice" role="status">{t('recipes.savedDefault')}</p>}
       </div>;
     })}</div>
-    <Notice>{t('recipes.freshPlanNote')}</Notice>
+    <div className="recipes-note"><Notice>{t('recipes.freshPlanNote')}</Notice></div>
   </section>;
 }
 

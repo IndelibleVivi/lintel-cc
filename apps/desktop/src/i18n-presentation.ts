@@ -23,6 +23,8 @@ const catalogs = { 'zh-CN': zhCN, en } as const;
 // grouped by where core emits the string. New core wording renders raw until it
 // is added here with a matching catalog entry (fail-open, never a guess).
 export const PRESENTATION_KEYS: Record<string, string> = {
+  'Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理': 'present.cleanupScope',
+
   "OTel 数据收集总开关": "present.client.CLAUDE_CODE_ENABLE_TELEMETRY.label",
   "开启后 Claude Code 才收集 OTel 指标/日志/trace；后续 exporter 与内容记录都以此为前提。官方明确该变量在项目与本地设置中被忽略，只能由 shell、user 或 managed 设置提供。": "present.client.CLAUDE_CODE_ENABLE_TELEMETRY.impact",
   "OTel 用户提示词记录": "present.client.OTEL_LOG_USER_PROMPTS.label",

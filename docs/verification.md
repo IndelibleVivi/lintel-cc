@@ -33,6 +33,10 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 这三个检查均不进入隐式默认组；`journey-client-control` 在 core/full 的 native CI 组，`recipe-test` 在 frontend 组，`client-control-ui` 在 browser 组，通过同一 canonical entrypoint 调用。它们不验证真实 Claude 的 exporter 行为、身份重新生成、个人账号、生产 SSH、安装或正式发行。规格见[客户端控制增强](specs/client-control.md)。
 
+顶栏与卡片收尾沿用这组检查：`client-control-ui` 在两种窗口尺寸／两套主题下核对单行页眉、按需展开的准确路径、详情面板与 Clawd 的层级、清理文件完整路径、启动记录及逐条配方截图；`i18n-ui` 验默认收起、Escape／外部点击、焦点返回、无额外 core 调用与 reduced-motion 静态光标。截图留在本地临时 fixture，不能单靠自动断言判定审美接受。
+
+合成操作包含三次独立加密备份。该项 CLI／UI 子进程给出有限 120 秒执行预算，其他命令维持原预算；UI 等待实际 core 回复，再检查原计划、回执与字节结果，不把固定 12 秒内弹窗出现当作 core 已完成。失败报告只增加命令名、是否成功和错误代码，保留原敏感值断言；没有更改生产加密或执行时限。
+
 ## 独立试用接续
 
 2026-10-15 将外部 Linux 六文件合成试用中的相关断言合入既有 `journey-agent-cli`，不另建检查入口。该 journey 现在通过 named CLI 核对：无 state 的静态发现；四件清单中精确选择三件的预检／归档；同一原任务 ID 的完成／查询；全部六份源文件逐字节不变；另一份 HOME／state 的独立包清单、SHA-256 与指令正文；独立读者没有源归档记录；输出及双方持久 JSON 不含测试口令，正常读取／完成不留解密 staging。既有选择性迁入、保全、等待超时及恢复场景继续保留。named CLI helper 使用临时 cwd；所有子进程使用显式合成 HOME／state 与有限环境，不继承调用者凭据、代理或 test hooks，需要的故障屏障由该旅程自行明确注入。

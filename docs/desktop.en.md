@@ -16,6 +16,8 @@ The [operator guide](operator-guide.en.md) covers goals through results. App hel
 
 Drafts are host/environment-separated in current-Webview localStorage; editing does not directly publish configuration. The owning host's core retains tasks/restoration after window closure. App exit stops its local proxies, without closing launched clients.
 
+The single-line toolbar keeps the host, environment, language and three appearance icons visible. The slow-blinking `>_` beside the environment opens Current target: host, environment name, full configuration root, environment ID and the detected client path, with path-copy controls. Paths are collapsed by default. Outside interaction, focus leaving the disclosure or Escape closes it; Escape returns focus to the cursor button. Reduced motion keeps the cursor static. Disclosure only changes presentation; approval previews still show the complete frozen target and destinations.
+
 ### Interface language
 
 App supports Simplified Chinese/English and follows system by default. The top selector shows actual `EN`/`中文` and an arrow; its native menu exposes Follow system/Simplified Chinese/English, avoiding confusion with appearance System. Follow-system still shows actual language; Settings shows full mode/labels/explanation with visible focus. Both selectors retain manual choice only in this Webview's local storage. Native `app_preferred_languages` readonly fetches at most eight bounded CoreFoundation identifiers; Info.plist declares `en`/`zh-Hans`. Browser/synthetic runs fall back to browser languages; unsupported languages resolve to English. `app_set_language` accepts only `en`/`zh-CN` and updates ordinary macOS menus without changing actions/shortcuts. No Claude/account/work reads or system-language edits occur.
@@ -54,6 +56,8 @@ Cleanup has three paths:
 
 All require confirming target terminals/IDEs/automatic restarters closed. Core rechecks writers; unassignable Claude writers block cleanup without global killing. UI shows files/existence/coverage, never credential bodies.
 
+Recognized local scope first shows category, filename and presence; expand a file row for its exact full path, or Refresh scope to observe again. Session launch records accepts an original launch/resume request ID for a read-only result check, without starting another session or copying work content.
+
 Only Explicitly inspect authentication sources runs target Claude auth status. Official logout invokes that environment's `auth logout` and may contact servers; unverifiable shared auth/schema refuses. Without logout, Keychain/outside-root auth remains unknown; file completion is not full logout. Browser/Desktop/IDE/supervisor scopes remain separate.
 
 Archives require passphrases ≥12 characters, temporarily in form/request, never drafts/localStorage/journal. Records → Work archive or result View work archive unlocks inventory and paged structured messages/tools/unknown records/raw text. Category import needs a separate plan/approval and refuses same-name overwrite. Default materials enter references; explicitly enabling reviewed personal instructions chooses client-discovered instruction paths. Sessions/memories enter `lintel-imports`, without hooks/MCP activation or continuation claims.
@@ -73,6 +77,8 @@ Changes and comparison saves a sanitized semantic snapshot and compares two snap
 Advanced configuration editing offers strict validation, a per-field masked diff and original-task restoration for an explicitly chosen user/project-local JSON file: writes reuse the existing plan chain, recheck the digest before approval, seal an age `lintel.config/1` backup before writing, and restore only the original task's fields while retaining unrelated later edits; credential values and unrecognized keys stay masked by default.
 
 The Protect plan and Cleanup and rebuild pages hold three editable quick recipes: "reduce body recording" disables the known content-recording fields while keeping metrics, "clear runtime residue" uses the residue currently selected in the local-data view, and "preserve work and rebuild" archives and imports the selected work content. Recipes store only non-secret intent such as the preset and finite field choices; drafts and original tasks do not drift across host or environment switches, and every run regenerates a fresh plan for the current host and environment, never replaying an old approval.
+
+Each row groups its name, description, target and option summary, with one Apply recipe action on the right. Edit and Save personal default sit in a secondary action row. The current page's target has a quiet emphasis; other targets remain available and open their corresponding page. `Recipes.css` is the single styling entry for this layout.
 
 ## Browser and network
 

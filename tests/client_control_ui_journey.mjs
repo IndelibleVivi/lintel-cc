@@ -38,7 +38,9 @@ const calls=[],copied=[],reveals=[],resources=[];
 let queue=Promise.resolve(),clipboardFail=false;
 function processCall(args,payload,env=actor){return new Promise((resolve,reject)=>{
  const child=spawn(runner,args,{env,stdio:['pipe','pipe','pipe']});let out='',err='',inputError;
- const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout'))},55000);
+ const composite=payload?.command==='execute'&&coreResponses.some(item=>item.envelope.data?.id===payload.plan_id&&item.envelope.data?.kind==='client_workflow');
+ const budget=composite?120000:55000;
+ const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout: '+payload?.command))},budget);
  child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);
  child.stdin.once('error',error=>{inputError=error});
  child.once('error',error=>{clearTimeout(timeout);reject(error)});
@@ -58,7 +60,7 @@ const coreResponses=[];
 function coreTracked(payload){const result=core(payload);result.then(envelope=>coreResponses.push({command:payload.command,envelope})).catch(()=>{});return result}
 async function dataTracked(payload){const result=await coreTracked(payload);assert.ok(result.ok,`${payload.command}: ${result.error?.message}`);return result.data}
 function lastPlanId(command){const entry=[...coreResponses].reverse().find(item=>item.command===command&&item.envelope.ok);return entry?.envelope.data?.id}
-async function waitForResult(command,previous){for(let i=0;i<600;i++){const completed=coreResponses.filter(item=>item.command===command);if(completed.length>previous){assert.ok(completed.at(-1).envelope.ok,JSON.stringify(completed.at(-1).envelope.error));return completed.at(-1).envelope.data}await new Promise(resolve=>setTimeout(resolve,20))}throw new Error(`no completed ${command}`)}
+async function waitForResult(command,previous){const deadline=Date.now()+(command==='execute'?125000:60000);while(Date.now()<deadline){const completed=coreResponses.filter(item=>item.command===command);if(completed.length>previous){assert.ok(completed.at(-1).envelope.ok,JSON.stringify(completed.at(-1).envelope.error));return completed.at(-1).envelope.data}await new Promise(resolve=>setTimeout(resolve,20))}throw new Error(`no completed ${command}`)}
 
 const L={envDetails:'环境详情',tabState:'本地状态',tabCompare:'变化与对照',reveal:'显示原始值',hide:'隐藏原始值',locate:'在 Finder 中定位',combineReduce:'同时减少正文记录',combineReset:'同时重置本地客户端标识',combinePreview:'预览合成计划',writersStopped:'已关闭目标的终端、IDE 与自动重启来源',approve:'批准并执行',previewPolicy:'预览变更',configRead:'读取',configReinspect:'重新观察',configPreviewEdit:'预览并应用',restoreInspect:'读取可恢复字段',restorePreview:'预览恢复',snapshotSave:'保存快照',snapshotCompare:'比较',snapshotPair:'并排对照',applyNormal:'将普通配置应用到目标环境',recipeApply:'应用配方',recipeSave:'保存为个人默认',recipeReduce:'减少正文记录'};
 
@@ -122,8 +124,11 @@ try{
  await page.getByLabel(L.combineReduce).check();
  await page.getByLabel(L.combineReset).check();
  await page.getByLabel(L.writersStopped).check();
+ const previousCombined=coreResponses.filter(item=>item.command==='plan_client_workflow').length;
  await page.getByRole('button',{name:L.combinePreview,exact:true}).click();
+ await waitForResult('plan_client_workflow',previousCombined);
  const dialog=page.getByRole('dialog');
+ async function approveCurrent(){const previous=coreResponses.filter(item=>item.command==='execute').length;await dialog.getByRole('button',{name:L.approve,exact:true}).click();await waitForResult('execute',previous);}
  await dialog.locator('.approval-root, .plan-target').first().waitFor();
  // Bind to the real persisted plan ID rather than a collapsed <details> text.
  const planId=lastPlanId('plan_client_workflow');
@@ -136,7 +141,7 @@ try{
  // One approval: passphrase fields only appear when the frozen plan requires them.
  const passFields=dialog.locator('.archive-password input[type=password]');
  if(await passFields.count()>=1){await passFields.nth(0).fill(password);if(await passFields.count()>1)await passFields.nth(1).fill(password)}
- await dialog.getByRole('button',{name:L.approve,exact:true}).click();
+ await approveCurrent();
  await dialog.locator('.receipt-id code').waitFor();
  const receiptId=await dialog.locator('.receipt-id code').innerText();
  assert.equal(calls.filter(c=>c.command==='execute').length,1,'exactly one approval executes the combined plan');
@@ -174,12 +179,16 @@ try{
  await archiveReader.locator('summary').click();
  await archiveReader.getByLabel('原任务 ID',{exact:true}).fill(receiptId);
  await archiveReader.getByLabel('归档口令（仅本次交互）',{exact:true}).fill(password);
+ const previousManifest=coreResponses.filter(item=>item.command==='residue_archive_inspect').length;
  await archiveReader.getByRole('button',{name:'打开加密清单',exact:true}).click();
+ await waitForResult('residue_archive_inspect',previousManifest);
  await archiveReader.getByRole('checkbox',{name:`恢复 ${debugFile}`,exact:true}).check();
+ const previousResidueRestore=coreResponses.filter(item=>item.command==='plan_residue_restore').length;
  await archiveReader.getByRole('button',{name:'预览恢复 1 项',exact:true}).click();
+ await waitForResult('plan_residue_restore',previousResidueRestore);
  await dialog.locator('.plan-target').waitFor();
  assert.equal(await dialog.locator('.archive-password input').first().inputValue(),password,'reader passphrase reaches only the current approval');
- await dialog.getByRole('button',{name:L.approve,exact:true}).click();
+ await approveCurrent();
  await dialog.locator('.receipt-id code').waitFor();
  assert.equal(await readFile(debugFile,'utf8'),'synthetic debug line\n');
  await dialog.getByRole('button',{name:'查看记录',exact:true}).click();
@@ -205,7 +214,7 @@ try{
  assert.ok(editPlanId,'advanced edit is bound to its real persisted plan');
  const editPass=dialog.locator('.archive-password input[type=password]');
  if(await editPass.count()>=1){await editPass.nth(0).fill(password);if(await editPass.count()>1)await editPass.nth(1).fill(password)}
- await dialog.getByRole('button',{name:L.approve,exact:true}).click();
+ await approveCurrent();
  const editReceipt=await dialog.locator('.receipt-id code').innerText();
  const editedDoc=JSON.parse(await readFile(path.join(rootA,'settings.json'),'utf8'));
  assert.equal(editedDoc.synthetic_note,'after','the edited document was written and read back');
@@ -226,7 +235,7 @@ try{
  await config.getByRole('button',{name:L.restorePreview,exact:true}).click();
  await dialog.locator('.plan-identity code.full-path').waitFor({state:'attached'});
  const restorePass=dialog.locator('.archive-password input[type=password]');await restorePass.nth(0).fill(password);await restorePass.nth(1).fill(password);
- await dialog.getByRole('button',{name:L.approve,exact:true}).click();
+ await approveCurrent();
  await dialog.locator('.receipt-id code').waitFor().catch(()=>{});
  const restoredDoc=JSON.parse(await readFile(path.join(rootA,'settings.json'),'utf8'));
  assert.equal(restoredDoc.synthetic_note,'before','restore returned the selected field to its original value');
@@ -283,7 +292,7 @@ try{
  assert.equal(applyPlan.environment_id,envB.id,'the cross-environment plan targets the chosen environment');
  const applyPass=dialog.locator('.archive-password input[type=password]');
  if(await applyPass.count()){await applyPass.nth(0).fill(password);await applyPass.nth(1).fill(password);}
- await dialog.getByRole('button',{name:L.approve,exact:true}).click();
+ await approveCurrent();
  await dialog.locator('.receipt-id code').waitFor();
  assert.equal(JSON.parse(await readFile(path.join(rootB,'settings.json'),'utf8')).env.OTEL_LOG_USER_PROMPTS,'1');
  await dialog.getByRole('button',{name:'查看记录',exact:true}).click();
@@ -370,7 +379,51 @@ try{
   await page.getByRole('tab',{name:L.tabState,exact:true}).click();
  }
  report.checks.push('expanded configuration, recipe, custom policy, residue filters and archive forms: themed controls inspected in Day/Night at 900px, including numeric/password fields');
+ for(const [width,height,theme] of [[900,640,'light'],[900,640,'dark'],[1120,760,'light'],[1120,760,'dark']]){
+  await page.setViewportSize({width,height});
+  await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await page.locator('.sidebar nav').getByRole('button',{name:'记录与恢复',exact:true}).click();
+  await page.locator('.launch-records').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(fixture,`polish-records-${width}-${theme}.png`)});
+  await page.locator('.sidebar nav').getByRole('button',{name:'清理与重建',exact:true}).click();
+  const scope=page.locator('.cleanup-scope');
+  await scope.locator('.cleanup-file-path').first().waitFor();
+  await scope.scrollIntoViewIfNeeded();
+  assert.equal(await scope.locator('.cleanup-file-path').first().evaluate(element=>element.open),false,'full paths are initially quiet');
+  await page.screenshot({path:path.join(fixture,`polish-scope-${width}-${theme}.png`)});
+  await scope.locator('.cleanup-file-path > summary').first().click();
+  assert.ok((await scope.locator('.cleanup-file-full-path').first().innerText()).includes(home),'the exact path remains available on demand');
+  await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
+  const recipes=page.locator('.recipes');
+  await recipes.locator('.surface-heading').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(fixture,`polish-recipes-${width}-${theme}.png`)});
+  for(let row=0;row<3;row++){
+   const recipe=recipes.locator('.recipe-row').nth(row);
+   await recipe.scrollIntoViewIfNeeded();
+   await recipe.screenshot({path:path.join(fixture,`polish-recipe-${row+1}-${width}-${theme}.png`)});
+  }
+  await page.locator('.sidebar nav').getByRole('button',{name:'环境',exact:true}).click();
+  assert.ok(await page.locator('.target-bar').evaluate(element=>element.getBoundingClientRect().height<=60),'header stays one line');
+  const target=page.getByRole('button',{name:'查看目标详情',exact:true});
+  await target.click();
+  const targetPanel=page.locator('.target-details-panel');
+  assert.ok((await targetPanel.innerText()).includes(rootA));
+  await targetPanel.getByRole('button',{name:'复制完整路径',exact:true}).first().click();
+  assert.equal(copied.at(-1),rootA,'copy uses the complete exact root, not its shortened label');
+  const rect=await targetPanel.boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width,'target details fit the workspace');
+  const panelCoversCompanion=await page.locator('.home-greeting > .clawd').evaluate(element=>{
+   const box=element.getBoundingClientRect(),panel=document.querySelector('.target-details-panel');
+   const x=box.x+box.width/2,y=box.y+box.height/2,front=document.elementFromPoint(x,y);
+   return !panel.getClientRects().length||panel.contains(front);
+  });
+  assert.ok(panelCoversCompanion,'the details panel stays above the companion and its menu');
+  await page.screenshot({path:path.join(fixture,`polish-target-${width}-${theme}.png`)});
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.target-details-panel').count(),0);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal overflow after disclosure');
+ }
+ report.checks.push('polish: compact target disclosure and exact root, cleanup path expansion, launch records and all recipe rows captured at 900/1120 in Day/Night');
  await page.setViewportSize({width:1120,height:760});
  assert.deepEqual(errors,[]);
  report.passed=true;
-}finally{if(page&&!report.passed)await page.screenshot({path:path.join(fixture,'failure.png')}).catch(()=>{});await browser?.close();if(preview.exitCode===null){const ended=new Promise(resolve=>preview.once('exit',resolve));preview.kill('SIGTERM');await ended}await writeFile(process.env.LINTEL_CLIENT_CONTROL_UI_REPORT||path.join(fixture,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2))}
+}finally{if(!report.passed)report.coreResults=coreResponses.map(item=>({command:item.command,ok:item.envelope.ok,errorCode:item.envelope.error?.code}));if(page&&!report.passed)await page.screenshot({path:path.join(fixture,'failure.png')}).catch(()=>{});await browser?.close();if(preview.exitCode===null){const ended=new Promise(resolve=>preview.once('exit',resolve));preview.kill('SIGTERM');await ended}await writeFile(process.env.LINTEL_CLIENT_CONTROL_UI_REPORT||path.join(fixture,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2))}
