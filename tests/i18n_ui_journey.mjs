@@ -77,16 +77,23 @@ try{
   await targetToggle.click();
   await targetPanel.getByRole('button',{name:'Copy full path',exact:true}).last().focus();
   await page.keyboard.press('Tab');
-  assert.equal(await page.locator('.target-details-panel').count(),0,'tabbing out dismisses the nonmodal details');
+  assert.equal(await page.locator('.target-details-panel').count(),1,'inline details stay available while tabbing into the workspace');
+  await targetToggle.focus();
+  await page.locator('.sidebar .brand').click();
+  assert.equal(await page.locator('.target-details-panel').count(),1,'inline details do not reflow the workspace on an outside pointer');
+  await page.getByRole('button',{name:'Start a task',exact:true}).click();
+  await page.getByRole('dialog').waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').waitFor({state:'hidden'});
+  assert.equal(await page.locator('.target-details-panel').count(),1,'Escape belongs to an open modal before the inline disclosure');
   await targetToggle.focus();
   await page.keyboard.press('Enter');
-  await page.locator('.sidebar .brand').click();
-  assert.equal(await page.locator('.target-details-panel').count(),0,'outside pointer dismisses target details');
+  assert.equal(await page.locator('.target-details-panel').count(),0,'the lower-row trigger collapses its details');
   assert.equal(coreCalls.length,beforeTargetCalls,'target disclosure is local UI only');
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await page.locator('.target-cursor').evaluate(node=>getComputedStyle(node).animationName),'none');
   await page.emulateMedia({reducedMotion:'no-preference'});
-  report.checks.push('one-line target toolbar: exact paths on demand, outside/Escape dismissal and focus return, no core request, reduced-motion cursor static');
+  report.checks.push('one-line toolbar with separate lower-row terminal trigger: inline exact paths, explicit/Escape collapse and focus return, no core request, reduced-motion cursor static');
   // (2) Manual override to zh-CN: instant rerender, menu push, no core side effects; greeting identity stable.
   const titleBefore=await page.locator('.home-title').innerText();
   const coreBefore=coreCalls.length;

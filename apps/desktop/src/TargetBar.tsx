@@ -14,26 +14,18 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const detailsId = useId();
-  const details = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => { setOpen(false); }, [hostAlias, selectedId]);
   useEffect(() => {
     if (!open) return;
-    function outside(event: Event) {
-      if (event.target instanceof Node && !details.current?.contains(event.target)) setOpen(false);
-    }
     function escape(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]')) return;
       event.preventDefault();
       setOpen(false);
       trigger.current?.focus({ preventScroll: true });
     }
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('focusin', outside);
     document.addEventListener('keydown', escape);
     return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('focusin', outside);
       document.removeEventListener('keydown', escape);
     };
   }, [open]);
@@ -41,7 +33,7 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
   function path(value: string) {
     return <div className="target-detail-path"><code>{value}</code><button className="icon-button" aria-label={t('label.copyFullPath')} onClick={() => void onCopy(value)}><Icon name="copy" size={14}/></button></div>;
   }
-  return <header className="target-bar">
+  return <div className="target-chrome"><header className="target-bar">
     <div className="target-context"><div className="target-line">
       <button className="host-switch" disabled={busy} onClick={onRemote} title={host}>{hostAlias ?? t('app.localLabel')}<Icon name="chevron" size={11}/></button>
       <span className="slash" aria-hidden="true">/</span>
@@ -49,9 +41,13 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
         {!environments.length && <option value="">{t('app.noEnvSelected')}</option>}
         {environments.map(env => <option key={env.id} value={env.id}>{env.name}</option>)}
       </select><Icon name="chevron" size={11}/></div>
-      <div className="target-details-container" ref={details}>
+    </div></div>
+    {children}
+    <button className="icon-button refresh-button" aria-label={t('app.recheckEnv')} disabled={busy || loading} onClick={onRefresh}><Icon name="refresh" size={16}/></button>
+  </header>
+      <div className="target-details-container">
         <button ref={trigger} className="target-details-toggle" aria-label={t('app.targetDetails')} title={t('app.targetDetails')} aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen(value => !value)}>
-          <span aria-hidden="true">&gt;<span className="target-cursor">_</span></span>
+          <svg className="target-terminal-mark" width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m4.5 4.75 5 4.25-5 4.25"/><path className="target-cursor" d="M13 13.25h5"/></svg>
         </button>
         {open && <section id={detailsId} className="target-details-panel" role="region" aria-label={t('app.targetDetails')}>
           <div className="target-details-heading"><strong>{t('app.currentTarget')}</strong><button className="icon-button" aria-label={t('app.close')} onClick={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}><Icon name="close" size={15}/></button></div>
@@ -64,8 +60,5 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
           <p className="target-runtime"><span className="status-dot"/>{t(hostAlias ? 'app.remoteWorkspace' : transport === 'native' ? 'app.localRunner' : transport === 'synthetic' ? 'app.syntheticRunner' : 'app.desktopUnavailable')}</p>
         </section>}
       </div>
-    </div></div>
-    {children}
-    <button className="icon-button refresh-button" aria-label={t('app.recheckEnv')} disabled={busy || loading} onClick={onRefresh}><Icon name="refresh" size={16}/></button>
-  </header>;
+  </div>;
 }

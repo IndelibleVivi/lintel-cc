@@ -385,7 +385,9 @@ try{
   await page.locator('.sidebar nav').getByRole('button',{name:'记录与恢复',exact:true}).click();
   await page.locator('.launch-records').scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(fixture,`polish-records-${width}-${theme}.png`)});
+  const previousScope=coreResponses.filter(item=>item.command==='cleanup_inspect').length;
   await page.locator('.sidebar nav').getByRole('button',{name:'清理与重建',exact:true}).click();
+  await waitForResult('cleanup_inspect',previousScope);
   const scope=page.locator('.cleanup-scope');
   await scope.locator('.cleanup-file-path').first().waitFor();
   await scope.scrollIntoViewIfNeeded();
@@ -411,12 +413,13 @@ try{
   await targetPanel.getByRole('button',{name:'复制完整路径',exact:true}).first().click();
   assert.equal(copied.at(-1),rootA,'copy uses the complete exact root, not its shortened label');
   const rect=await targetPanel.boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=width,'target details fit the workspace');
-  const panelCoversCompanion=await page.locator('.home-greeting > .clawd').evaluate(element=>{
-   const box=element.getBoundingClientRect(),panel=document.querySelector('.target-details-panel');
-   const x=box.x+box.width/2,y=box.y+box.height/2,front=document.elementFromPoint(x,y);
-   return !panel.getClientRects().length||panel.contains(front);
+  const inlineDetails=await targetPanel.evaluate(panel=>{
+   const header=document.querySelector('.target-bar').getBoundingClientRect(),trigger=document.querySelector('.target-details-toggle').getBoundingClientRect();
+   const box=panel.getBoundingClientRect(),main=document.querySelector('main').getBoundingClientRect();
+   return trigger.top>=header.bottom&&box.top>=trigger.bottom&&main.top>=box.bottom&&getComputedStyle(panel).position==='static';
   });
-  assert.ok(panelCoversCompanion,'the details panel stays above the companion and its menu');
+  assert.ok(inlineDetails,'terminal trigger is below the toolbar; details expand downward in normal flow without covering the workspace');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.target-cursor')).opacity==='1');
   await page.screenshot({path:path.join(fixture,`polish-target-${width}-${theme}.png`)});
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.target-details-panel').count(),0);
@@ -426,4 +429,4 @@ try{
  await page.setViewportSize({width:1120,height:760});
  assert.deepEqual(errors,[]);
  report.passed=true;
-}finally{if(!report.passed)report.coreResults=coreResponses.map(item=>({command:item.command,ok:item.envelope.ok,errorCode:item.envelope.error?.code}));if(page&&!report.passed)await page.screenshot({path:path.join(fixture,'failure.png')}).catch(()=>{});await browser?.close();if(preview.exitCode===null){const ended=new Promise(resolve=>preview.once('exit',resolve));preview.kill('SIGTERM');await ended}await writeFile(process.env.LINTEL_CLIENT_CONTROL_UI_REPORT||path.join(fixture,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2))}
+}finally{if(!report.passed){report.coreResults=coreResponses.slice(-12).map(item=>({command:item.command,ok:item.envelope.ok,errorCode:item.envelope.error?.code}));report.lastCommands=calls.slice(-12).map(item=>item.command);if(page)report.currentPage=await page.locator('.sidebar nav [aria-current=page]').innerText().catch(()=>'unavailable');}if(page&&!report.passed)await page.screenshot({path:path.join(fixture,'failure.png')}).catch(()=>{});await browser?.close();if(preview.exitCode===null){const ended=new Promise(resolve=>preview.once('exit',resolve));preview.kill('SIGTERM');await ended}await writeFile(process.env.LINTEL_CLIENT_CONTROL_UI_REPORT||path.join(fixture,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2))}

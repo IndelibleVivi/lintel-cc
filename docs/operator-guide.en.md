@@ -35,7 +35,7 @@ Home quietly centers Clawd/original time greetings. Explicit Start a task opens 
 
 **Environment** is primarily a registered Claude Code configuration directory, not project code or a credential-isolated account container. Overview → Configuration sources and verification scope shows root; Launch and sources shows executable/root. Confirm host/name/full path together.
 
-The toolbar keeps the host and environment name visible. Click the slow-blinking `>_` to view the full root, environment ID and client path, with path-copy controls; Escape or outside interaction closes it. Collapsed paths do not change exact target review in approval previews.
+The toolbar keeps the host and environment name visible. A separate lower row holds an orange terminal icon with a slow-blinking cursor. Click it to expand the full root, environment ID and client path downward, with path-copy controls; the icon, Close or Escape collapses it. Content moves below the details, outside interaction retains them, and changing target collapses them. Collapsed paths do not change exact target review in approval previews.
 
 **Browser profile** is independently authorized on this App's Mac. SSH never turns it/local proxy into VPS components. Root/profile do not automatically establish identity isolation.
 
