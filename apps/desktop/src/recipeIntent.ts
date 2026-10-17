@@ -112,3 +112,53 @@ export function saveRecipe(id: RecipeId, hostAlias: string | null, environmentId
   return { saved, omittedKeys };
 }
 export function defaultRecipe(id: RecipeId): RecipeIntent { return defaults[id]; }
+
+// Whether a saved intent still matches the recipe's built-in default. The
+// comparison is semantic, never a serialized-blob match: object key order and
+// list order must not manufacture a "customized" difference, and only the
+// sanitizable ordinary fields count. Only a policy slot that still equals its
+// default may keep the built-in "reduce body recording" name — a user-saved
+// default that turns recording on must not wear that promise.
+export function isDefaultRecipeIntent(id: RecipeId, intent: RecipeIntent): boolean {
+  const base = defaults[id];
+  if (intent.kind !== base.kind) return false;
+  if (base.kind === 'residue' && intent.kind === 'residue') {
+    return intent.reduceContent === base.reduceContent && intent.resetIdentity === base.resetIdentity;
+  }
+  if (base.kind === 'cleanup' && intent.kind === 'cleanup') {
+    return intent.recipe === base.recipe && sameStrings(intent.categories, base.categories) && intent.activateInstructions === base.activateInstructions;
+  }
+  if (base.kind === 'policy' && intent.kind === 'policy') {
+    return intent.preset === base.preset && intent.keepRemoteControl === base.keepRemoteControl
+      && (intent.trustedDevices ?? 'unknown') === (base.trustedDevices ?? 'unknown')
+      && sameStrings(intent.releaseSettings ?? [], base.releaseSettings ?? [])
+      && sameChoices(intent.customSettings ?? {}, base.customSettings ?? {})
+      && sameValues(intent.customValues ?? {}, base.customValues ?? {});
+  }
+  return false;
+}
+function sameStrings(left: string[], right: string[]): boolean {
+  const a = [...left].sort(), b = [...right].sort();
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+function sameChoices(left: CustomSettings, right: CustomSettings): boolean {
+  const effective = (value: CustomSettings) => Object.entries(value).filter(([, choice]) => choice !== 'keep').map(([key]) => key);
+  const keys = effective(left), other = effective(right);
+  return keys.length === other.length && keys.every(key => left[key] === right[key]);
+}
+function sameValues(left: CustomValues, right: CustomValues): boolean {
+  const keys = Object.keys(left), other = Object.keys(right);
+  return keys.length === other.length && keys.every(key => right[key] === left[key]);
+}
+
+// Finite counts the UI uses to describe a customized saved policy default
+// truthfully — no "everything off" claim when the user's choices say otherwise.
+export function customizedPolicySummary(intent: RecipeIntent): { enabled: number; disabled: number; other: number } {
+  const settings = intent.kind === 'policy' ? intent.customSettings ?? {} : {};
+  const entries = Object.values(settings).filter(choice => choice !== 'keep');
+  return {
+    enabled: entries.filter(choice => choice === 'enable').length,
+    disabled: entries.filter(choice => choice === 'disable').length,
+    other: entries.filter(choice => choice !== 'enable' && choice !== 'disable').length,
+  };
+}

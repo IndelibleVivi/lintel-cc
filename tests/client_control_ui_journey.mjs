@@ -324,6 +324,53 @@ try{
  assert.notEqual(firstPlan,secondPlan,'a saved recipe never replays an old approval; each run is a new plan ID');
  report.checks.push(`recipe re-run produced fresh plan IDs (${firstPlan} -> ${secondPlan})`);
 
+ // --- Misleading-label regression: a personal default that ENABLES content
+ // recording must not keep the "reduce body recording" name or promise ---
+ const personalRow=recipes.locator('.recipe-row').filter({hasText:'个人默认 ·'});
+ const promptsRow=page.locator('.custom-policy-row[data-key="OTEL_LOG_USER_PROMPTS"]');
+ const promptsChoice=await promptsRow.locator('select').inputValue();
+ // The reduce recipe was applied twice above, so the draft already carries the
+ // disable choices; flipping this one field to enable is the misleading case.
+ await promptsRow.locator('select').selectOption('enable');
+ await page.getByRole('button',{name:'把当前方案存为个人默认',exact:true}).click();
+ await personalRow.waitFor();
+ assert.equal(await recipes.locator('.recipe-row').filter({hasText:L.recipeReduce}).count(),0,'a personal default that enables recording may not keep the reduce name');
+ assert.ok((await personalRow.locator('strong').innerText()).includes('个人默认 · 自定义'));
+ const detail=await personalRow.locator('.recipe-copy p').innerText();
+ assert.ok(detail.includes('自定义字段')&&detail.includes('1 项启用'),'detail must describe the actual saved intent: '+detail);
+ assert.ok(detail.includes('保留 Remote Control')&&!detail.includes('不保留'),'detail keeps the actual Remote Control choice: '+detail);
+ report.checks.push('saved recording-ON intent relabels the slot as an accurate personal default (zh-CN)');
+ // Editing the recipe inline must update the parent label immediately.
+ await personalRow.getByRole('button',{name:'编辑',exact:true}).click();
+ await personalRow.getByLabel('保留 Remote Control').uncheck();
+ await personalRow.locator('.recipe-copy p').getByText('不保留 Remote Control').waitFor();
+ await personalRow.getByLabel('保留 Remote Control').check();
+ await personalRow.locator('.recipe-copy p').getByText('保留 Remote Control').waitFor();
+ report.checks.push('inline recipe edits update the row label reactively in both directions');
+ // English renders the same personal label and never reuses the built-in promise.
+ await page.locator('.language-switch select').selectOption('en');
+ const personalEn=recipes.locator('.recipe-row').filter({hasText:'Personal default ·'});
+ await personalEn.locator('strong',{hasText:'Personal default · Custom'}).waitFor();
+ assert.equal(await recipes.locator('.recipe-row').filter({hasText:'Reduce body recording'}).count(),0,'no row may keep the reduce promise in English');
+ await page.locator('.language-switch select').selectOption('zh-CN');
+ await personalRow.waitFor();
+ report.checks.push('personal default renders "Personal default · Custom" under English, without the reduce promise');
+ // Host/environment restore: env B keeps the built-in name, env A keeps its own.
+ await page.getByLabel('当前环境',{exact:true}).selectOption(envB.id);
+ await revealPolicyRecipes();
+ await recipes.locator('.recipe-row').filter({hasText:L.recipeReduce}).first().waitFor();
+ assert.equal(await personalRow.count(),0,'environment B keeps the untouched built-in recipe name');
+ await page.getByLabel('当前环境',{exact:true}).selectOption(envA.id);
+ await revealPolicyRecipes();
+ await personalRow.waitFor();
+ report.checks.push('host/environment scopes resolve to the correct label per environment');
+ // Restoring the original draft intent returns the row to its built-in name.
+ await promptsRow.locator('select').selectOption(promptsChoice);
+ await page.getByRole('button',{name:'把当前方案存为个人默认',exact:true}).click();
+ await recipes.locator('.recipe-row').filter({hasText:L.recipeReduce}).first().waitFor();
+ assert.equal(await personalRow.count(),0,'restoring the default intent restores the built-in name');
+ report.checks.push('saving the original intent back returns the built-in name');
+
  // --- Responsive + Day/Night with no horizontal overflow ---
  await page.locator('.sidebar nav').getByRole('button',{name:'环境',exact:true}).click();
  if(await page.getByRole('tab').count()===0)await page.getByRole('button',{name:L.envDetails,exact:true}).click();

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Icon, Notice } from './ui';
 import { useI18n } from './i18n-provider';
-import { RECIPE_IDS, recipeTargets, readRecipe, saveRecipe, type RecipeId, type RecipeIntent, type PolicyRecipeIntent, type ResidueRecipeIntent, type CleanupRecipeIntent } from './recipeIntent';
+import { RECIPE_IDS, recipeTargets, readRecipe, saveRecipe, isDefaultRecipeIntent, customizedPolicySummary, type RecipeId, type RecipeIntent, type PolicyRecipeIntent, type ResidueRecipeIntent, type CleanupRecipeIntent } from './recipeIntent';
 import type { PolicyPreset, TrustedDevices } from './types';
 import './Recipes.css';
 
@@ -23,6 +23,10 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
   const [open, setOpen] = useState<RecipeId | null>(null);
   const [notice, setNotice] = useState<RecipeId | null>(null);
   const [saveFailure, setSaveFailure] = useState<RecipeId | null>(null);
+  // The recipe rows re-read the stored intent from the editor's save path; a
+  // bump keeps the name/detail in step with the intent the editor just wrote.
+  const [, bumpLabel] = useState(0);
+  const refreshLabels = () => bumpLabel(value => value + 1);
   function apply(id: RecipeId) {
     const intent = readRecipe(id, hostAlias, environmentId);
     if (intent.kind === 'policy') { onApplyPolicy(intent); onPolicy(); }
@@ -43,11 +47,26 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
     <div className="recipe-list">{RECIPE_IDS.map(id => {
       const intent = readRecipe(id, hostAlias, environmentId);
       const matchesScope = recipeTargets[id] === scope;
+      // A customized policy intent must not wear the built-in promise (e.g.
+      // "reduce body recording") when the user saved something different.
+      const customized = intent.kind === 'policy' && !isDefaultRecipeIntent(id, intent);
+      const summary = customized ? customizedPolicySummary(intent) : null;
+      const presetLabel = intent.kind === 'policy'
+        ? t(intent.preset === 'preserve' ? 'policy.preserve' : intent.preset === 'reduce' ? 'policy.reduce' : 'policy.custom')
+        : '';
+      const nameText = customized ? t('recipes.name.personalPolicy', { preset: presetLabel }) : t(`recipes.name.${id}` as never);
+      const detailText = customized && summary
+        ? t('recipes.detail.personalPolicy', {
+            preset: presetLabel,
+            remote: t(intent.kind === 'policy' && intent.keepRemoteControl ? 'recipes.remoteKept' : 'recipes.remoteDropped'),
+            enabled: summary.enabled, disabled: summary.disabled, other: summary.other,
+          })
+        : t(`recipes.detail.${id}` as never);
       return <div className={`recipe-row ${matchesScope ? 'current-scope' : 'other-scope'}`} key={id}>
         <div className="recipe-head">
           <div className="recipe-copy">
-            <strong>{t(`recipes.name.${id}` as never)}</strong>
-            <p>{t(`recipes.detail.${id}` as never)}</p>
+            <strong>{nameText}</strong>
+            <p>{detailText}</p>
             <div className="recipe-meta">
               <span className={`recipe-chip recipe-target${matchesScope ? ' scope' : ''}`}>{targetLabel(id)}</span>
               {intent.kind === 'policy' && <span className="recipe-chip">{t('recipes.intentPolicy', { count: Object.keys(intent.customSettings ?? {}).filter(key => (intent.customSettings ?? {})[key] !== 'keep').length })}</span>}
@@ -65,9 +84,9 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
         </div>
         {open === id && <div className="recipe-edit">
           <p className="small-print">{t('recipes.editNote')}</p>
-          {intent.kind === 'policy' ? <PolicyRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId}/>
-            : intent.kind === 'residue' ? <ResidueRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId}/>
-            : <CleanupRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId}/>}
+          {intent.kind === 'policy' ? <PolicyRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId} onChanged={refreshLabels}/>
+            : intent.kind === 'residue' ? <ResidueRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId} onChanged={refreshLabels}/>
+            : <CleanupRecipeFields id={id} hostAlias={hostAlias} environmentId={environmentId} onChanged={refreshLabels}/>}
         </div>}
         {saveFailure === id && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
         {notice === id && <p className="small-print recipe-notice" role="status">{t('recipes.savedDefault')}</p>}
@@ -77,14 +96,14 @@ export default function Recipes({ hostAlias, environmentId, disabled, onPolicy, 
   </section>;
 }
 
-function PolicyRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
+function PolicyRecipeFields({ id, hostAlias, environmentId, onChanged }: { id: RecipeId; hostAlias: string | null; environmentId: string; onChanged: () => void }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
   const [failed, setFailed] = useState(false);
   if (intent.kind !== 'policy') return null;
   function update(patch: Partial<PolicyRecipeIntent>) {
     const next = { ...intent, ...patch } as PolicyRecipeIntent;
-    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved); onChanged();
   }
   return <div className="recipe-fields">
     {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
@@ -95,14 +114,14 @@ function PolicyRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; ho
   </div>;
 }
 
-function ResidueRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
+function ResidueRecipeFields({ id, hostAlias, environmentId, onChanged }: { id: RecipeId; hostAlias: string | null; environmentId: string; onChanged: () => void }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
   const [failed, setFailed] = useState(false);
   if (intent.kind !== 'residue') return null;
   function update(patch: Partial<ResidueRecipeIntent>) {
     const next = { ...intent, ...patch } as ResidueRecipeIntent;
-    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved); onChanged();
   }
   return <div className="recipe-fields">
     {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
@@ -112,14 +131,14 @@ function ResidueRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; h
   </div>;
 }
 
-function CleanupRecipeFields({ id, hostAlias, environmentId }: { id: RecipeId; hostAlias: string | null; environmentId: string }) {
+function CleanupRecipeFields({ id, hostAlias, environmentId, onChanged }: { id: RecipeId; hostAlias: string | null; environmentId: string; onChanged: () => void }) {
   const { t } = useI18n();
   const [intent, setIntent] = useState<RecipeIntent>(() => readRecipe(id, hostAlias, environmentId));
   const [failed, setFailed] = useState(false);
   if (intent.kind !== 'cleanup') return null;
   function update(patch: Partial<CleanupRecipeIntent>) {
     const next = { ...intent, ...patch } as CleanupRecipeIntent;
-    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved);
+    setIntent(next); setFailed(!saveRecipe(id, hostAlias, environmentId, next).saved); onChanged();
   }
   return <div className="recipe-fields">
     {failed && <p className="small-print password-error" role="alert">{t('recipes.editSaveFailed')}</p>}
