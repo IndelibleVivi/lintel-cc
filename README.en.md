@@ -1,317 +1,95 @@
 # Lintel
 
-[简体中文 (canonical)](README.md) · English · [Documentation](docs/index.en.md) · [Website](https://lintel.page/en/)
+[简体中文](README.md) · English · [Documentation](docs/index.en.md) · [Website](https://lintel.page/en/)
 
-![Lintel Preview: the terracotta l tail above a fine ASCII landscape](assets/preview/lintel-banner.png)
+![Lintel wordmark and character landscape on warm paper](assets/preview/lintel-banner.png)
 
-A clean, personal tool for Claude Code users. Review configuration changes,
-preserve selected instructions, memories and sessions, and check operation results.
-The macOS app and standalone CLI share the same execution core.
+**Manage Claude Code environments. Keep your work portable.**
 
-**Lintel 0.1.0 Preview / development preview. The source is public; you can try
-it from source in an isolated test environment. There is currently no public
-Release download and no signed or notarized distribution.** The full SPEC is
-not delivered. Limited local cleanup, the official logout entry, work
-archive/migration and SSH control are wired up. Real authentication, production
-Chrome/Edge/Firefox/AdsPower, OS-level network enforcement, and production
-remote environments remain unverified. See
-[current state (Chinese)](docs/current-state.md) for the current candidate source and
-layered evidence. Public source is not a general reuse licence; a licence for
-the original materials is still to be chosen.
+Lintel provides a macOS app and a standalone CLI for reviewing configuration and optional outbound traffic, preserving instructions and sessions in encrypted archives, cleaning or rebuilding environments, and managing specific browser profiles and SSH hosts. The app and CLI share an execution core: review the target and changes before modifying it, inspect the result afterwards, and preserve later edits when restoring settings.
 
-## First trial: get the source, then one guided journey
+**Currently 0.1.0 Preview.** You can try the public source. There is no public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is still the 10-13 `878482f` build and is not installed in Applications; later source adds client controls and interface updates without replacing that candidate. See [current status (Chinese)](docs/current-state.md) for exact source, platform and acceptance scope.
 
-You can try the real CLI today from public source. There is no public Release
-download. Get it and build it:
+[First use](docs/start-here.en.md) · [Choose a task](docs/operator-guide.en.md) · [Use with an agent](docs/agents.en.md) · [Architecture](docs/architecture.en.md)
+
+## Start with your goal
+
+| Your goal | What Lintel provides | Guide |
+| --- | --- | --- |
+| Reduce outbound traffic while keeping needed features | Protection presets, individual settings, a controlled proxy and egress tests | [Protection](docs/operator-guide.en.md#protect) |
+| Preserve work or prepare a new environment | Exact selection of instructions, memory and sessions; encrypted archives, independent reading and selective import | [Work preservation](docs/operator-guide.en.md#work) |
+| Repair local login, clean state or retire an environment | A preview of exact file and authentication scope; required preservation before deletion | [Cleanup](docs/operator-guide.en.md#cleanup) |
+| Manage one browser profile | Extension/host pairing, profile permissions and site state | [Browser](docs/browser.en.md) |
+| Operate an SSH host from a Mac or CLI | Verify the remote runner, execute on the target host, query the original task after disconnecting | [Remote](docs/remote.en.md) |
+| Retrieve results or restore settings and services | Original task records, drift checks, field-level restore and restoration of explicitly bound systemd services | [Recovery](docs/operator-guide.en.md#recovery) |
+
+The app supports Simplified Chinese/English and Day/Night/System themes. Clawd, character landscapes and small interactions add a playful layer without requiring a chat model. Interface animation, logo cursor and terminal cursor have independent local switches; only the logo blinks by default, and system reduced motion takes priority. The orange `>_` left of the host opens an inline display of the exact configuration path and environment ID.
+
+## Build and try locally
+
+<a id="local-build-and-trial"></a>
+
+### Explore the interface
+
+With Git, Rust stable and Node.js/npm compatible with the repository dependencies:
 
 ```sh
 git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
-cargo build -p lintel-runner
-```
-
-Then follow the **[English quickstart](docs/quickstart.en.md)** (or the
-[Chinese quickstart](docs/quickstart.md)). In one disposable synthetic
-home/state it registers an environment, previews an exact selection, reviews
-and approves a frozen archive-only plan, queries the original job, and
-re-inspects/reads the carried `.age` package in a **separate independent
-state** — without touching your real Claude login, settings or browser data.
-
-## Three core values
-
-1. **Preserve selected work.** Generate an encrypted archive only, or archive
-   and then prepare a new config root and migrate the content you select. The
-   independent `.age` package can be read and selectively imported without the
-   original job or state. Archiving keeps content as data; native continuation requires a separate supported, approved request and remains unverified with real authentication.
-2. **Review changes.** Preview the exact settings changes before approving
-   them, then read back the result. Twenty-seven recognized fields have
-   type-appropriate controls, with current configuration, pending edits, source,
-   impact and restoration available. Reading configuration is separate from what actually
-   runs.
-3. **Check original results.** Build a frozen, hashed plan, review it, approve
-   the exact hash, and query the original job afterwards. Interrupted work is
-   checked by querying the original ID (query-only, never auto-replayed or
-   auto-recovered). Field restore detects later external edits.
-
-## Start from the goal in front of you
-
-| What you want | Current entry | How-to |
-| --- | --- | --- |
-| Send less data out while keeping the features you need | Protect plan | [Choose a plan and check the result](docs/operator-guide.en.md#protect) |
-| Collect instructions, memory and sessions, or prepare a new environment | Work preservation | [Archive-only, preserve and portable work](docs/operator-guide.en.md#work) |
-| Fix login, clean client state, or retire an environment | Cleanup and rebuild | [Exact scope and preserve-first order](docs/operator-guide.en.md#cleanup) |
-| Manage a specific browser profile | Browser on the home screen | [Load, pair and two-phase clear](docs/browser.en.md) |
-| Manage SSH hosts and explicitly bound services | Hosts and SSH | [Connect, query original jobs and services](docs/remote.en.md) |
-| Check for changes, restore settings or recover an interrupted result | Records and recovery | [Original-job query and conflict handling](docs/operator-guide.en.md#recovery) |
-
-For a first run, start with the [English quickstart](docs/quickstart.en.md);
-the [human operator guide](docs/operator-guide.en.md) covers the GUI
-workflow task by task. The sidebar "Terminal and Agent" lets you choose the
-exact CLI, check HOME/state and execution user, and review and copy the current
-task's operation handoff. The [Agent CLI guide](docs/agents.en.md) covers obtaining
-a candidate, installing it independently, and automation. The home screen, help
-and `lintel tasks --json` share one
-[six-task map](contracts/task-catalog.json).
-
-A browser clear started from the App can continue from a popup after a full
-browser restart, and the final result returns to the original App task. An
-unexecuted preview can be cancelled or expires after five minutes; retrying
-requires a new preview and approval, and old IDs are never redone.
-
-## What you can do today
-
-- Current App source supports Simplified Chinese / English, follows the macOS App language by default, and remembers an explicit choice in Settings. UI text, Clawd greetings and dates change together while the current task, drafts and approved plan remain intact; paths, commands and original work content retain their exact bytes. Translations ship with the App without an online translation service. See [current state (Chinese)](docs/current-state.md) for which built candidates include this change. The CLI and browser extension retain their independent languages. Website source now has Simplified Chinese/English entrances; deployment status is separate in current state.
-- Select exact optional telemetry destinations from a static official-source catalog in the existing controlled-channel draft. Claude settings, active rules, controlled rule tests and observed requests remain separate. Mixed model/authentication/download hosts are informational; the NONESSENTIAL switch also disables Claude Code updates. See [telemetry control](docs/telemetry.en.md).
-- Open Settings → Lintel version and updates for the App version and manual checking. Background checks default off; download/signature verification, approved installation and explicit restart are separate. Source builds without a release key/feed show an explicit limitation. There is no formal Release or activated feed. [App updates and release preparation](docs/app-updates.en.md) describes the common version record for future builds, website DMGs and updater archives.
-- Settings → Appearance provides independent switches for interface animation, logo blink and terminal blink. Only the logo blinks by default; system reduced motion takes priority and preferences stay on this device.
-- Register a Claude Code config directory, or create a dedicated environment.
-  Select the environment at the top and use the orange `>_` before the host selector to expand its full path below. Open
-  the protect plan, preview the exact changes, then approve execution.
-- Choose "keep features", "reduce egress" or "custom". Custom groups the 27 fields recognized by the v5 rule, with direct per-row actions and separate current configuration/pending edits. Enter Bulk edit explicitly; it offers only actions appropriate for every selected setting, with filtering, individual undo and discard-all. API bodies can be off, recorded inline or written to a local directory. Original values, sources, destinations and rule evidence expand on demand; long paths cannot squeeze setting names. Credentials stay masked: an existing credential-bearing endpoint may be replaced by a plain address, while new request-header values require explicit private advanced editing. Untouched fields, general proxy and custom OTel remain. Exact changes still require preview and approval; configuration readback is separate from runtime behavior. Remote Control is checked against static version evidence and declared Trusted Devices conditions.
-- Environment details also hold "Local data and identity", "Changes and comparison" and "Advanced configuration editing". Local data lists work content, runtime residue, identity material and plugin configuration through a finite known-location table plus explicitly added directories, reading metadata and paging only; only clearable runtime residue is selected by default, work content is user-chosen and unclassified items are not deleted by default. Identity reports presence only; the raw `userID` is read into this page's memory only after an explicit reveal, and can be copied or backed up and reset without logging out or clearing credentials. A residue clear can first write an independent `lintel.residue/1` encrypted backup and then remove exact originals; that backup opens on its own and restores to its original paths, never as a work import.
-- Changes and comparison stores sanitized semantic snapshots and compares two snapshots or two registered environments; per-item acceptance only becomes a comparison baseline, not a restoration source, and the lightweight check reads finite configuration sources when an environment opens or a launch happens, with no resident watcher.
-- Advanced editing performs strict JSON validation, a per-field masked diff and original-task restoration on an explicitly chosen user/project-local file, sealing an age `lintel.config/1` backup before writing and restoring only the original task's fields while retaining unrelated edits. Three editable quick recipes ("reduce body recording", "clear runtime residue", "preserve work and rebuild") store non-secret intent only and regenerate a fresh plan for the current host and environment every run, never replaying an old approval. A saved intent that differs from the built-in recipe is labeled as a personal default with its actual choices, so enabling recording is not described as reducing it.
-- View durable task results, check for settings drift, accept the current
-  values, and restore Lintel's field changes from its own records. After an
-  interruption, querying the original job checks the concrete settings
-  publication evidence before an independent restore preview is offered;
-  later conflicting edits block restore.
-- Work preservation can archive only, or archive and prepare a new config root
-  and migrate the selected content. Both report completion against their own
-  goal; the old directory, login and settings are preserved. An independent
-  `.age` package remains readable off the original job/state.
-- Before preserving, select by whole category, by project path group, session
-  file group, or individual file. Oversized sessions can be explicitly
-  excluded while other items are fully preserved. A frozen plan also has a
-  16 MiB persisted-record budget; deep paths and many destinations can be
-  rejected while still within the body limits, in which case narrow the exact
-  selection. The paged file inventory reads metadata only; approval freezes exact paths and complete digests without adding unselected files. Current source admits 256 MiB per file, 1 GiB total and 10,000 files, preserving `lintel.work/1` original bytes through streaming and private temporary-disk verification without truncation. Older candidates/runners retain their own limits. Every page first decrypts/verifies the complete package, requiring temporary disk and time. The UI shows ongoing reads and queue waits, labels previous pages while loading, and clears page text/passphrases on leaving; already submitted reads continue before queued operations. Finite SSH limits remain independent.
-- Environment details show connected components by exact host/root: limited
-  CLI, config sources, auth location metadata, original service records and an
-  independent browser entry. A read-only capacity preflight flags over-limit
-  files and scan gaps; the real plan still re-reads all selected originals. Unknown and unsupported components differ. The UI uses the current runner's reported limits to exclude oversized originals, without guessing missing capacity reports.
-- Unlock an archive in the current task or an independent work package on a
-  target host, page through messages, tools and unknown records, generate an
-  editable handoff draft, and separately create an import plan. The approval
-  view and CLI show each selected file's source, final destination and digest.
-  Ciphertext transfer uses explicitly selected system tools. Import never overwrites a same-name file and requires filesystem/kernel atomic no-replace rename support, otherwise refusing while preserving existing content. Cleanup offers login repair, rebuild and retirement with exact authentication/file scope. Official logout needs an observable logged-in subject and rechecks the frozen authentication state before execution and after preservation. Local handling never proves server revocation.
-- Open the selected config environment in an independent project cwd. Launch
-  and resume previews list limited roots, project/ancestor candidates and
-  system managed config sources, and flag hooks/MCP/helper declarations and
-  unknown auth. They do not execute config content or read credential bodies,
-  and do not prove actual loading or isolation. Native resume is a separate
-  approved finite entry using a byte-identical private transcript copy, static version support and original-request checks. Unknown versions refuse; real authentication and actual recovery remain unaccepted. Reviewed handoff text can be copied before opening a blank session; users paste and send it themselves.
-- The default home screen is a quiet Clawd companion, with original time-of-day
-  greetings; an explicit action opens six task choices. Day / Night / System
-  themes are available. Clawd has moon and snack surprises, and the
-  pocket menu includes a moon-picking action. The pocket playroom shares one opt-in runner with the
-  website: Clawd keeps its connected short legs, bounces over obstacles, and
-  collects stars at different heights. Current source jumps immediately on press; short taps keep the original height and holding adds lift to that same jump. Starting speed is 260px/s, increasing smoothly to 350px/s, with ordinary rewards placed along the tap arc and adjusted above taller obstacles, plus a high +50 star every fourth star. The original monochrome pixel/ASCII-like hills remain, with forest and courtyard marks appearing as distance grows. Stones, books, plant pots and fences vary in size and spacing; the latest local App candidate includes this game; see [current state (Chinese)](docs/current-state.md) for packaging and native observations. Scores stay local to each client.
-- Explicitly test IPv4/IPv6 from the host-default path and the selected Lintel channel, with echoed IP, elapsed time and specific failures. An absent channel stays untested. macOS supports an approved shared-service IPv6 off/link-local change, automatic comparison against the same targets and complete original-configuration restore. Linux offers readonly inspection and probes. Real macOS configuration round trips remain unverified; see the [IPv4/IPv6 Leaf (Chinese)](docs/specs/ip-network.md).
-- Optionally start a loopback proxy in the desktop environment detail, set a
-  default allow/block and exact host/port rules, read back the live config, and
-  explicitly request opening Claude through that channel. Only connections
-  through the proxy are covered. The additive `address_family` option selects system routing or strict `ipv4_only` for sockets Lintel creates toward the destination or upstream; it does not prove the upstream’s final public address.
-- From the home screen "Browser" entry, prepare the companion extension,
-  install the local connection, pair and view instances. The App ships
-  Chromium/Firefox extension and Native Messaging host. The extension still
-  needs a developer load; signed/store distribution is not done. Site clear is
-  two-phase: isolated preparation, a full browser restart, then a separate
-  confirm to delete.
-- Register, remove and undo removal of an SSH alias on the desktop, reusing the
-  same environment, cleanup, archive and task views. Removing an alias affects
-  only Lintel's host list; system SSH config and original tasks are retained.
-  Linux x86_64/arm64 hosts can "check and prepare the runner" from the host
-  panel: preview, then approve installing the App's built-in static runner.
-  Only the target user's dedicated version directory is written; no compiler or
-  sudo is needed on the VPS.
-
-Remote connection errors distinguish SSH, runner and response failures, with bounded diagnostics and a manually copyable summary. Installation persists intent before upload, then checks bytes and actual capability before binding. Interrupted installation queries the original ID, newer bindings are never rolled back by historical queries, and unresolved installs block another upload. Existing PATH runners remain compatible. Interactive Open Claude uses the same strict SSH alias, selected root, pinned runner and Terminal PTY without a prompt. Mutation jobs ACK only after durable acceptance. Already-root systemd or an existing lingering current-UID user manager can own a per-job transient service; otherwise setsid explicitly limits continuation. Lintel never enables linger, invokes sudo or changes login policy. Lost ACKs query originals, without replay or reboot-survival promises. Independent VM evidence covers eligible logout continuation and original-ID reconciliation after real reboot; production VPS acceptance remains separate. On reopening the App, persistent host records can query the original and open its full receipt; settings and service restoration still require separate approval. Removed hosts retain query-only recovery until registered again.
-
-App help offers the six goals, human and Agent guides, source information and the independent [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide). User-selected links open in the system browser without environment/diagnostic payloads. New independent-cwd launch/resume previews require filesystem birth time; missing evidence is an explicit limitation while reading remains available. Old unattempted previews need new checks; attempted originals remain query-only. Ordinary project-file edits do not change directory identity.
-
-See the [operator guide](docs/operator-guide.en.md) for the human workflow and
-[remote](docs/remote.en.md), [browser](docs/browser.en.md) and [services](docs/services.en.md)
-for the specific limitations.
-
-Third-party licence texts accompany the App under `Contents/Resources/third-party-notices`. The target-filtered Rust normal/build dependency inventory is a superset, not an exact linked SBOM. Upstream rights remain separate from Lintel original material; see [release preparation](docs/app-updates.en.md).
-
-## Local build and trial
-
-Requires Rust stable, Node.js and npm; the macOS desktop build also needs Xcode
-Command Line Tools. The current local build and test host is macOS arm64. Linux
-source has passed synthetic journeys, independent OpenSSH and real
-systemd/PAM/reboot VM checks in Ubuntu CI; see the
-[verification guide (Chinese)](docs/verification.md). Real authentication and production
-VPS are verified separately.
-
-```sh
-cargo build --workspace
+cargo build -p lintel-runner --locked
 cd apps/desktop
 npm ci
 npm run dev:synthetic
 ```
 
-Open the local address the dev server prints. `dev:synthetic` creates an
-isolated temporary home/state and calls the real CLI; the interface clearly
-labels it a "test space" and never uses your Claude login or browser data. The
-generated temporary directory is retained for inspection. Plain `npm run dev`
-does not provide a browser-to-host execution channel.
+Open the local URL printed in the terminal. This entry uses the real CLI with a fresh synthetic HOME/state and a visibly labelled test space. It is a browser-based development trial; the native macOS app is built separately. The temporary directory is retained for inspection. Personal logins and browser profiles are not used.
 
-To build the desktop App, first prepare both static Linux runners following [remote resources](docs/remote.en.md#prepare-app-resources) if installation support is needed. Missing resources produce an explicit App limitation:
+In Work preservation, select the synthetic instructions and memory, preview an archive-only task, review the scope, approve it and read the archive from the original result. The source material is kept and no new configuration environment is created. See [First use](docs/start-here.en.md) for steps, expected results and native app builds.
 
-```sh
-cd apps/desktop
-# Without Linux runners, create the empty resource directory; installation reports missing resources.
-mkdir -p src-tauri/runner-bundles
-npm run desktop:build
-```
+### Use only the CLI, or hand a task to an agent
 
-The build generates third-party licence texts (requiring the current Rust toolchain’s `rust-docs` component and cached locked dependencies), prepares Chromium/Firefox extensions and compiles/packages the current-platform browser host. It supports native builds matching the Rust host; cross-architecture/universal builds refuse. Default frontend builds exclude optional local fonts and use system fallbacks. Output is `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`: a local candidate without Developer ID, notarization or non-developer installation acceptance, never automatically copied into Applications. App users can prepare extension files from bundled resources; [browser installation](docs/browser.en.md) retains separate developer-loading limits.
-
-Standalone CLI (run these from the repository root):
+In another terminal at the repository root, the CLI needs no Node, Tauri or installed app:
 
 ```sh
-./target/debug/lintel --help                  # static; no state, no discovery
-./target/debug/lintel version --json          # static; no state, no discovery
-./target/debug/lintel context --json          # read-only state/user/exe facts
-./target/debug/lintel tasks --json            # static; the six-task map
-./target/debug/lintel work --help             # static help; no state
-./target/debug/lintel capabilities --json     # static catalog; optional target inspection
-./target/debug/lintel describe plan_policy    # static operation contract
-./target/debug/lintel env list                # may register discovered roots + save inventory
-./target/debug/lintel tui                      # interactive; uses real state
+cargo build -p lintel-runner --locked
+./target/debug/lintel version --json
+./target/debug/lintel context --json
+./target/debug/lintel tasks --json
+./target/debug/lintel capabilities --json
 ```
 
-`version`, `context`, `tasks`, `help`, `describe`, `schema`, and `capabilities`
-without a target are **static**: they do not run Claude, discover personal directories, or
-initialize state. `env list` and `tui` are different — `env list` may register
-discovered default roots and save inventory, and `tui` operates on real state,
-so do not run them against your real HOME just to read help.
+These static entry points describe the executable, context and interfaces. Continue with the [Agent CLI guide](docs/agents.en.md) to choose a target, plan and execute. The [complete CLI trial](docs/quickstart.en.md) provides a synthetic archive journey with byte-level checks. Linux uses the standalone CLI/runner without a desktop environment. The current three-platform standalone CLI candidate remains `bb9fa824`, with no formal download link; a CLI built from source is independent of the App candidate.
 
-Named commands or the compatible `lintel request` share plan / approval /
-execute / query / recovery. **Rejected submissions exit non-zero; an accepted
-ACK is not task completion.** Interactive start uses `lintel launch ID` on a
-real TTY; generic `call launch` is explicitly refused.
-Remote interactive launch uses `lintel remote launch ALIAS ENVIRONMENT_ID`, also on a real TTY; JSON `remote control` never launches an interactive session. Discovery inspects only known directories and executes no Claude, shell rc, hooks or MCP.
+## How the parts work together
 
-Independent CLI candidates can be packaged for macOS arm64 and Linux
-x86_64/aarch64, each carrying both static Linux remote runners, candidate
-identity and a file checksum manifest. There is no formal download link. See
-[obtaining and installing a candidate](docs/agents.en.md#install-candidate).
+![Architecture overview: app and CLI, shared core, SSH controller, browser and proxy paths](docs/assets/architecture-overview.en.svg)
 
-## Data and boundaries
+Local file tasks run in the local core. SSH requests go to the target host's runner and core. The browser extension operates its own profile; the controlled proxy handles connections routed through it. An encrypted work package can travel through your chosen file-transfer tool and open in independent state.
 
-No Lintel account, model key or license key is needed. The app sends no
-analytics, crash uploads or remote font requests by default; there is no online
-activation service. The browser host and core each expose only their own
-limited operations, with no arbitrary shell/file interface. Data is previewed
-locally and copied manually; there is no automatic upload. Explicit IP tests and approved post-change probes contact the frozen HTTPS echo targets (ipify IPv4-only/IPv6-only by default), exposing the request’s public IP to them. No background public probe runs. A host IPv6 change affects every application using that service, persists until explicitly restored and may require macOS system authorization.
+[See the full architecture and source map](docs/architecture.en.md).
 
-Config-directory isolation is not an OS sandbox and does not prove login
-credentials are independent. Proxy environment variables are not OS-level
-process network enforcement. Browser deletion cannot be undone; settings
-restore checks current values. Lintel does not promise to change server-side
-account state.
+## Data and scope
 
-Linux cleanup can independently inspect and approve an exact root-bound systemd service pause or restoration. Pause writes only the original job's persistent startup blocker and stops that target; restore checks outside edits, removes only the owned blocker and starts only if originally active. Neighbor services and enablement remain. Current-user and already-root system managers have finite scope; other supervisors, containers and macOS services are unsupported. See [services](docs/services.en.md). Core locks, frozen snapshots and prewrite checks do not provide atomic compare-and-swap with outside editors; one paused unit cannot prove every Claude/IDE/interactive writer stopped. See [concurrency and recovery](docs/core.en.md#concurrency-and-recovery).
+Lintel requires no account of its own, model key or online activation. Analytics, crash uploads and remote font requests are off by default. Explicit egress tests contact the displayed echo services and reveal the tested exit IP to them.
 
-## Feedback and issues
+Identify the **host, configuration root and browser profile** before acting. Select the project working directory separately from the Claude configuration root. A new root separates local state; a proxy controls connections passing through it. Neither establishes an OS sandbox or account isolation. Browser deletion is irreversible; settings restoration checks for subsequent edits. Feature-specific constraints live in their guides, with runtime coverage in [current status (Chinese)](docs/current-state.md).
 
-Use the project's GitHub Issues for bug reports and questions:
-<https://github.com/IndelibleVivi/lintel-cc/issues>. For a first-trial
-roadblock, the [Preview feedback template](.github/ISSUE_TEMPLATE/preview-feedback.yml)
-asks for source revision, platform, and steps. Attach only synthetic or
-redacted information; **never** attach credentials, tokens, raw conversations,
-work packages, personal browser data, an unredacted Lintel state export, or
-private paths.
+Selective egress configuration currently covers the 27 fields recognized by the v5 rule. Ordinary App editing offers an action directly on each row, with explicit Bulk edit for only common applicable actions and a count for hidden selections. Three quick recipes retain non-secret intent and regenerate a plan on every run; a personal default whose intent differs is labelled from its actual choices. See [protection operations](docs/operator-guide.en.md#protect) and [desktop custom protection](docs/desktop.en.md#custom-protection).
+
+In a bounded isolated HOME/state, 10-15 used the same `878482f` release WebKit to register an environment, make an exact selection, approve one archive task and observe a completed receipt, then read the package after reopening the App and in an independent state. The full language/game matrix, real personal authentication, production browsers, clean-Mac download installation and signing/notarization remain separate unverified layers.
 
 ## Development and documentation
 
-Use the [English documentation hub](docs/index.en.md) for the maintained reader path. Chinese is canonical; the eleven user/operator guides have English siblings. Specifications, current state and developer evidence retain Chinese authority and are labeled below.
+The [documentation hub](docs/index.en.md) separates first use, task guides and engineering references. [Core concepts](docs/concepts.en.md) explains targets, plans, original tasks and work packages. Use [Troubleshooting](docs/troubleshooting.en.md) when a result needs investigation.
 
-The standalone static website source is in [`apps/site` (Chinese README)](apps/site/README.md).
-It explains the six current tasks and uses a synthetic preservation journey to
-show preview, approved execution, and original-job verification. The spacious character
-landscape uses the native wordmark with a full orange final-l foot and a separate
-slow-blinking header underscore. Lake taps make ripples that expand, fade and
-expire; the three Clawds have quiet, temporary visual responses, with no discovery
-counter or coaching prompts. Night scenery uses soft warm-gray tones while keeping
-the original orange bodies and dark eyes. A hidden star map remains in the scenery.
-An interactive four-step work-package journey explains the
-flow; scenery can be paused and respects reduced motion. Source-reading examples,
-Chinese and English trial links, and the opt-in Clawd game remain available.
-A quiet link opens the 20-second English concept film with speech, music and sound
-effects; playback starts only on request. The existing static site is live at
-[lintel.page](https://lintel.page/), with same-origin hosting on Cloudflare Pages. The site provides `/` Simplified Chinese and `/en/` English, six tasks with original title icons and alternating SVG scenes, and immediate press-and-hold jumps. Ordinary stars follow the tap arc and adjust above taller obstacles; high stars still need a higher jump. The original monochrome scenery, three places, four obstacle families and varied spacing remain. [Current state (Chinese)](docs/current-state.md) records the live revision and candidate status.
-It does not connect to the local execution core or offer a formal app download.
-See the [site README (Chinese)](apps/site/README.md) to start it and the
-[hosting guide (Chinese)](docs/site-hosting.md) to update it.
+Start engineering work with the [architecture/source map](docs/architecture.en.md), [Core / CLI](docs/core.en.md) and [protocol (Chinese)](contracts/protocol.md). List the shared verification entry points with:
 
 ```sh
-python3 tests/verify.py
 python3 tests/verify.py --list
-python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 ```
 
-Daily GitHub CI selects frontend/UI, native/CLI, heavy work-package and Linux VM checks by changed paths; weekly and manual runs retain full cross-platform integration coverage. The local verifier without selection arguments still runs the complete synthetic default group. See the [verification guide (Chinese)](docs/verification.md) for groups, dependencies and evidence boundaries. Cloudflare Pages website updates remain separate; CI does not deploy or release the App.
+Choose checks relevant to the change using the [verification guide (Chinese)](docs/verification.md). Running without arguments selects the full synthetic default group; it is not a documentation-only quick check.
 
-- [Product target (Chinese)](docs/SPEC.md), [product baseline and 18 behavior checks (Chinese)](docs/specs/product-baseline-status.md), [86 full acceptance checks (Chinese)](docs/ACCEPTANCE.md)
-- [Unified verification and independent runtime gates (Chinese)](docs/verification.md)
-- [Current implementation state (Chinese)](docs/current-state.md), [desktop usage and visual conventions](docs/desktop.en.md), [visual identity and source assets (Chinese)](docs/visual-language.md)
-- [Human operator guide](docs/operator-guide.en.md), [Agent CLI and installation](docs/agents.en.md)
-- [Shared core / CLI](docs/core.en.md), [browser](docs/browser.en.md), [network](docs/network.en.md), [remote](docs/remote.en.md), [Linux service pause/resume](docs/services.en.md)
-- [Current implementation architecture](docs/architecture.en.md), [protocol (Chinese)](contracts/protocol.md), [research basis (Chinese)](docs/RESEARCH.md)
+Report issues through [GitHub Issues](https://github.com/IndelibleVivi/lintel-cc/issues), including version/source, target, steps and actual result. Use synthetic examples and omit credentials or unredacted work material.
 
-### Source layout
-
-`crates/core` owns plans and file operations, `apps/runner` provides the CLI,
-`apps/desktop` is Tauri + React, `extensions/browser` holds the extension and
-Native Messaging host, `crates/egress` is the controlled proxy,
-`crates/operations` owns static operation schemas and strict field contracts,
-`crates/remote` is the shared limited SSH controller for GUI and CLI, and the
-desktop `src-tauri/src/remote.rs` only locates App resources and adapts native
-commands.
-`platform/ssh` preserves the existing Python callers' compatibility subset; new capabilities have one canonical shared Rust owner.
-
-## Platform support
-
-- **macOS desktop GUI**: Tauri app, currently built and checked as an unsigned
-  arm64 candidate.
-- **macOS arm64 CLI** and **Linux headless CLI** (x86_64 / aarch64): standalone
-  CLI; Linux source is built and checked synthetically.
-- Three-platform candidate package records exist, but that does not mean they
-  are downloadable or that the Linux runtime fully passes. Only source code is
-  public.
-
-## Source, licensing and rights
-
-Lintel is an independent tool, not affiliated with Anthropic. The Clawd
-character belongs to Anthropic; the optional local font is not distributed
-with the repository. Product name **Lintel**, repository currently named
-**lintel-cc**. Source is available at
-<https://github.com/IndelibleVivi/lintel-cc>. Only the **source code is
-public**; a general reuse licence for the project's original code,
-documentation and identity assets has not yet been chosen, and source
-visibility does not grant a general reuse licence. Third-party dependencies
-and the Clawd character retain their own rights.
+Lintel is not affiliated with Anthropic. Clawd and third-party dependencies retain their respective rights. A public reuse license for original project material is still to be selected; source publication and a formal release are tracked separately.

@@ -1,0 +1,51 @@
+flowchart TB
+  subgraph execution["01  Environment and file operations: execute on the selected host"]
+    direction LR
+    entry["Entry points<br/>macOS app / standalone CLI"]
+    local["Local core<br/>plan / approve / execute / verify"]
+    localstate["Local state<br/>inventory / frozen plans / original jobs"]
+    targets["Local targets<br/>config / work files / encrypted packages<br/>host network and bound services"]
+    controller["Shared SSH controller<br/>crates/remote"]
+    runner["Target runner + shared core<br/>apps/runner + crates/core"]
+    remoteowned["Target host and user<br/>state / plans / original jobs<br/>config / work / bound services"]
+    entry -->|"Local request"| local
+    entry -->|"Remote request"| controller
+    local -->|"Persist"| localstate
+    local -->|"Inspect / apply"| targets
+    controller -->|"OpenSSH / finite JSON"| runner
+    runner -->|"Execute / persist remotely"| remoteowned
+  end
+  subgraph browser["02  Browser: a separately paired local profile"]
+    direction LR
+    browserentry["App / macOS CLI"]
+    host["Native Messaging host<br/>pairing / task coordination"]
+    extension["Paired extension<br/>native API / operation journal"]
+    profile["Exact browser profile<br/>permissions / site state"]
+    browserentry -->|"Finite control"| host
+    host -->|"Native Messaging / original ID"| extension
+    extension -->|"Browser-native operations"| profile
+  end
+  subgraph network["03  Network: routed connections and explicitly requested tests"]
+    direction LR
+    netentry["App / CLI<br/>start channel / request test"]
+    client["Client routed through proxy<br/>separate from control requests"]
+    egress["crates/egress<br/>loopback CONNECT / HTTPS probe"]
+    destination["Allowed destination<br/>or upstream proxy"]
+    echo["Listed echo endpoint<br/>observe IPv4 / IPv6 egress"]
+    netentry -->|"Control / explicit probe"| egress
+    client -->|"Proxied connection"| egress
+    egress -->|"Host / port rules"| destination
+    egress -->|"Explicit HTTPS request"| echo
+  end
+  subgraph updates["04  App updating: separate records and release configuration"]
+    direction LR
+    updateentry["macOS app"]
+    updater["app_updates.rs<br/>Tauri updater / activity gate"]
+    intent["App data<br/>original update intent / install result<br/>explicit restart"]
+    feed["Fixed feed / signed asset<br/>currently inactive"]
+    updateentry -->|"Check / approve"| updater
+    updater -->|"Persist / reconcile"| intent
+    updater -.->|"Requires release key / feed"| feed
+  end
+  transfer["Explicit system file transfer · work package"]
+  website["Separate website · no execution connection"]

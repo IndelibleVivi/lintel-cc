@@ -1,143 +1,95 @@
 # Lintel
 
-简体中文（canonical） · [English](README.en.md) · [文档](docs/index.md) · [官网](https://lintel.page/)
+简体中文 · [English](README.en.md) · [使用文档](docs/index.md) · [官网](https://lintel.page/)
 
-![Lintel Preview：末尾橙色 l 字脚与字符山湖](assets/preview/lintel-banner.png)
+![Lintel：暖纸上的字标与字符山湖](assets/preview/lintel-banner.png)
 
-一个简洁的 Claude Code 个人工具，把环境与工作收好。审阅配置变化，保全选中的指令、记忆和会话，并核对操作结果。提供 macOS App 与独立 CLI，两者共用执行核心。
+**管理 Claude Code 的环境，把工作资料带得走。**
 
-**Lintel 0.1.0 Preview / 开发预览。** 源码已公开，可从源码在独立测试环境中试用；目前没有公开 Release 下载或正式签名、公证分发。完整 SPEC 尚未交付；真实认证、正式 Chrome/Edge/Firefox/AdsPower、进程级网络强约束和生产远端环境仍未验收。当前候选来源与分层证据见 [当前状态](docs/current-state.md)。源码公开不构成通用复用许可，原创材料的许可仍待选定。
+Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、加密保全指令和会话、清理重建环境，以及管理具体浏览器 profile 和 SSH 主机。App 与 CLI 共用执行核心；修改前查看目标与变化，执行后核对结果，需要恢复时保留后续编辑。
 
-首次试用从 [中文 quickstart](docs/quickstart.md) 或 [English quickstart](docs/quickstart.en.md) 开始：在一次性测试目录中选择合成原件、审阅归档计划、批准保全、查询原任务，再用独立 state 打开工作包。整个旅程保留源原件，不使用个人登录或浏览器资料。想直接看 App，可用下文的 `dev:synthetic`。
+**当前为 0.1.0 Preview。** 可以从公开源码试用；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选仍为 10-13 构建的 `878482f`，未安装到 Applications；后续源码实现了客户端控制与界面更新，但没有替换这个候选。准确来源、平台与验收范围见[当前状态](docs/current-state.md)。
 
-三个可以先体验的场景：
+[第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
-- **收好工作：** 按具体原件选择，加密保全后独立阅读；选择片段整理可编辑交接稿，迁入另行预览批准。
-- **审阅变化：** 先看准确目标、范围和 diff，再批准；配置读回与实际运行效果分别核对。
-- **核对结果：** 接收与完成分开；中断后查询原任务 ID，恢复时保留后续编辑。
-
-试用遇到卡点，可通过 [Issues](https://github.com/IndelibleVivi/lintel-cc/issues) 反馈目标、步骤与实际结果；请使用合成示例，不附凭据、原始会话、工作包或未脱敏的 state。
+<a id="现在可以做什么"></a>
 
 ## 从眼前的目标开始
 
-| 想做的事 | 当前入口 | 操作说明 |
+| 你想做什么 | Lintel 提供什么 | 从哪里进入 |
 | --- | --- | --- |
-| 减少外发，保留需要的功能 | 保护方案 | [选择方案与核对效果](docs/operator-guide.md#protect) |
-| 收好指令、记忆和会话，或准备新环境 | 工作保全 | [只归档、保全与 portable work](docs/operator-guide.md#work) |
-| 修复登录、清理客户端状态或退役 | 清理与重建 | [准确范围与先保全的顺序](docs/operator-guide.md#cleanup) |
-| 管理具体 browser profile | 首页浏览器 | [加载、配对与两阶段清理](docs/browser.md) |
-| 管理 SSH 主机与明确绑定的服务 | 主机与 SSH 连接 | [连接、原任务恢复和服务](docs/remote.md) |
-| 核对变化、恢复设置或找回中断结果 | 记录与恢复 | [原任务查询与冲突处理](docs/operator-guide.md#recovery) |
+| 减少外发，保留需要的功能 | 保护方案、逐项配置、受控代理通道与出口测试 | [保护方案](docs/operator-guide.md#protect) |
+| 收好工作，或准备新环境 | 精确选择指令、记忆和会话；加密归档、独立阅读与选择性迁入 | [工作保全](docs/operator-guide.md#work) |
+| 修复登录、清理旧状态、退役环境 | 按目标预览文件与认证处理范围；涉及删除时先完成所需保全 | [清理与重建](docs/operator-guide.md#cleanup) |
+| 管理某个浏览器 profile | 配对扩展与本地 host，处理对应权限和站点状态 | [浏览器](docs/browser.md) |
+| 从 Mac 或 CLI 操作 SSH 主机 | 核对远端 runner，在目标主机执行，断线后查询原任务 | [远程](docs/remote.md) |
+| 找回结果，恢复配置或服务 | 原任务记录、变化检查、字段恢复与明确绑定的 systemd 服务恢复 | [记录与恢复](docs/operator-guide.md#recovery) |
 
-第一次使用读 [人类操作指南](docs/operator-guide.md)；侧栏“终端与 Agent”可选择准确 CLI、核对 HOME/state 与执行用户、审阅并复制当前任务的操作交接包。[Agent CLI 指南](docs/agents.md) 覆盖取得候选、独立安装和自动化。首页、帮助和 `lintel tasks --json` 共用 [六任务映射](contracts/task-catalog.json)。
-
-App 发起的浏览器清理可在浏览器完整重启后从 popup 续办，最终结果回到原 App 任务。未执行预览可取消、五分钟后过期；重新尝试须新预览与批准，旧 ID 不重做。
-
-## 现在可以做什么
-
-- 当前 App 源码支持简体中文 / English，默认跟随 macOS 为 App 选择的语言，可在“设置与模块”中手动切换并记住选择。界面、Clawd 问候与日期一起切换，当前任务、草案和批准计划保留；路径、命令和工作原文保持原样。翻译随 App 打包，不使用在线翻译。已构建候选是否包含本次更新，见[当前状态](docs/current-state.md)；CLI、浏览器扩展保持各自现有语言；官网源码另有简中／English 入口，部署状态独立见当前状态。
-- 在现有受控通道草案中按官方静态目录选择精确遥测目标，分别核对 Claude 设置、实际通道配置、受控规则测试和观察到的请求。模型、认证与更新的混合用途域名仅作说明；总开关同时关闭 Claude Code 自动更新的影响明确展示。见 [遥测控制](docs/telemetry.md)。
-- 在“设置与模块 → Lintel 版本与更新”查看 App 自身版本，手动检查；后台检查默认关闭，下载验签、批准安装和显式重启分开。源码构建未配置发行公钥／feed 时明确不可用；当前没有正式 Release 或 feed 激活。未来候选构建、签名版本核验、官网 DMG 与 updater archive 的共用版本记录见 [App 更新与发行准备](docs/app-updates.md)。
-- “设置与模块 → 外观”的三个动态开关分别控制界面动画、Logo 光标和终端光标；默认只有 Logo 慢闪，系统“减少动态”优先，偏好只保存在本机。
-- 登记 Claude Code 配置目录，或创建专用环境。顶部选择环境，点击“本机”／主机名称左侧的橙色 `>_` 可向下展开完整路径；进入保护方案后预览具体变更，再批准执行。
-- 选择“保持功能”“减少外发”或“自定义”。自定义按类别展示 v5 规则识别的 27 项控制，每行直接选择操作，当前配置与待预览改动分开；“批量编辑”单独进入，只提供对全部所选项共同适用的动作，支持筛选、逐项撤销与整体撤销。API 正文可选关闭、内联记录或写入本机目录；原始值、来源、接收端／落盘位置与版本规则按需展开，长路径不会挤压设置名称。凭据值始终遮蔽；已有凭据接收端可替换为不含凭据的地址，请求头新值仍须走明确的私有高级编辑。未调整的字段、通用代理与自设 OTel 保留；准确修改仍需预览批准，配置读回与实际运行分开。Remote Control 按静态版本与声明的 Trusted Devices 条件核对。
-- 环境详情另有“本地数据与身份”“变化与对照”和“高级配置编辑”。“本地数据与身份”按有限已知位置表与明确附加目录列出工作内容、运行残留、身份材料与插件配置，只读元数据并分页；默认仅选中可清理运行残留，工作内容需另行选择，未分类项不默认删除；身份只报存在性，展开后才在本页内存读取 `userID`，也可复制或先加密备份再重置该标识（不顺带注销或清凭据）。残留清理可先写独立 `lintel.residue/1` 加密备份再精确删除，备份可单独检查与原路径恢复，不与工作 import 混用。
-- “变化与对照”保存脱敏语义快照并比较两个快照或两个已登记环境，逐项接受当前值只作比较基线、不是恢复来源；轻量变化检查在打开环境或经 Lintel 启动时读有限配置来源，无常驻 watcher。
-- “高级配置编辑”对明确选择的 user/project-local 配置做严格 JSON 校对、逐字段遮蔽 diff 与原任务恢复，写前生成 age 加密 `lintel.config/1` 备份，恢复只改原任务字段并保留无关编辑。三条可编辑快捷配方“减少正文记录”“清理运行残留”“保住工作并重建”只保存非秘密意图，每次运行按当前主机与环境重新生成计划，不重放旧审批。与内置意图不同的已保存方案显示为“个人默认”及实际选项说明，避免把开启记录的方案误称为“减少正文记录”。
-- 查看持久任务结果、检查设置漂移、接受当前值，以及按字段恢复 Lintel 的配置修改。中断后查询原任务会核对具体 settings 发布证据，确认已写入才开放独立恢复预览；后续编辑冲突会阻止恢复。
-- 工作保全可只生成加密归档，也可归档后准备新配置根并迁入所选内容。两者成功都按自己的目标显示完成；旧目录、登录与设置保留。独立 `.age` 包脱离原 job/state 仍能阅读和选择性迁入，会话与记忆以资料形式保留，不宣称可以续聊。
-- 保全前可按整类，或按项目路径组、会话文件组及单个原件选择；超限会话可明确排除，其余原件完整保全。冻结计划另有 16 MiB 持久记录预算；深路径与大量落点可能在正文限额内仍被拒绝，此时可缩小精确选择。分页文件清单只读取元数据；批准冻结精确路径和完整内容摘要，未选文件不会加入。当前源码支持单文件 256 MiB／合计 1 GiB／10,000 文件；保持 `lintel.work/1` 原字节语义，以流式读写和私有临时磁盘完整核验，资料不截断。旧候选和旧 runner 保留各自限额，升级状态见当前状态。每页阅读也先完整解密全包，须留出临时磁盘与时间；阅读与跨页面等待显示持续状态，翻页时明确标注仍在显示上一页。离开资料页会清除页面正文与口令，已提交的读取仍继续，同一队列请求随后执行。远端阅读继续受有限 SSH 请求边界约束。
-- 环境详情的“关联组件”按准确主机／root 展示有限 CLI、配置来源、认证位置、服务原记录和独立浏览器入口；未知与暂不支持明确区分。工作保全提供只读容量预检，指出超限文件与扫描缺口；真实计划仍重新读取全部所选原件。界面按当前 runner 报告的容量排除超限原件，缺少容量报告时不猜阈值。
-- 解锁当前任务归档或目标主机上的独立工作包，按需分页阅读消息、工具与未知记录，选择片段生成可编辑的工作交接稿，并另行生成迁入计划；批准界面与 CLI 展示选中文件的来源、最终迁入位置与摘要；密文包由明确的系统文件传输带到目标，同名内容不覆盖。新文件发布要求目标文件系统／内核支持原子不覆盖 rename；不支持时明确拒绝，已有内容保留。清理页提供修复本地登录、清理并重建和退役路径，精确文件与认证范围先预览；官方注销须能观察登录主体，批准冻结的认证状态在执行前及保全后重新核对，变化时停止；本地文件处理不等于服务端撤销。
-- 在独立项目 cwd 中打开所选配置环境；启动／resume 预览展示有限 root、项目／上级候选及系统 managed 配置来源，标明 hooks／MCP／helper 声明和认证未知项，首次请求前复查变化。它不执行配置内容或读取凭据正文，也不证明实际加载或隔离。审阅工作稿后复制并打开空白会话，粘贴与发送由用户完成。原生 resume 是另行批准的有限入口，使用 byte-identical 私有 transcript 副本、静态版本支持检查和原请求核对；未知版本明确拒绝，真实 Claude 认证及实际恢复仍未验收。
-- 默认首页保留 Clawd、56 句原创时段问候与留白，另有日期／整分钟／稀有彩蛋；特殊日期仅在当天第一次打开显示，本地只记最后显示的特殊日期；“开始一项任务”展开六个用户目标，专业工作区持续显示当前目标、主机与完整配置 root，空环境也能选择主机、浏览器与 CLI。提供 Day / Night / System、可摸摸／拖抱／弹飞的 Clawd、连续戳戳害羞与躲藏彩蛋。下拉放飞可打开口袋菜单，摘月亮或进入四幅点阵风景和跳跃小游戏；点按还有月亮和零食的回应；Clawd 保留连着身体的四条短直腿，以轻微弹跳跳过障碍，收集不同高度的星星；当前源码按下立即跳，轻点保持原高度、按住继续加高，初速 260 并渐增至 350px/s，普通星按轻跳轨迹与障碍高度摆放，每第四颗有高处 +50 大星星；跑道保留原单色像素／字符风格山线，并随距离增加树林和庭院标记，石头、书本、花盆与栅栏按不同大小和疏密节奏出现；最新本地 App 候选已包含这套玩法，具体包装与原生观察见[当前状态](docs/current-state.md)。游戏与官网共用实现、成绩各自留在本机；不调用聊天模型。
-- 在“环境详情 → 外发与权限”显式测试主机默认网络与所选 Lintel 通道的 IPv4／IPv6 出口，查看 IP、耗时和具体失败；没有通道的两格显示未测试。macOS 可预览、批准所选宿主共享服务的 IPv6 关闭／仅链路本地，写入后同目标复测，并按原任务完整恢复。Linux 提供只读观察与实测。真实 macOS 配置往返仍未验收，见 [IPv4 / IPv6 Leaf](docs/specs/ip-network.md)。
-- 启动 loopback 代理、设置默认允许／阻止与确切主机／端口规则、选择 Lintel 自己连接的 `system` 或严格 `ipv4_only`、读回配置并观察通道连接，再明确请求通过它打开 Claude。只覆盖经过代理的连接；上游之后的出口与其他应用仍单独核对。
-- 在首页“浏览器”入口准备伴随扩展、安装本地连接、配对和查看实例。App 自带 Chromium / Firefox 扩展与 Native Messaging host，无需源码或终端构建。选择浏览器，预览并批准准备固定扩展目录，按页面说明在目标 profile 加载；随后填入准确扩展 ID，另行预览并批准本地连接。受管版本更新也需核对并批准，冲突目录不覆盖。扩展仍需开发加载，Firefox 临时加载会在退出后移除，签名或商店发布尚未完成；站点清理分隔离准备、完整浏览器重启、再次确认删除两步，独立 Chromium 的真实持久安装／完整重启 smoke 已通过，正式 Chrome/Edge/Firefox 与 AdsPower 尚未验收。安装流程与各浏览器限制见 [浏览器指南](docs/browser.md)。
-
-桌面可登记、移除和撤销移除 SSH alias，复用同一环境、清理、归档和任务界面。移除只影响 Lintel 主机列表，系统 SSH 配置与原任务保留。连接失败会区分 SSH、远端 runner 和响应问题，显示排查步骤、退出码及可展开的错误片段；排查摘要可手动复制。远端需要 Lintel runner。Linux x86_64 / arm64 可在主机面板“检查并准备运行器”，先预览，再批准安装 App 内置的静态 runner；只写目标用户的专用版本目录，不需要 VPS 上的编译环境或 sudo。文件与运行能力核验后再连接；中断后只核对原安装；旧安装核对不会覆盖后续版本绑定，已有未决安装会阻止另一份上传，更新后原任务保留原 runner。已有 PATH runner 仍可使用。连接后可从环境详情或任务回执“打开 Claude”，Terminal 会用同一严格 SSH alias 和选定配置根建立交互会话；不会自动发送 prompt。runner 在持久接收后返回 ACK；Linux PID 1 为 systemd 且当前用户已经是 root 时，由单任务 system transient service 执行；普通用户只有已有 `Linger=yes` 和可用 user bus 时才使用 user transient service。其他主机继续使用 `setsid`，回执明确显示退出登录后的续跑限制。Lintel 不启用 linger、不执行 sudo、不调整登录策略。App 重开后可查询原任务、查看完整回执，再独立批准恢复；ACK 丢失不会重新提交。托管事实在接收前持久写入，不承诺重启后继续执行。独立 Linux VM 已实际验证符合条件的 system/user manager 在严格 logout 后继续并完成原任务；不符合条件的 setsid 路径以及真实重启后的任务进入原任务核对，没有重新提交。生产 VPS 行为仍需独立验收，见 [远程指南](docs/remote.md)。
-
-桌面重开后，可在主机面板的持久提交记录“查询原任务”，再选择“查看完整回执与恢复”，进入该 alias 和环境的结果页。配置恢复与服务恢复仍各自预览并批准；移除主机后只保留原任务查询，重新登记后才可准备恢复。
-
-App 的“帮助”包含六个任务入口、人类指南、Agent CLI 指南、开发者 GitHub、项目源码说明及 [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) 的 VPS 101 / SSH 排障入口。链接由用户点击后在系统浏览器打开，不附带环境或诊断数据；项目仓库保留完整目标、实际验收证据与当前限制。
-
-独立项目 cwd 的新 launch／resume 预览需要文件系统提供目录创建时间；缺少时明确返回限制，资料阅读仍可用。旧未启动预览需重新核对，已经尝试的启动继续按原 ID 查询。普通项目文件新增／删除不使目录身份失效。
-
-第三方许可正文随 App 放在 `Contents/Resources/third-party-notices`；Rust 清单是按目标筛选的 normal/build 依赖超集，不是精确链接 SBOM。原项目与第三方的权利分别保留，详见 [发行准备](docs/app-updates.md)。
+App 支持简体中文／English 与 Day／Night／System。首页的 Clawd、字符风景和小彩蛋保留在工具之外的轻松一层；使用这些交互不需要聊天模型。界面动画、Logo 光标和终端光标各有本机开关，默认只保留 Logo 慢闪，系统减少动态优先。顶栏主机名左侧的橙色 `>_` 可向下展开准确配置路径与环境 ID。
 
 ## 本地构建与试用
 
-需要 Rust stable、Node.js 与 npm；macOS 桌面构建还需要 Xcode Command Line Tools。当前本地构建与测试主机为 macOS arm64，Linux 源码已在 Ubuntu CI 通过合成旅程、独立 OpenSSH 与真实 systemd/PAM/reboot VM 检查；具体范围见[验证指南](docs/verification.md)，真实认证和生产 VPS 状态分别验收。
+### 先体验界面
+
+准备 Git、Rust stable 和与仓库依赖兼容的 Node.js／npm，在终端运行：
 
 ```sh
-cargo build --workspace
+git clone https://github.com/IndelibleVivi/lintel-cc.git
+cd lintel-cc
+cargo build -p lintel-runner --locked
 cd apps/desktop
 npm ci
 npm run dev:synthetic
 ```
 
-打开开发服务器报告的本地地址。`dev:synthetic` 创建独立临时 home/state 并调用真实 CLI，界面明确显示“测试空间”；不会使用你的 Claude 登录或浏览器资料。生成的临时目录会保留便于检查。普通 `npm run dev` 不提供浏览器到本机的执行通道。
+打开终端显示的本地地址。这个入口用真实 CLI 操作新建的合成 HOME／state，界面会显示“测试空间”；它是浏览器中的开发试用，原生 macOS App 另行构建。临时目录保留供检查，不使用你的个人登录或浏览器资料。
 
-构建桌面应用（若要包含 Linux 安装功能，先按[远程资源准备](docs/remote.md#准备-app-内置资源)构建并打包两种静态 runner；缺少资源时 App 会明确提示）：
+进入“工作保全”，选择合成指令和记忆，预览“只生成工作归档”，核对范围后批准，再从原任务结果打开归档阅读。这条路径保留源资料，不建立新配置环境。完整步骤、预期结果和原生 App 构建见[第一次使用](docs/start-here.md)。
 
-```sh
-cd apps/desktop
-# 若不包含 Linux runner，建立空资源目录；安装入口会明确显示缺资源
-mkdir -p src-tauri/runner-bundles
-npm run desktop:build
-```
+### 只用 CLI 或交给 Agent
 
-构建会自动生成第三方许可正文（需要当前 Rust toolchain 的 `rust-docs` 与已缓存的锁定依赖），准备 Chromium / Firefox 扩展并编译、打包当前平台的 browser host，目前只支持匹配 Rust host 的 native 构建，跨架构／universal App 会明确拒绝；默认前端构建排除仅供本机使用的可选字体，使用系统 fallback。输出 `apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app`。这是本地构建候选，未经过 Developer ID 签名、公证或非开发者安装验收，不会自动复制到 Applications。App 用户可直接从内置文件准备扩展目录；独立开发 ZIP 与各浏览器加载限制见 [浏览器指南](docs/browser.md)。
-
-独立 CLI（在 repository 根目录执行）：
+在另一个终端进入仓库根目录；CLI 不需要 Node、Tauri 或已安装 App：
 
 ```sh
-./target/debug/lintel --help
+cargo build -p lintel-runner --locked
 ./target/debug/lintel version --json
 ./target/debug/lintel context --json
 ./target/debug/lintel tasks --json
-./target/debug/lintel work --help
 ./target/debug/lintel capabilities --json
-./target/debug/lintel describe plan_policy
-./target/debug/lintel env list
-./target/debug/lintel tui
 ```
 
-`discover` 可登记已发现的默认根，只检查已知目录，不运行 Claude、shell rc、hooks 或 MCP。命名命令或兼容 `lintel request` 共用计划/批准/执行/查询/恢复。静态 version/schema/describe/capabilities 不初始化 state；submit 拒绝退出非零，accepted 与任务完成分开。交互启动使用真实 TTY 的 `lintel launch ID`，generic `call launch` 明确拒绝。远端交互使用 `lintel remote launch ALIAS ENVIRONMENT_ID`，同样需要真实 TTY；JSON `remote control` 不启动交互会话。
+这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选仍为 `bb9fa824`，没有正式下载链接；从源码构建的 CLI 不受 App 候选版本约束。
 
-独立 CLI 候选可打包为 macOS arm64、Linux x86_64 与 aarch64 archives，每包携带两种 static Linux remote runners、候选身份及文件校验清单。取得匹配候选后，无需 Rust 或 GUI；核验包和文件，解包到尚不存在的新版本目录，再选择准确的 `bin/lintel`。升级保留旧 executable、state 与原任务 ID，不自动修改 PATH、shell rc 或服务。打包命令、安装／升级和源码构建见 [Agent CLI 指南](docs/agents.md)；完整 core 与兼容合同见 [core 与 CLI](docs/core.md) 和 [协议](contracts/protocol.md)。
+## 怎样协作
+
+![Lintel 总览：App 与 CLI 调用共享 core、SSH controller，以及独立浏览器和网络通道](docs/assets/architecture-overview.svg)
+
+本机文件任务由本机 core 执行；SSH 请求交给目标主机的 runner 和 core。浏览器扩展操作它所属的 profile，受控代理只处理经过它的连接。工作包可以通过你选择的文件传输工具带走，再在独立 state 中打开。
+
+[查看完整架构图与源码入口](docs/architecture.md)。
 
 ## 数据与边界
 
-无需 Lintel 账号、模型 key 或卡密。应用不默认发送 analytics、崩溃上传或远程字体请求；没有在线激活服务。浏览器 host 与 core 只暴露各自有限的操作，不提供任意 shell/文件接口。支持资料本地预览、手动复制，没有自动上传。显式出口测试及批准后的复测会访问计划列出的 HTTPS 回显目标（默认 ipify IPv4-only／IPv6-only），向它们暴露本次出口 IP；没有后台公网测试。宿主 IPv6 变更影响此网络服务的所有应用，保持设置直到明确恢复，可能需要 macOS 系统授权。
+Lintel 无需自身账号、模型 key 或在线激活，默认不发送 analytics、崩溃报告或远程字体请求。主动出口测试会连接界面列出的回显服务，并向它们暴露本次出口 IP。
 
-配置目录隔离不等于 OS sandbox，也不证明登录凭据相互独立。代理环境变量不等于进程网络强约束。浏览器删除不能撤销；设置恢复会核对当前值，不能“恢复全部”掩盖后续改动。Lintel 不承诺改变服务端账户状态或解除账号关联。
+操作前认准**主机、配置目录、浏览器 profile**；项目工作目录与 Claude 配置目录分开选择。新配置目录提供本地状态分离，代理提供经过它的连接控制；两者都不能充当系统级沙箱或账户隔离证明。浏览器删除无法撤销，配置恢复会核对后续修改。具体功能的限制放在各自指南中，运行验收范围由[当前状态](docs/current-state.md)维护。
 
-Linux systemd 服务可在“清理与重建”展开“目标后台服务”，核对准确 unit 与配置目录绑定，再独立批准暂停或恢复。暂停添加只属于原任务的持久启动阻止项并停止目标，恢复核对外部编辑、移除该项，按原先状态启动；不改变邻居服务或 enablement。当前用户管理器与 root 登录下的系统管理器均有有限范围，其他 supervisor / 容器 / macOS 服务不支持；见 [服务指南](docs/services.md)。
+当前已接通的选择性外发配置使用 v5 规则识别的 27 个字段。App 普通编辑可直接在每行选动作，也可明确进入批量编辑；只提供共同适用的动作，并显示筛选之外选择的数量。三条快捷配方只保存非秘密意图，每次重新生成计划；与内置意图不同的个人默认按实际选择标注。详细边界在[保护方案操作](docs/operator-guide.md#protect)与[桌面自定义保护](docs/desktop.md#自定义保护)。
 
-当前 core 使用本地锁、冻结快照与写入前复查，但不能把外部编辑器的并发写入称为已获得原子 CAS。有限 systemd 暂停不能代表所有 Claude、IDE 或交互写入者已停；真实使用前需评估这些 [具体限制](docs/core.md#并发与恢复边界)。
+在有限隔离 HOME／state 中，10-15 已用同一 `878482f` release WebKit 完成登记、精确选择、一次批准归档与 completed 回执，并在重开 App 和独立 state 中读回工作包。完整语言／游戏矩阵、真实个人认证、正式浏览器、干净 Mac 下载首装及签名公证仍分别未验收。
 
 ## 开发与文档
 
-[中英文文档入口](docs/index.md) 汇集维护中的使用／操作指南；中文是 canonical edition，规格、当前状态与开发证据仍由原中文文件拥有。
+[文档入口](docs/index.md)按首次使用、具体任务、工程参考组织内容。[基本概念](docs/concepts.md)解释目标、计划、原任务与工作包；遇到卡点可查[排错指南](docs/troubleshooting.md)。
 
-官网源码在 [`apps/site`](apps/site/README.md)：独立静态页面，以六个任务说明当前能力，用合成保全旅程解释预览、批准执行与原任务核对；首屏在字标与山湖之间留出安静空间，完整橙脚承住末尾 `l`，header 的独立 `_` 慢闪。点湖面会产生扩散、渐隐并自行消失的水纹，三幅画中的 Clawd 藏着短暂回应，夜景以柔和暖灰衬托橙色身体与黑眼睛；彩蛋不显示提示或发现计数；四步工作包旅程可点击探索，提供风景暂停与 reduced motion。原件阅读示例、中英文试用入口与 opt-in Clawd 跳跃小游戏保持可达。按需打开的 20 秒英文概念短片保留配音、音乐与音效。既有静态站点已在 [lintel.page](https://lintel.page/) 上线，使用 Cloudflare Pages 同源托管。官网提供 `/` 简中与 `/en/` English、六任务标题小图标与交错 SVG 场景；共享跑道已上线按下即跳、按住更高，普通星沿轻跳轨迹并随障碍高度调整，高处大星仍需更高跳跃。原单色像素景色、三种场景、四类障碍与变化间距保留，实际线上 revision 与 App 候选状态见[当前状态](docs/current-state.md)。网站不连接本机执行核心，不提供正式 App 下载。启动方式见[官网说明](apps/site/README.md)，更新程序见[托管说明](docs/site-hosting.md)。
+开发者从[架构与源码地图](docs/architecture.md)、[Core / CLI](docs/core.md)和[协议](contracts/protocol.md)进入。统一验证入口：
 
 ```sh
-python3 tests/verify.py
 python3 tests/verify.py --list
-python3 tests/verify.py --json /tmp/lintel-verify/evidence.json
 ```
 
-日常 GitHub CI 按改动范围选择 frontend／UI、native／CLI、工作包重检查与 Linux VM，完整跨平台验收保留每周与手动入口；本地不带参数的验证仍运行完整 synthetic 默认组。分组、依赖与证据边界见[验证指南](docs/verification.md)。Cloudflare Pages 官网更新仍是独立操作，CI 不执行部署或 App 发行。
+选择与改动相关的检查，方法见[验证指南](docs/verification.md)。无参数运行包含完整 synthetic 默认组，并非文档修改专用的快速检查。
 
-- [产品目标](docs/SPEC.md)、[本轮产品基线与 18 项行为验收](docs/specs/product-baseline-status.md)、[86 项完整验收](docs/ACCEPTANCE.md)、[验收证据索引](docs/acceptance-status.json)
-- [统一验证与独立 runtime 关口](docs/verification.md)
-- [当前实现状态](docs/current-state.md)、[桌面使用与视觉约定](docs/desktop.md)、[视觉身份与源资产](docs/visual-language.md)
-- [首次试用](docs/quickstart.md)、[English quickstart](docs/quickstart.en.md)、[人类操作指南](docs/operator-guide.md)、[Agent CLI 与安装](docs/agents.md)
-- [共享 core / CLI](docs/core.md)、[浏览器](docs/browser.md)、[网络](docs/network.md)、[远程](docs/remote.md)、[Linux 服务暂停与恢复](docs/services.md)
-- [当前实现架构](docs/architecture.md)、[协议](contracts/protocol.md)、[研究依据](docs/RESEARCH.md)
+反馈请提交到 [Issues](https://github.com/IndelibleVivi/lintel-cc/issues)，说明版本或来源、目标、步骤与实际结果；使用合成示例，不附凭据或未脱敏工作资料。
 
-源码：`crates/core` 为计划与文件操作权威，`apps/runner` 提供 CLI，`apps/desktop` 为 Tauri + React，`extensions/browser` 为扩展和 Native Messaging host，`crates/egress` 为受控代理，`crates/operations` 为静态操作/schema 与严格字段合同，`crates/remote` 是 GUI/CLI 共用有限 SSH controller，桌面 `src-tauri/src/remote.rs` 只定位 App 资源并适配 native command；`platform/ssh` 保留已有 Python caller 的兼容子集，新增能力只由共享 Rust 路径拥有。
-
-Lintel 是独立工具，与 Anthropic 无官方关联。Clawd 形象属于 Anthropic；可选本地字体不随仓库分发。产品名 **Lintel**，仓库暂名 **lintel-cc**。尚未选定项目原创代码、文档与身份资产的公开复用许可证；源码可见性不构成这些材料的通用复用许可，也不表示正式发布。第三方依赖与 Clawd 形象保留各自权利，未由本项目重新授权。
+Lintel 与 Anthropic 无官方关联，Clawd 形象及第三方依赖保留各自权利。项目原创材料的公开复用许可尚待选定；源码公开与正式发行分别记录。

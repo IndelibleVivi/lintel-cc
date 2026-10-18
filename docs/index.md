@@ -1,30 +1,36 @@
 # Lintel 文档
 
-简体中文（canonical） · [English](index.en.md) · [仓库首页](../README.md)
+简体中文 · [English](index.en.md) · [仓库首页](../README.md)
 
-中文是产品文档的 canonical edition；英文入口与下面 11 篇使用／操作指南保持语义一致。共享命令、平台状态、默认值、隐私与恢复边界在两版中一同维护。规格、验收与当前状态仍由原中文文件拥有，不把翻译或源码更新当作候选安装、正式发行或官网部署。
+按眼前要做的事情读。第一次使用不需要先读完整 SPEC，也不需要掌握协议字段。
 
-第一次试用从 [quickstart](quickstart.md) 开始：在一次性合成目录中选择原件、审阅并批准只归档计划、查询原任务，再用独立 state 读取密文包。它不使用个人登录或浏览器资料。[操作指南](operator-guide.md) 从六个目标说明 App 的完整路径；[Agent CLI](agents.md) 面向已获操作授权的终端／自动化使用者。
+## 第一次来
 
-| 想找什么 | 中文 | English |
-| --- | --- | --- |
-| 合成首次试用 | [quickstart](quickstart.md) | [Quickstart](quickstart.en.md) |
-| 按目标操作与恢复 | [操作指南](operator-guide.md) | [Operator guide](operator-guide.en.md) |
-| CLI 安装、批准与秘密 stdin | [Agent CLI](agents.md) | [Agent CLI](agents.en.md) |
-| App 页面、语言与候选使用 | [桌面指南](desktop.md) | [Desktop](desktop.en.md) |
-| 扩展加载、配对与两阶段清理 | [浏览器](browser.md) | [Browser](browser.en.md) |
-| SSH、runner 安装与原任务查询 | [远程](remote.md) | [Remote](remote.en.md) |
-| IP 实测、宿主 IPv6 与通道 | [网络](network.md) | [Network](network.en.md) |
-| 精确 systemd 暂停／恢复 | [服务](services.md) | [Services](services.en.md) |
-| 遥测目录与受控规则测试 | [遥测](telemetry.md) | [Telemetry](telemetry.en.md) |
-| App updater 与发行准备 | [App 更新](app-updates.md) | [App updates](app-updates.en.md) |
-| core 合同、存储与兼容 | [Core / CLI](core.md) | [Core / CLI](core.en.md) |
-| 执行归属与状态 | [架构](architecture.md) | [Architecture](architecture.en.md) |
+[第一次使用](start-here.md)带你打开界面并完成一次合成资料归档；[基本概念](concepts.md)解释主机、配置目录、计划与工作包。需要命令行的完整可核对示例时，再走 [CLI 完整试用](quickstart.md)。
 
-完整目标仍在 [SPEC](SPEC.md)；[产品基线](specs/product-baseline.md)、[18 项基线证据](specs/product-baseline-status.md)、[完整验收](ACCEPTANCE.md) 和[验证指南](verification.md) 分别拥有目标、证据和检查入口。[当前状态](current-state.md) 是当前候选／资源／运行证据的短表，[候选历史](candidate-history.md) 保存早期观察；历史通过不自动成为当前交付声明。
+## 已经知道要做什么
 
-[客户端控制增强 mini spec](specs/client-control.md) 定义本轮外发控制、本地数据与身份、快照对照恢复、快捷配方的补充实施目标；实现与验收状态仍以当前状态和验证证据为准。
+| 目标或问题 | 去哪里 |
+| --- | --- |
+| 设置保护方案（含 27 字段逐项／批量编辑）、工作保全、清理重建、恢复结果与配方 | [按目标操作](operator-guide.md) |
+| 使用 CLI、安装独立候选、交接给 Agent | [Agent CLI](agents.md) |
+| App 页面、语言、桌面使用 | [桌面指南](desktop.md) |
+| 扩展安装、配对、浏览器重启后的清理收尾 | [浏览器](browser.md) |
+| SSH 主机、远端 runner、断线后找回任务 | [远程](remote.md) |
+| IPv4／IPv6 出口测试与宿主网络配置 | [网络](network.md) |
+| 遥测目标、通道规则与测试结果 | [遥测](telemetry.md) |
+| 暂停和恢复具体 systemd 服务 | [服务](services.md) |
+| App 版本检查、更新与发行准备 | [App 更新](app-updates.md) |
+| 不知道结果该怎么看、遇到错误或入口不可用 | [排错指南](troubleshooting.md) |
 
-[视觉语言](visual-language.md) 管理身份与可编辑资产；[官网托管](site-hosting.md) 管理明确授权后的 preview／production 上传与读回。官网与 App／CLI 的执行路径独立，合成网站示例不产生真实计划或回执。源码 push、构建候选、安装、App Release、feed 与网站部署是分别核对的结果。
+## 理解实现或参与开发
 
-协议、规格、验证与开发者证据尚未完整翻译。英文读者可从 English hub 找到对应中文权威文件及语言标签。源码可见性不构成通用复用许可；原创材料的公开许可尚未选定，第三方权利保持原状。
+先看[架构与源码地图](architecture.md)，再按需要进入 [Core / CLI](core.md)、[协议](../contracts/protocol.md)和[统一验证](verification.md)。[视觉语言](visual-language.md)维护身份与展示资产；[官网托管](site-hosting.md)维护独立网站的发布流程。
+
+目标与证据分开查：[SPEC](SPEC.md)和[产品基线](specs/product-baseline.md)描述目标；[当前状态](current-state.md)列出当前交付和已验证范围；[基线证据](specs/product-baseline-status.md)、[完整验收](ACCEPTANCE.md)与[候选历史](candidate-history.md)保留详细依据。
+
+中文为产品文档的主版本，配套英文页维护相同命令、默认值和操作边界。工程规格与验收记录尚有中文专页；英文入口会明确标注。
+
+当前是 **0.1.0 Preview**：本地发行准备候选、源码能力、公开下载与已启用更新通道要分开核对。不存在公开 Release 下载或正式签名版本。
+
+页面语言与方向保持稳定；如果结果是等待、部分完成或 `needs_reconciliation`，从保留的原 ID 进入[排错指南](troubleshooting.md)，不要为了重新阅读而删除 Lintel state 或工作包。

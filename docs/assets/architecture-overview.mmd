@@ -1,0 +1,18 @@
+flowchart TB
+    entry["macOS App / 独立 CLI"]
+    core["本机 core"]
+    remote["SSH controller"]
+    browser["本机 browser host<br/>仅 macOS"]
+    proxy["受控通道"]
+    files["配置 / 工作包 / 记录"]
+    runner["目标 runner + core<br/>远端执行与记录"]
+    profile["已配对 profile 扩展"]
+    dest["经过代理的目的地"]
+    entry -->|"本机操作"| core
+    entry -->|"远端操作"| remote
+    entry -->|"独立配对"| browser
+    entry -->|"管理通道"| proxy
+    core -->|"执行 / 核对"| files
+    remote -->|"OpenSSH"| runner
+    browser -->|"Native Messaging"| profile
+    proxy -->|"CONNECT"| dest

@@ -1,136 +1,272 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1360" viewBox="0 0 1200 1360" role="img" aria-labelledby="title desc" lang="zh-CN">
-  <title id="title">Lintel：执行归属与独立通道</title>
-  <desc id="desc">macOS App 与 CLI 共享本机 core，也可通过有限 SSH controller 请求目标 runner。冻结计划、批准、变更和回执由执行端拥有。浏览器 host 与扩展、loopback 代理各有独立边界；静态官网没有执行通道。本图描述当前源码，不证明所有 runtime 已验收。</desc>
-  <style>
-    text{fill:#3D3D3A;font-family:"Avenir Next","PingFang SC",Arial,sans-serif;font-size:20px}
-    .display{font-family:"Iowan Old Style","Songti SC",Georgia,serif;font-size:39px}
-    .head{font-size:27px;font-weight:600}
-    .body{font-size:21px}
-    .code{font-family:"SFMono-Regular",Consolas,monospace;font-size:19px}
-    .note{fill:#686356;font-size:19px}
-    .accent{fill:#995134}
-    .zone{fill:#F3F1E9;stroke:#CBC6BA;stroke-width:1.2}
-    .node{fill:#FAF9F5;stroke:#BBB4A6;stroke-width:1.2}
-    .route{fill:none;stroke:#686356;stroke-width:1.8;marker-end:url(#arrow)}
-    .bus{fill:none;stroke:#686356;stroke-width:1.8}
-    .label{paint-order:stroke fill;stroke:#FAF9F5;stroke-width:8px;stroke-linejoin:round;font-size:19px}
-  </style>
-  <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#686356" stroke-width="1.4"/></marker>
-  </defs>
-  <rect width="1200" height="1360" fill="#FAF9F5"/>
-  <g id="heading">
-    <text x="54" y="69" class="display">同一套执行核心，清楚的边界。</text>
-    <text x="54" y="114" class="body">当前源码的执行归属 · runtime 与发行证据另见 current-state</text>
-  </g>
-  <g id="routes">
-    <path d="M214 266 V304 H400 M598 266 V304 H400" class="bus"/>
-    <path d="M400 304 V420" class="route"/>
-    <path d="M400 304 H974 V362" class="route"/>
-  </g>
-  <g id="UI">
-    <rect x="64" y="167" width="300" height="99" class="node"/>
-    <text x="90" y="208" class="head">macOS App</text>
-    <text x="90" y="243" class="note">目标、审阅、批准与结果</text>
-  </g>
-  <g id="CLI">
-    <rect x="448" y="167" width="300" height="99" class="node"/>
-    <text x="474" y="208" class="head">CLI / TUI</text>
-    <text x="474" y="243" class="note">同一合同与操作语义</text>
-  </g>
-  <text x="436" y="351" class="label">本机调用</text>
-  <text x="787" y="285" class="label">有限远端请求</text>
-  <g id="local-runtime">
-    <rect x="54" y="376" width="710" height="545" class="zone"/>
-    <text x="82" y="404" class="note">01 / 本机执行端</text>
-    <g id="Core">
-      <rect x="164" y="420" width="490" height="163" class="node"/>
-      <text x="190" y="462" class="head">本机 core</text>
-      <text x="190" y="497" class="code">crates/core</text>
-      <text x="190" y="535" class="body">冻结计划 → 核对批准 → 精确操作</text>
-      <text x="190" y="565" class="note">operations 提供静态合同，不执行副作用</text>
-    </g>
-    <path d="M320 583 V682" class="route"/>
-    <path d="M500 583 V622 H565 V682" class="route"/>
-    <text x="151" y="642" class="body">持久记录与读回</text>
-    <text x="466" y="660" class="body">批准后精确变更</text>
-    <g id="Journal">
-      <rect x="91" y="682" width="288" height="133" class="node"/>
-      <text x="115" y="723" class="head">计划 / 原任务回执</text>
-      <text x="115" y="761" class="body">accepted ≠ completed</text>
-      <text x="115" y="795" class="note">读回证据决定完成状态</text>
-    </g>
-    <g id="Files">
-      <rect x="413" y="682" width="310" height="133" class="node"/>
-      <text x="437" y="723" class="head">配置 / 工作文件</text>
-      <text x="437" y="761" class="body">加密包、迁入与字段恢复</text>
-      <text x="437" y="795" class="note">冻结范围；保留后续外部编辑</text>
-    </g>
-    <text x="92" y="867" class="body accent">不确定时查原 ID；不重放副作用。</text>
-    <text x="92" y="898" class="note">portable work 可独立读包；系统文件传输另行显式选择</text>
-  </g>
-  <g id="SSH">
-    <rect x="810" y="362" width="336" height="97" class="node"/>
-    <text x="838" y="402" class="head">有限 SSH controller</text>
-    <text x="838" y="436" class="code">crates/remote</text>
-  </g>
-  <g id="remote-runtime">
-    <rect x="810" y="493" width="336" height="428" class="zone"/>
-    <text x="836" y="526" class="note">02 / 目标主机执行端</text>
-    <path d="M974 459 V553" class="route"/>
-    <text x="889" y="483" class="label">SSH / JSON stdin</text>
-    <g id="Runner">
-      <rect x="835" y="553" width="286" height="116" class="node"/>
-      <text x="857" y="593" class="head">runner · submit</text>
-      <text x="857" y="628" class="body">持久接受后 ACK</text>
-      <text x="857" y="654" class="note">重连只查询原任务 ID</text>
-    </g>
-    <path d="M974 669 V739" class="route"/>
-    <rect x="838" y="686" width="283" height="36" fill="#F3F1E9"/>
-    <text x="846" y="710" class="body">同一 core：执行 / 持久记录</text>
-    <g id="RemoteCore">
-      <rect x="835" y="739" width="286" height="89" class="node"/>
-      <text x="857" y="776" class="head">目标 core / journal</text>
-      <text x="857" y="809" class="body">计划、变更、原任务结果</text>
-    </g>
-    <text x="836" y="867" class="note">controller 不替代执行端回执</text>
-    <text x="836" y="897" class="note">不隐式传包或重新提交任务</text>
-  </g>
-  <g id="browser-channel">
-    <rect x="54" y="959" width="520" height="270" class="zone"/>
-    <text x="81" y="997" class="body">03 / App 与 macOS CLI 的独立浏览器通道</text>
-    <g id="Host">
-      <text x="82" y="1052" class="head">Native host</text>
-      <text x="82" y="1088" class="body">配对与任务协调</text>
-    </g>
-    <g id="Ext">
-      <text x="344" y="1052" class="head">profile 扩展</text>
-      <text x="344" y="1088" class="body">原生 API / journal</text>
-    </g>
-    <path d="M247 1044 H326" class="route" marker-start="url(#arrow)"/>
-    <text x="239" y="1132" class="note">连接 / 原 ID</text>
-    <text x="82" y="1175" class="body">clear：真实重启 + 再次批准 → 完成</text>
-    <text x="82" y="1209" class="note">Linux runner 不提供本机 browser host control</text>
-  </g>
-  <g id="proxy-channel">
-    <rect x="602" y="959" width="544" height="270" class="zone"/>
-    <text x="629" y="997" class="body">04 / App、CLI 各自持有代理通道</text>
-    <g id="Proxy">
-      <text x="630" y="1052" class="head">loopback CONNECT</text>
-      <text x="630" y="1088" class="code">crates/egress</text>
-    </g>
-    <g id="Destination">
-      <text x="965" y="1052" class="head">允许的目的地</text>
-      <text x="965" y="1088" class="body">或上游代理</text>
-    </g>
-    <path d="M905 1044 H947" class="route"/>
-    <text x="630" y="1132" class="note">匹配 host / port 规则的连接</text>
-    <text x="630" y="1175" class="body">仅代理路径；不解密 TLS。</text>
-    <text x="630" y="1209" class="note">不证明进程直接出站已被强制阻止</text>
-  </g>
-  <g id="Site">
-    <path d="M54 1271 H1146" fill="none" stroke="#CBC6BA"/>
-    <text x="54" y="1321" class="head">独立官网</text>
-    <text x="223" y="1321" class="body">静态说明与示例 · 共享展示模块 · 没有执行通道</text>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1636" viewBox="0 0 1600 1636" role="img" aria-labelledby="title desc" lang="zh-CN">
+<title id="title">Lintel / 执行分工与状态归属</title><desc id="desc">显式文件交接：工作包由选定系统工具传输；目标 core 可在独立 state 中打开。; 独立官网 apps/site：静态说明与共享展示模块，没有通向执行核心的调用。; 共用 contracts / operations：接口与字段合同；各执行端仍分别拥有自己的状态。</desc>
+<style>text{font-family:'Noto Sans CJK SC','PingFang SC',Arial,sans-serif}</style><rect width="100%" height="100%" fill="#FAF9F5"/><text x="52" y="62" font-size="38" font-weight="600" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Lintel / 执行分工与状态归属</text><text x="52" y="104" font-size="22" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">当前源码架构 · 与实际安装、认证和发行状态分开阅读</text><line x1="52" x2="1548" y1="150" y2="150" stroke="#B9B4A9"/><text x="52" y="190" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">01  环境与文件操作：按目标主机执行</text><svg xmlns="http://www.w3.org/2000/svg" width="1496" height="293.3266116712496" viewBox="0.00 0.00 1571.04 308.04" x="52.0" y="215">
+<g id="execution-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 296.52)">
+<title>Lintel</title>
+
+<g id="execution-node1" class="node">
+<title>entry</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="235,-131 0,-131 0,-65 235,-65 235,-131" />
+<text text-anchor="middle" x="117.5" y="-104" font-family="Noto Sans CJK SC" font-size="20.00">操作入口</text>
+<text text-anchor="middle" x="117.5" y="-82" font-family="Noto Sans CJK SC" font-size="20.00">macOS App / 独立 CLI</text>
+</g>
+
+<g id="execution-node2" class="node">
+<title>local</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="593,-181 347,-181 347,-115 593,-115 593,-181" />
+<text text-anchor="middle" x="470" y="-154" font-family="Noto Sans CJK SC" font-size="20.00">本机 core</text>
+<text text-anchor="middle" x="470" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">计划 / 批准 / 执行 / 核对</text>
+</g>
+
+<g id="execution-edge1" class="edge">
+<title>entry-&gt;local</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M235.21,-114.65C268.68,-119.42 305.36,-124.66 339.54,-129.53" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="339.52,-132 346.8,-130.57 340.21,-127.15 339.52,-132" />
+<text text-anchor="middle" x="291" y="-130.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">本机请求</text>
+</g>
+
+<g id="execution-node5" class="node">
+<title>controller</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="576.5,-85 363.5,-85 363.5,-19 576.5,-19 576.5,-85" />
+<text text-anchor="middle" x="470" y="-58" font-family="Noto Sans CJK SC" font-size="20.00">共享 SSH controller</text>
+<text text-anchor="middle" x="470" y="-36" font-family="Noto Sans CJK SC" font-size="20.00">crates/remote</text>
+</g>
+
+<g id="execution-edge2" class="edge">
+<title>entry-&gt;controller</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M235.21,-82.68C274.21,-77.56 317.57,-71.87 356.26,-66.8" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="356.8,-69.2 363.42,-65.86 356.16,-64.34 356.8,-69.2" />
+<text text-anchor="middle" x="291" y="-84.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">远端请求</text>
+</g>
+
+<g id="execution-node3" class="node">
+<title>localstate</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1093,-285 803,-285 803,-219 1093,-219 1093,-285" />
+<text text-anchor="middle" x="948" y="-258" font-family="Noto Sans CJK SC" font-size="20.00">本机 state</text>
+<text text-anchor="middle" x="948" y="-236" font-family="Noto Sans CJK SC" font-size="20.00">清单 / 冻结计划 / 原任务记录</text>
+</g>
+
+<g id="execution-edge3" class="edge">
+<title>local-&gt;localstate</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M593.27,-174.72C654.93,-188.19 730.29,-204.65 795.58,-218.92" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="795.31,-221.37 802.68,-220.47 796.36,-216.58 795.31,-221.37" />
+<text text-anchor="middle" x="698" y="-217.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">持久记录</text>
+</g>
+
+<g id="execution-node4" class="node">
+<title>targets</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1073,-192 823,-192 823,-104 1073,-104 1073,-192" />
+<text text-anchor="middle" x="948" y="-165" font-family="Noto Sans CJK SC" font-size="20.00">本机目标</text>
+<text text-anchor="middle" x="948" y="-143" font-family="Noto Sans CJK SC" font-size="20.00">配置 / 工作文件 / 加密包</text>
+<text text-anchor="middle" x="948" y="-121" font-family="Noto Sans CJK SC" font-size="20.00">宿主网络与绑定服务</text>
+</g>
+
+<g id="execution-edge4" class="edge">
+<title>local-&gt;targets</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M593.27,-148C661.32,-148 746.04,-148 815.51,-148" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="815.61,-150.45 822.61,-148 815.61,-145.55 815.61,-150.45" />
+<text text-anchor="middle" x="698" y="-153.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">核对后操作</text>
+</g>
+
+<g id="execution-node6" class="node">
+<title>runner</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="1085.5,-77 810.5,-77 810.5,-11 1085.5,-11 1085.5,-77" />
+<text text-anchor="middle" x="948" y="-50" font-family="Noto Sans CJK SC" font-size="20.00">目标 runner + 同一 core</text>
+<text text-anchor="middle" x="948" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">apps/runner + crates/core</text>
+</g>
+
+<g id="execution-edge5" class="edge">
+<title>controller-&gt;runner</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M576.64,-50.22C643.37,-49.1 730.46,-47.64 803.42,-46.41" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="803.48,-48.86 810.43,-46.3 803.39,-43.96 803.48,-48.86" />
+<text text-anchor="middle" x="698" y="-54.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">OpenSSH / 有限 JSON</text>
+</g>
+
+<g id="execution-node7" class="node">
+<title>remoteowned</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1548,-88 1268,-88 1268,0 1548,0 1548,-88" />
+<text text-anchor="middle" x="1408" y="-61" font-family="Noto Sans CJK SC" font-size="20.00">目标主机与该用户</text>
+<text text-anchor="middle" x="1408" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">自己的 state / 计划 / 原任务</text>
+<text text-anchor="middle" x="1408" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">配置与工作文件 / 绑定服务</text>
+</g>
+
+<g id="execution-edge6" class="edge">
+<title>runner-&gt;remoteowned</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M1085.79,-44C1140.9,-44 1204.56,-44 1260.59,-44" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1260.74,-46.45 1267.74,-44 1260.74,-41.55 1260.74,-46.45" />
+<text text-anchor="middle" x="1180.5" y="-49.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">在远端执行与记录</text>
+</g>
+</g>
+</svg><text x="52" y="540.3266116712496" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">配置、工作保全、清理、字段恢复、宿主网络计划与具体服务操作由执行端 core 负责。</text><line x1="52" x2="1548" y1="577.3266116712496" y2="577.3266116712496" stroke="#B9B4A9"/><text x="52" y="617.3266116712496" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">02  浏览器：单独配对的本机 profile</text><svg xmlns="http://www.w3.org/2000/svg" width="1487.04" height="89.04" viewBox="0.00 0.00 1487.04 89.04" x="56.48000000000002" y="642.3266116712496">
+<g id="browser-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 77.52)">
+<title>Lintel</title>
+
+<g id="browser-node1" class="node">
+<title>browserentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="190,-55 0,-55 0,-11 190,-11 190,-55" />
+<text text-anchor="middle" x="95" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">App / macOS CLI</text>
+</g>
+
+<g id="browser-node2" class="node">
+<title>host</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="568,-66 327,-66 327,0 568,0 568,-66" />
+<text text-anchor="middle" x="447.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Native Messaging host</text>
+<text text-anchor="middle" x="447.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">配对与任务协调</text>
+</g>
+
+<g id="browser-edge1" class="edge">
+<title>browserentry-&gt;host</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M190.39,-33C230.15,-33 277.02,-33 319.72,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="319.81,-35.45 326.81,-33 319.81,-30.55 319.81,-35.45" />
+<text text-anchor="middle" x="258.5" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">有限 control</text>
+</g>
+
+<g id="browser-node3" class="node">
+<title>extension</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="1084,-66 795,-66 795,0 1084,0 1084,-66" />
+<text text-anchor="middle" x="939.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">已配对的扩展</text>
+<text text-anchor="middle" x="939.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">原生 API / operation journal</text>
+</g>
+
+<g id="browser-edge2" class="edge">
+<title>host-&gt;extension</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M568.05,-33C634.2,-33 717.05,-33 787.62,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="787.85,-35.45 794.85,-33 787.85,-30.55 787.85,-35.45" />
+<text text-anchor="middle" x="681.5" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Native Messaging / 原 ID</text>
+</g>
+
+<g id="browser-node4" class="node">
+<title>profile</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1464,-66 1243,-66 1243,0 1464,0 1464,-66" />
+<text text-anchor="middle" x="1353.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">准确 browser profile</text>
+<text text-anchor="middle" x="1353.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">权限与站点状态</text>
+</g>
+
+<g id="browser-edge3" class="edge">
+<title>extension-&gt;profile</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M1084.02,-33C1133.61,-33 1188.54,-33 1235.72,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1235.92,-35.45 1242.92,-33 1235.92,-30.55 1235.92,-35.45" />
+<text text-anchor="middle" x="1163.5" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">浏览器原生操作</text>
+</g>
+</g>
+</svg><text x="52" y="763.3666116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">扩展持有 browser operation journal。清理收尾需要真实浏览器重启与再次批准。</text><line x1="52" x2="1548" y1="800.3666116712495" y2="800.3666116712495" stroke="#B9B4A9"/><text x="52" y="840.3666116712495" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">03  网络：经过通道的连接与明确发起的测试</text><svg xmlns="http://www.w3.org/2000/svg" width="1178.04" height="182.04" viewBox="0.00 0.00 1178.04 182.04" x="210.98000000000002" y="865.3666116712495">
+<g id="network-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 170.52)">
+<title>Lintel</title>
+
+<g id="network-node1" class="node">
+<title>netentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="225,-159 12,-159 12,-93 225,-93 225,-159" />
+<text text-anchor="middle" x="118.5" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">App / CLI</text>
+<text text-anchor="middle" x="118.5" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">启动通道 / 请求测试</text>
+</g>
+
+<g id="network-node3" class="node">
+<title>egress</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="752,-112 394,-112 394,-46 752,-46 752,-112" />
+<text text-anchor="middle" x="573" y="-85" font-family="Noto Sans CJK SC" font-size="20.00">crates/egress</text>
+<text text-anchor="middle" x="573" y="-63" font-family="Noto Sans CJK SC" font-size="20.00">loopback CONNECT / HTTPS probe</text>
+</g>
+
+<g id="network-edge1" class="edge">
+<title>netentry-&gt;egress</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M225.02,-115.04C273.1,-110.05 331.48,-103.98 386.52,-98.27" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="386.86,-100.69 393.57,-97.53 386.35,-95.82 386.86,-100.69" />
+<text text-anchor="middle" x="315.5" y="-115.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">管理 / 显式探测</text>
+</g>
+
+<g id="network-node2" class="node">
+<title>client</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="237,-66 0,-66 0,0 237,0 237,-66" />
+<text text-anchor="middle" x="118.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">选择通过代理的客户端</text>
+<text text-anchor="middle" x="118.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">独立于管理请求</text>
+</g>
+
+<g id="network-edge2" class="edge">
+<title>client-&gt;egress</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M237.21,-44.97C282.85,-49.61 336.22,-55.03 386.76,-60.17" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="386.66,-62.62 393.87,-60.89 387.16,-57.75 386.66,-62.62" />
+<text text-anchor="middle" x="315.5" y="-62.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">经代理的连接</text>
+</g>
+
+<g id="network-node4" class="node">
+<title>destination</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1122,-159 966,-159 966,-93 1122,-93 1122,-159" />
+<text text-anchor="middle" x="1044" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">允许的目的地</text>
+<text text-anchor="middle" x="1044" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">或上游代理</text>
+</g>
+
+<g id="network-edge3" class="edge">
+<title>egress-&gt;destination</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M752.31,-96.87C823.1,-103.96 901.15,-111.78 958.53,-117.53" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="958.57,-120 965.78,-118.26 959.06,-115.13 958.57,-120" />
+<text text-anchor="middle" x="842.5" y="-117.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">按 host / port 规则</text>
+</g>
+
+<g id="network-node5" class="node">
+<title>echo</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1155,-66 933,-66 933,0 1155,0 1155,-66" />
+<text text-anchor="middle" x="1044" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">计划列出的回显目标</text>
+<text text-anchor="middle" x="1044" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">观察 IPv4 / IPv6 出口</text>
+</g>
+
+<g id="network-edge4" class="edge">
+<title>egress-&gt;echo</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M752.31,-61.51C810.44,-55.81 873.46,-49.63 925.91,-44.48" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="926.19,-46.92 932.91,-43.8 925.71,-42.04 926.19,-46.92" />
+<text text-anchor="middle" x="842.5" y="-63.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">显式 HTTPS 请求</text>
+</g>
+</g>
+</svg><text x="52" y="1079.4066116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">App 与 CLI 各自持有通道。CONNECT 不解密 TLS；通道之外的出站不在该代理观察内。</text><line x1="52" x2="1548" y1="1116.4066116712495" y2="1116.4066116712495" stroke="#B9B4A9"/><text x="52" y="1156.4066116712495" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">04  App 更新：独立记录与发行配置</text><svg xmlns="http://www.w3.org/2000/svg" width="1046.04" height="204.04" viewBox="0.00 0.00 1046.04 204.04" x="276.98" y="1181.4066116712495">
+<g id="updates-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 192.52)">
+<title>Lintel</title>
+
+<g id="updates-node1" class="node">
+<title>updateentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="144,-107 0,-107 0,-63 144,-63 144,-107" />
+<text text-anchor="middle" x="72" y="-80" font-family="Noto Sans CJK SC" font-size="20.00">macOS App</text>
+</g>
+
+<g id="updates-node2" class="node">
+<title>updater</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="559,-118 269,-118 269,-52 559,-52 559,-118" />
+<text text-anchor="middle" x="414" y="-91" font-family="Noto Sans CJK SC" font-size="20.00">app_updates.rs</text>
+<text text-anchor="middle" x="414" y="-69" font-family="Noto Sans CJK SC" font-size="20.00">Tauri updater / activity gate</text>
+</g>
+
+<g id="updates-edge1" class="edge">
+<title>updateentry-&gt;updater</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M144.28,-85C178.51,-85 220.93,-85 261.86,-85" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="261.95,-87.45 268.95,-85 261.95,-82.55 261.95,-87.45" />
+<text text-anchor="middle" x="206.5" y="-90.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">检查 / 批准</text>
+</g>
+
+<g id="updates-node3" class="node">
+<title>intent</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1023,-181 770,-181 770,-93 1023,-93 1023,-181" />
+<text text-anchor="middle" x="896.5" y="-154" font-family="Noto Sans CJK SC" font-size="20.00">App data</text>
+<text text-anchor="middle" x="896.5" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">原更新 intent / 安装结果</text>
+<text text-anchor="middle" x="896.5" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">显式重启</text>
+</g>
+
+<g id="updates-edge2" class="edge">
+<title>updater-&gt;intent</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M559.17,-100.6C623.71,-107.59 699.34,-115.77 762.51,-122.61" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="762.54,-125.08 769.76,-123.39 763.07,-120.2 762.54,-125.08" />
+<text text-anchor="middle" x="664.5" y="-125.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">持久记录与核对</text>
+</g>
+
+<g id="updates-node4" class="node">
+<title>feed</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1005.5,-66 787.5,-66 787.5,0 1005.5,0 1005.5,-66" />
+<text text-anchor="middle" x="896.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">固定 feed / 签名资源</text>
+<text text-anchor="middle" x="896.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">当前未激活</text>
+</g>
+
+<g id="updates-edge3" class="edge">
+<title>updater-&gt;feed</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" stroke-dasharray="5,2" d="M559.17,-69.4C629.85,-61.75 713.81,-52.66 780.16,-45.48" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="780.65,-47.89 787.34,-44.7 780.12,-43.02 780.65,-47.89" />
+<text text-anchor="middle" x="664.5" y="-71.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">须配置发行公钥与 feed</text>
+</g>
+</g>
+</svg><text x="52" y="1417.4466116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">更新 intent 存在 App data，独立于 core job。虚线所示发行连接尚未配置激活。</text><line x1="52" x2="1548" y1="1454.4466116712495" y2="1454.4466116712495" stroke="#B9B4A9"/><text x="52" y="1494.4466116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">显式文件交接：工作包由选定系统工具传输；目标 core 可在独立 state 中打开。</text><text x="52" y="1528.4466116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">独立官网 apps/site：静态说明与共享展示模块，没有通向执行核心的调用。</text><text x="52" y="1562.4466116712495" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">共用 contracts / operations：接口与字段合同；各执行端仍分别拥有自己的状态。</text><text x="52" y="1606.4466116712495" font-size="17" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Source snapshot: e592d38 · 2026-10-16</text></svg>

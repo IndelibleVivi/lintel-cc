@@ -1,0 +1,18 @@
+flowchart TB
+    entry["macOS app / standalone CLI"]
+    core["Local core"]
+    remote["SSH controller"]
+    browser["Local browser host<br/>macOS only"]
+    proxy["Controlled channel"]
+    files["Config / packages / records"]
+    runner["Target runner + core<br/>remote execution / records"]
+    profile["Paired profile extension"]
+    dest["Proxied destinations"]
+    entry -->|"Local operations"| core
+    entry -->|"Remote operations"| remote
+    entry -->|"Separate pairing"| browser
+    entry -->|"Manage channel"| proxy
+    core -->|"Execute / verify"| files
+    remote -->|"OpenSSH"| runner
+    browser -->|"Native Messaging"| profile
+    proxy -->|"CONNECT"| dest

@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="496" viewBox="0 0 1400 496" role="img" aria-labelledby="title desc" lang="en">
+<title id="title">Shared entry points, explicit execution paths</title><desc id="desc">Current source architecture · installation, authentication and release evidence remain separate</desc>
+<style>text{font-family:'Noto Sans CJK SC','PingFang SC',Arial,sans-serif}</style><rect width="100%" height="100%" fill="#FAF9F5"/><text x="36" y="47" font-size="28" font-weight="600" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Shared entry points, explicit execution paths</text><svg xmlns="http://www.w3.org/2000/svg" width="1344" height="385.69773046448324" viewBox="0.00 0.00 1153.54 331.04" x="28" y="80">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 319.52)">
+<title>Lintel</title>
+
+<g id="node1" class="node">
+<title>entry</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="729,-308 431,-308 431,-264 729,-264 729,-308" />
+<text text-anchor="middle" x="580" y="-281" font-family="Noto Sans CJK SC" font-size="20.00">macOS app / standalone CLI</text>
+</g>
+
+<g id="node2" class="node">
+<title>core</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="304.5,-187 175.5,-187 175.5,-143 304.5,-143 304.5,-187" />
+<text text-anchor="middle" x="240" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">Local core</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>entry-&gt;core</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M496.27,-263.95C449.68,-252.24 401,-240 401,-240 401,-240 339.25,-211.62 292.23,-190.01" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="293.09,-187.7 285.71,-187.01 291.04,-192.16 293.09,-187.7" />
+<text text-anchor="middle" x="463.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Local operations</text>
+</g>
+
+<g id="node3" class="node">
+<title>remote</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="568,-187 400,-187 400,-143 568,-143 568,-187" />
+<text text-anchor="middle" x="484" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">SSH controller</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>entry-&gt;remote</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M563.06,-264C547.05,-244.15 522.96,-214.3 505.58,-192.75" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="507.4,-191.1 501.1,-187.19 503.58,-194.18 507.4,-191.1" />
+<text text-anchor="middle" x="616" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Remote operations</text>
+</g>
+
+<g id="node4" class="node">
+<title>browser</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="840.5,-198 631.5,-198 631.5,-132 840.5,-132 840.5,-198" />
+<text text-anchor="middle" x="736" y="-171" font-family="Noto Sans CJK SC" font-size="20.00">Local browser host</text>
+<text text-anchor="middle" x="736" y="-149" font-family="Noto Sans CJK SC" font-size="20.00">macOS only</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>entry-&gt;browser</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M633.33,-263.95C663,-252.24 694,-240 694,-240 694,-240 703.99,-222.39 714.23,-204.35" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="716.38,-205.54 717.7,-198.24 712.11,-203.12 716.38,-205.54" />
+<text text-anchor="middle" x="767" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Separate pairing</text>
+</g>
+
+<g id="node5" class="node">
+<title>proxy</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1104,-187 890,-187 890,-143 1104,-143 1104,-187" />
+<text text-anchor="middle" x="997" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">Controlled channel</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>entry-&gt;proxy</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M699.29,-263.95C765.65,-252.24 835,-240 835,-240 835,-240 897.13,-211.62 944.44,-190.01" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="945.66,-192.14 951.01,-187.01 943.63,-187.69 945.66,-192.14" />
+<text text-anchor="middle" x="936.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Manage channel</text>
+</g>
+
+<g id="node6" class="node">
+<title>files</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="284,-55 0,-55 0,-11 284,-11 284,-55" />
+<text text-anchor="middle" x="142" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">Config / packages / records</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>core-&gt;files</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M224.04,-142.82C207.17,-120.44 180.51,-85.09 162.19,-60.79" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="164.13,-59.28 157.96,-55.17 160.21,-62.23 164.13,-59.28" />
+<text text-anchor="middle" x="254" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Execute / verify</text>
+</g>
+
+<g id="node7" class="node">
+<title>runner</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="596.5,-66 311.5,-66 311.5,0 596.5,0 596.5,-66" />
+<text text-anchor="middle" x="454" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Target runner + core</text>
+<text text-anchor="middle" x="454" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">remote execution / records</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>remote-&gt;runner</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M479.11,-142.82C474.78,-124.05 468.34,-96.13 463.06,-73.28" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="465.43,-72.63 461.47,-66.36 460.66,-73.74 465.43,-72.63" />
+<text text-anchor="middle" x="507" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">OpenSSH</text>
+</g>
+
+<g id="node8" class="node">
+<title>profile</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="878.5,-55 623.5,-55 623.5,-11 878.5,-11 878.5,-55" />
+<text text-anchor="middle" x="751" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">Paired profile extension</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>browser-&gt;profile</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M739.71,-131.87C742.16,-110.57 745.36,-82.89 747.72,-62.4" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="750.18,-62.44 748.55,-55.21 745.32,-61.88 750.18,-62.44" />
+<text text-anchor="middle" x="810" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Native Messaging</text>
+</g>
+
+<g id="node9" class="node">
+<title>dest</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1130.5,-55 905.5,-55 905.5,-11 1130.5,-11 1130.5,-55" />
+<text text-anchor="middle" x="1018" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">Proxied destinations</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>proxy-&gt;dest</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M1000.42,-142.82C1003.96,-120.92 1009.51,-86.58 1013.42,-62.34" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1015.88,-62.47 1014.58,-55.17 1011.05,-61.69 1015.88,-62.47" />
+<text text-anchor="middle" x="1046" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">CONNECT</text>
+</g>
+</g>
+</svg></svg>

@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="594" viewBox="0 0 1400 594" role="img" aria-labelledby="title desc" lang="zh-CN">
+<title id="title">同一组操作入口，清楚的执行分工</title><desc id="desc">当前源码架构 · 与实际安装、认证和发行状态分开阅读</desc>
+<style>text{font-family:'Noto Sans CJK SC','PingFang SC',Arial,sans-serif}</style><rect width="100%" height="100%" fill="#FAF9F5"/><text x="36" y="47" font-size="28" font-weight="600" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">同一组操作入口，清楚的执行分工</text><svg xmlns="http://www.w3.org/2000/svg" width="1344" height="483.5852354245468" viewBox="0.00 0.00 920.04 331.04" x="28" y="80">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 319.52)">
+<title>Lintel</title>
+
+<g id="node1" class="node">
+<title>entry</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="534,-308 299,-308 299,-264 534,-264 534,-308" />
+<text text-anchor="middle" x="416.5" y="-281" font-family="Noto Sans CJK SC" font-size="20.00">macOS App / 独立 CLI</text>
+</g>
+
+<g id="node2" class="node">
+<title>core</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="200.5,-187 80.5,-187 80.5,-143 200.5,-143 200.5,-187" />
+<text text-anchor="middle" x="140.5" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">本机 core</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>entry-&gt;core</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M366.45,-263.95C338.6,-252.24 309.5,-240 309.5,-240 309.5,-240 244.42,-211.5 195.03,-189.88" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="195.87,-187.57 188.48,-187.01 193.91,-192.06 195.87,-187.57" />
+<text text-anchor="middle" x="341.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">本机操作</text>
+</g>
+
+<g id="node3" class="node">
+<title>remote</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="426.5,-187 258.5,-187 258.5,-143 426.5,-143 426.5,-187" />
+<text text-anchor="middle" x="342.5" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">SSH controller</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>entry-&gt;remote</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M403.44,-264C391.21,-244.32 372.85,-214.8 359.48,-193.31" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="361.45,-191.84 355.68,-187.19 357.29,-194.43 361.45,-191.84" />
+<text text-anchor="middle" x="420.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">远端操作</text>
+</g>
+
+<g id="node4" class="node">
+<title>browser</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="659.5,-198 459.5,-198 459.5,-132 659.5,-132 659.5,-198" />
+<text text-anchor="middle" x="559.5" y="-171" font-family="Noto Sans CJK SC" font-size="20.00">本机 browser host</text>
+<text text-anchor="middle" x="559.5" y="-149" font-family="Noto Sans CJK SC" font-size="20.00">仅 macOS</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>entry-&gt;browser</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M441.74,-264C462.09,-247.06 491.2,-222.84 515.39,-202.71" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="516.97,-204.58 520.78,-198.22 513.84,-200.81 516.97,-204.58" />
+<text text-anchor="middle" x="520.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">独立配对</text>
+</g>
+
+<g id="node5" class="node">
+<title>proxy</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="829.5,-187 713.5,-187 713.5,-143 829.5,-143 829.5,-187" />
+<text text-anchor="middle" x="771.5" y="-160" font-family="Noto Sans CJK SC" font-size="20.00">受控通道</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>entry-&gt;proxy</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M482.93,-263.95C519.88,-252.24 558.5,-240 558.5,-240 558.5,-240 643.89,-210.33 706.54,-188.57" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="707.49,-190.83 713.3,-186.22 705.88,-186.2 707.49,-190.83" />
+<text text-anchor="middle" x="642.5" y="-227.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">管理通道</text>
+</g>
+
+<g id="node6" class="node">
+<title>files</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="209,-55 0,-55 0,-11 209,-11 209,-55" />
+<text text-anchor="middle" x="104.5" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">配置 / 工作包 / 记录</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>core-&gt;files</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M134.64,-142.82C128.54,-120.82 118.98,-86.28 112.26,-62.03" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="114.59,-61.26 110.36,-55.17 109.87,-62.57 114.59,-61.26" />
+<text text-anchor="middle" x="164" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">执行 / 核对</text>
+</g>
+
+<g id="node7" class="node">
+<title>runner</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="439,-66 236,-66 236,0 439,0 439,-66" />
+<text text-anchor="middle" x="337.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">目标 runner + core</text>
+<text text-anchor="middle" x="337.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">远端执行与记录</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>remote-&gt;runner</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M341.69,-142.82C340.97,-124.13 339.9,-96.37 339.02,-73.57" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="341.46,-73.27 338.74,-66.36 336.57,-73.45 341.46,-73.27" />
+<text text-anchor="middle" x="376.5" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">OpenSSH</text>
+</g>
+
+<g id="node8" class="node">
+<title>profile</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="672.5,-55 466.5,-55 466.5,-11 672.5,-11 672.5,-55" />
+<text text-anchor="middle" x="569.5" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">已配对 profile 扩展</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>browser-&gt;profile</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M561.97,-131.87C563.61,-110.57 565.74,-82.89 567.32,-62.4" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="569.77,-62.37 567.87,-55.21 564.89,-62 569.77,-62.37" />
+<text text-anchor="middle" x="630.5" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Native Messaging</text>
+</g>
+
+<g id="node9" class="node">
+<title>dest</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="897,-55 700,-55 700,-11 897,-11 897,-55" />
+<text text-anchor="middle" x="798.5" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">经过代理的目的地</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>proxy-&gt;dest</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M775.9,-142.82C780.47,-120.82 787.64,-86.28 792.68,-62.03" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="795.08,-62.52 794.1,-55.17 790.28,-61.52 795.08,-62.52" />
+<text text-anchor="middle" x="824.5" y="-95.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">CONNECT</text>
+</g>
+</g>
+</svg></svg>

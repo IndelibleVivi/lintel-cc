@@ -1,0 +1,51 @@
+flowchart TB
+  subgraph execution["01  环境与文件操作：按目标主机执行"]
+    direction LR
+    entry["操作入口<br/>macOS App / 独立 CLI"]
+    local["本机 core<br/>计划 / 批准 / 执行 / 核对"]
+    localstate["本机 state<br/>清单 / 冻结计划 / 原任务记录"]
+    targets["本机目标<br/>配置 / 工作文件 / 加密包<br/>宿主网络与绑定服务"]
+    controller["共享 SSH controller<br/>crates/remote"]
+    runner["目标 runner + 同一 core<br/>apps/runner + crates/core"]
+    remoteowned["目标主机与该用户<br/>自己的 state / 计划 / 原任务<br/>配置与工作文件 / 绑定服务"]
+    entry -->|"本机请求"| local
+    entry -->|"远端请求"| controller
+    local -->|"持久记录"| localstate
+    local -->|"核对后操作"| targets
+    controller -->|"OpenSSH / 有限 JSON"| runner
+    runner -->|"在远端执行与记录"| remoteowned
+  end
+  subgraph browser["02  浏览器：单独配对的本机 profile"]
+    direction LR
+    browserentry["App / macOS CLI"]
+    host["Native Messaging host<br/>配对与任务协调"]
+    extension["已配对的扩展<br/>原生 API / operation journal"]
+    profile["准确 browser profile<br/>权限与站点状态"]
+    browserentry -->|"有限 control"| host
+    host -->|"Native Messaging / 原 ID"| extension
+    extension -->|"浏览器原生操作"| profile
+  end
+  subgraph network["03  网络：经过通道的连接与明确发起的测试"]
+    direction LR
+    netentry["App / CLI<br/>启动通道 / 请求测试"]
+    client["选择通过代理的客户端<br/>独立于管理请求"]
+    egress["crates/egress<br/>loopback CONNECT / HTTPS probe"]
+    destination["允许的目的地<br/>或上游代理"]
+    echo["计划列出的回显目标<br/>观察 IPv4 / IPv6 出口"]
+    netentry -->|"管理 / 显式探测"| egress
+    client -->|"经代理的连接"| egress
+    egress -->|"按 host / port 规则"| destination
+    egress -->|"显式 HTTPS 请求"| echo
+  end
+  subgraph updates["04  App 更新：独立记录与发行配置"]
+    direction LR
+    updateentry["macOS App"]
+    updater["app_updates.rs<br/>Tauri updater / activity gate"]
+    intent["App data<br/>原更新 intent / 安装结果<br/>显式重启"]
+    feed["固定 feed / 签名资源<br/>当前未激活"]
+    updateentry -->|"检查 / 批准"| updater
+    updater -->|"持久记录与核对"| intent
+    updater -.->|"须配置发行公钥与 feed"| feed
+  end
+  transfer["显式系统文件传输 · 工作包"]
+  website["独立官网 · 无执行连接"]

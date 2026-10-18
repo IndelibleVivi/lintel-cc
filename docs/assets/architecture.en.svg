@@ -1,0 +1,272 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1564" viewBox="0 0 1600 1564" role="img" aria-labelledby="title desc" lang="en">
+<title id="title">Lintel / execution paths and state ownership</title><desc id="desc">Explicit file handoff: a chosen system tool carries the package; the target core can open it in independent state.; Separate apps/site: static information and shared presentation modules, with no call into the execution core.; Shared contracts / operations describe interfaces and fields; state remains with the respective execution owner.</desc>
+<style>text{font-family:'Noto Sans CJK SC','PingFang SC',Arial,sans-serif}</style><rect width="100%" height="100%" fill="#FAF9F5"/><text x="52" y="62" font-size="38" font-weight="600" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Lintel / execution paths and state ownership</text><text x="52" y="104" font-size="22" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Current source architecture · installation, authentication and release evidence remain separate</text><line x1="52" x2="1548" y1="150" y2="150" stroke="#B9B4A9"/><text x="52" y="190" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">01  Environment and file operations: execute on the selected host</text><svg xmlns="http://www.w3.org/2000/svg" width="1496" height="231.68354583115473" viewBox="0.00 0.00 1989.04 308.04" x="52.0" y="215">
+<g id="execution-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 296.52)">
+<title>Lintel</title>
+
+<g id="execution-node1" class="node">
+<title>entry</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="298,-131 0,-131 0,-65 298,-65 298,-131" />
+<text text-anchor="middle" x="149" y="-104" font-family="Noto Sans CJK SC" font-size="20.00">Entry points</text>
+<text text-anchor="middle" x="149" y="-82" font-family="Noto Sans CJK SC" font-size="20.00">macOS app / standalone CLI</text>
+</g>
+
+<g id="execution-node2" class="node">
+<title>local</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="795,-181 466,-181 466,-115 795,-115 795,-181" />
+<text text-anchor="middle" x="630.5" y="-154" font-family="Noto Sans CJK SC" font-size="20.00">Local core</text>
+<text text-anchor="middle" x="630.5" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">plan / approve / execute / verify</text>
+</g>
+
+<g id="execution-edge1" class="edge">
+<title>entry-&gt;local</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M298.11,-113.44C348.92,-118.74 406.2,-124.72 458.67,-130.19" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="458.49,-132.63 465.71,-130.92 459,-127.76 458.49,-132.63" />
+<text text-anchor="middle" x="382" y="-132.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Local request</text>
+</g>
+
+<g id="execution-node5" class="node">
+<title>controller</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="750,-85 511,-85 511,-19 750,-19 750,-85" />
+<text text-anchor="middle" x="630.5" y="-58" font-family="Noto Sans CJK SC" font-size="20.00">Shared SSH controller</text>
+<text text-anchor="middle" x="630.5" y="-36" font-family="Noto Sans CJK SC" font-size="20.00">crates/remote</text>
+</g>
+
+<g id="execution-edge2" class="edge">
+<title>entry-&gt;controller</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M298.11,-83.79C363.93,-77.48 440.61,-70.12 503.62,-64.08" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="504.11,-66.49 510.85,-63.38 503.64,-61.61 504.11,-66.49" />
+<text text-anchor="middle" x="382" y="-85.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Remote request</text>
+</g>
+
+<g id="execution-node3" class="node">
+<title>localstate</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1404.5,-285 1020.5,-285 1020.5,-219 1404.5,-219 1404.5,-285" />
+<text text-anchor="middle" x="1212.5" y="-258" font-family="Noto Sans CJK SC" font-size="20.00">Local state</text>
+<text text-anchor="middle" x="1212.5" y="-236" font-family="Noto Sans CJK SC" font-size="20.00">inventory / frozen plans / original jobs</text>
+</g>
+
+<g id="execution-edge3" class="edge">
+<title>local-&gt;localstate</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M795.38,-177.39C865.39,-189.94 947.59,-204.68 1020.35,-217.73" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1020.04,-220.16 1027.36,-218.98 1020.91,-215.34 1020.04,-220.16" />
+<text text-anchor="middle" x="903.5" y="-214.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Persist</text>
+</g>
+
+<g id="execution-node4" class="node">
+<title>targets</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1413,-192 1012,-192 1012,-104 1413,-104 1413,-192" />
+<text text-anchor="middle" x="1212.5" y="-165" font-family="Noto Sans CJK SC" font-size="20.00">Local targets</text>
+<text text-anchor="middle" x="1212.5" y="-143" font-family="Noto Sans CJK SC" font-size="20.00">config / work files / encrypted packages</text>
+<text text-anchor="middle" x="1212.5" y="-121" font-family="Noto Sans CJK SC" font-size="20.00">host network and bound services</text>
+</g>
+
+<g id="execution-edge4" class="edge">
+<title>local-&gt;targets</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M795.38,-148C860.48,-148 936.1,-148 1004.89,-148" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1004.95,-150.45 1011.95,-148 1004.95,-145.55 1004.95,-150.45" />
+<text text-anchor="middle" x="903.5" y="-153.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Inspect / apply</text>
+</g>
+
+<g id="execution-node6" class="node">
+<title>runner</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="1357,-77 1068,-77 1068,-11 1357,-11 1357,-77" />
+<text text-anchor="middle" x="1212.5" y="-50" font-family="Noto Sans CJK SC" font-size="20.00">Target runner + shared core</text>
+<text text-anchor="middle" x="1212.5" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">apps/runner + crates/core</text>
+</g>
+
+<g id="execution-edge5" class="edge">
+<title>controller-&gt;runner</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M750.27,-50.36C839.99,-49.12 963.79,-47.42 1060.53,-46.08" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1060.78,-48.53 1067.75,-45.98 1060.71,-43.63 1060.78,-48.53" />
+<text text-anchor="middle" x="903.5" y="-54.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">OpenSSH / finite JSON</text>
+</g>
+
+<g id="execution-node7" class="node">
+<title>remoteowned</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1966,-88 1655,-88 1655,0 1966,0 1966,-88" />
+<text text-anchor="middle" x="1810.5" y="-61" font-family="Noto Sans CJK SC" font-size="20.00">Target host and user</text>
+<text text-anchor="middle" x="1810.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">state / plans / original jobs</text>
+<text text-anchor="middle" x="1810.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">config / work / bound services</text>
+</g>
+
+<g id="execution-edge6" class="edge">
+<title>runner-&gt;remoteowned</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M1357.02,-44C1444.72,-44 1557.09,-44 1647.91,-44" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1647.97,-46.45 1654.97,-44 1647.97,-41.55 1647.97,-46.45" />
+<text text-anchor="middle" x="1534" y="-49.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Execute / persist remotely</text>
+</g>
+</g>
+</svg><text x="52" y="478.68354583115473" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Each executing core owns configuration, preservation, cleanup, restore, host-network plans and specific service operations.</text><line x1="52" x2="1548" y1="515.6835458311548" y2="515.6835458311548" stroke="#B9B4A9"/><text x="52" y="555.6835458311548" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">02  Browser: a separately paired local profile</text><svg xmlns="http://www.w3.org/2000/svg" width="1496" height="78.07779419005416" viewBox="0.00 0.00 1706.04 89.04" x="52.0" y="580.6835458311548">
+<g id="browser-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 77.52)">
+<title>Lintel</title>
+
+<g id="browser-node1" class="node">
+<title>browserentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="190,-55 0,-55 0,-11 190,-11 190,-55" />
+<text text-anchor="middle" x="95" y="-28" font-family="Noto Sans CJK SC" font-size="20.00">App / macOS CLI</text>
+</g>
+
+<g id="browser-node2" class="node">
+<title>host</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="616,-66 338,-66 338,0 616,0 616,-66" />
+<text text-anchor="middle" x="477" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Native Messaging host</text>
+<text text-anchor="middle" x="477" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">pairing / task coordination</text>
+</g>
+
+<g id="browser-edge1" class="edge">
+<title>browserentry-&gt;host</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M190.42,-33C232.76,-33 283.66,-33 330.69,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="330.9,-35.45 337.9,-33 330.9,-30.55 330.9,-35.45" />
+<text text-anchor="middle" x="264" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Finite control</text>
+</g>
+
+<g id="browser-node3" class="node">
+<title>extension</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="1190,-66 884,-66 884,0 1190,0 1190,-66" />
+<text text-anchor="middle" x="1037" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Paired extension</text>
+<text text-anchor="middle" x="1037" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">native API / operation journal</text>
+</g>
+
+<g id="browser-edge2" class="edge">
+<title>host-&gt;extension</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M616.29,-33C695.09,-33 794.16,-33 876.26,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="876.65,-35.45 883.65,-33 876.65,-30.55 876.65,-35.45" />
+<text text-anchor="middle" x="750" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Native Messaging / original ID</text>
+</g>
+
+<g id="browser-node4" class="node">
+<title>profile</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1683,-66 1437,-66 1437,0 1683,0 1683,-66" />
+<text text-anchor="middle" x="1560" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Exact browser profile</text>
+<text text-anchor="middle" x="1560" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">permissions / site state</text>
+</g>
+
+<g id="browser-edge3" class="edge">
+<title>extension-&gt;profile</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M1190.1,-33C1266.03,-33 1356.92,-33 1429.48,-33" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1429.89,-35.45 1436.89,-33 1429.89,-30.55 1429.89,-35.45" />
+<text text-anchor="middle" x="1313.5" y="-38.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Browser-native operations</text>
+</g>
+</g>
+</svg><text x="52" y="690.761340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">The extension owns its operation journal. Final clearing requires a real browser restart and a second approval.</text><line x1="52" x2="1548" y1="727.761340021209" y2="727.761340021209" stroke="#B9B4A9"/><text x="52" y="767.761340021209" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">03  Network: routed connections and explicitly requested tests</text><svg xmlns="http://www.w3.org/2000/svg" width="1416.04" height="182.04" viewBox="0.00 0.00 1416.04 182.04" x="91.98000000000002" y="792.761340021209">
+<g id="network-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 170.52)">
+<title>Lintel</title>
+
+<g id="network-node1" class="node">
+<title>netentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="302.5,-159 18.5,-159 18.5,-93 302.5,-93 302.5,-159" />
+<text text-anchor="middle" x="160.5" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">App / CLI</text>
+<text text-anchor="middle" x="160.5" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">start channel / request test</text>
+</g>
+
+<g id="network-node3" class="node">
+<title>egress</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="900,-112 542,-112 542,-46 900,-46 900,-112" />
+<text text-anchor="middle" x="721" y="-85" font-family="Noto Sans CJK SC" font-size="20.00">crates/egress</text>
+<text text-anchor="middle" x="721" y="-63" font-family="Noto Sans CJK SC" font-size="20.00">loopback CONNECT / HTTPS probe</text>
+</g>
+
+<g id="network-edge1" class="edge">
+<title>netentry-&gt;egress</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M302.79,-114.11C373.15,-108.19 459.12,-100.95 534.69,-94.59" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="535.2,-97.01 541.97,-93.98 534.79,-92.13 535.2,-97.01" />
+<text text-anchor="middle" x="431.5" y="-114.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Control / explicit probe</text>
+</g>
+
+<g id="network-node2" class="node">
+<title>client</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="321,-66 0,-66 0,0 321,0 321,-66" />
+<text text-anchor="middle" x="160.5" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Client routed through proxy</text>
+<text text-anchor="middle" x="160.5" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">separate from control requests</text>
+</g>
+
+<g id="network-edge2" class="edge">
+<title>client-&gt;egress</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M321.17,-46.15C387.71,-51.63 465.42,-58.03 534.48,-63.72" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="534.39,-66.17 541.57,-64.3 534.79,-61.29 534.39,-66.17" />
+<text text-anchor="middle" x="431.5" y="-66.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Proxied connection</text>
+</g>
+
+<g id="network-node4" class="node">
+<title>destination</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1366.5,-159 1145.5,-159 1145.5,-93 1366.5,-93 1366.5,-159" />
+<text text-anchor="middle" x="1256" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">Allowed destination</text>
+<text text-anchor="middle" x="1256" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">or upstream proxy</text>
+</g>
+
+<g id="network-edge3" class="edge">
+<title>egress-&gt;destination</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M900.22,-94.72C978.63,-101.63 1068.54,-109.56 1138.23,-115.7" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1138.15,-118.16 1145.33,-116.33 1138.58,-113.27 1138.15,-118.16" />
+<text text-anchor="middle" x="1009.5" y="-115.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Host / port rules</text>
+</g>
+
+<g id="network-node5" class="node">
+<title>echo</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1393,-66 1119,-66 1119,0 1393,0 1393,-66" />
+<text text-anchor="middle" x="1256" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Listed echo endpoint</text>
+<text text-anchor="middle" x="1256" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">observe IPv4 / IPv6 egress</text>
+</g>
+
+<g id="network-edge4" class="edge">
+<title>egress-&gt;echo</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M900.22,-63.62C968.99,-57.68 1046.59,-50.99 1111.64,-45.37" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="1111.94,-47.81 1118.7,-44.76 1111.52,-42.92 1111.94,-47.81" />
+<text text-anchor="middle" x="1009.5" y="-66.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Explicit HTTPS request</text>
+</g>
+</g>
+</svg><text x="52" y="1006.801340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">App and CLI own separate channels. CONNECT does not decrypt TLS; direct outbound traffic is outside this proxy observation.</text><line x1="52" x2="1548" y1="1043.801340021209" y2="1043.801340021209" stroke="#B9B4A9"/><text x="52" y="1083.801340021209" font-size="27" font-weight="600" fill="#A35232" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">04  App updating: separate records and release configuration</text><svg xmlns="http://www.w3.org/2000/svg" width="1241.04" height="204.04" viewBox="0.00 0.00 1241.04 204.04" x="179.48000000000002" y="1108.801340021209">
+<g id="updates-graph0" class="graph" transform="scale(1 1) rotate(0) translate(11.52 192.52)">
+<title>Lintel</title>
+
+<g id="updates-node1" class="node">
+<title>updateentry</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="143,-107 0,-107 0,-63 143,-63 143,-107" />
+<text text-anchor="middle" x="71.5" y="-80" font-family="Noto Sans CJK SC" font-size="20.00">macOS app</text>
+</g>
+
+<g id="updates-node2" class="node">
+<title>updater</title>
+<polygon fill="#faf9f5" stroke="#a35232" stroke-width="1.2" points="603,-118 313,-118 313,-52 603,-52 603,-118" />
+<text text-anchor="middle" x="458" y="-91" font-family="Noto Sans CJK SC" font-size="20.00">app_updates.rs</text>
+<text text-anchor="middle" x="458" y="-69" font-family="Noto Sans CJK SC" font-size="20.00">Tauri updater / activity gate</text>
+</g>
+
+<g id="updates-edge1" class="edge">
+<title>updateentry-&gt;updater</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M143.02,-85C188.56,-85 249.56,-85 305.69,-85" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="305.86,-87.45 312.86,-85 305.86,-82.55 305.86,-87.45" />
+<text text-anchor="middle" x="228" y="-90.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Check / approve</text>
+</g>
+
+<g id="updates-node3" class="node">
+<title>intent</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1218,-181 850,-181 850,-93 1218,-93 1218,-181" />
+<text text-anchor="middle" x="1034" y="-154" font-family="Noto Sans CJK SC" font-size="20.00">App data</text>
+<text text-anchor="middle" x="1034" y="-132" font-family="Noto Sans CJK SC" font-size="20.00">original update intent / install result</text>
+<text text-anchor="middle" x="1034" y="-110" font-family="Noto Sans CJK SC" font-size="20.00">explicit restart</text>
+</g>
+
+<g id="updates-edge2" class="edge">
+<title>updater-&gt;intent</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" d="M603.1,-98.05C675.72,-104.63 764.71,-112.7 842.85,-119.77" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="842.71,-122.22 849.9,-120.41 843.15,-117.34 842.71,-122.22" />
+<text text-anchor="middle" x="726.5" y="-122.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Persist / reconcile</text>
+</g>
+
+<g id="updates-node4" class="node">
+<title>feed</title>
+<polygon fill="#faf9f5" stroke="#b9b4a9" stroke-width="1.2" points="1164,-66 904,-66 904,0 1164,0 1164,-66" />
+<text text-anchor="middle" x="1034" y="-39" font-family="Noto Sans CJK SC" font-size="20.00">Fixed feed / signed asset</text>
+<text text-anchor="middle" x="1034" y="-17" font-family="Noto Sans CJK SC" font-size="20.00">currently inactive</text>
+</g>
+
+<g id="updates-edge3" class="edge">
+<title>updater-&gt;feed</title>
+<path fill="none" stroke="#3d3d3a" stroke-width="1.15" stroke-dasharray="5,2" d="M603.1,-71.95C692.99,-63.8 807.98,-53.38 896.42,-45.37" />
+<polygon fill="#3d3d3a" stroke="#3d3d3a" stroke-width="1.15" points="896.79,-47.8 903.54,-44.73 896.35,-42.92 896.79,-47.8" />
+<text text-anchor="middle" x="726.5" y="-74.2" font-family="Noto Sans CJK SC" font-size="16.00" fill="#3d3d3a">Requires release key / feed</text>
+</g>
+</g>
+</svg><text x="52" y="1344.841340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Update intents live in app data, separate from core jobs. The dashed release connection is not configured or active.</text><line x1="52" x2="1548" y1="1381.841340021209" y2="1381.841340021209" stroke="#B9B4A9"/><text x="52" y="1421.841340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Explicit file handoff: a chosen system tool carries the package; the target core can open it in independent state.</text><text x="52" y="1455.841340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Separate apps/site: static information and shared presentation modules, with no call into the execution core.</text><text x="52" y="1489.841340021209" font-size="20" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Shared contracts / operations describe interfaces and fields; state remains with the respective execution owner.</text><text x="52" y="1533.841340021209" font-size="17" font-weight="400" fill="#3D3D3A" font-family="Noto Sans CJK SC, PingFang SC, Arial, sans-serif">Source snapshot: e592d38 · 2026-10-16</text></svg>
