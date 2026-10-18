@@ -3,16 +3,17 @@ import {readFile,writeFile,mkdir,lstat,copyFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {validatePublicRelease} from './app-release.mjs';
+import {validatePublicRelease,validateManualPublicRelease} from './app-release.mjs';
 import {checkSiteLanguages} from './prepare-site-languages.mjs';
 import {RELEASE_COPY,releaseSecurityCopy} from '../apps/site/site-copy.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-let mediaDir,out;const appRecords=[];
+let mediaDir,out;const appRecords=[];const manualRecords=[];
 const args=process.argv.slice(2);
 for(let i=0;i<args.length;i++){
   if(args[i]==='--media-dir')mediaDir=args[++i];
   else if(args[i]==='--out')out=args[++i];
   else if(args[i]==='--app-release')appRecords.push(args[++i]);
+  else if(args[i]==='--app-manual')manualRecords.push(args[++i]);
   else throw new Error('Usage: prepare-site.mjs --media-dir DIRECTORY --out ABSENT_DIRECTORY');
 }
 if(!mediaDir||!out)throw new Error('Both --media-dir and --out are required');
@@ -43,6 +44,15 @@ for(const file of appRecords){
  if(releases.some(previous=>previous.channel===release.channel))throw new Error('Duplicate release channel');
  releases.push(release);
 }
+const manualReleases=[];
+for(const file of manualRecords){
+ const s=await lstat(file);if(!s.isFile()||s.size>64*1024)throw new Error('Expected a bounded manual release record');
+ const release=validateManualPublicRelease(JSON.parse(await readFile(file,'utf8')));
+ if(release.publication_verified!==true||release.status!=='public_bytes_verified'||!release.public_checked_at)throw new Error('Verify public release bytes before enabling website download');
+ if(manualReleases.some(previous=>previous.channel===release.channel))throw new Error('Duplicate manual release channel');
+ manualReleases.push(release);
+}
+if(releases.length&&manualReleases.length)throw new Error('Choose one download story: signed updater release or manual download, not both');
 await mkdir(out,{recursive:true});
 for(const [name,file] of inputs){const target=path.join(out,name);await mkdir(path.dirname(target),{recursive:true});await copyFile(file,target);}
 if(releases.length){
@@ -66,6 +76,21 @@ if(releases.length){
  }
  const data=JSON.stringify({schema:'lintel.app-downloads/1',releases},null,2);await writeFile(path.join(out,'app-downloads.json'),data,{flag:'wx'});files.push({path:'app-downloads.json',bytes:Buffer.byteLength(data)});
 }
-const manifest={schema:'lintel.site-build/1',source_revision:head.stdout.trim(),source_dirty:status.stdout.trim().length>0,created_at:new Date().toISOString(),origin:'https://lintel.page',locales:[{language:'zh-CN',path:'/'},{language:'en',path:'/en/'}],kind:releases.length?'Static website with explicitly verified App release metadata; binaries stay on GitHub':'Static product website; concept movie; no native operations or App Release',app_release_versions:releases.map(r=>({channel:r.channel,version:r.version})),files};
+if(manualReleases.length){
+ const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const primary=manualReleases.find(r=>r.channel==='stable')??manualReleases[0];
+ const links=primary.downloads.map(a=>`<a class="button primary" href="${escape(a.url)}">macOS ${a.platform==='darwin-aarch64'?'Apple Silicon':'Intel'} · ${escape(primary.version)} DMG <span aria-hidden="true">↗</span></a>`).join('');
+ if(!html.includes('<!-- lintel-app-release:start -->')||!html.includes('<!-- lintel-app-release:end -->'))throw new Error('Missing canonical App release block');
+ for(const [language,name] of [['zh','index.html'],['en','en/index.html']]){
+  const copy=key=>`<span data-site-release-copy="${key}">${escape(RELEASE_COPY[key][language])}</span>`;
+  const security=`<span data-site-release-security data-developer-id="${escape(primary.apple_security.developer_id)}" data-notarization="${escape(primary.apple_security.notarization)}">${escape(releaseSecurityCopy(language,primary.apple_security.developer_id,primary.apple_security.notarization))}</span>`;
+  const block=`<!-- lintel-app-release:start --><div class="preview-note"><span>${primary.channel==='stable'?'STABLE':'PREVIEW'} / ${escape(primary.version)}</span><div class="trial-actions">${links}</div><p>${copy('installation')} ${copy('manual')} ${security}</p><p>${copy('privacy')}<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/app-updates${language==='en'?'.en':''}.md">${copy('guide')} ↗</a></p></div><!-- lintel-app-release:end -->`;
+  const source=language==='zh'?html:await readFile(path.join(site,name),'utf8');
+  const projected=source.replace(/<!-- lintel-app-release:start -->[\s\S]*?<!-- lintel-app-release:end -->/,block).replace(/0\.1\.0 PREVIEW/g,`${escape(primary.version)} ${primary.channel.toUpperCase()}`);
+  await writeFile(path.join(out,name),projected);files.find(f=>f.path===name).bytes=Buffer.byteLength(projected);
+ }
+ const data=JSON.stringify({schema:'lintel.app-downloads/1',releases:manualReleases},null,2);await writeFile(path.join(out,'app-downloads.json'),data,{flag:'wx'});files.push({path:'app-downloads.json',bytes:Buffer.byteLength(data)});
+}
+const manifest={schema:'lintel.site-build/1',source_revision:head.stdout.trim(),source_dirty:status.stdout.trim().length>0,created_at:new Date().toISOString(),origin:'https://lintel.page',locales:[{language:'zh-CN',path:'/'},{language:'en',path:'/en/'}],kind:releases.length?'Static website with explicitly verified App release metadata; binaries stay on GitHub':manualReleases.length?'Static website with explicitly verified manual App download metadata; binaries stay on GitHub; no updater feed':'Static product website; concept movie; no native operations or App Release',app_release_versions:[...releases,...manualReleases].map(r=>({channel:r.channel,version:r.version})),files};
 await writeFile(path.join(out,'site-build.json'),JSON.stringify(manifest,null,2),{flag:'wx'});
 console.log(JSON.stringify({output:out,source_revision:manifest.source_revision,source_dirty:manifest.source_dirty,files:files.length,total_bytes:files.reduce((n,f)=>n+f.bytes,0)},null,2));

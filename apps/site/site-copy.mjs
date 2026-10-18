@@ -197,6 +197,7 @@ export const SITE_LOCALES = Object.freeze(['zh','en']);
 export const ENGLISH_GUIDES = Object.freeze(['quickstart','operator-guide','agents','desktop','browser','remote','network','services','telemetry','app-updates','core','architecture']);
 export const RELEASE_COPY = Object.freeze({
   installation:{zh:'初次安装使用 DMG；已带 updater 的 App 在“设置与模块 → Lintel 版本与更新”检查。',en:'Use a DMG for the first installation. Apps with the updater check under “Settings and modules → Lintel version and updates”.'},
+  manual:{zh:'本版本未启用 App 内更新；新版本发布后回到此页下载。',en:'In-app updates are not enabled in this build; return to this page for new versions.'},
   security:{zh:'版本记录已核对公开二进制字节；Developer ID 与公证状态：',en:'Public binary bytes were checked against the release record. Developer ID / notarization status: '},
   signature:{zh:'。更新签名不替代 Apple 信任验证。',en:'. The update signature does not replace Apple trust verification.'},
   privacy:{zh:'网站不连接执行核心。无默认分析上传；托管方处理普通 HTTP 请求。',en:'The website does not connect to the execution core. No default analytics uploads; the host processes ordinary HTTP requests. '},

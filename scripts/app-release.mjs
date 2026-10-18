@@ -115,6 +115,11 @@ export async function prepare(record){
  const updaterFeed={version:record.version,notes:record.notes,pub_date:record.pub_date,platforms:Object.fromEntries(Object.entries(platforms).map(([key,{url,signature}])=>[key,{url,signature}]))};
  return {release,updaterFeed};
 }
+function checkAssetUrl(versionStr,item,suffix,names){
+ const u=new URL(item.url),name=u.pathname.split('/').at(-1);
+ if(u.origin!=='https://github.com'||u.username||u.password||u.port||u.search||u.hash||u.pathname!==`/IndelibleVivi/lintel-cc/releases/download/v${versionStr}/${name}`||!/^[-A-Za-z0-9_.]+$/.test(name)||!name.includes(versionStr)||!name.endsWith(suffix)||names.has(name)||!Number.isSafeInteger(item.bytes)||item.bytes<=0||item.bytes>MAX_BYTES||!/^[a-f0-9]{64}$/.test(item.sha256))fail('Invalid declared release asset');
+ names.add(name);
+}
 export function validatePublicRelease(release){
  exact(release,['schema','version','previous_version','channel','source_revision','notes','pub_date','pubkey','platforms','downloads','status','publication_verified','apple_security','public_checked_at'],'public release record');
  if(release.schema!=='lintel.app-release-public/1'||!['preview','stable'].includes(release.channel))fail('Invalid public release record');
@@ -130,11 +135,7 @@ export function validatePublicRelease(release){
  const platforms=Object.keys(release.platforms);
  if(!platforms.length||!Array.isArray(release.downloads)||release.downloads.length!==platforms.length)fail('Invalid release assets');
  const seen=new Set(),names=new Set();
- const asset=(item,suffix)=>{
-  const u=new URL(item.url),name=u.pathname.split('/').at(-1);
-  if(u.origin!=='https://github.com'||u.username||u.password||u.port||u.search||u.hash||u.pathname!==`/IndelibleVivi/lintel-cc/releases/download/v${release.version}/${name}`||!/^[-A-Za-z0-9_.]+$/.test(name)||!name.includes(release.version)||!name.endsWith(suffix)||names.has(name)||!Number.isSafeInteger(item.bytes)||item.bytes<=0||item.bytes>MAX_BYTES||!/^[a-f0-9]{64}$/.test(item.sha256))fail('Invalid declared release asset');
-  names.add(name);
- };
+ const asset=(item,suffix)=>checkAssetUrl(release.version,item,suffix,names);
  for(const [platform,item] of Object.entries(release.platforms)){
   exact(item,['url','signature','bytes','sha256'],platform);asset(item,'.app.tar.gz');base64(item.signature,'update signature');
  }
@@ -156,11 +157,75 @@ async function verifyPublic(release){
  }
  return {...release,status:'public_bytes_verified',publication_verified:true,public_checked_at:new Date().toISOString()};
 }
+// Manual-download-only Preview records: DMG bytes are verified and published,
+// but no updater archive, signature, pubkey or feed exists for this shape.
+export function validateManualRecord(record){
+ exact(record,['schema','version','previous_version','channel','source_revision','notes','pub_date','platforms'],'manual release record');
+ if(record.schema!=='lintel.app-release-manual/1'||!['preview','stable'].includes(record.channel))fail('Invalid manual release schema/channel');
+ if(!newer(record.version,record.previous_version))fail('Release must increase SemVer precedence; build metadata is not an upgrade');
+ if(record.channel==='stable'&&version(record.version).pre.length)fail('Stable cannot publish prerelease');
+ if(!/^[a-f0-9]{40}$/.test(record.source_revision))fail('Expected source revision declaration');
+ if(typeof record.notes!=='string'||Buffer.byteLength(record.notes)>16*1024||typeof record.pub_date!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(record.pub_date)||!Number.isFinite(Date.parse(record.pub_date)))fail('Invalid release notes/date');
+ exact(record.platforms,['darwin-aarch64','darwin-x86_64'],'platforms');
+ if(!Object.keys(record.platforms).length)fail('Select at least one macOS architecture');
+ for(const [platform,asset] of Object.entries(record.platforms)){
+  exact(asset,['dmg_path','dmg_name'],platform);
+  if(typeof asset.dmg_path!=='string'||!path.isAbsolute(asset.dmg_path))fail('Artifact input paths must be explicit and absolute');
+  if(typeof asset.dmg_name!=='string'||!/^[-A-Za-z0-9_.]+$/.test(asset.dmg_name)||!asset.dmg_name.includes(record.version)||!asset.dmg_name.endsWith('.dmg'))fail('Public asset names must include exact version and safe characters');
+ }
+ return record;
+}
+export async function prepareManual(record){
+ validateManualRecord(record);const downloads=[];
+ for(const [platform,asset] of Object.entries(record.platforms)){
+  await regular(asset.dmg_path);
+  const frozen=identity(await lstat(asset.dmg_path,{bigint:true}));
+  const dmg=await digestFile(asset.dmg_path,'sha256');
+  if(identity(await lstat(asset.dmg_path,{bigint:true}))!==frozen)fail('DMG changed during verification');
+  downloads.push({platform,url:`https://github.com/IndelibleVivi/lintel-cc/releases/download/v${record.version}/${asset.dmg_name}`,bytes:dmg.bytes,sha256:dmg.digest.toString('hex')});
+ }
+ const release={schema:'lintel.app-release-manual-public/1',version:record.version,previous_version:record.previous_version,channel:record.channel,source_revision:record.source_revision,notes:record.notes,pub_date:record.pub_date,downloads,status:'prepared_local',publication_verified:false,apple_security:{developer_id:'unverified',notarization:'unverified'}};
+ validateManualPublicRelease(release);
+ return {release};
+}
+export function validateManualPublicRelease(release){
+ exact(release,['schema','version','previous_version','channel','source_revision','notes','pub_date','downloads','status','publication_verified','apple_security','public_checked_at'],'manual public release record');
+ if(release.schema!=='lintel.app-release-manual-public/1'||!['preview','stable'].includes(release.channel))fail('Invalid manual public release record');
+ if(!newer(release.version,release.previous_version)||release.channel==='stable'&&version(release.version).pre.length)fail('Invalid manual public release version');
+ if(!/^[a-f0-9]{40}$/.test(release.source_revision)||typeof release.notes!=='string'||Buffer.byteLength(release.notes)>16*1024||typeof release.pub_date!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(release.pub_date)||!Number.isFinite(Date.parse(release.pub_date)))fail('Invalid manual public release metadata');
+ if(!['prepared_local','public_bytes_verified'].includes(release.status)||typeof release.publication_verified!=='boolean'||release.publication_verified!==(release.status==='public_bytes_verified'))fail('Invalid publication status');
+ if(release.public_checked_at!==undefined && (typeof release.public_checked_at!=='string'||!Number.isFinite(Date.parse(release.public_checked_at))))fail('Invalid public verification date');
+ if(release.publication_verified && !release.public_checked_at)fail('Missing public verification date');
+ exact(release.apple_security,['developer_id','notarization'],'Apple security status');
+ if(!['unverified','verified'].includes(release.apple_security.developer_id)||!['unverified','verified'].includes(release.apple_security.notarization))fail('Invalid Apple security declaration');
+ if(!Array.isArray(release.downloads)||!release.downloads.length)fail('Invalid manual release assets');
+ const seen=new Set(),names=new Set();
+ for(const item of release.downloads){
+  exact(item,['platform','url','bytes','sha256'],'download');
+  if(!['darwin-aarch64','darwin-x86_64'].includes(item.platform)||seen.has(item.platform))fail('Invalid download platform');seen.add(item.platform);
+  checkAssetUrl(release.version,item,'.dmg',names);
+ }
+ return release;
+}
+async function verifyPublicManual(release){
+ validateManualPublicRelease(release);
+ for(const asset of release.downloads){
+  const response=await fetch(asset.url,{signal:AbortSignal.timeout(300000)});
+  if(!response.ok)fail('Release artifact is not publicly available');
+  if(new URL(response.url).protocol!=='https:')fail('Insecure release redirect');
+  const hash=createHash('sha256');let bytes=0;
+  for await(const chunk of response.body){bytes+=chunk.length;if(bytes>asset.bytes||bytes>MAX_BYTES)fail('Published artifact bytes differ');hash.update(chunk);}
+  if(bytes!==asset.bytes||hash.digest('hex')!==asset.sha256)fail('Published artifact digest differs');
+ }
+ return {...release,status:'public_bytes_verified',publication_verified:true,public_checked_at:new Date().toISOString()};
+}
 async function main(){
  const args=process.argv.slice(2),mode=args.shift();let input,out,platform;
  for(let i=0;i<args.length;i++){if(args[i]==='--record')input=args[++i];else if(args[i]==='--out')out=args[++i];else if(args[i]==='--platform')platform=args[++i];else fail('Unknown release argument');}
  if(!['configure','build','prepare','verify-public'].includes(mode)||!input||(mode!=='build'&&!out))fail('Usage: app-release.mjs configure|prepare|verify-public --record FILE --out ABSENT_DIRECTORY; build --record FILE');
  await regular(input,64*1024);const record=JSON.parse(await readFile(input,'utf8'));
+ const manual=record&&record.schema==='lintel.app-release-manual/1';
+ if(manual&&(mode==='configure'||mode==='build'))fail('Manual download records have no updater configuration or signed build');
  if(mode==='build'){
   validateRecord(record);
   platform=platform??(Object.keys(record.platforms).length===1?Object.keys(record.platforms)[0]:undefined);
@@ -174,7 +239,7 @@ async function main(){
   if(result.status!==0)fail('Release build failed');return;
  }
  out=path.resolve(out);await absent(out);
- const result=mode==='configure'?{configuration:buildConfiguration(record)}:mode==='prepare'?await prepare(record):{release:await verifyPublic(record)};
+ const result=mode==='configure'?{configuration:buildConfiguration(record)}:mode==='prepare'?(manual?await prepareManual(record):await prepare(record)):{release:manual?await verifyPublicManual(record):await verifyPublic(record)};
  await mkdir(out,{recursive:true});
  if(result.configuration)await writeFile(path.join(out,'tauri-release.json'),JSON.stringify(result.configuration,null,2),{flag:'wx'});
  if(result.release)await writeFile(path.join(out,'release.json'),JSON.stringify(result.release,null,2),{flag:'wx'});

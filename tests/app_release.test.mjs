@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {newer,validateRecord,buildConfiguration,prepare,verifyArtifact,validatePublicRelease} from '../scripts/app-release.mjs';
+import {newer,validateRecord,buildConfiguration,prepare,prepareManual,verifyArtifact,validatePublicRelease,validateManualRecord,validateManualPublicRelease} from '../scripts/app-release.mjs';
 import {fixture} from './fixtures/app_update_fixture.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 function record(f){return {schema:'lintel.app-release/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),pubkey:f.pubkey,notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{archive_path:f.archive,signature_path:f.signaturePath,dmg_path:f.dmg,archive_name:'Lintel_0.2.0_aarch64.app.tar.gz',dmg_name:'Lintel_0.2.0_aarch64.dmg'}}};}
@@ -37,6 +37,40 @@ with tarfile.open(sys.argv[1],'w:gz') as t:
  const inspected=spawnSync('python3',[path.join(repo,'scripts/inspect-app-archive.py'),unsafe,'0.2.0','darwin-aarch64'],{encoding:'utf8'});
  assert.notEqual(inspected.status,0);assert.match(inspected.stderr,/descends through a symlink/);
  const corrupted=path.join(dir,'corrupted.tar.gz');const bytes=await readFile(f.archive);bytes[20]^=1;await writeFile(corrupted,bytes);await assert.rejects(verifyArtifact(corrupted,f.signature,f.pubkey,'0.2.0'),/signature failed/);
+});
+test('manual download records: strict shape, verified DMG metadata, no feed',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-manual-release-')),f=fixture(path.join(dir,'fixture'));
+ const manual=f=>({schema:'lintel.app-release-manual/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{dmg_path:f.dmg,dmg_name:'Lintel_0.2.0_aarch64.dmg'}}});
+ const outputs=await prepareManual(manual(f));
+ assert.equal(outputs.updaterFeed,undefined,'Manual prepare must not produce an updater feed');
+ assert.equal(outputs.release.schema,'lintel.app-release-manual-public/1');assert.equal(outputs.release.status,'prepared_local');
+ assert.equal(outputs.release.downloads.length,1);assert.match(outputs.release.downloads[0].url,/releases\/download\/v0\.2\.0\/Lintel_0\.2\.0_aarch64\.dmg$/);
+ assert.equal(JSON.stringify(outputs).includes(dir),false,'Private artifact input paths leaked');
+ assert.throws(()=>validateManualRecord({...manual(f),pubkey:'x'}),/fields/);
+ const relative=manual(f);relative.platforms['darwin-aarch64'].dmg_path='relative.dmg';assert.throws(()=>validateManualRecord(relative),/absolute/);
+ const renamed=manual(f);renamed.platforms['darwin-aarch64'].dmg_name='Lintel.dmg';assert.throws(()=>validateManualRecord(renamed),/version/);
+ const missing=manual(f);missing.platforms['darwin-aarch64'].dmg_path=path.join(dir,'absent.dmg');await assert.rejects(prepareManual(missing),/ENOENT|regular artifact/);
+ validateManualPublicRelease(outputs.release);
+ const tampered=structuredClone(outputs.release);tampered.downloads[0].sha256='x'.repeat(64);assert.throws(()=>validateManualPublicRelease(tampered));
+ const dup=structuredClone(outputs.release);dup.downloads.push({...dup.downloads[0]});assert.throws(()=>validateManualPublicRelease(dup),/platform/);
+ const extra={...outputs.release,private_path:dir};assert.throws(()=>validateManualPublicRelease(extra),/fields/);
+});
+test('site projects manual downloads without any updater feed',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-manual-site-')),f=fixture(path.join(dir,'fixture'));
+ const outputs=await prepareManual({schema:'lintel.app-release-manual/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{dmg_path:f.dmg,dmg_name:'Lintel_0.2.0_aarch64.dmg'}}});
+ const media=path.join(dir,'media');await mkdir(media);await writeFile(path.join(media,'lintel-intro.mp4'),'synthetic media');await writeFile(path.join(media,'lintel-film-poster.jpg'),'synthetic poster');
+ const rec=path.join(dir,'release.json');await writeFile(rec,JSON.stringify(outputs.release));
+ const pack=(out,extra=[])=>spawnSync(process.execPath,[path.join(repo,'scripts/prepare-site.mjs'),'--media-dir',media,'--out',path.join(dir,out),...extra],{cwd:repo,encoding:'utf8'});
+ const refused=pack('unverified',['--app-manual',rec]);assert.notEqual(refused.status,0);assert.match(refused.stderr,/Verify public release bytes/);
+ const reviewed={...outputs.release,publication_verified:true,status:'public_bytes_verified',public_checked_at:'2026-10-09T00:00:00Z'};await writeFile(rec,JSON.stringify(reviewed));
+ assert.equal(pack('manual',['--app-manual',rec]).status,0);
+ const html=await readFile(path.join(dir,'manual/index.html'),'utf8');assert.match(html,/Apple Silicon/);assert.match(html,/未启用 App 内更新/);assert.match(html,/公证状态：unverified/);
+ const en=await readFile(path.join(dir,'manual/en/index.html'),'utf8');assert.match(en,/In-app updates are not enabled/);
+ const names=(await import('node:fs/promises')).readdir;assert.equal((await names(path.join(dir,'manual'))).includes('updates'),false,'Manual packaging must not write an updater feed');
+ const build=JSON.parse(await readFile(path.join(dir,'manual/site-build.json')));assert.match(build.kind,/no updater feed/);assert.deepEqual(build.app_release_versions,[{channel:'preview',version:'0.2.0'}]);
+ const downloads=JSON.parse(await readFile(path.join(dir,'manual/app-downloads.json')));assert.equal(downloads.releases[0].schema,'lintel.app-release-manual-public/1');
+ const signedRec=path.join(dir,'signed.json');await writeFile(signedRec,JSON.stringify({...reviewed,schema:'lintel.app-release/1'}));
+ assert.notEqual(pack('mixed',['--app-release',signedRec,'--app-manual',rec]).status,0,'Signed and manual download stories must not mix');
 });
 test('site packages only explicit verified metadata, no binaries or invented Release',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'lintel-app-site-')),f=fixture(path.join(dir,'fixture')),outputs=await prepare(record(f));

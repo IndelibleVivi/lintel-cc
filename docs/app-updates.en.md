@@ -122,6 +122,18 @@ node scripts/app-release.mjs prepare \
 
 Update signatures protect the package and version accepted by the updater. Apple Developer ID code signing and notarization form a separate layer of macOS installation trust. Non-developer distribution must independently complete [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution), without bypassing Gatekeeper.
 
+### Manual download shape (no updater feed)
+
+A Preview without in-app updates uses a `lintel.app-release-manual/1` record: same fields as the signed record, but **without** `pubkey`, `archive_path`, `signature_path` or `archive_name`; each platform declares only `dmg_path` and `dmg_name`. `configure`/`build` reject manual records (they pin the signed build configuration); `prepare` dispatches on the record schema and, for the manual shape, performs only the DMG frozen-identity and SHA-256 byte checks, emitting `release.json` (schema `lintel.app-release-manual-public/1`) and **no** `updates/` feed. `verify-public` dispatches the same way and checks only the public DMG bytes.
+
+`prepare-site.mjs --app-manual <release.json>` requires verified public bytes and projects the download buttons plus the "no in-app updates" note, but writes no updater feed; `--app-release` and `--app-manual` cannot be combined — one site payload carries one download story. The manual shape does not disable or loosen any existing signature check; once signing is in place, the updater is enabled through the original `lintel.app-release/1` path.
+
+```sh
+node scripts/app-release.mjs prepare \
+  --record candidate-packages/app-release-manual-input.json \
+  --out candidate-packages/app-prepared-manual
+```
+
 ## Activation order when release is authorized
 
 These external actions are not part of the present preparation. With exact release/hosting authorization in future, first complete signing/notarization and candidate-installation acceptance, then create the matching GitHub Release and upload each architecture's DMG, `.app.tar.gz` and `.sig` under the public names in the record. Keep version/tag/filenames immutable; never reuse a released version.

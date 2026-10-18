@@ -122,6 +122,18 @@ node scripts/app-release.mjs prepare \
 
 更新签名保障 updater 接受的包与版本；Apple Developer ID code signing 与 notarization 是 macOS 安装信任的另一层，不由更新签名代替。正式非开发者分发须独立完成 [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)，不绕过 Gatekeeper。
 
+### 手动下载形态（无 updater feed）
+
+未启用 App 内更新的 Preview 使用 `lintel.app-release-manual/1` 记录：字段与签名记录相同，但**没有** `pubkey`、`archive_path`、`signature_path` 与 `archive_name`，每个平台只声明 `dmg_path` 与 `dmg_name`。`configure`／`build` 拒绝手动记录（它们固定签名构建配置）；`prepare` 按记录 schema 分流，对手动形态只做 DMG 的冻结身份与 SHA-256 字节核验，输出 `release.json`（schema `lintel.app-release-manual-public/1`），**不生成** `updates/` feed。`verify-public` 同样按 schema 分流，只核对公开 DMG 字节。
+
+`prepare-site.mjs --app-manual <release.json>` 要求公开字节已核验，投影下载按钮与“未启用 App 内更新”说明，但不写任何 updater feed；`--app-release` 与 `--app-manual` 不能同时使用，一个站点 payload 只承载一种下载叙事。手动形态不关闭或放宽任何现有签名校验；办完签名后仍走原 `lintel.app-release/1` 路径启用 updater。
+
+```sh
+node scripts/app-release.mjs prepare \
+  --record candidate-packages/app-release-manual-input.json \
+  --out candidate-packages/app-prepared-manual
+```
+
 ## 有发行授权时的激活顺序
 
 本轮不执行这些外部动作。未来有精确发行与托管授权时：先完成签名／公证与候选安装验收，再创建相应版本的 GitHub Release，按记录中的公开名字上传各架构 DMG、`.app.tar.gz` 和 `.sig`；保持版本／tag／文件名不可变，不复用已发行版本。
