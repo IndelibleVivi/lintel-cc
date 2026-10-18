@@ -14,24 +14,28 @@ export function hasConfirmedWorkArchive(receipt: Receipt): boolean {
   return !!receipt.archive_path && (!!receipt.archive_digest || receipt.steps.some(step => step.id === 'archive' && step.status === 'completed'));
 }
 
-export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download' | 'language';
+export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download' | 'language' | 'preserve' | 'sessions' | 'folder' | 'system';
 const paths: Record<IconName, ReactNode> = {
   sidebar: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></>,
-  environments: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></>,
-  policy: <><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></>,
-  rebuild: <><path d="M5 9a8 8 0 1 1-1 7M5 3v6h6"/><path d="M10 16v-5h5v5"/></>,
-  history: <><path d="M3 11a9 9 0 1 1 3 8M3 5v6h6"/><path d="M12 7v5l3 2"/></>,
+  environments: <><path d="M4 6.5 12 3l8 3.5v3.25L12 13l-8-3.25Z"/><path d="m4 12.25 8 3.25 8-3.25M4 16.5l8 3.25 8-3.25"/><rect x="10.25" y="15.25" width="3.5" height="3.5" rx="1"/></>,
+  policy: <><path d="M12 3 19 6v5.25c0 4.2-2.55 7.5-7 9.75-4.45-2.25-7-5.55-7-9.75V6Z"/><path d="M8.5 9.5h7M8.5 13h4.5"/></>,
+  rebuild: <><path d="m5 4 10.5 8.5M13.5 10.5l-3 3.5-6-1-2 6 6-1 4-3.5"/><path d="M15 16.5h5v4h-5Z"/></>,
+  history: <><path d="M6 3h9l4 4v14H6Z"/><path d="M15 3v5h4M9 11h6M9 14.5h6M9 18h3.5"/><path d="m15.5 17.25 1.5 1.5 3-3"/></>,
   settings: <><path d="m10 3-1 3-3 1-2-1-2 4 2 2v3l-1 2 3 3 3-1 3 1 1 2h4l1-3 2-2 2-1-1-4-2-1-1-3-3-2-2 1Z"/><circle cx="12" cy="12" r="3"/></>,
   help: <><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3h.01"/></>,
   plus: <path d="M12 5v14M5 12h14"/>, arrow: <path d="M4 12h16m-6-6 6 6-6 6"/>,
   check: <path d="m5 12 4 4L19 6"/>, refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6"/></>,
   copy: <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>,
   terminal: <><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m6 9 3 3-3 3m6 0h5"/></>, chevron: <path d="m9 5 7 7-7 7"/>,
-  warning: <><path d="m12 3 10 18H2Z"/><path d="M12 9v5m0 3h.01"/></>,
+  warning: <><path d="M10.28 4.23a2 2 0 0 1 3.44 0l7 12.25a2 2 0 0 1-1.73 3H5a2 2 0 0 1-1.73-3Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r=".9"/></>,
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/></>,
   moon: <path d="M20 14a8 8 0 0 1-10-10A9 9 0 1 0 20 14Z"/>,
   download: <><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></>,
   language: <><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></>,
+  preserve: <><rect x="3" y="7.5" width="18" height="12" rx="2"/><path d="M9 7.5V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5v2M3 12.5h18"/></>,
+  sessions: <><path d="M6 4h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 3.5v-3.5H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M8.5 9h7M8.5 12.5h4.5"/></>,
+  folder: <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4l2 2.5h8A1.5 1.5 0 0 1 20.5 9v8.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/>,
+  system: <><circle cx="12" cy="12" r="8.5"/><path d="M12 5a7 7 0 0 1 0 14Z" fill="currentColor" stroke="none"/></>,
 };
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
 export function Brand() { return <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect className="brand-beam" x="4" y="8.5" width="23" height="4"/><rect className="brand-support" x="6.5" y="12.5" width="4" height="10.5"/><rect className="brand-support" x="20.5" y="12.5" width="3.5" height="10.5"/><rect className="brand-mark-cursor" x="24.75" y="21" width="4" height="2"/></svg>; }
