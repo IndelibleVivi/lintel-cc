@@ -2,7 +2,7 @@
 
 [简体中文 (canonical)](app-updates.md) · English · [Documentation](index.en.md)
 
-This guide describes the macOS App updater in current source and the future release procedure. The public entrance remains **the 0.1.0 development preview, with no formal Release download, release public key or activated feed**. Source integration, synthetic tests, builds, installation, public Releases and production feeds are separate facts; see [current state (Chinese)](current-state.md) for exact evidence. CLI version installation retains the separate [Agent CLI](agents.en.md) procedure.
+This guide describes the macOS App updater in current source and the release procedure. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) publishes eight manual-download assets whose public bytes were checked. The App has no Developer ID signing or Apple notarization, and **no release public key or activated feed**. Clean-Mac download/install remains unverified. Source integration, synthetic tests, builds, installation, public Releases and production feeds are separate facts; see [current state (Chinese)](current-state.md) for exact evidence. CLI version installation retains the separate [Agent CLI](agents.en.md) procedure.
 
 ## Using the App
 
@@ -140,7 +140,7 @@ node scripts/app-release.mjs prepare \
 
 ## Activation order when release is authorized
 
-These external actions are not part of the present preparation. With exact release/hosting authorization in future, first complete signing/notarization and candidate-installation acceptance, then create the matching GitHub Release and upload each architecture's DMG, `.app.tar.gz` and `.sig` under the public names in the record. Keep version/tag/filenames immutable; never reuse a released version.
+Each external release and hosting action still requires exact authorization. A signed updater release first completes signing/notarization and candidate-installation acceptance, then creates the matching GitHub Release and uploads each architecture's DMG, `.app.tar.gz` and `.sig` under the public names in the record. Keep version/tag/filenames immutable; never reuse a released version. An explicitly authorized unsigned developer Preview follows the manual-record/download path above, discloses unverified Apple trust and clean-Mac installation, and generates no updater feed.
 
 After public artifact upload, verify the exact bytes first; **activate the feed last**:
 

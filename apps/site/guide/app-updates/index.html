@@ -36,7 +36,7 @@
       <article class="guide-body" data-guide-document="app-updates">
         <h1 id="lintel-app-更新与发行准备">Lintel App 更新与发行准备</h1>
 <p>简体中文（canonical） · <a href="/guide/app-updates/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
-<p>本指南说明当前源码中的 macOS App updater 与未来发行流程。当前公开入口仍是 <strong>0.1.0 开发预览，没有正式 Release 下载、发行公钥或已激活 feed</strong>。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state</a>。CLI 版本安装仍使用 <a href="/guide/agents/">Agent CLI</a> 的独立流程。</p>
+<p>本指南说明当前源码中的 macOS App updater 与发行流程。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 已公开 8 个手动下载资产并核对实际字节；App 没有 Developer ID 签名或 Apple 公证，<strong>没有发行公钥或已激活 feed</strong>。干净 Mac 下载首装仍未验收。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state</a>。CLI 版本安装仍使用 <a href="/guide/agents/">Agent CLI</a> 的独立流程。</p>
 <h2 id="在-app-中使用">在 App 中使用</h2>
 <p>打开“设置与模块 → Lintel 版本与更新”。版本来自 native App 的 package metadata；通道由构建固定，不能通过 Webview 请求任意 URL、公钥、降级或安装器参数。</p>
 <ol><li><strong>检查更新。</strong> 手动检查访问固定的 <code>https://lintel.page/updates/preview.json</code> 或 <code>stable.json</code>。未配置构建明确显示不可用；离线、无 feed、响应不合规均是错误，不显示“已经最新”。成功检查只说明该通道没有更高版本或有候选。</li><li><strong>下载并核验。</strong> 使用官方 Tauri updater 验证下载字节与签名，再核对签名 trusted comment 中的版本。下载完成事件还不是核验通过。候选冻结版本、签名、URL 与本次 ID；重新检查会使旧候选失效。</li><li><strong>审阅并安装。</strong> 勾选当前候选并批准后才替换 App。native 层排除本 App 正在执行的 core、browser、SSH 和 network 操作，并拒绝仍有活跃受控代理的安装。下载与检查可以独立进行。安装前持久化原意图；写入未确认则不进入安装。</li><li><strong>保存好工作后重启。</strong> 安装不自动重启。再次检查 native activity 与代理后才接受显式重启；请先保存编辑中的交接稿。外部 Claude 会话和已 detached 的远端任务不由 updater 杀掉，原任务仍按原 ID 查询。</li></ol>
@@ -115,7 +115,7 @@ node scripts/app-release.mjs prepare \
   --record candidate-packages/app-release-manual-input.json \
   --out candidate-packages/app-prepared-manual</code></pre>
 <h2 id="有发行授权时的激活顺序">有发行授权时的激活顺序</h2>
-<p>本轮不执行这些外部动作。未来有精确发行与托管授权时：先完成签名／公证与候选安装验收，再创建相应版本的 GitHub Release，按记录中的公开名字上传各架构 DMG、<code>.app.tar.gz</code> 和 <code>.sig</code>；保持版本／tag／文件名不可变，不复用已发行版本。</p>
+<p>每次外部发行与托管仍需精确授权。签名 updater 发行先完成签名／公证与候选安装验收，再创建相应版本的 GitHub Release，按记录中的公开名字上传各架构 DMG、<code>.app.tar.gz</code> 和 <code>.sig</code>；保持版本／tag／文件名不可变，不复用已发行版本。明确获准的未签名开发者 Preview 则走上方 manual 记录与手动下载路径，公开说明 Apple 信任与干净 Mac 首装的未验收状态，不生成 updater feed。</p>
 <p>公开 artifact 上传完成后先逐字节核对，<strong>feed 最后激活</strong>：</p>
 <pre class="guide-code" data-language="sh"><code>node scripts/app-release.mjs verify-public \
   --record candidate-packages/app-prepared/release.json \

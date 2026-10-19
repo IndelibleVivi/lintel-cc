@@ -356,8 +356,7 @@ does not provide a browser-to-host execution channel.
 
 ## Just want the CLI installed?
 
-Public releases are empty; there is **no formal download link**. Install
-independently from verified source, or use the candidate-package flow (verify
+The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual CLI downloads for three platforms. Linux is experimental and archive names retain the original candidate identity. Read the Release INSTALL and SHA256SUMS, then use the candidate-package flow (verify
 identity, platform and bytes, unpack into a new version directory, change no
 PATH / shell rc / App / service). See
 [obtaining a candidate](agents.en.md#install-candidate) and

@@ -8,7 +8,7 @@
 
 Lintel provides a macOS app and a standalone CLI for reviewing configuration and optional outbound traffic, preserving instructions and sessions in encrypted archives, cleaning or rebuilding environments, and managing specific browser profiles and SSH hosts. The app and CLI share an execution core: review the target and changes before modifying it, inspect the result afterwards, and preserve later edits when restoring settings.
 
-**Currently 0.1.0 Preview.** You can try the public source. There is no public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the clean 10-19 `fcae6cb` build, including client controls, individual/bulk policy editing and distinct sidebar icons. The app was extracted from its read-only DMG and its bundled resource bytes were verified; it has not been installed in Applications. Native behavior evidence is recorded separately for each build. See [current status (Chinese)](docs/current-state.md) for exact source, platform and acceptance scope.
+**The 0.1.0 developer Preview is published.** Download the Apple Silicon macOS App or three-platform CLI manually from the [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0); read the corresponding INSTALL and SHA256SUMS first. All eight public assets were downloaded and checked; the App retains the accepted clean `fcae6cb` product bytes. No Developer ID signing, Apple notarization or updater feed is provided. Clean-Mac download/install remains unverified; stop if the system blocks installation and use the source trial below. See [current status (Chinese)](docs/current-state.md) for exact source, platform and native acceptance scope.
 
 [First use](docs/start-here.en.md) · [Choose a task](docs/operator-guide.en.md) · [Use with an agent](docs/agents.en.md) · [Architecture](docs/architecture.en.md)
 
@@ -62,7 +62,7 @@ cargo build -p lintel-runner --locked
 ./target/debug/lintel capabilities --json
 ```
 
-These static entry points describe the executable, context and interfaces. Continue with the [Agent CLI guide](docs/agents.en.md) to choose a target, plan and execute. The [complete CLI trial](docs/quickstart.en.md) provides a synthetic archive journey with byte-level checks. Linux uses the standalone CLI/runner without a desktop environment. The current three-platform standalone CLI candidate is `0.1.0-candidate-fcae6cb1efb5`, with no formal download link; a CLI built from source is independent of the App candidate.
+These static entry points describe the executable, context and interfaces. Continue with the [Agent CLI guide](docs/agents.en.md) to choose a target, plan and execute. The [complete CLI trial](docs/quickstart.en.md) provides a synthetic archive journey with byte-level checks. Linux uses the standalone CLI/runner without a desktop environment. The current three-platform standalone CLI candidate is `0.1.0-candidate-fcae6cb1efb5`, published in the [v0.1.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). Archive names retain their original candidate identity; both Linux architectures are experimental. A CLI built from source is independent of the App candidate.
 
 ## From originals to your next session
 

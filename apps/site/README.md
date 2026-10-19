@@ -30,7 +30,7 @@ node scripts/prepare-site-languages.mjs --check
 
 `scripts/prepare-site.mjs` enumerates every `SITE_ROUTES` entry explicitly. It does not copy a directory tree. The payload includes both locales for every route, the finite modules and assets, the canonical social image and the two explicitly reviewed film files. `/download/` and `/releases/` start in an unavailable state until a canonical release record with verified public bytes is supplied. A verified manual record projects its real architecture, version, bytes, SHA-256, Apple trust facts and manual-only update mode, while a signed updater record also produces the existing channel feeds. No binary is placed in the Pages payload.
 
-Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个人工具说明环境整理与工作保全。页面是一片**开阔的字符风景**加**简短的产品叙事**：首屏是本地 raster 插画与原生字标；正文以 [六任务映射](../../contracts/task-catalog.json) 对应的六项带原创标题小图标与交错 SVG 场景的能力说明开始，通过插画与原生合成阅读示例引出四步流程和边界说明，并提供完整简中／English 页面、quickstart 与使用指南入口，不嵌入模拟 App。当前生产站点已在 [lintel.page](https://lintel.page/) 上线，由 Cloudflare Pages 同源托管；不提供正式 App 下载。准确部署状态见 [current-state](../../docs/current-state.md)，更新程序见[官网托管说明](../../docs/site-hosting.md)。
+Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个人工具说明环境整理与工作保全。页面是一片**开阔的字符风景**加**简短的产品叙事**：首屏是本地 raster 插画与原生字标；正文以 [六任务映射](../../contracts/task-catalog.json) 对应的六项带原创标题小图标与交错 SVG 场景的能力说明开始，通过插画与原生合成阅读示例引出四步流程和边界说明，并提供完整简中／English 页面、quickstart 与使用指南入口，不嵌入模拟 App。当前生产站点已在 [lintel.page](https://lintel.page/) 上线，由 Cloudflare Pages 同源托管；[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已公开手动下载资产，站点只有收到公开字节核验记录才投影下载入口。准确部署状态见 [current-state](../../docs/current-state.md)，更新程序见[官网托管说明](../../docs/site-hosting.md)。
 
 ## 本地预览
 
@@ -56,7 +56,7 @@ python3 -m http.server 4317 --bind 127.0.0.1 --directory apps/site
 - **`#keep`、`#sample-pages`、`#review`** — 中文产品叙事与合成阅读示例：精确保全、原生 `<details id="sample-pages">` 阅读示例（带 `<summary>`，鼠标／键盘开合，链接会直接展开并定位到原件，内含**显式合成**的 `CLAUDE.md`、`MEMORY.md`、`session.jsonl` 片段，无 reader 编辑／写入、剪贴板、crypto 或“生成工作包”按钮）、预览→批准→原任务结果，内容不等待滚动动画。
 - **`#how-it-works`** — 用“只保全、不清理”的三份合成原件示例解释四步（明确对象 → 预览 → 批准执行 → 原任务核对），`.execution-entries` 说明 macOS App／独立 CLI／SSH 三个入口（App 与 CLI 共用执行核心；SSH 由目标主机 runner 执行），`.execution-boundary` 说明浏览器与官网的独立有限边界；末尾 `.thread-line` 保留 `accepted ≠ completed · 只核对，不重放`。四步 `li` 与全部文本是**服务器渲染**的权威说明；其上的交互式“工作包旅程”（`#workflow-trail`）为近旁解释，缺 JavaScript 时保持隐藏。
 - **`#continue`** — 结束寄语（往前走，不必丢掉来路）。
-- **`#try`** — 作用范围与限制、尚未提供正式下载等边界、0.1.0 Preview 状态，以及可用的中文／English quickstart 与六个 docs 真链接。
+- **`#try`** — 作用范围与限制、由显式发行记录决定的下载状态、0.1.0 Preview 状态，以及可用的中文／English quickstart 与六个 docs 真链接。
 - **`#clawd-game`** — 主动开始的小游戏，仅在跑道聚焦时接管按键，离屏／失焦／页面隐藏会暂停。
 
 阅读顺序即为页面顺序：`#top` → `#capabilities`（六项能力索引）→ `#journey` → `#keep`（含 `#sample-pages`）→ `#review` → `#how-it-works`（四步流程）→ `#continue` → `#try` → `#clawd-game`。
@@ -105,7 +105,7 @@ python3 tests/verify.py --checks clawd-app-ui --require-passed
 
 ## 未来 App 下载与更新资料
 
-[`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。本次只是源码准备，未创建正式下载或更改线上站点。
+[`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。当前 v0.1.0 开发者 Preview 使用 manual 记录，公开下载与站点的实际部署证据见 current-state；不生成 updater feed。
 
 ## 语言与发行状态的唯一入口
 

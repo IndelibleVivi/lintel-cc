@@ -2,13 +2,13 @@
 
 [简体中文 (canonical)](agents.md) · English · [Documentation](index.en.md)
 
-For coding agents/script authors with existing operation authorization. Lintel 0.1.0 Preview is a source development preview, protocol 1/catalog 1, without signed formal distribution/public Release downloads. CLI is GUI-independent; configuration/plans/execution/archive/restoration share core. Self-description is the current binary's contract; inspect target applicability rather than infer permission from implementation.
+For coding agents/script authors with existing operation authorization. Lintel 0.1.0 developer Preview uses protocol 1/catalog 1 and provides [manual public downloads](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) without Developer ID signing or notarization. CLI is GUI-independent; configuration/plans/execution/archive/restoration share core. Self-description is the current binary's contract; inspect target applicability rather than infer permission from implementation.
 
 Start with [English quickstart](quickstart.en.md) / [中文 quickstart](quickstart.md) for disposable synthetic preservation/original-query/independent package reading, then prepare real operations here.
 
 ## From App to terminal or Agent
 
-Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. No formal download link; website/App main-doc links mean latest development documentation.
+Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual CLI downloads for three platforms. Read INSTALL and SHA256SUMS first; Linux is experimental. Website/App main-doc links mean latest development documentation.
 
 On macOS, reading a CLI from a protected location such as a removable volume may first wait for system file-access authorization. The CLI subprocess deadline does not include that OS wait. If checking remains pending, inspect the native permission prompt. Alternatively, copy the verified candidate, preserving its directory structure, into a new local version/test directory with existing access and select its `bin/lintel` again. System permission remains the user’s decision.
 

@@ -183,7 +183,7 @@ lintel env compare &quot;$ID&quot; --other-environment-id &quot;$OTHER_ID&quot; 
 <h2 id="还想继续用-app">还想继续用 App？</h2>
 <p>桌面开发路径见仓库根目录 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.md">README 的本地构建章节</a>，其中 <code>npm run dev:synthetic</code> 会创建一份独立临时 home/state 并调用真实 CLI，界面明确 标注“测试空间”，不会使用你的 Claude 登录或浏览器资料。普通 <code>npm run dev</code> 不提供浏览器到本机的执行通道。</p>
 <h2 id="只想装-cli">只想装 CLI？</h2>
-<p>公开发布为空、<strong>没有正式下载链接</strong>。请从已核对的源码独立安装，或走候选包 流程（核对身份、平台与字节，再解到新的版本目录，不改 PATH／shell rc／App／ service）。见 <a href="/guide/agents/#用户安装候选包">Agent CLI 指南</a> 与 <a href="/guide/agents/#从源码独立安装">从源码独立安装</a>。</p>
+<p><a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 已提供三平台 CLI 手动下载；Linux 为 experimental，包名保留原候选身份。先读 Release 的 INSTALL 与 SHA256SUMS，再走候选包 流程（核对身份、平台与字节，再解到新的版本目录，不改 PATH／shell rc／App／ service）。见 <a href="/guide/agents/#用户安装候选包">Agent CLI 指南</a> 与 <a href="/guide/agents/#从源码独立安装">从源码独立安装</a>。</p>
 <h2 id="你应该分清的三件事">你应该分清的三件事</h2>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">说法</th><th class="align-left">不等于</th></tr></thead><tbody><tr><td class="align-left"><code>accepted</code>（durable ACK）</td><td class="align-left">任务已完成</td></tr><tr><td class="align-left">查询原 job（query-only，不重放）</td><td class="align-left">自动恢复／迁入／启动</td></tr><tr><td class="align-left">资料完整保全</td><td class="align-left">原会话可以续聊</td></tr></tbody></table></div>
 <h2 id="平台与未验收边界">平台与未验收边界</h2>

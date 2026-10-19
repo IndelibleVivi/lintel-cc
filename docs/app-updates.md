@@ -2,7 +2,7 @@
 
 简体中文（canonical） · [English](app-updates.en.md) · [文档入口](index.md)
 
-本指南说明当前源码中的 macOS App updater 与未来发行流程。当前公开入口仍是 **0.1.0 开发预览，没有正式 Release 下载、发行公钥或已激活 feed**。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 [current-state](current-state.md)。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
+本指南说明当前源码中的 macOS App updater 与发行流程。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已公开 8 个手动下载资产并核对实际字节；App 没有 Developer ID 签名或 Apple 公证，**没有发行公钥或已激活 feed**。干净 Mac 下载首装仍未验收。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 [current-state](current-state.md)。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
 
 ## 在 App 中使用
 
@@ -140,7 +140,7 @@ node scripts/app-release.mjs prepare \
 
 ## 有发行授权时的激活顺序
 
-本轮不执行这些外部动作。未来有精确发行与托管授权时：先完成签名／公证与候选安装验收，再创建相应版本的 GitHub Release，按记录中的公开名字上传各架构 DMG、`.app.tar.gz` 和 `.sig`；保持版本／tag／文件名不可变，不复用已发行版本。
+每次外部发行与托管仍需精确授权。签名 updater 发行先完成签名／公证与候选安装验收，再创建相应版本的 GitHub Release，按记录中的公开名字上传各架构 DMG、`.app.tar.gz` 和 `.sig`；保持版本／tag／文件名不可变，不复用已发行版本。明确获准的未签名开发者 Preview 则走上方 manual 记录与手动下载路径，公开说明 Apple 信任与干净 Mac 首装的未验收状态，不生成 updater feed。
 
 公开 artifact 上传完成后先逐字节核对，**feed 最后激活**：
 

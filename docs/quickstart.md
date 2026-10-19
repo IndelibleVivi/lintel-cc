@@ -322,7 +322,7 @@ lintel env compare "$ID" --other-environment-id "$OTHER_ID" --json
 
 ## 只想装 CLI？
 
-公开发布为空、**没有正式下载链接**。请从已核对的源码独立安装，或走候选包
+[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已提供三平台 CLI 手动下载；Linux 为 experimental，包名保留原候选身份。先读 Release 的 INSTALL 与 SHA256SUMS，再走候选包
 流程（核对身份、平台与字节，再解到新的版本目录，不改 PATH／shell rc／App／
 service）。见 [Agent CLI 指南](agents.md#用户安装候选包) 与
 [从源码独立安装](agents.md#从源码独立安装)。

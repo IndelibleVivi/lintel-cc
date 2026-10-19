@@ -12,7 +12,7 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 | A macOS app built by you or a trusted provider | Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against [current status (Chinese)](current-state.md) |
 | Linux, or a CLI-only workflow | Use [Agent CLI](agents.en.md) for installation and the [complete CLI trial](quickstart.en.md) for a synthetic example |
 
-This remains 0.1.0 Preview, without a public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the clean 10-19 `fcae6cb` build, including current client controls and UI updates. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
+The [0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual downloads for the Apple Silicon App and three-platform CLI. Read the Release INSTALL and checksums first. The App retains accepted clean `fcae6cb` product bytes; no Developer ID signing, notarization or updater feed is provided, and clean-Mac installation remains unverified. Stop if the system blocks installation and continue with the source trial below. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
 
 ## Synthetic interface trial
 

@@ -31,6 +31,6 @@
 
 中文为产品文档的主版本，配套英文页维护相同命令、默认值和操作边界。工程规格与验收记录尚有中文专页；英文入口会明确标注。
 
-当前是 **0.1.0 Preview**：本地发行准备候选、源码能力、公开下载与已启用更新通道要分开核对。不存在公开 Release 下载或正式签名版本。
+当前是 **0.1.0 Preview**：本地发行准备候选、源码能力、公开下载与已启用更新通道要分开核对。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已提供手动下载，未提供 Developer ID 签名、公证或 updater feed。
 
 页面语言与方向保持稳定；如果结果是等待、部分完成或 `needs_reconciliation`，从保留的原 ID 进入[排错指南](troubleshooting.md)，不要为了重新阅读而删除 Lintel state 或工作包。

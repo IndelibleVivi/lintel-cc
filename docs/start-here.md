@@ -12,7 +12,7 @@
 | 已由自己或可信提供方构建的 macOS App | 打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见[当前状态](current-state.md) |
 | Linux，或只需要 CLI | [Agent CLI](agents.md)负责安装；[CLI 完整试用](quickstart.md)提供全程合成示例 |
 
-当前仍为 0.1.0 Preview；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 10-19 的 clean `fcae6cb`，已包含当前客户端控制与界面更新。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
+[0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已提供 Apple Silicon App 与三平台 CLI 的手动下载，先阅读 Release 内的 INSTALL 与校验和。App 产品字节来自已验收的 clean `fcae6cb`；没有 Developer ID 签名、公证或 updater feed，干净 Mac 首装未验证。系统阻止时停止，继续下方源码试用。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
 
 ## 合成界面试用
 

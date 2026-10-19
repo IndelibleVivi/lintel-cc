@@ -2,13 +2,13 @@
 
 简体中文（canonical） · [English](agents.en.md) · [文档入口](index.md)
 
-此指南面向已有操作授权的 coding agent 和脚本作者。当前为 Lintel 0.1.0 Preview / 源码开发预览，协议 1 / catalog 1；没有正式签名发行或公开 Release 下载。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
+此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.1.0 开发者 Preview 使用协议 1 / catalog 1，已提供[公开手动下载](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
 
 首次试用可先走 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。
 
 ## 从 App 接到终端或 Agent
 
-App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。没有正式下载链接；官网与 App 的 main 文档入口都标为“最新开发说明”。
+App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。
 
 macOS 在读取外置宗卷等受保护位置的 CLI 时可能先等待系统文件访问授权；CLI 的子进程时限不包含这段 OS 等待。核对长期停在等待时，先查看原生权限提示。也可将已核验候选按原目录结构复制到已允许的本地新版本／测试目录，再选择其中的 `bin/lintel` 重新核对；系统权限由用户自行决定。
 
