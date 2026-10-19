@@ -776,12 +776,19 @@ python3 tests/verify.py --checks telemetry-ui,app-update-ui
 
 正式 Developer ID／公证、公开 Release／feed、旧实际 App 升级与 native WebKit 仍需独立验收；没有真实更新或生产系统网络 mutation。
 
-## 2026-10-19 本地候选与官网收束
+<a id="2026-10-19-本地候选与官网收束"></a>
+## 2026-10-19–20 本地候选与官网收束
 
-clean `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 已构建本地 unsigned App／DMG，完整性校验后只读挂载，取出的全 App 与 DMG 一致，executable 与构建输出一致。随包两份 static Linux runner、browser host 与 16 个扩展文件均实际核对 manifest 字节；文档 revision 已编译钉定。三平台 CLI 候选 `0.1.0-candidate-fcae6cb1efb5` 已准备，实际 macOS 交付包在另一份空 state 读回三份原文且没有来源 job。新的 GUI 复测遇到 macOS 锁屏，暂未完成；下面完整 native 观察仍属于 `e822d74`。
+clean `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 已构建本地 unsigned App／DMG，完整性校验后只读挂载，取出的全 App 与 DMG 一致，executable 与构建输出一致。随包两份 static Linux runner、browser host 与 16 个扩展文件均实际核对 manifest 字节；文档 revision 已编译钉定。三平台 CLI 候选 `0.1.0-candidate-fcae6cb1efb5` 已准备，实际 macOS 交付包在另一份空 state 读回三份原文且没有来源 job。10-20 解锁后已完成该新包的真实 native 首用与关键阅读路径；下面旧版配置／清理证据仍属于 `e822d74`。
+
+新 `fcae6cb` 使用另一新 synthetic HOME／state 和含空格路径，从空白登记精确选择三件／521 B；预览与批准前没有密文，一次批准的原 ID 完成 archive-only。六原件逐字节不变、无新 root。Quit 确认旧进程退出，再重开同 state，中文／环境与原 completed 记录保留。独立文件入口重新解锁并读指令、记忆、结构化会话（byte offset 0／198，content block 0）及会话原文；实际交付 CLI 在另一空 state 读回完整三件，manifest 摘要和 bytes 一致，无来源 job。reader 锁定后正文与口令清空；有限 HOME／state 文件扫描未发现本次试用口令字节。
+
+同一新包另实测了中英原生菜单、Day／Night／System、动态默认、风景册、跑道跳跃／暂停／重试，以及帮助中的 fcae6cb docs pin 和真实系统浏览器打开的对应链接。更新默认后台关闭，点击手动检查返回明确 updater_unconfigured。CLI 交接曾在外置宗卷路径停于 macOS 可移动宗卷授权，process sample 为文件 open，TCC 日志记录原生 prompting；未改权限。将交付 CLI 的字节一致副本保留 sidecar 放到合成临时目录后，核对返回候选匹配、同 HOME／UID／state，审阅后复制成功，任务仍只有原归档 job。受保护的外置宗卷原路径仍未验收。
 
 真实 `e822d74` arm64 release WebKit 的新合成 HOME／state 已完成：空白登记、精确三件归档、原任务 completed、退出重开、独立文件读包、原文／结构化会话定位、一项保护设置修改及保留后续编辑的原字段恢复、Finder 定位，以及独立加密残留备份／精确清理／原路径恢复。原件与恢复内容均单独核对 bytes；这些不代表真实认证、正式浏览器或生产 SSH 通过。可重复的原生程序见 [App 候选首用](app-updates.md#候选首次使用验收)。
 
 本机 canonical App matrix 首轮 20 selections 中 19 passed；`client-control-ui` 抓到 reinspection core 回复早于 React editor 重挂的测试等待错误。修复等待真实 editor／清空草案完成后，同一空草案禁用预览断言与零改动行断言，两次检查通过。原失败保留，不改写为原报告全绿。desktop Rust 通过，两个既有 ignored 不算通过。最新 native release CLI 的 `cli-candidate` 另行通过；其他架构 runtime 保持独立。
+
+clean `ddfcd438990bb4b9af4b2720dac6e3af77c0d78c` 的 [GitHub CI 39252988511](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39252988511) 已完成，14 个 jobs（含 aggregate）全部 success；CI 结果与上述真实 native 观察分别成立。
 
 官网现在由 finite route map 生成五类页面、15 篇中英指南，共 40 路静态正文。`site-ui` 在浏览器中检查全部 guide 的 390px 无 JS 布局、同页语言／query／hash、主题历史、原首页游戏／播放器实例和实际同源 20 秒影片。源码／语言／游戏／发行准备的 Node 检查一并通过；本机 loopback 的真实浏览器检查已完成；静态生成与实际浏览器行为分别记录。SVG 旅程图另以 900px、灰度、双语结构与 strict readability 检查；原始 QA、fixture 与内部记录不进入 public Git。准确候选与部署事实由 [current-state](current-state.md)维护。

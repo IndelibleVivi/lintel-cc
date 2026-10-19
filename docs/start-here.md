@@ -29,7 +29,7 @@ npm run dev:synthetic
 
 打开终端报告的地址，确认页面显示**测试空间**。这个入口启动 Vite 合成模式，通过真实 CLI 使用一份新建 HOME／state。脚本准备了 `CLAUDE.md`、`projects/synthetic/memory/notes.md` 和合成 settings；目录路径会打印在终端。
 
-这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。`e822d74` 原生 App 已在另一份隔离 HOME／state 中完成精确三件归档、退出重开、原任务核对与独立文件阅读；独立 CLI state 已核对三份原文字节。它仍不等于真实个人认证或干净 Mac 下载首装验收。
+这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。10-20 已用从 DMG 取出的 clean `fcae6cb` 原生 App，在另一份隔离 HOME／state 中完成空白登记、精确三件归档、退出重开、原任务核对与独立文件阅读；实际交付 CLI 在独立空 state 核对三份原文字节一致。它仍不等于真实个人认证或干净 Mac 下载首装验收。
 
 ### 做一次“只生成工作归档”
 

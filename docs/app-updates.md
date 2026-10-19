@@ -65,6 +65,8 @@ Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完
 6. **退出后重开读包。** 完全退出 App，再以同一 HOME／state 启动。在“记录与恢复”核对原任务，再从“会话与资料”的“独立加密包”入口填入密文绝对路径并重新输入口令。应恰好列出三份所选原件，指令、记忆和会话原文均可阅读；不批准迁入、启动或清理。独立 HOME／state 读包另用 [quickstart 第 7 步](quickstart.md#7-在另一份独立-state-里-inspect--read) 验证，不能把同一 state 重开当作独立安装。
 7. **分别记结果。** 记录启动、登记、精确选择、预览、批准、原任务完成、退出重开、独立文件读包及六份原件核对的实际结果。自动化无窗口、无法输入或截图失败时标未验证，并保存错误；不据此改写为产品成功或失败。原始截图、fixture、state、口令与内部记录留在本地，不上传整个候选 evidence 目录。
 
+完成主路径后，另外观察中英菜单、Day／Night／System 与动态默认，打开帮助核对文档 revision／实际链接，并手动检查一次更新；未配置 feed 应明确显示限制，不能报“已是最新版”。从“终端与 Agent”选择本平台交付 CLI，核对候选与 HOME／UID／state，审阅后复制交接包并确认无新 job。外置宗卷的系统访问授权单独记录，处理方式见 [CLI 入口](agents.md#从-app-接到终端或-agent)。
+
 ## 一份记录准备三种输出
 
 [`app-release.mjs`](../scripts/app-release.mjs) 是本地发行准备入口。它不创建 key、不签名、不上传、不创建 GitHub Release、不部署 Pages。输入是本地 `lintel.app-release/1` 记录；包含实际 artifact 路径的输入留在 Git 外或 ignored 目录，公开输出不含本机路径。

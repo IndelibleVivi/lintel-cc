@@ -10,6 +10,8 @@ Start with [English quickstart](quickstart.en.md) / [中文 quickstart](quicksta
 
 Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. No formal download link; website/App main-doc links mean latest development documentation.
 
+On macOS, reading a CLI from a protected location such as a removable volume may first wait for system file-access authorization. The CLI subprocess deadline does not include that OS wait. If checking remains pending, inspect the native permission prompt. Alternatively, copy the verified candidate, preserving its directory structure, into a new local version/test directory with existing access and select its `bin/lintel` again. System permission remains the user’s decision.
+
 App never downloads silently, changes PATH or copies journals. Missing sidecar means unknown identity; byte agreement authenticates neither signatures nor source. Wrong architecture/protocol/digest/static-probe failure shows specific errors.
 
 Handoff must use original task state. Accepted/uncertain jobs query the original ID; launches use readonly original-request query. Different CLI does not mean different state or rebind remote runner. Handoff text confers no new authorization.

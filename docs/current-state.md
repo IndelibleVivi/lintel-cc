@@ -1,20 +1,22 @@
 # 当前状态
 
-2026-10-19 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 **发行准备候选**是 clean source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 的 App／DMG；随包文档编译 revision 也是该值，包含当前客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。DMG 13,217,299 bytes，SHA-256 `7017b1d0a88068d54956c76b50511ff9503f132ad8d796079f43572e1038cb03`，完整性校验与只读挂载后 App 全文件读回一致；取出 executable 与构建输出相同。App 为 arm64／ad-hoc linker signature，无 Developer ID Team ID，未安装到 Applications、无公证、无公开二进制或 updater feed。本地手动形态记录为 `prepared_local`／`publication_verified:false`；其中 source revision 是构建者声明，准备日期不是公开发行日期。
+2026-10-20 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 **发行准备候选**是 clean source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 的 App／DMG；随包文档编译 revision 也是该值，包含当前客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。DMG 13,217,299 bytes，SHA-256 `7017b1d0a88068d54956c76b50511ff9503f132ad8d796079f43572e1038cb03`，完整性校验与只读挂载后 App 全文件读回一致；取出 executable 与构建输出相同。App 为 arm64／ad-hoc linker signature，无 Developer ID Team ID，未安装到 Applications、无公证、无公开二进制或 updater feed。本地手动形态记录为 `prepared_local`／`publication_verified:false`；其中 source revision 是构建者声明，准备日期不是公开发行日期。
 
 独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 已准备。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。官网新增五类路由与 English 共 40 页已在本地准备，生产仍只有 clean `c80a783` payload 的历史部署证据，本轮未部署。
 
-本轮完整 native 操作先在从 DMG 取出的 `e822d74` 完成，下面逐项保留它的 source 范围；新 `fcae6cb` 的行为证据单独记录。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
+新 `fcae6cb` 已完成真实 native 首用、归档、退出重开、独立阅读与 CLI 交接；配置恢复和残留清理的完整 native 操作先在 `e822d74` 完成，下面保留各自的 source 范围。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 
 ## 当前候选验收
 
-| 范围／所测 source | 2026-10-19 fresh 观察 |
+| 范围／所测 source | 10-19／10-20 fresh 观察 |
 | --- | --- |
 | native 首用与重开（`e822d74`） | macOS 26.5.2 arm64；新 synthetic HOME／state 的真实 release WebKit 空白登记、精确三件选择（排除第四份）、无密文时预览、批准一次、原 job completed；六份原件逐字节不变，无新 root。Quit 后原进程退出，同 state 重开保留中文与环境；记录页仍有同一原 ID completed |
 | 工作包与正文（`e822d74`） | 重开后从独立加密文件入口重新输入口令，恰有指令／记忆／会话三件；原文、结构化消息、真实 byte offset／content block 与本地派生交接稿已实际观察。另一独立 HOME／state 的 CLI 无来源 job，三份完整原文逐字节相同 |
 | 配置修改与恢复（`e822d74`） | native 自定义空草案显示零待改且禁用预览；一项关闭的 before/after、批准、completed 与 settings 读回通过。原任务的独立恢复将该项从 0 恢复到 1，保留两处后来编辑；未运行 Claude、不证明客户端实际加载 |
 | 有限本地状态与 Finder（`e822d74`） | native 元数据扫描与 Finder 实际定位合成日志通过；精确 1 文件／71 B 先加密备份、再清理 completed，独立文件入口重新解锁，单独预览并批准恢复原路径，字节一致；工作资料、占位凭据和后续配置编辑保留。身份文件不存在时明确说明 |
-| 新包资源（`fcae6cb`） | DMG 校验、只读挂载全 App 对照、native executable 构建字节一致、两份 static ELF／browser host／扩展资源核对通过；文档 clean revision 已编译钉定。新版窗口已启动，macOS 锁屏使 GUI 复测暂未完成 |
+| 最新 native 首用与阅读（`fcae6cb`，10-20） | 新 synthetic HOME／state、含空格路径：空白登记、精确三件／521 B、批准前无密文、一次批准 archive-only completed；六原件不变。Quit／重开保留环境与中文，原 ID 仍 completed；独立文件入口读回三件原文、会话结构与 byte offset 0／198。实际交付 CLI 在另一空 state 逐字节读回三件，无来源 job |
+| 新包资源与日常入口（`fcae6cb`，10-20） | DMG／全 App／executable 与资源字节核对通过；帮助中的 clean docs revision 及实际打开链接均为 fcae6cb。中英原生菜单、Day／Night／System、动态默认、风景册及跑道跳跃／暂停／重试通过；手动更新检查明确返回 updater_unconfigured，默认后台检查关闭 |
+| 原生 CLI 交接（`fcae6cb`，10-20） | 实际交付 CLI 的本机临时副本字节相同；静态核对返回候选匹配、同 HOME／UID／state，审阅后复制成功且无新 job。原外置宗卷路径读取曾停在 macOS 可移动宗卷隐私授权；未更改权限，该路径未验收，不把系统等待当作 CLI 子进程超时 |
 | 本机回归 | desktop Rust 通过，2 项既有 ignored 不算通过；App matrix 20 项原为 19 passed／1 failed。失败来自 client-control-ui 在 React reinspection 重挂前跳过清草案，补真实挂载／清空等待后完整检查两次通过；保留原 empty-preview 断言并增加零改动行断言。原失败报告仍保留，不标为全绿 |
 | 官网与阅读路径 | 五类路由、15 篇 repo 单源指南及精确 English mirrors，共 40 路静态页面。首页六任务标题进入站内指南；语言／历史保留原游戏、短片、details 与风景状态。真实 20 秒同源影片播放、全部 30 篇中英 guide 的 390px 无 JS 布局、首页 1440／390／320 日夜、无运行错误／第三方请求通过。manual／签名记录的 finite payload 与多通道／无 feed 边界通过合成检查；未部署 |
 | CLI 与资源 | 当前 native release CLI 的 canonical `cli-candidate` 打包、解包、实际执行、保留 state 升级及实际三平台输入 smoke 通过。两份新 musl runner 为 static ELF／正确架构；其他架构实际执行仍是独立验收，不能从格式检查推断 |
@@ -24,7 +26,7 @@
 
 App／CLI 共用 core、有限 SSH 与原任务查询；v5 的 27 项保护字段、客户端配置／残留／身份控制、精确工作选择、流式加密包、独立阅读、有限启动来源、systemd、browser、IPv4／IPv6 与遥测已在源码接通。六任务合同与完整目标分别由 [product baseline](specs/product-baseline.md)、[SPEC](SPEC.md) 维护，不能把源码支持扩大为所有平台实效。
 
-GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。没有接入自动部署。
+GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。clean `ddfcd43` 的 [GitHub CI 39252988511](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39252988511) 已完成，14 个 jobs（含 aggregate）全部 success。没有接入自动部署。
 
 逐轮 source、旧候选资源、CI 和隔离 runtime 证据已移入 [候选历史](candidate-history.md#2026-10-19-归档的阶段证据)，[基线验收](specs/product-baseline-status.md) 保留 A01–A18；具体命令和证据边界见 [验证说明](verification.md)。历史通过不会把本轮未测层标成通过。
 

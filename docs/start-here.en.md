@@ -29,7 +29,7 @@ npm run dev:synthetic
 
 Open the URL printed by the terminal and confirm the interface identifies a **test space**. This starts Vite fixture mode with the real CLI and a fresh HOME/state. The script creates `CLAUDE.md`, `projects/synthetic/memory/notes.md` and synthetic settings. It prints the temporary directory path.
 
-This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial path. The `e822d74` native app completed exact three-file archiving, quit/reopen, original-job lookup and independent-file reading in another isolated HOME/state. A separate CLI state verified all three originals byte for byte. That still does not establish personal authentication or download/install on a clean Mac.
+This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial path. On 10-20, the clean `fcae6cb` native app extracted from its DMG completed empty-workspace registration, exact three-file archiving, quit/reopen, original-job lookup and independent-file reading in another isolated HOME/state. The delivered CLI in a separate empty state verified all three originals byte for byte. That still does not establish personal authentication or download/install on a clean Mac.
 
 ### Create an archive only
 
