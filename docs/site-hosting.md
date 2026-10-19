@@ -23,7 +23,7 @@ python3 -m http.server 4317 --bind 127.0.0.1 \
 
 正式域名曾实际返回 CSS `max-age=14400`；回访浏览器会继续使用旧样式，即使 `_headers` 的目标策略已经改为立即 revalidate。两条 canonical stylesheet 入口因此使用版本 query，CSS 字节变更时更新该 query 并重新生成 English。线上检查要包含一次正常缓存的回访，不以禁用浏览器缓存代替最终验收；此做法不改变 Cloudflare 账号缓存设置。
 
-指南 article 的 canonical template 使用 Cloudflare `email_off` 注释保护整段技术正文，保留 `claude@synthetic.service`、`claude@.service`、Firefox ID 等原文。正式域名的 Email Address Obfuscation 曾将这些标识误判为邮箱并注入解码脚本，而 Pages preview 没有该改写；因此须在正式域名读回正文与命令，不能只验收 preview。保护标记由 `apps/site/guide-article.html` 生成，不手改投影页；具体机制见 [Cloudflare 官方说明](https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/#prevent-cloudflare-from-obfuscating-email)。
+指南 article 的 canonical template 使用 Cloudflare `email_off` 注释保护整段技术正文，保留 `claude@synthetic.service`、`claude@.service`、Firefox ID 等原文。正式域名的 Email Address Obfuscation 曾将这些标识误判为邮箱并注入解码脚本，而 Pages preview 没有该改写；因此须在正式域名读回正文与命令，不能只验收 preview。保护标记由 `apps/site/guide-article.html` 生成，不手改投影页。Cloudflare 会消费这两条注释；线上比较只允许移除这两个自有标记，正文、技术字符串与其余 HTML 仍须逐字节相同，不接纳额外解码脚本；具体机制见 [Cloudflare 官方说明](https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/#prevent-cloudflare-from-obfuscating-email)。
 
 ## Preview 与生产
 
