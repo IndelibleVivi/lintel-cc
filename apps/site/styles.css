@@ -499,7 +499,7 @@
 .fact-list{grid-column:2;display:grid;grid-template-columns:1fr 1fr;gap:22px 36px}
 .fact-list > div{padding-top:12px;border-top:1px solid var(--line)}
 .fact-list dt{font:10px/1.6 var(--mono);color:var(--accent)}
-.fact-list dd{font:12px/1.8 var(--sans);color:var(--muted);margin-top:7px}
+.fact-list dd{font:12px/1.8 var(--sans);color:var(--muted);margin-top:7px;overflow-wrap:anywhere}
 .fact-list-wide{grid-column:auto;grid-template-columns:1fr 1fr;margin-top:38px}
 .route-note{font:11px/1.9 var(--sans);color:var(--muted);margin-top:24px;max-width:72ch}
 .route-checklist{list-style:none;padding:0;margin:38px 0 0;border-top:1px solid var(--line)}
