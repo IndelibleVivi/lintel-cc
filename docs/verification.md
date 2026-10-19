@@ -778,6 +778,8 @@ python3 tests/verify.py --checks telemetry-ui,app-update-ui
 
 ## 2026-10-19 本地候选与官网收束
 
+clean `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 已构建本地 unsigned App／DMG，完整性校验后只读挂载，取出的全 App 与 DMG 一致，executable 与构建输出一致。随包两份 static Linux runner、browser host 与 16 个扩展文件均实际核对 manifest 字节；文档 revision 已编译钉定。三平台 CLI 候选 `0.1.0-candidate-fcae6cb1efb5` 已准备，实际 macOS 交付包在另一份空 state 读回三份原文且没有来源 job。新的 GUI 复测遇到 macOS 锁屏，暂未完成；下面完整 native 观察仍属于 `e822d74`。
+
 真实 `e822d74` arm64 release WebKit 的新合成 HOME／state 已完成：空白登记、精确三件归档、原任务 completed、退出重开、独立文件读包、原文／结构化会话定位、一项保护设置修改及保留后续编辑的原字段恢复、Finder 定位，以及独立加密残留备份／精确清理／原路径恢复。原件与恢复内容均单独核对 bytes；这些不代表真实认证、正式浏览器或生产 SSH 通过。可重复的原生程序见 [App 候选首用](app-updates.md#候选首次使用验收)。
 
 本机 canonical App matrix 首轮 20 selections 中 19 passed；`client-control-ui` 抓到 reinspection core 回复早于 React editor 重挂的测试等待错误。修复等待真实 editor／清空草案完成后，同一空草案禁用预览断言与零改动行断言，两次检查通过。原失败保留，不改写为原报告全绿。desktop Rust 通过，两个既有 ignored 不算通过。最新 native release CLI 的 `cli-candidate` 另行通过；其他架构 runtime 保持独立。

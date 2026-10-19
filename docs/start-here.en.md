@@ -12,7 +12,7 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 | A macOS app built by you or a trusted provider | Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against [current status (Chinese)](current-state.md) |
 | Linux, or a CLI-only workflow | Use [Agent CLI](agents.en.md) for installation and the [complete CLI trial](quickstart.en.md) for a synthetic example |
 
-This remains 0.1.0 Preview, without a public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the 10-19 `e822d74` build, including current client controls and UI updates. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
+This remains 0.1.0 Preview, without a public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the clean 10-19 `fcae6cb` build, including current client controls and UI updates. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
 
 ## Synthetic interface trial
 

@@ -1,5 +1,9 @@
 # 开发候选历史证据
 
+## 2026-10-19 · 已替换的 e822d74 本地包
+
+该轮 App／DMG 的 source 声明为 `e822d748c96cc3d5da8822aebf17e50347e5cf30`，DMG 12,558,680 bytes，SHA-256 `1e6ad6870cadfd3a8f1b421f1a6975bef64091dfbb0b22091cbc98f4a30a25ae`。只读挂载取出后完成了本机 synthetic 首用、工作包、配置恢复与残留恢复，具体范围由 [验证说明](verification.md#2026-10-19-本地候选与官网收束)保留。该 App 的文档资源实际为 latest development/main，未钉定 clean revision；prepare 的 source 声明不改变这一事实。旧包保留，未安装到 Applications、无 Developer ID／公证／公开下载／更新 feed；当前候选已由 [current-state](current-state.md)单独维护。
+
 ## 2026-10-13 cdb0ba8 本地 DMG
 
 后续 `878482f` 仅修正 notices 的 clean-checkout 构建接线并重封包；以下完整 native 交互仍对应本候选，未冒充后续包的逐项复验。

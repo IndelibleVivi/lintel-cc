@@ -39,12 +39,12 @@
 <p>这张图回答三个问题：请求从哪里进入，操作由谁执行，结果保存在谁手里。它描述当前源码，运行与发行范围查<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
 <p><a class="guide-image-fallback" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.svg">Lintel 完整架构：环境与远端执行、浏览器、网络、App 更新四条路径</a></p>
 <p><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.svg">查看大图 SVG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.png">PNG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.mmd">Mermaid 源</a></p>
-<p>手机上可以放大原图，或直接阅读下面的四段执行说明。README 使用的是<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture-overview.svg">简版总览</a>。</p>
+<p>手机上可以放大原图，或直接阅读下面的四段执行说明。另有<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture-overview.svg">简版总览</a>可独立查看。</p>
 <h2 id="四条执行路径">四条执行路径</h2>
 <p><strong>环境与文件任务。</strong> App 的 native request 和独立 CLI 调用同一 <code>crates/core</code>。本机 core 拥有环境清单、冻结计划、配置与文件操作、原任务记录和字段恢复。远端请求通过共享 <code>crates/remote</code>，以 OpenSSH 携带有限 JSON 请求到目标 runner；目标 core 使用自己的 state 执行与记录。controller 保存任务映射，但不替远端宣布操作完成。<code>crates/operations</code> 描述接口与严格字段合同，不执行文件副作用。</p>
 <p><strong>浏览器。</strong> App 和 macOS CLI 通过 Native Messaging host 管理配对与任务协调；已配对扩展拥有 profile 原生操作和 operation journal。浏览器清理的收尾需要真实重启与再次批准。切换 SSH 环境不会改变这条本机浏览器路径；Linux runner 不提供本机 browser-host control。</p>
 <p><strong>网络。</strong> <code>crates/egress</code> 提供 loopback CONNECT 通道和显式 HTTPS 出口测试实现。App 与 CLI 各自持有通道；客户端选择通过代理时，连接才受该通道规则约束。配置读回、代理连接观察、IPv4／IPv6 实测分别给出证据。宿主网络计划及恢复由 core 管理：当前 macOS 支持明确服务的 IPv6 配置操作，Linux 保留只读观察和测试。详细范围见<a href="/guide/network/">网络</a>。</p>
-<p><strong>App 更新。</strong> native <code>app_updates.rs</code> 与 Tauri updater 处理候选检查、下载验签、批准安装和明确重启；原更新 intent 留在 App data，独立于 core job。activity gate 管理 App 操作与更新的互斥，活跃代理另行阻止更新。当前没有公开 Release 下载、正式签名或已启用的发布公钥／feed；<code>e822d74</code> 是本地发行准备候选，不是公开更新源。官网只能依据已完成公开字节核对的 <code>lintel.app-release-public/1</code> 记录生成手工下载元数据；源码里的 feed 路径不等于已激活。</p>
+<p><strong>App 更新。</strong> native <code>app_updates.rs</code> 与 Tauri updater 处理候选检查、下载验签、批准安装和明确重启；原更新 intent 留在 App data，独立于 core job。activity gate 管理 App 操作与更新的互斥，活跃代理另行阻止更新。当前没有公开 Release 下载、正式签名或已启用的发布公钥／feed；<code>fcae6cb</code> 是本地发行准备候选，不是公开更新源。官网只能依据已完成公开字节核对的 <code>lintel.app-release-public/1</code> 或 <code>lintel.app-release-manual-public/1</code> 记录生成手工下载元数据；源码里的 feed 路径不等于已激活。</p>
 <p>官网 <code>apps/site</code> 独立展示文档、插画和共享游戏，没有通向本机 core、SSH controller 或 browser host 的执行调用。工作包可以由用户明确选择的系统文件传输工具携带；目标 core 在独立 state 中解锁、检查和选择性迁入，不依赖源 job。</p>
 <h2 id="一次计划型-core-任务怎样完成">一次计划型 core 任务怎样完成</h2>
 <p><code>生成并保存计划 → 审阅准确范围与 hash → 持久 accepted → 执行 → 核对结果</code></p>

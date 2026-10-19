@@ -8,7 +8,7 @@ This view answers three questions: where requests enter, who executes an operati
 
 [Full SVG](assets/architecture.en.svg) · [PNG](assets/architecture.en.png) · [Mermaid source](assets/architecture.en.mmd)
 
-On a phone, zoom the original image or read the four paths below. The README uses a [smaller overview](assets/architecture-overview.en.svg).
+On a phone, zoom the original image or read the four paths below. A [smaller overview](assets/architecture-overview.en.svg) is available separately.
 
 ## Four execution paths
 
@@ -18,7 +18,7 @@ On a phone, zoom the original image or read the four paths below. The README use
 
 **Network.** `crates/egress` implements loopback CONNECT channels and explicit HTTPS egress probes. App and CLI own separate channels. Client connections are covered by a channel only when routed through it. Configuration readback, observed proxy connections and IPv4/IPv6 tests provide distinct evidence. The core owns host-network plans and restoration: current macOS support includes IPv6 changes for explicitly selected services, while Linux provides read-only observation and tests. See [Network](network.en.md).
 
-**App updates.** Native `app_updates.rs` and the Tauri updater handle candidate checks, download/signature verification, approved installation and explicit restart. Original update intents live in app data, separately from core jobs. The activity gate coordinates app operations against installation; active proxies block updating separately. There is no public Release download, formal signing or active release key/feed. `e822d74` is a local release-preparation candidate, not a public update source. The website may derive manual-download metadata only from a `lintel.app-release-public/1` record after public-byte verification; the source feed path does not establish activation.
+**App updates.** Native `app_updates.rs` and the Tauri updater handle candidate checks, download/signature verification, approved installation and explicit restart. Original update intents live in app data, separately from core jobs. The activity gate coordinates app operations against installation; active proxies block updating separately. There is no public Release download, formal signing or active release key/feed. `fcae6cb` is a local release-preparation candidate, not a public update source. The website may derive manual-download metadata only from a `lintel.app-release-public/1` or `lintel.app-release-manual-public/1` record after public-byte verification; the source feed path does not establish activation.
 
 `apps/site` independently presents documentation, artwork and the shared game. It has no execution call into the core, SSH controller or browser host. A work package can travel using an explicitly selected system file-transfer tool. The target core can unlock, inspect and selectively import it in independent state without the source job.
 

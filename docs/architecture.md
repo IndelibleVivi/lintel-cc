@@ -8,7 +8,7 @@
 
 [查看大图 SVG](assets/architecture.svg) · [PNG](assets/architecture.png) · [Mermaid 源](assets/architecture.mmd)
 
-手机上可以放大原图，或直接阅读下面的四段执行说明。README 使用的是[简版总览](assets/architecture-overview.svg)。
+手机上可以放大原图，或直接阅读下面的四段执行说明。另有[简版总览](assets/architecture-overview.svg)可独立查看。
 
 ## 四条执行路径
 
@@ -18,7 +18,7 @@
 
 **网络。** `crates/egress` 提供 loopback CONNECT 通道和显式 HTTPS 出口测试实现。App 与 CLI 各自持有通道；客户端选择通过代理时，连接才受该通道规则约束。配置读回、代理连接观察、IPv4／IPv6 实测分别给出证据。宿主网络计划及恢复由 core 管理：当前 macOS 支持明确服务的 IPv6 配置操作，Linux 保留只读观察和测试。详细范围见[网络](network.md)。
 
-**App 更新。** native `app_updates.rs` 与 Tauri updater 处理候选检查、下载验签、批准安装和明确重启；原更新 intent 留在 App data，独立于 core job。activity gate 管理 App 操作与更新的互斥，活跃代理另行阻止更新。当前没有公开 Release 下载、正式签名或已启用的发布公钥／feed；`e822d74` 是本地发行准备候选，不是公开更新源。官网只能依据已完成公开字节核对的 `lintel.app-release-public/1` 记录生成手工下载元数据；源码里的 feed 路径不等于已激活。
+**App 更新。** native `app_updates.rs` 与 Tauri updater 处理候选检查、下载验签、批准安装和明确重启；原更新 intent 留在 App data，独立于 core job。activity gate 管理 App 操作与更新的互斥，活跃代理另行阻止更新。当前没有公开 Release 下载、正式签名或已启用的发布公钥／feed；`fcae6cb` 是本地发行准备候选，不是公开更新源。官网只能依据已完成公开字节核对的 `lintel.app-release-public/1` 或 `lintel.app-release-manual-public/1` 记录生成手工下载元数据；源码里的 feed 路径不等于已激活。
 
 官网 `apps/site` 独立展示文档、插画和共享游戏，没有通向本机 core、SSH controller 或 browser host 的执行调用。工作包可以由用户明确选择的系统文件传输工具携带；目标 core 在独立 state 中解锁、检查和选择性迁入，不依赖源 job。
 

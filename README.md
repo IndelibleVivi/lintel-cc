@@ -8,7 +8,7 @@
 
 Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、加密保全指令和会话、清理重建环境，以及管理具体浏览器 profile 和 SSH 主机。App 与 CLI 共用执行核心；修改前查看目标与变化，执行后核对结果，需要恢复时保留后续编辑。
 
-**当前为 0.1.0 Preview。** 可以从公开源码试用；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 10-19 的 `e822d74`，已包含客户端控制、逐项／批量保护编辑和新版侧栏图标。它从 DMG 取出后在隔离测试空间运行，未安装到 Applications。准确来源、平台与验收范围见[当前状态](docs/current-state.md)。
+**当前为 0.1.0 Preview。** 可以从公开源码试用；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 10-19 的 clean `fcae6cb`，已包含客户端控制、逐项／批量保护编辑和新版侧栏图标。已从只读 DMG 取出，包内资源已核对，未安装到 Applications；各版本的 native 行为证据分别记录。准确来源、平台与验收范围见[当前状态](docs/current-state.md)。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
@@ -62,7 +62,7 @@ cargo build -p lintel-runner --locked
 ./target/debug/lintel capabilities --json
 ```
 
-这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选仍为 `bb9fa824`，没有正式下载链接；从源码构建的 CLI 不受 App 候选版本约束。
+这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，没有正式下载链接；从源码构建的 CLI 不受 App 候选版本约束。
 
 ## 从原件到下一次工作
 

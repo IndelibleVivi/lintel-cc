@@ -1,21 +1,24 @@
 # 当前状态
 
-2026-10-19 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 **发行准备候选**是 10-19 的 `e822d748c96cc3d5da8822aebf17e50347e5cf30` App／DMG，包含客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。已从只读 DMG 复制到独立测试目录，并核对整份 App 文件与原包相同；DMG 12,558,680 bytes，SHA-256 `1e6ad6870cadfd3a8f1b421f1a6975bef64091dfbb0b22091cbc98f4a30a25ae`。native executable 为 arm64／ad-hoc linker signature，无 Developer ID Team ID；未安装到 Applications、无公证、无公开二进制或 updater feed。prepare 记录的 source revision 是构建者声明；该 App 的文档资源实际标记为 latest development/main，不能声称 clean revision 文档已钉定。
+2026-10-19 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 **发行准备候选**是 clean source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 的 App／DMG；随包文档编译 revision 也是该值，包含当前客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。DMG 13,217,299 bytes，SHA-256 `7017b1d0a88068d54956c76b50511ff9503f132ad8d796079f43572e1038cb03`，完整性校验与只读挂载后 App 全文件读回一致；取出 executable 与构建输出相同。App 为 arm64／ad-hoc linker signature，无 Developer ID Team ID，未安装到 Applications、无公证、无公开二进制或 updater feed。本地手动形态记录为 `prepared_local`／`publication_verified:false`；其中 source revision 是构建者声明，准备日期不是公开发行日期。
 
-官网生产仍只有 clean `c80a783` 静态 payload 的历史部署证据；本轮尚未重新部署。独立三平台 CLI 候选原为 `bb9fa824`；两份 Linux musl runner 已在 10-19 从当前源码用隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建，并通过 canonical static ELF／架构检查；资源已刷新，新的 clean App／三平台 CLI 包仍在收口。下方带日期的旧轮观察保留其原包与原 source 范围；`878482f` 不再是最新候选，历史成功也不扩大为本轮 native 完整矩阵。
+独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 已准备。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。官网新增五类路由与 English 共 40 页已在本地准备，生产仍只有 clean `c80a783` payload 的历史部署证据，本轮未部署。
+
+本轮完整 native 操作先在从 DMG 取出的 `e822d74` 完成，下面逐项保留它的 source 范围；新 `fcae6cb` 的行为证据单独记录。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 
 ## 当前候选验收
 
-| 范围 | 2026-10-19 fresh 观察 |
+| 范围／所测 source | 2026-10-19 fresh 观察 |
 | --- | --- |
-| native 首用与重开 | macOS 26.5.2 arm64；新 synthetic HOME／state 的真实 release WebKit 空白登记、精确三件选择（排除第四份）、无密文时预览、批准一次、原 job completed；六份原件逐字节不变，无新 root。Quit 后原进程退出，同 state 重开保留中文与环境；记录页仍有同一原 ID completed |
-| 工作包与正文 | 重开后从独立加密文件入口重新输入口令，恰有指令／记忆／会话三件；原文、结构化消息、真实 byte offset／content block 与本地派生交接稿已实际观察。另一独立 HOME／state 的 CLI 无来源 job，三份完整原文逐字节相同 |
-| 配置修改与恢复 | native 自定义空草案显示零待改且禁用预览；一项关闭的 before/after、批准、completed 与 settings 读回通过。原任务的独立恢复将该项从 0 恢复到 1，保留两处后来编辑；未运行 Claude、不证明客户端实际加载 |
-| 有限本地状态与 Finder | native 元数据扫描与 Finder 实际定位合成日志通过；精确 1 文件／71 B 先加密备份、再清理 completed，独立文件入口重新解锁，单独预览并批准恢复原路径，字节一致；工作资料、占位凭据和后续配置编辑保留。身份文件不存在时明确说明 |
+| native 首用与重开（`e822d74`） | macOS 26.5.2 arm64；新 synthetic HOME／state 的真实 release WebKit 空白登记、精确三件选择（排除第四份）、无密文时预览、批准一次、原 job completed；六份原件逐字节不变，无新 root。Quit 后原进程退出，同 state 重开保留中文与环境；记录页仍有同一原 ID completed |
+| 工作包与正文（`e822d74`） | 重开后从独立加密文件入口重新输入口令，恰有指令／记忆／会话三件；原文、结构化消息、真实 byte offset／content block 与本地派生交接稿已实际观察。另一独立 HOME／state 的 CLI 无来源 job，三份完整原文逐字节相同 |
+| 配置修改与恢复（`e822d74`） | native 自定义空草案显示零待改且禁用预览；一项关闭的 before/after、批准、completed 与 settings 读回通过。原任务的独立恢复将该项从 0 恢复到 1，保留两处后来编辑；未运行 Claude、不证明客户端实际加载 |
+| 有限本地状态与 Finder（`e822d74`） | native 元数据扫描与 Finder 实际定位合成日志通过；精确 1 文件／71 B 先加密备份、再清理 completed，独立文件入口重新解锁，单独预览并批准恢复原路径，字节一致；工作资料、占位凭据和后续配置编辑保留。身份文件不存在时明确说明 |
+| 新包资源（`fcae6cb`） | DMG 校验、只读挂载全 App 对照、native executable 构建字节一致、两份 static ELF／browser host／扩展资源核对通过；文档 clean revision 已编译钉定。新版窗口已启动，macOS 锁屏使 GUI 复测暂未完成 |
 | 本机回归 | desktop Rust 通过，2 项既有 ignored 不算通过；App matrix 20 项原为 19 passed／1 failed。失败来自 client-control-ui 在 React reinspection 重挂前跳过清草案，补真实挂载／清空等待后完整检查两次通过；保留原 empty-preview 断言并增加零改动行断言。原失败报告仍保留，不标为全绿 |
 | 官网与阅读路径 | 五类路由、15 篇 repo 单源指南及精确 English mirrors，共 40 路静态页面。首页六任务标题进入站内指南；语言／历史保留原游戏、短片、details 与风景状态。真实 20 秒同源影片播放、全部 30 篇中英 guide 的 390px 无 JS 布局、首页 1440／390／320 日夜、无运行错误／第三方请求通过。manual／签名记录的 finite payload 与多通道／无 feed 边界通过合成检查；未部署 |
 | CLI 与资源 | 当前 native release CLI 的 canonical `cli-candidate` 打包、解包、实际执行、保留 state 升级及实际三平台输入 smoke 通过。两份新 musl runner 为 static ELF／正确架构；其他架构实际执行仍是独立验收，不能从格式检查推断 |
-| 仍待本轮收口 | clean source 的最终 App／DMG／三平台 CLI 包、资源 revision 核对与 Git。公开二进制、干净 Mac 下载首装、真实认证、正式浏览器／生产 SSH、Apple 信任与网站上线仍分别核验 |
+| 发行与实机边界 | 本地 App／DMG／三平台 CLI／手动形态 release 记录已准备；未生成 updater feed。公开二进制、干净 Mac 下载首装、真实认证、正式浏览器／生产 SSH、Apple 信任与网站上线仍分别核验 |
 
 ## 能力与验证 owner
 
