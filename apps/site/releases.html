@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Lintel 0.1.0 Preview 状态：区分源码、本地候选、公开字节核对与正式发行。">
+  <link rel="canonical" href="https://lintel.page/releases/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/releases/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/releases/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/releases/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="版本状态 · Lintel">
+  <meta property="og:description" content="源码、候选、公开下载和正式发行分别记录；当前没有公开 App Release。">
+  <meta property="og:url" content="https://lintel.page/releases/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>版本状态 · Lintel</title>
+</head>
+<body class="route-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" aria-current="page" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/releases/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" data-route-path="/releases/" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/releases/" lang="en" hreflang="en" data-site-route-language="en" data-article-language="en" data-route-path="/releases/">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <section class="route-hero wrap">
+      <p class="eyebrow" data-route-copy="releaseEyebrow">RELEASE STATUS / FACTS FIRST</p>
+      <h1><span data-route-copy="releaseTitleA">版本与记录。</span><br><span data-route-copy="releaseTitleB">从这里核对。</span></h1>
+      <p class="route-intro" data-route-copy="releaseIntro">这里分别记录源码、本地候选、公开字节核对与发行。版本与下载以本页构建时明确提供的记录为准；没有记录时，只呈现源码与本地候选边界。</p>
+      <div class="route-actions"><a class="button primary" href="/download/" data-route-copy="download">打开安装说明</a><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">查看当前源码</a></div>
+    </section>
+    <section class="route-section wrap" aria-labelledby="status-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="releaseEyebrow">CURRENT CANDIDATE</p><h2 id="status-title" data-route-copy="currentStatus">当前状态</h2><p data-route-copy="currentStatusBody">页面在构建时读取显式发行记录；没有记录时只显示源码与本地候选边界。</p></div>
+      <!-- lintel-app-release:start -->
+      <div class="release-status-table" data-release-status="unavailable">
+        <div class="release-status-head"><span data-route-copy="artifact">对象</span><span data-route-copy="exists">已经存在</span><span data-route-copy="missing">还不存在</span></div>
+        <div><strong data-route-copy="sourceArtifact">源码</strong><p data-route-copy="sourceExists">公开仓库与 0.1.0 Preview 源码</p><p data-route-copy="sourceMissing">不是签名安装包</p></div>
+        <div><strong data-route-copy="candidateArtifact">本地候选</strong><p data-route-copy="candidateExists">macOS arm64 本地发行准备候选</p><p data-route-copy="candidateMissing">没有公开下载 URL 或发布日期</p></div>
+        <div><strong data-route-copy="appleArtifact">Apple 信任</strong><p data-route-copy="appleExists">本地未签名构建路径存在</p><p data-route-copy="appleMissing">没有 Developer ID 与公证验收</p></div>
+        <div><strong data-route-copy="updatesArtifact">更新</strong><p data-route-copy="updatesExists">代码具备受限 updater 路径</p><p data-route-copy="updatesMissing">没有配置公钥／feed；不检查、不下载</p></div>
+        <div><strong data-route-copy="releaseArtifact">发行</strong><p data-route-copy="releaseExists">—</p><p data-route-copy="releaseMissing">没有正式 GitHub Release、DMG 或校验和</p></div>
+      </div>
+      <!-- lintel-app-release:end -->
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="meaning-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="releaseEyebrow">HOW TO READ STATUS</p><h2 id="meaning-title" data-route-copy="readStatus">这些词分别说明什么</h2></div>
+      <dl class="fact-list fact-list-wide"><div><dt data-route-copy="sourceArtifact">Source</dt><dd data-route-copy="sourceMeaning">仓库里有这条路径，检查针对的是哪一份 revision 还要另外看。</dd></div><div><dt data-route-copy="candidateArtifact">Candidate</dt><dd data-route-copy="candidateMeaning">一个明确构建的本地包，可用于试用或验收；它不是自动获得公开分发授权。</dd></div><div><dt>Public bytes verified</dt><dd data-route-copy="publicMeaning">公开 URL 上的字节数与 SHA-256 与原记录一致；仍不等于安装、认证或 Apple 信任通过。</dd></div><div><dt>Released</dt><dd data-route-copy="releasedMeaning">已发布并保有可核对记录。本页不会从其他事实推断这一步。</dd></div></dl>
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="limits-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="boundariesEyebrow">OPEN VERIFICATION</p><h2 id="limits-title" data-route-copy="openLimits">仍在继续验证</h2></div>
+      <ul class="route-limits"><li data-route-copy="limitAuth">真实认证与 native resume</li><li data-route-copy="limitBrowser">正式 Chrome／Edge／Firefox／AdsPower 与非开发者安装</li><li data-route-copy="limitRemote">生产 VPS、完整远端监管与跨重启承诺</li><li data-route-copy="limitRelease">开发者签名、公证、公开下载首装与升级</li><li data-route-copy="limitNetwork">完整网络强制约束与所有客户端入口</li></ul>
+      <p class="route-note" data-route-copy="limitsNote">详细证据与候选范围由仓库的 current-state 和验证文档维护；这里只呈现用户需要知道的状态，不把目标写成已交付。</p>
+    </section>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">状态事实来自显式打包记录与维护文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">安装</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

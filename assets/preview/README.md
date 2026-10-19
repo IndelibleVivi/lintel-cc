@@ -9,6 +9,9 @@ a Release, configure hosting or upload a GitHub social preview.
 | `lintel-banner-night.svg` / `.png` | Night presentation sibling, 1600 × 900 |
 | `lintel-social-preview.svg` / `.png` | Share composition, 1280 × 720 |
 | `film.tsx` / `player.html` | Editable 20-second concept intro and opt-in local player; MP4/audio/bundle outputs stay ignored |
+| `diagrams/` | Selected user work journey, zh-CN + en editable SVG/portable PNG pairs |
+| `screenshots/` | Unedited native App captures using synthetic data, with source and locale provenance |
+| `asset-index.json` | Finite source/purpose index for the selected README visuals |
 
 The composition follows the supplied concept's fine character forest, layered
 mountains, moon and reflected lake. The tiny Clawd stays on the shore. Large
@@ -24,6 +27,31 @@ presentation exports keep the integrated base static. The smaller lockup,
 additional sky space and lower landscape match the website's more open composition.
 The [mark](../../apps/desktop/assets/identity/source/lintel-mark.svg) remains native
 vector geometry. Image generation never redraws the identity.
+
+## Selected README visuals
+
+The README uses the existing banner, one real App view in each interface
+language, the horizontal [work journey](diagrams/README.md), and the existing
+share composition as the link cover for the concept film. App screenshots use
+only a synthetic environment; the two locale captures show their actual UI
+language. They do not depict a production account or a signed public release.
+
+[`asset-index.json`](asset-index.json) records the selected files, source
+revision, capture conditions and alt text. The journey retains editable SVG
+sources and canonical identity geometry. Rebuild a portable PNG with the
+existing bundled Chromium runtime:
+
+```sh
+node scripts/render-preview-svg.mjs assets/preview/diagrams/work-journey.zh-CN.svg \
+  assets/preview/diagrams/work-journey.zh-CN.png
+```
+
+An optional final argument sets a CSS display width for a reading-size check;
+it is not a pixel-density setting. Local fonts are used at render time and are
+not distributed. Native captures are saved directly from the tested App and
+are never redrawn as interface evidence. Older unselected compositions are not
+part of this public asset set. Rendering and source verification do not imply
+owner aesthetic acceptance.
 
 ## Concept film
 

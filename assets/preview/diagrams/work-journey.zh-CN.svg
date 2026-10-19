@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc" lang="zh-CN">
+<title id="title">带走工作 —— 用户工作旅程</title>
+<desc id="desc">选中的指令、记忆与会话经过审阅，收进加密工作包；离开原环境也能独立打开阅读。迁入新环境是单独一步，需要另一份预览与批准。</desc>
+<defs>
+  <style>
+    text{font-family:"PingFang SC","Songti SC",Georgia,serif}
+    .mono{font-family:Menlo,Consolas,monospace}
+    .title{font-family:"LXGW WenKai","Songti SC",serif}
+    .subtitle{font-family:"Source Han Serif SC","Songti SC",serif}
+    .stage-label{font-size:20px;letter-spacing:2px;fill:#6E6A61}
+    .cap{font-size:24px;fill:#3D3D3A}
+    .cap-soft{font-size:24px;fill:#6E6A61}
+    .file-label{font-size:20px;fill:#3D3D3A;font-family:Menlo,Consolas,monospace}
+    .file-tag{font-size:20px;letter-spacing:0;fill:#9F5137;font-family:Menlo,Consolas,monospace}
+    .sheet{fill:#FFFFFF;stroke:#E5E3DA;stroke-width:1.5}
+    .line{stroke:#E5E3DA;stroke-width:1.5}
+    .ink{stroke:#3D3D3A;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .soft-ink{stroke:#BEB9AF;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .accent{stroke:#C16A47;fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .route{stroke:#6E6A61;fill:none;stroke-width:2;stroke-linecap:round}
+    .texture{fill:#BEB9AF;font-family:Menlo,Consolas,monospace;font-size:11px}
+  </style>
+  <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" fill="#6E6A61" />
+  </marker>
+  <marker id="arr-soft" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M0 0L10 5L0 10z" fill="#B3AC9F" />
+  </marker>
+</defs>
+
+<rect width="1600" height="900" fill="#FAF9F5" />
+<rect x="24" y="24" width="1552" height="852" fill="none" stroke="#E5E3DA" rx="10" />
+
+<!-- header -->
+<text x="80" y="112" font-size="20" letter-spacing="6" fill="#6E6A61" class="mono" data-readability="supporting">PORTABLE WORK · 02</text>
+<text x="80" y="182" font-size="60" fill="#3D3D3A" class="title" data-readability="critical">带走工作。</text>
+<text x="80" y="232" font-size="24" fill="#6E6A61" class="subtitle">选择、审阅、收进工作包 —— 离开原环境也能读。</text>
+
+<!-- edge texture -->
+<g class="texture" opacity=".55" id="texture" data-readability="decorative">
+  <text x="1060" y="110">^  /\  ^   /\    ^  /\   ^</text>
+  <text x="1140" y="140">/\   ~  /\  ^   /\    ~</text>
+</g>
+
+<!-- ================= STAGE 1 : source ================= -->
+<text x="120" y="330" class="stage-label mono" data-readability="supporting">源环境 SOURCE</text>
+<g transform="translate(120 370)" id="source">
+  <rect class="sheet" x="0" y="0" width="250" height="330" rx="8" />
+  <line class="line" x1="0" y1="52" x2="250" y2="52" />
+  <text class="mono" x="18" y="34" font-size="20" fill="#6E6A61" data-readability="supporting">Claude 配置</text>
+  <g class="ink" stroke-width="2">
+    <path d="M22 78h52l10 10h144v14H22z" fill="#F4F1EA" stroke="#3D3D3A" />
+  </g>
+  <g transform="translate(28 118)">
+    <rect class="sheet" x="0" y="0" width="194" height="52" rx="5" />
+    <path class="accent" stroke-width="2" d="M14 26h8m4 0h-4" />
+    <text class="file-label" x="20" y="31" data-readability="supporting">CLAUDE.md</text>
+    <text class="file-tag" x="182" y="31" text-anchor="end" data-readability="supporting">指令</text>
+  </g>
+  <g transform="translate(28 182)">
+    <rect class="sheet" x="0" y="0" width="194" height="52" rx="5" />
+    <text class="file-label" x="20" y="31" data-readability="supporting">memory/</text>
+    <text class="file-tag" x="182" y="31" text-anchor="end" data-readability="supporting">记忆</text>
+  </g>
+  <g transform="translate(28 246)">
+    <rect class="sheet" x="0" y="0" width="194" height="52" rx="5" />
+    <text class="file-label" x="20" y="31" data-readability="supporting">sessions/</text>
+    <text class="file-tag" x="182" y="31" text-anchor="end" data-readability="supporting">会话</text>
+  </g>
+  <text class="cap-soft" x="12" y="322">原件留在原处</text>
+</g>
+
+<path class="route" d="M382 535 H 452" marker-end="url(#arr)" />
+<text class="cap-soft mono" x="388" y="512" font-size="20" data-readability="supporting" style="font-size:20px">选择</text>
+
+<!-- ================= STAGE 2 : review ================= -->
+<text x="470" y="330" class="stage-label mono" data-readability="supporting">审阅 REVIEW</text>
+<g transform="translate(470 370)" id="review">
+  <rect class="sheet" x="0" y="0" width="230" height="330" rx="8" />
+  <line class="line" x1="0" y1="52" x2="230" y2="52" />
+  <text class="mono" x="18" y="34" font-size="20" fill="#6E6A61" data-readability="supporting">plan · freeze</text>
+  <g transform="translate(22 78)">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="#C16A47" stroke-width="1.5" />
+    <path class="accent" stroke-width="2" d="M6 10l3 3 6-6" />
+    <text class="file-label" x="30" y="15" data-readability="supporting">CLAUDE.md</text>
+  </g>
+  <g transform="translate(22 118)">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="#C16A47" stroke-width="1.5" />
+    <path class="accent" stroke-width="2" d="M6 10l3 3 6-6" />
+    <text class="file-label" x="30" y="15" data-readability="supporting">notes.md</text>
+  </g>
+  <g transform="translate(22 158)">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="#C16A47" stroke-width="1.5" />
+    <path class="accent" stroke-width="2" d="M6 10l3 3 6-6" />
+    <text class="file-label" x="30" y="15" data-readability="supporting">session.jsonl</text>
+  </g>
+  <g transform="translate(22 198)">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="#BEB9AF" stroke-width="1.5" />
+    <text class="file-label" x="30" y="15" data-readability="supporting">其他原件</text>
+  </g>
+  <line class="line" x1="18" y1="248" x2="212" y2="248" />
+  <text class="cap-soft" x="18" y="278">批准后才执行</text>
+  <text class="cap-soft mono" x="18" y="304" font-size="20" data-readability="supporting">approve → run</text>
+</g>
+
+<path class="route" d="M712 535 H 782" marker-end="url(#arr)" />
+<text class="cap-soft mono" x="716" y="512" font-size="20" data-readability="supporting" style="font-size:20px">加密</text>
+
+<!-- ================= STAGE 3 : package ================= -->
+<text x="800" y="330" class="stage-label mono" data-readability="supporting">工作包 PACKAGE</text>
+<g transform="translate(800 372)" id="package">
+  <rect x="0" y="30" width="220" height="150" rx="8" fill="#EFEDE6" stroke="#9F5137" stroke-width="1.5" />
+  <path class="soft-ink" stroke-width="1.5" d="M2 36 L110 118 L218 36" fill="none" />
+  <path d="M2 176 L86 112 M218 176 L134 112" stroke="#E5E3DA" stroke-width="1.5" fill="none" />
+  <circle cx="110" cy="118" r="17" fill="#C16A47" />
+  <path d="M104 118l4 4 8-9" stroke="#FAF9F5" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <rect x="66" y="200" width="88" height="30" rx="15" fill="#FFFFFF" stroke="#E5E3DA" />
+  <text class="mono" x="110" y="220" font-size="20" fill="#9F5137" text-anchor="middle" data-readability="supporting">.age</text>
+  <g transform="translate(8 266)">
+    <path class="soft-ink" stroke-width="1.5" d="M0 0h204" />
+    <text class="cap" x="4" y="30">选中的资料</text>
+    <text class="cap-soft" x="4" y="62">原件不变</text>
+  </g>
+</g>
+
+<path class="route" d="M1032 500 H 1104" marker-end="url(#arr)" />
+<text class="cap-soft mono" x="1036" y="478" font-size="20" data-readability="supporting" style="font-size:20px">解锁</text>
+
+<!-- ================= STAGE 4 : read ================= -->
+<text x="1120" y="330" class="stage-label mono" data-readability="supporting">独立阅读 READ</text>
+<g transform="translate(1120 372)" id="reader">
+  <rect class="sheet" x="0" y="0" width="310" height="330" rx="8" />
+  <line class="line" x1="0" y1="46" x2="310" y2="46" />
+  <text class="mono" x="16" y="30" font-size="20" fill="#6E6A61" data-readability="supporting">工作包 · 阅读</text>
+  <g transform="translate(88 72)">
+    <path class="ink" stroke-width="2" d="M4 18h56l8 8 8-8h56v84H76l-8 8-8-8H4z" fill="#F4F1EA" />
+    <path class="ink" stroke-width="2" d="M68 26v84" />
+    <path class="soft-ink" stroke-width="1.5" d="M14 40h40M14 56h40M14 72h34M82 40h40M82 56h40M82 72h34" />
+  </g>
+  <text class="cap" x="18" y="216">指令 · 记忆 · 会话</text><text class="cap-soft" x="18" y="246">不依赖旧环境</text><text class="cap-soft" x="18" y="276">或原任务记录</text><text class="cap-soft" x="18" y="306">口令解锁 · 核对字节</text></g>
+
+<!-- import branch: separate dashed card below the package column -->
+<path class="route" stroke-dasharray="5 6" d="M950 554 C 1005 615 1040 668 1120 710" marker-end="url(#arr-soft)" fill="none" />
+<g transform="translate(800 716)" id="import">
+  <rect x="0" y="0" width="620" height="130" rx="8" fill="none" stroke="#B3AC9F" stroke-width="1.5" stroke-dasharray="6 6" />
+  <g transform="translate(22 20)" opacity=".8">
+    <path class="soft-ink" stroke-width="2" d="M0 14h36l7 7h80v50H0z" fill="#FFFFFF" />
+    <path class="soft-ink" stroke-width="1.5" d="M14 42h56M14 54h46" />
+  </g>
+  <text class="cap" x="170" y="38">迁入新环境</text><text class="cap-soft" x="170" y="76">另一份预览 · 另行批准</text><text class="cap-soft" x="170" y="108">不随归档发生</text></g>
+
+<!-- remote note, quiet caption under the corner mark -->
+<text class="cap-soft mono" x="1520" y="212" font-size="20" fill="#6E6A61" text-anchor="end" data-readability="supporting">SSH 远端任务沿用同一入口</text>
+<text class="cap-soft" x="1520" y="236" font-size="20" fill="#6E6A61" text-anchor="end" data-readability="supporting">原任务 ID 断线后仍可查询</text>
+
+<!-- footer -->
+<line class="line" x1="80" y1="780" x2="700" y2="780" />
+<g transform="translate(1351 80) scale(0.26)" id="identity">
+  <rect x="0" y="0" width="650" height="110" rx="6" fill="#C16A47" />
+  <rect x="80" y="110" width="106" height="300" rx="4" fill="#3D3D3A" />
+  <rect x="468" y="110" width="96" height="300" rx="4" fill="#3D3D3A" />
+  <rect x="588" y="364" width="102" height="46" rx="3" fill="#C16A47" />
+</g>
+<text x="80" y="800" font-size="24" fill="#6E6A61">原件保留在源环境。</text><text x="80" y="828" font-size="24" fill="#6E6A61">只有选中的资料进入加密包。</text><text x="80" y="856" font-size="24" fill="#6E6A61">凭据 · settings · hooks · MCP 不进入工作包</text></svg>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="四条执行路径、状态归属与实现入口。">
+  <link rel="canonical" href="https://lintel.page/guide/architecture/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/architecture/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/architecture/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/architecture/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="架构与源码地图 · Lintel">
+  <meta property="og:description" content="四条执行路径、状态归属与实现入口。">
+  <meta property="og:url" content="https://lintel.page/guide/architecture/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>架构与源码地图 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/architecture/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/architecture/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="architecture">
+        <h1 id="lintel-架构执行分工与状态归属">Lintel 架构：执行分工与状态归属</h1>
+<p>简体中文 · <a href="/guide/architecture/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>这张图回答三个问题：请求从哪里进入，操作由谁执行，结果保存在谁手里。它描述当前源码，运行与发行范围查<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
+<p><a class="guide-image-fallback" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.svg">Lintel 完整架构：环境与远端执行、浏览器、网络、App 更新四条路径</a></p>
+<p><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.svg">查看大图 SVG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.png">PNG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.mmd">Mermaid 源</a></p>
+<p>手机上可以放大原图，或直接阅读下面的四段执行说明。README 使用的是<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture-overview.svg">简版总览</a>。</p>
+<h2 id="四条执行路径">四条执行路径</h2>
+<p><strong>环境与文件任务。</strong> App 的 native request 和独立 CLI 调用同一 <code>crates/core</code>。本机 core 拥有环境清单、冻结计划、配置与文件操作、原任务记录和字段恢复。远端请求通过共享 <code>crates/remote</code>，以 OpenSSH 携带有限 JSON 请求到目标 runner；目标 core 使用自己的 state 执行与记录。controller 保存任务映射，但不替远端宣布操作完成。<code>crates/operations</code> 描述接口与严格字段合同，不执行文件副作用。</p>
+<p><strong>浏览器。</strong> App 和 macOS CLI 通过 Native Messaging host 管理配对与任务协调；已配对扩展拥有 profile 原生操作和 operation journal。浏览器清理的收尾需要真实重启与再次批准。切换 SSH 环境不会改变这条本机浏览器路径；Linux runner 不提供本机 browser-host control。</p>
+<p><strong>网络。</strong> <code>crates/egress</code> 提供 loopback CONNECT 通道和显式 HTTPS 出口测试实现。App 与 CLI 各自持有通道；客户端选择通过代理时，连接才受该通道规则约束。配置读回、代理连接观察、IPv4／IPv6 实测分别给出证据。宿主网络计划及恢复由 core 管理：当前 macOS 支持明确服务的 IPv6 配置操作，Linux 保留只读观察和测试。详细范围见<a href="/guide/network/">网络</a>。</p>
+<p><strong>App 更新。</strong> native <code>app_updates.rs</code> 与 Tauri updater 处理候选检查、下载验签、批准安装和明确重启；原更新 intent 留在 App data，独立于 core job。activity gate 管理 App 操作与更新的互斥，活跃代理另行阻止更新。当前没有公开 Release 下载、正式签名或已启用的发布公钥／feed；<code>e822d74</code> 是本地发行准备候选，不是公开更新源。官网只能依据已完成公开字节核对的 <code>lintel.app-release-public/1</code> 记录生成手工下载元数据；源码里的 feed 路径不等于已激活。</p>
+<p>官网 <code>apps/site</code> 独立展示文档、插画和共享游戏，没有通向本机 core、SSH controller 或 browser host 的执行调用。工作包可以由用户明确选择的系统文件传输工具携带；目标 core 在独立 state 中解锁、检查和选择性迁入，不依赖源 job。</p>
+<h2 id="一次计划型-core-任务怎样完成">一次计划型 core 任务怎样完成</h2>
+<p><code>生成并保存计划 → 审阅准确范围与 hash → 持久 accepted → 执行 → 核对结果</code></p>
+<p>最终结果可以是 <code>completed</code>、<code>partially_completed</code>、<code>failed</code> 或 <code>needs_reconciliation</code>。查询原 ID 用于追踪与核对，可能写入中断核对信息；它不重放破坏性动作。恢复另外生成计划，按字段归属及当前值核对后批准。</p>
+<p>这段生命周期针对 core 计划型任务。会话 launch／resume 使用专用 request 与真实 TTY 执行入口；generic execute／submit 不接收这些计划。浏览器 operation 和 App 更新 intent 也分别保存，不能用一个通用 job 流程代替所有模块。</p>
+<h2 id="源码地图">源码地图</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">你要理解或修改的部分</th><th class="align-left">入口</th></tr></thead><tbody><tr><td class="align-left">App 页面与 native 调度</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop"><code>apps/desktop</code></a>、<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/main.rs"><code>src-tauri/src/main.rs</code></a></td></tr><tr><td class="align-left">CLI／TUI、submit、专用交互启动</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/runner/src/main.rs"><code>apps/runner/src/main.rs</code></a></td></tr><tr><td class="align-left">计划、环境、文件、工作包、任务记录与恢复</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/core"><code>crates/core</code></a></td></tr><tr><td class="align-left">静态 operation／schema 与字段校验</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/operations"><code>crates/operations</code></a></td></tr><tr><td class="align-left">共用 SSH controller</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/remote"><code>crates/remote</code></a></td></tr><tr><td class="align-left">浏览器扩展与 Native Messaging host</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/extensions/browser"><code>extensions/browser</code></a></td></tr><tr><td class="align-left">CONNECT、出口实测与通道规则测试</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/egress"><code>crates/egress</code></a></td></tr><tr><td class="align-left">App 自身更新与活动互斥</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/app_updates.rs"><code>app_updates.rs</code></a>、<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/activity.rs"><code>activity.rs</code></a></td></tr><tr><td class="align-left">用户任务导航与技术操作映射</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/contracts/task-catalog.json"><code>contracts/task-catalog.json</code></a></td></tr><tr><td class="align-left">官网、统一验证入口</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/site"><code>apps/site</code></a>、<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/tests/verify.py"><code>tests/verify.py</code></a></td></tr></tbody></table></div>
+<p><code>platform/ssh</code> 保留原 Python caller 的兼容子集；新增共享远端能力由 Rust controller 拥有。协议与存储细节继续查 <a href="/guide/core/">Core / CLI</a>和<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/contracts/protocol.md">协议</a>。</p>
+<p> 展开 Mermaid（用于 GitHub 阅读与后续编辑）</p>
+<pre class="guide-code" data-language="mermaid"><code>flowchart TB
+  subgraph execution[&quot;01  环境与文件操作：按目标主机执行&quot;]
+    direction LR
+    entry[&quot;操作入口&lt;br/&gt;macOS App / 独立 CLI&quot;]
+    local[&quot;本机 core&lt;br/&gt;计划 / 批准 / 执行 / 核对&quot;]
+    localstate[&quot;本机 state&lt;br/&gt;清单 / 冻结计划 / 原任务记录&quot;]
+    targets[&quot;本机目标&lt;br/&gt;配置 / 工作文件 / 加密包&lt;br/&gt;宿主网络与绑定服务&quot;]
+    controller[&quot;共享 SSH controller&lt;br/&gt;crates/remote&quot;]
+    runner[&quot;目标 runner + 同一 core&lt;br/&gt;apps/runner + crates/core&quot;]
+    remoteowned[&quot;目标主机与该用户&lt;br/&gt;自己的 state / 计划 / 原任务&lt;br/&gt;配置与工作文件 / 绑定服务&quot;]
+    entry --&gt;|&quot;本机请求&quot;| local
+    entry --&gt;|&quot;远端请求&quot;| controller
+    local --&gt;|&quot;持久记录&quot;| localstate
+    local --&gt;|&quot;核对后操作&quot;| targets
+    controller --&gt;|&quot;OpenSSH / 有限 JSON&quot;| runner
+    runner --&gt;|&quot;在远端执行与记录&quot;| remoteowned
+  end
+  subgraph browser[&quot;02  浏览器：单独配对的本机 profile&quot;]
+    direction LR
+    browserentry[&quot;App / macOS CLI&quot;]
+    host[&quot;Native Messaging host&lt;br/&gt;配对与任务协调&quot;]
+    extension[&quot;已配对的扩展&lt;br/&gt;原生 API / operation journal&quot;]
+    profile[&quot;准确 browser profile&lt;br/&gt;权限与站点状态&quot;]
+    browserentry --&gt;|&quot;有限 control&quot;| host
+    host --&gt;|&quot;Native Messaging / 原 ID&quot;| extension
+    extension --&gt;|&quot;浏览器原生操作&quot;| profile
+  end
+  subgraph network[&quot;03  网络：经过通道的连接与明确发起的测试&quot;]
+    direction LR
+    netentry[&quot;App / CLI&lt;br/&gt;启动通道 / 请求测试&quot;]
+    client[&quot;选择通过代理的客户端&lt;br/&gt;独立于管理请求&quot;]
+    egress[&quot;crates/egress&lt;br/&gt;loopback CONNECT / HTTPS probe&quot;]
+    destination[&quot;允许的目的地&lt;br/&gt;或上游代理&quot;]
+    echo[&quot;计划列出的回显目标&lt;br/&gt;观察 IPv4 / IPv6 出口&quot;]
+    netentry --&gt;|&quot;管理 / 显式探测&quot;| egress
+    client --&gt;|&quot;经代理的连接&quot;| egress
+    egress --&gt;|&quot;按 host / port 规则&quot;| destination
+    egress --&gt;|&quot;显式 HTTPS 请求&quot;| echo
+  end
+  subgraph updates[&quot;04  App 更新：独立记录与发行配置&quot;]
+    direction LR
+    updateentry[&quot;macOS App&quot;]
+    updater[&quot;app_updates.rs&lt;br/&gt;Tauri updater / activity gate&quot;]
+    intent[&quot;App data&lt;br/&gt;原更新 intent / 安装结果&lt;br/&gt;显式重启&quot;]
+    feed[&quot;固定 feed / 签名资源&lt;br/&gt;当前未激活&quot;]
+    updateentry --&gt;|&quot;检查 / 批准&quot;| updater
+    updater --&gt;|&quot;持久记录与核对&quot;| intent
+    updater -.-&gt;|&quot;须配置发行公钥与 feed&quot;| feed
+  end
+  transfer[&quot;显式系统文件传输 · 工作包&quot;]
+  website[&quot;独立官网 · 无执行连接&quot;]</code></pre>
+<p></p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/architecture.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

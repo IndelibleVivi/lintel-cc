@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Lintel 0.1.0 Preview 安装信息：当前没有公开 App 二进制或正式 Release，可从源码试用 macOS App 或独立 CLI。">
+  <link rel="canonical" href="https://lintel.page/download/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/download/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/download/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/download/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="下载与安装 · Lintel">
+  <meta property="og:description" content="当前是 0.1.0 Preview：没有公开 App 下载、Developer ID 签名、公证或已启用的更新通道。">
+  <meta property="og:url" content="https://lintel.page/download/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>下载与安装 · Lintel</title>
+</head>
+<body class="route-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" aria-current="page" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/download/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" data-route-path="/download/" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/download/" lang="en" hreflang="en" data-site-route-language="en" data-article-language="en" data-route-path="/download/">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <section class="route-hero wrap">
+      <p class="eyebrow" data-route-copy="downloadEyebrow">DOWNLOAD / APP &amp; CLI</p>
+      <h1><span data-route-copy="downloadTitleA">选择你的方式。</span><br><span data-route-copy="downloadTitleB">先核对，再开始。</span></h1>
+      <p class="route-intro" data-route-copy="downloadIntro">先核对平台、版本与安装说明，再选择公开下载或源码试用。下载区只展示已核对公开字节的记录；没有记录时，使用明确的源码与本地构建路径。Apple 签名、公证与真实首装分别记录。</p>
+      <div class="route-actions"><a class="button primary" href="/guide/start-here/" data-route-copy="trialUiLink">第一次使用</a><a class="text-link" href="/releases/" data-route-copy="status">查看状态与证据</a></div>
+      <p class="route-boundary"><strong data-route-copy="downloadFacts">当前事实：</strong><span data-route-copy="downloadFactBody">本地候选不自动成为公开下载；准确版本、来源与实测范围见当前状态及下方记录。</span></p>
+    </section>
+    <section class="route-section wrap" aria-labelledby="available-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="availableEyebrow">AVAILABLE NOW</p><h2 id="available-title" data-route-copy="availableTitle">现在可以怎样开始</h2><p data-route-copy="availableIntro">按你已有的环境和目标选择，不要从不存在的按钮推断支持范围。</p></div>
+      <div class="download-grid">
+        <article class="download-choice"><p class="route-kicker">01 / SYNTHETIC UI</p><h3 data-route-copy="trialUi">先看 App 界面</h3><p data-route-copy="trialUiBody">从源码启动合成模式，使用一份新建测试 HOME／state 完成一次归档；不会配置你的 Claude 或浏览器。</p><a class="text-link" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明 →</a></article>
+        <article class="download-choice"><p class="route-kicker">02 / CLI TRIAL</p><h3 data-route-copy="trialCli">只走独立 CLI</h3><p data-route-copy="trialCliBody">构建 lintel，在一份一次性合成 fixture 中登记、预览、批准、查询并独立读包。</p><a class="text-link" href="/guide/quickstart/" data-route-copy="trialCliLink">打开完整试用 →</a></article>
+        <article class="download-choice"><p class="route-kicker">03 / LOCAL APP</p><h3 data-route-copy="trialApp">本地构建 macOS App</h3><p data-route-copy="trialAppBody">需要匹配 Rust host 的本机构建。产物不会自动安装到 Applications，也不代表正式签名或可分发。</p><a class="text-link" href="/guide/start-here/#build-native" data-route-copy="trialAppLink">查看构建步骤 →</a></article>
+      </div>
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="app-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="appEyebrow">APP / MANUAL DOWNLOAD</p><h2 id="app-title" data-route-copy="appTitle">App 安装资料</h2></div>
+      <!-- lintel-app-release:start -->
+      <div class="release-facts" data-download-app="unavailable">
+        <p class="release-state"><span>PREVIEW</span><strong data-route-copy="unavailable">暂无公开 App 下载</strong></p>
+        <dl class="fact-list"><div><dt data-route-copy="factVersion">版本</dt><dd>0.1.0 Preview</dd></div><div><dt data-route-copy="factPlatform">平台</dt><dd data-route-copy="factPlatformValue">macOS arm64 本地开发构建；Linux 仅 CLI／runner</dd></div><div><dt data-route-copy="factSignature">签名</dt><dd data-route-copy="factSignatureValue">没有 Developer ID 签名；没有公证</dd></div><div><dt data-route-copy="factUpdate">更新</dt><dd data-route-copy="factUpdateValue">未配置更新源；当前没有可检查的 feed</dd></div></dl>
+        <p class="route-note" data-route-copy="appNote">已有本地构建的用户按安装与更新指南核对候选来源与版本。公开二进制出现前，不从第三方镜像补齐缺失的 DMG。</p>
+      </div>
+      <!-- lintel-app-release:end -->
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="safety-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="installationEyebrow">INSTALLATION BOUNDARY</p><h2 id="safety-title" data-route-copy="installationTitle">安装顺序与边界</h2></div>
+      <ol class="route-checklist">
+        <li><span>01</span><div><strong data-route-copy="installOneTitle">先核对来源</strong><p data-route-copy="installOneBody">记录候选版本、架构、来源 revision 和它实际来自哪里。相同版本号不代表相同构建。</p></div></li>
+        <li><span>02</span><div><strong data-route-copy="installTwoTitle">需要时本地构建</strong><p data-route-copy="installTwoBody">使用当前源码、锁定依赖和 Xcode Command Line Tools；构建不等于正式发行。</p></div></li>
+        <li><span>03</span><div><strong data-route-copy="installThreeTitle">首次试用只用合成资料</strong><p data-route-copy="installThreeBody">登记一个明确测试目录，完成归档并重新读包，不先改动个人 Claude 环境。</p></div></li>
+        <li><span>04</span><div><strong data-route-copy="installFourTitle">按系统提示处理信任</strong><p data-route-copy="installFourBody">没有 Developer ID／公证的构建不应被描述成正式安装包；不要关闭全局 Gatekeeper 或使用 xattr 绕过。</p></div></li>
+      </ol>
+    </section>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerBoundary">网站不连接执行核心、native 或业务 API。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="独立 CLI、接口发现、秘密 stdin、portable work 与候选安装。">
+  <link rel="canonical" href="https://lintel.page/guide/agents/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/agents/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/agents/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/agents/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Agent CLI · Lintel">
+  <meta property="og:description" content="独立 CLI、接口发现、秘密 stdin、portable work 与候选安装。">
+  <meta property="og:url" content="https://lintel.page/guide/agents/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>Agent CLI · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/agents/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/agents/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="agents">
+        <h1 id="lintel-agent-cli">Lintel Agent CLI</h1>
+<p>简体中文（canonical） · <a href="/guide/agents/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>此指南面向已有操作授权的 coding agent 和脚本作者。当前为 Lintel 0.1.0 Preview / 源码开发预览，协议 1 / catalog 1；没有正式签名发行或公开 Release 下载。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。</p>
+<p>首次试用可先走 <a href="/guide/quickstart/">中文 quickstart</a> / <a href="/guide/quickstart/">English quickstart</a>，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。</p>
+<h2 id="从-app-接到终端或-agent">从 App 接到终端或 Agent</h2>
+<p>App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。没有正式下载链接；官网与 App 的 main 文档入口都标为“最新开发说明”。</p>
+<p>App 不后台下载、修改 PATH 或复制 journal。缺少 candidate sidecar 表示身份未知；字节一致只说明文件与 sidecar 匹配，不证明签名或源码可信。错误架构、协议不合、摘要不符和无法完成有限静态探测会给出具体错误。</p>
+<p>交接包须明确使用原任务所在的 state。对于已接受或结果不确定的 job，执行它给出的原 ID 查询命令；对于会话启动，使用原 launch request 的只读查询。换 CLI 不等于换 state，也不改绑原远端 runner；不从交接文字获得新的执行授权。</p>
+<h2 id="用户安装候选包">用户安装候选包</h2>
+<p>从可信的候选提供方取得当前平台 archive 与索引，核对 candidate 身份和平台；然后使用系统工具解到新的版本目录。下列 identity 是合成示例，须替换为实际索引中的值。</p>
+<p>安装与升级只用最简单可检视的机制：解到明确选择的<strong>新身份目录</strong>。先只创建父目录，再用普通 <code>mkdir &quot;$dest&quot;</code>（目录已存在会失败）作为是否解包的条件，因此绝不会覆盖已有版本：</p>
+<pre class="guide-code" data-language="sh"><code>parent=&quot;${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}&quot;
+mkdir -p &quot;$parent&quot;
+# 用实际索引名替换：&lt;version&gt;-candidate-&lt;revision 前 12 位&gt;
+identity=&quot;0.1.0-candidate-a239123903b6&quot;
+dest=&quot;$parent/$identity&quot;
+mkdir &quot;$dest&quot; &amp;&amp; tar -xzf &quot;candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz&quot; -C &quot;$dest&quot;</code></pre>
+<p>安装后从选定目录核对实际字节；<strong>目标主机不需要 Node</strong>，用系统 <code>shasum</code>／<code>sha256sum</code> 校验随包生成的 <code>SHA256SUMS</code>。清单覆盖全部 payload、<code>candidate.json</code> 与 <code>README.txt</code>，只排除清单自身；它证明这些文件的字节一致，不提供签名或可信源码 provenance。再运行绝对路径：</p>
+<pre class="guide-code" data-language="sh"><code>cd &quot;$dest&quot;
+shasum -a 256 -c SHA256SUMS      # macOS
+# Linux 上改用：sha256sum -c SHA256SUMS
+&quot;$dest/bin/lintel&quot; version --json
+&quot;$dest/bin/lintel&quot; capabilities --json</code></pre>
+<p>升级时把<strong>另一个</strong>身份归档解到另一个目录，重跑上面的校验与 <code>version</code>/<code>capabilities</code>，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。candidate 不是签名发行：Linux 归档在 macOS 上只做格式与字节检查，没有 Linux 运行时证据；只有本机架构匹配时才在本机执行所选 executable。</p>
+<p>卸载某个 CLI 版本时，先停止使用该路径，确认没有该版本正在执行的任务，再删除自己解包的那个候选目录。保留 Lintel state、工作包与原 job ID；移除 executable 不会恢复已经批准的配置，也不会卸载独立安装的浏览器 host 或远端 runner。配置恢复与这些组件各自的管理入口仍是独立操作，不要通过删除 state 代替恢复。</p>
+<h2 id="从源码独立安装">从源码独立安装</h2>
+<p>从已核对的源码 checkout 安装到你明确选择的用户目录（需要 Rust stable 与本地平台 toolchain；CLI 不需要 Node、Tauri、GUI 或已安装 App）：</p>
+<pre class="guide-code" data-language="sh"><code>cargo install --path apps/runner --locked --root &quot;$HOME/.local/share/lintel-cli/chosen-candidate&quot;
+&quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; version --json
+&quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; capabilities --json</code></pre>
+<p>脚本优先使用这个绝对 executable 路径；要使用 <code>lintel</code> 简写，把该目录的 <code>bin</code> 明确加入自己的 PATH。安装不自动修改 shell rc、系统 service、Claude、浏览器 profile 或既有 App。Linux runner 不编译 Tauri / browser；macOS CLI 包含有限 browser-host control 的库适配。</p>
+<p>升级时在核对新 checkout 后选择<strong>另一个版本目录</strong>重新运行安装，检查 <code>version</code>、<code>capabilities</code> 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 <code>0.1.0</code> 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。</p>
+<h2 id="先发现接口再发现目标">先发现接口，再发现目标</h2>
+<pre class="guide-code" data-language="sh"><code>lintel --help
+lintel version --json
+lintel capabilities --json
+lintel context --json
+lintel tasks --json
+lintel work session read --help
+lintel launch query --help
+lintel describe plan_policy --json
+lintel schema plan_policy
+lintel env list --json
+lintel env inspect &lt;environment-id&gt; --json
+lintel env components &lt;environment-id&gt; --project-cwd /synthetic/project --json
+lintel work preflight --environment &lt;environment-id&gt; --categories instructions,memory,sessions --json
+lintel work inventory --environment &lt;environment-id&gt; --categories memory,sessions --json
+lintel work archive plan --environment &lt;environment-id&gt; --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
+lintel capabilities --environment &lt;environment-id&gt;</code></pre>
+<p>静态 help/version/capabilities/describe/schema/tasks/context 不运行 Claude、不发现个人目录、不初始化 state。<code>describe</code> 返回稳定 operation ID、有限 transports、JSON Schema、平台/目标条件、目标与 Lintel state 副作用、批准方式、秘密字段、结果和恢复语义。显式目标 capabilities 附带该环境的真实 inspection；service 的准确 unit/manager 继续用 <code>service_inspect</code>，browser 继续用 profile inspection。</p>
+<p>Service unit 只接受准确 <code>.service</code> 名称，例如 <code>claude.service</code> 或 <code>claude@synthetic.service</code>；模板 <code>claude@.service</code>、路径、glob 与命令不受支持。schema 与 named CLI/core 共用的名称规则保持一致；named 输入在初始化目标 state 前检查，实际 unit 身份、绑定与 manager 状态仍由 core 核对。</p>
+<p><code>inspect_components</code> 对准确 environment 返回有限静态来源与原任务投影，<code>project_cwd</code> 可选且属于目标主机。它不调用 Claude、不读取凭据正文、不查询并改写 job；服务仅核对最多 8 个已有记录中的明确 unit，不能代替全局 supervisor 发现。<code>records</code> 最多 50 份，扫描／展示缺口分别标记；原任务的历史 coverage 不等于当前运行状态。浏览器 profile 属于独立本机模块，不由 root 推断归属。</p>
+<p><code>work_preflight</code> 只读取元数据，返回所选原件数量／字节、限额、阻塞相对路径及扫描完整性；<code>eligible</code> 只说明当前元数据准入，不冻结文件、不授予执行。符号链接、不可访问项或预算耗尽必须报告未知／不完整，阻塞列表截断不变成通过。实际 <code>plan_archive</code>／<code>plan_preserve</code> 继续完整读取原件并冻结摘要；预检后文件改变也必须通过这些原检查。当前流式路线可完整归档该 runner 限额内的大 session；超过其单文件／合计限额仍拒绝。原生 resume 的格式核对另限 ≤8 MiB，不限制独立归档与分页阅读。</p>
+<p><code>work_inventory</code> 是有界 metadata-only 分页清单，返回准确 environment/root、<code>files</code> 的原相对路径／类别／字节数、<code>total_files</code>、<code>complete</code>、<code>digest</code> 和 <code>next_offset</code>。继续页使用返回的 <code>--offset</code> 与同一个 <code>--expected-digest</code>；元数据清单改变拒绝 <code>stale_inventory</code>，不能拼接两份快照。这个摘要只绑定分页元数据，不是内容验证或执行批准；正文摘要由正式计划拥有。</p>
+<p><code>work preflight</code>、<code>work archive plan</code>、<code>work preserve plan</code> 的 repeatable <code>--path</code> 对应 additive <code>selected_paths</code>。省略则保留整类语义；提供时必须非空、唯一、canonical 相对路径，属于已选类别，不能有 <code>. / ..</code>、绝对路径、控制字符或模糊匹配。每个路径最多 4096 UTF-8 字节，最多 10,000 项，序列化数组最多 512 KiB。core 再核对每个原件、祖先和读取边界；只读取选中原件，缺失或不支持对象拒绝，不回退到整类。public plan 的 <code>work_selection</code> 显示冻结选择，新环境的 <code>planned_target</code> 显示完整最终落点。执行再次核对同一选中 manifest，未选文件增改不扩大范围。cleanup/reset/import 不接受这一字段；既有 archive/session read 的 <code>--path</code> 仍表示阅读包内文件。</p>
+<p>Named CLI 与有限 SSH 的 <code>environment_id</code>、<code>plan_id</code>、<code>job_id</code> 按 schema 的 UUID 格式检查，接受大小写十六进制的 <code>8-4-4-4-12</code> 连字符形式。错误格式返回 <code>invalid_request</code>，在本机 state 初始化或 SSH 调用前拒绝；始终使用执行器返回的原 ID。旧 raw protocol-1 仍由 core 按既有 ID 规则处理。</p>
+<p>外层 <code>remote.execute</code> / <code>remote.reconnect</code> 的 <code>plan_id</code> 与 <code>remote.launch</code> 的 <code>environment_id</code> 也共用这条 UUID 规则，在本地记录或 SSH 前检查。<code>install_id</code> 属于安装 controller 的独立受限标识规则，使用安装预览返回值。</p>
+<p>Named execute 与有限远端新提交的 <code>approval</code> 必须是原计划返回的 64 位 lowercase hex hash。格式错误在初始化 named core 或创建远端任务 intent／调用 SSH 前拒绝，格式合法仍须由 core 核对准确 plan.hash 与当前目标。已有远端任务记录的重复 execute 保持 query-only，不因参数错误删除记录或重发；原 ID 的 reconnect 是明确恢复入口。</p>
+<p>专用真实 TTY <code>lintel launch ID</code> 与 <code>capabilities --environment ID</code> 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 <code>invalid_request</code>，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。</p>
+<p><code>env list</code> 和 <code>discover</code> 可能登记已发现的默认根并保存 inventory；<code>job</code> 查询可能持久标记中断。<code>auth_probe</code> 会显式运行官方认证状态命令，并以 <code>identity_observed</code> 布尔值说明主体是否可核对；官方注销的主体缺失会拒绝预览，认证状态变化会使旧批准失效。未执行旧注销计划缺少绑定时需要新预览，已接受任务仍只查询原 ID。<code>archive_read</code> 返回工作正文。不要把它们都当成无副作用元数据操作。<code>discover</code> 快捷入口与 <code>request</code> JSON discover 返回同一 runner capability 集合。</p>
+<p>普通命令 stdout 只有一个 JSON envelope，<code>ok:false</code> 退出非零，诊断走 stderr。专用 <code>launch</code> 是交互进程接管入口，启动失败诊断写 stderr。<code>network serve</code> 是唯一这里明确使用 NDJSON stream 的长期入口。<code>ok:true</code> 说明请求处理成功；任务是否完成由 <code>data.status</code>、steps、coverage 和 error 判断。</p>
+<h2 id="本地清单与脱敏快照">本地清单与脱敏快照</h2>
+<p>当前源码的本地观察入口共用 core；远端先通过目标 runner 的 <code>describe</code>／<code>schema</code> 核对支持，旧 runner 不会因 App 升级自动具备新命令。</p>
+<pre class="guide-code" data-language="sh"><code>lintel env residue &#39;&lt;environment-id&gt;&#39;
+lintel env identity &#39;&lt;environment-id&gt;&#39;
+lintel env compare &#39;&lt;environment-id&gt;&#39; --other-environment-id &#39;&lt;other-environment-id&gt;&#39;
+lintel snapshot save --environment &#39;&lt;environment-id&gt;&#39;
+lintel snapshot list --environment &#39;&lt;environment-id&gt;&#39;
+lintel snapshot compare --environment &#39;&lt;environment-id&gt;&#39; --old-snapshot-id &#39;&lt;old-snapshot-id&gt;&#39; --new-snapshot-id &#39;&lt;new-snapshot-id&gt;&#39;</code></pre>
+<p><code>residue_inventory</code> 只读已知位置的文件元数据；表外区域未覆盖，达到深度／数量上限或读失败明确保留缺口。<code>identity_inspect</code> 默认只返回已识别字段的存在性。上面六个命令也支持 <code>lintel call OPERATION</code> 的 JSON stdin，并进入共享有限 SSH 请求合同；完整请求字段以当前 runner 的 schema 为准。</p>
+<p><code>snapshot_save</code> 保存不可覆盖的脱敏观察，返回快照 ID 和公开摘要；<code>snapshot_list</code> 最多展示 200 份记录、一次最多检查 2,000 个目录项，<code>scan_complete</code> 与逐项错误说明覆盖，损坏记录不隐藏其余快照。快照保留普通设置、有限声明与残留统计；请求头、带认证信息的接收端和原始身份不进入快照。身份比较材料仅在本地私有 state 内，比较响应只给相同／改变／未知；盐域不一致时不能据此判定身份变化。即时 <code>env_compare</code> 使用同一次临时盐，不保存快照或持久盐。</p>
+<p>缺失、损坏或读取失败的配置不能当作“关闭”；对应区域标为未完成，其余独立观察继续返回。遮蔽值的相等性也保持未知。脱敏快照用于比较，配置恢复仍须来源明确的原任务或加密备份和新批准，不能用摘要还原正文。普通命令沿用现有 state／锁行为，这些观察不启动 Claude、执行 hooks 或访问公网。</p>
+<p><code>lintel snapshot accept --environment &#39;&lt;environment-id&gt;&#39; --old-snapshot-id &#39;&lt;old-snapshot-id&gt;&#39; --new-snapshot-id &#39;&lt;new-snapshot-id&gt;&#39; --selected-changes &#39;[&quot;&lt;returned-change-id&gt;&quot;]&#39;</code> 只将 <code>snapshot compare</code> 返回的所选 <code>changes[].id</code> 接受为比较基线，不改配置。它会重新核对当前所选值；陈旧观察与遮蔽值不能被接受。形成语义基线后，旧的 <code>accept_drift</code> 返回 <code>semantic_baseline_selection_required</code>，应继续用逐项 <code>snapshot accept</code>；旧字段基线仅为尚未迁入语义基线的调用方保留。</p>
+<h3 id="高级配置本地数据与配方的可写入口">高级配置、本地数据与配方的可写入口</h3>
+<p>下列命名入口都进入同一计划／批准／job／receipt 链，只有明确批准后才写入；秘密（归档口令）仍只经 JSON stdin，不放 argv。</p>
+<pre class="guide-code" data-language="sh"><code>lintel config inspect --environment &#39;&lt;environment-id&gt;&#39; [--project-cwd /abs/project]
+lintel config read --environment &#39;&lt;environment-id&gt;&#39; --config-path /abs/settings.json   # 返回该文件当前 JSON 正文与摘要
+lintel config edit plan --environment &#39;&lt;environment-id&gt;&#39; --config-path /abs/settings.json   # stdin: {&quot;document&quot;:&quot;&lt;JSON 文本&gt;&quot;,&quot;expected_digest&quot;:&quot;&lt;当前摘要&gt;&quot;}
+lintel config apply plan --environment &#39;&lt;environment-id&gt;&#39; --source-environment-id &#39;&lt;other-id&gt;&#39; --selected-keys &#39;[&quot;OTEL_LOG_USER_PROMPTS&quot;]&#39;
+lintel config restore inspect --environment &#39;&lt;environment-id&gt;&#39; --job &#39;&lt;original-job-id&gt;&#39;
+lintel config restore plan --environment &#39;&lt;environment-id&gt;&#39; --job &#39;&lt;original-job-id&gt;&#39; --selected-keys &#39;[&quot;/env/OTEL_LOG_USER_PROMPTS&quot;]&#39;
+lintel data clear plan --environment &#39;&lt;environment-id&gt;&#39; --writers-confirmed-stopped   # stdin: {&quot;residue_paths&quot;:[...],&quot;archive_before_clear&quot;:true,&quot;delete_work&quot;:false}
+lintel data identity-reset plan --environment &#39;&lt;environment-id&gt;&#39;   # stdin: {&quot;writers_confirmed_stopped&quot;:true,&quot;identity_backup_paths&quot;:[...]}
+lintel data workflow plan --environment &#39;&lt;environment-id&gt;&#39;   # stdin: {&quot;writers_confirmed_stopped&quot;:true,&quot;policy&quot;:{...},&quot;reset_identity&quot;:true,&quot;residue_paths&quot;:[...]}</code></pre>
+<p><code>plan_config_edit</code> 需要严格 JSON <code>document</code> 与读取时的 <code>expected_digest</code>，把差异算成逐字段 diff；未识别键或凭据值（<code>OTEL_EXPORTER_OTLP_HEADERS</code>、带凭据的接收端 URL）在预览中只报 <code>masked: true</code>、<code>before</code>／<code>after</code> 为 <code>null</code>。执行写前生成独立 age 加密 <code>lintel.config/1</code> 备份（<code>config_archive_path</code>）并读回；<code>plan_config_restore</code> 只处理原任务改过的字段、要求现值仍等于原写入值（否则 <code>restore_conflict</code>），保留无关后续编辑。<code>config_inspect</code> 读取有限配置来源并遮蔽公开值，不读取身份／凭据文件正文；显式 <code>config_read</code> 返回所选配置原文，应只在私密终端／编辑器使用，勿将响应存入普通日志。managed 与身份文件不能作为高级编辑写入目标。</p>
+<p><code>plan_cleanup</code> 的 <code>clear_residue</code> 需要非空 <code>residue_paths</code>，两种操作均需 <code>writers_confirmed_stopped: true</code>。清理按 <code>archive_before_clear</code> 选择先备份或直接删除；<code>archive_only: true</code> 可只归档而不删除。<code>plan_identity_reset</code> 始终先将完整原始客户端状态及所选备份加密保全为 <code>lintel.residue/1</code>，再只移除 <code>userID</code>，不注销、不清凭据。备份可能包含敏感原文，仅以密文保管；可独立读取清单与恢复：</p>
+<pre class="guide-code" data-language="sh"><code># 字段全部经 stdin；秘密仍只经 stdin，不放 argv
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;job_id&quot;:&quot;&lt;original-job-id&gt;&quot;,&quot;archive_passphrase&quot;:getpass.getpass(&quot;Passphrase: &quot;)}))&#39; |
+  lintel call residue_archive_inspect
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;environment_id&quot;:&quot;&lt;id&gt;&quot;,&quot;job_id&quot;:&quot;&lt;original-job-id&gt;&quot;,&quot;selected_paths&quot;:[&quot;/abs/original&quot;],&quot;archive_passphrase&quot;:getpass.getpass(&quot;Passphrase: &quot;)}))&#39; |
+  lintel call plan_residue_restore</code></pre>
+<p><code>lintel.residue/1</code> 与工作包分开：有效原环境绑定才允许新恢复计划，旧的无绑定材料仍可读清单；只按包内记录的原路径恢复，已有文件不覆盖（<code>restore_conflict</code>），不是工作 import。<code>plan_client_workflow</code> 把配置修改、残留清理与标识重置合成一份计划、一次批准；同一文件不能属于两个步骤（<code>overlapping_actions</code>），中断后只查原 ID。App 侧对应“本地数据与身份”“变化与对照”“高级配置编辑”和三条“快捷配方”，详见 <a href="/guide/desktop/">桌面指南</a> 与 <a href="/guide/operator-guide/#recovery">操作指南</a>。</p>
+<h2 id="完整的计划批准查询与恢复">完整的计划、批准、查询与恢复</h2>
+<p>以下 ID/hash 是占位，必须使用<strong>当前主机、当前目标</strong>返回值。先登记准确配置根或从 inventory 选择目标；不得用项目代码目录替代 Claude config root。</p>
+<pre class="guide-code" data-language="sh"><code>lintel env register --name &#39;Example workspace&#39; --root /absolute/claude-config
+lintel policy plan --environment &lt;environment-id&gt; --preset reduce --no-keep-remote-control
+lintel plan show &lt;returned-plan-id&gt;
+lintel job submit --plan &lt;returned-plan-id&gt; --approval &lt;returned-plan-hash&gt;
+lintel job show &lt;returned-plan-id&gt;
+lintel job wait &lt;returned-plan-id&gt; --timeout 30s
+lintel restore plan --job &lt;original-job-id&gt;
+lintel plan show &lt;restore-plan-id&gt;
+lintel job submit --plan &lt;restore-plan-id&gt; --approval &lt;restore-plan-hash&gt;
+lintel job wait &lt;restore-plan-id&gt; --timeout 30s</code></pre>
+<p><code>policy plan</code> 必须显式选择 <code>--keep-remote-control</code> 或 <code>--no-keep-remote-control</code>。需要 Trusted Devices 条件时传 <code>--trusted-devices required|not_required|unknown</code>。custom 使用 <code>--preset custom --custom-settings &#39;{&quot;DISABLE_TELEMETRY&quot;:&quot;disable&quot;}&#39;</code>；按当前 schema 对 27 个字段选择 keep/enable/disable/remove/set；遮蔽键只允许 keep/disable/remove，set 还需配对 custom_values，非 custom 不接受 custom_settings，custom 不接受非空 release_settings。版本/策略/目标变更使批准失效，重新核对并预览。</p>
+<p>计划生成会保存冻结计划；不会修改目标 settings。<code>plan show</code> 不刷新旧计划，而是读回其公共范围。批准必须匹配该计划的 hash，并来自当前任务对这些动作的既有用户授权；没有通用 <code>--yes</code>。后续外部编辑会拒绝恢复；不要把冲突当作强制覆盖理由。</p>
+<p>通用 <code>execute</code>／<code>job submit</code> 只接受其支持的配置、保全、归档、清理、迁入、恢复与服务 mutation 计划；launch、resume 或未知 kind 返回 <code>invalid_plan_kind</code>，在新 job／durable ACK 前拒绝。已有原 job ID 仍只查询，不因类型被拒绝而删除原记录或重试提交；启动／续聊改用各自的准确批准入口。</p>
+<p><code>job submit</code> 返回 durable ACK，通常 status 为 accepted。ACK 后任务仍可能失败；另一独立进程使用同一个 HOME/state 和原 plan ID 可以查询。<code>job wait</code> 在轮询前按共同 schema 校验原 plan ID；无效 UUID 返回非零、<code>invalid_request</code>，不会初始化 state。默认等待 30s，支持 0–3600s 或毫秒值；超时返回非零、<code>error.code=wait_timeout</code>、原 <code>plan_id</code> 和最新 <code>data</code>，<strong>不会重新提交</strong>。needs_reconciliation/interrupted 是需要核对的终态，wait 不替你执行恢复。</p>
+<p>接受后的失败在持久回执 <code>error</code> 中记录 code/message/phase/recovery；已完成步骤和 archive/new_root 等产物保留。查询原记录，不从 warnings 中文文本猜 code、不自动再 execute。还要检查实际托管 <code>execution</code>：SSH 断线、父进程退出、logout、reboot 是不同事件，ACK 不保证 reboot survival。当前 runner 不 sudo、不启用 linger、不改变登录策略。</p>
+<p>配置发布中断后，先 <code>job show</code> 原 ID（或 <code>call job</code>）取得 <code>settings_recovery</code>。<code>written</code> 是核对 staged 文件对象与冻结计划后得到的证据，才允许新建 <code>plan_restore</code>；<code>not_written</code>／<code>ownership_unproven</code> 保留当前文件，不自动恢复、不重发。正常已完成任务的字段恢复仍检查后续编辑，其他字段保留。</p>
+<h2 id="所有-core-操作与旧调用者">所有 core 操作与旧调用者</h2>
+<p>命名入口涵盖常见任务；其余 core 请求使用有限 <code>call OPERATION</code>，参数对象从 stdin 进入，同一 schema 校验。交互启动使用真实 TTY 专用入口；<code>call launch</code>、<code>call launch_request</code>、<code>call resume_request</code> 与 JSON request 不得绕过这个边界。App 自己使用有限原生 adapter。例如：</p>
+<pre class="guide-code" data-language="sh"><code>lintel call cleanup_inspect &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;}
+JSON
+lintel call service_inspect &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;manager&quot;:&quot;user&quot;,&quot;unit&quot;:&quot;example.service&quot;}
+JSON</code></pre>
+<p>先 <code>describe</code> / <code>schema</code>，再从真实 inspection 准备准确计划。清理顺序为状态备份/工作归档 → 新根迁入（reset_client）→ 官方注销（若批准）→ 精确文件处理 → 退役（若选）。没有“全环境 export”“全局杀 Claude”“恢复全部”。service pause/resume 是独立批准任务，不自动改绑新根。</p>
+<p>旧 <code>request</code>、<code>submit</code>、<code>discover</code>、<code>inspect ID</code>、<code>jobs</code>、<code>job ID</code>、<code>launch ID</code>、<code>tui</code> 保留。协议 1 raw core request 保留历史 defaults；named CLI 和有限 SSH 使用明确严格字段，不会静默收紧已有 raw caller。<code>request</code> 的 execute 为前台处理；后台原 ID 回收使用 submit。<code>launch</code> 需要真实 TTY、不接受 prompt，启动的是准确程序和配置根，不能用于后台 mutation。旧 plan_reset/rebuild 及历史“部分完成”回执不改写为新 preservation outcome。</p>
+<a id="portable-work"></a>
+<h2 id="秘密-stdin-与-portable-work">秘密 stdin 与 portable work</h2>
+<p>秘密只经一次性 JSON stdin，不进入 argv、shell history、永久 request file、plan 或 receipt。手工使用下面的 Python <code>getpass</code>（从控制终端无回显读取），也可使用已有获准的秘密输入管道；不要启用会打印输入的 shell tracing。</p>
+<pre class="guide-code" data-language="sh"><code>lintel work archive plan --environment &lt;source-id&gt; --categories instructions,memory,sessions --output-path /absolute/new-work-package.age
+lintel plan show &lt;archive-plan-id&gt;
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel job submit --plan &lt;archive-plan-id&gt; --approval &lt;archive-plan-hash&gt;
+lintel job wait &lt;archive-plan-id&gt; --timeout 30s
+lintel work archive list</code></pre>
+<p>output_path 可省略以保存在 Lintel state；填写路径时父目录须存在且目的地尚未使用。计划冻结父目录的 device/inode，在接受和发布前复查；目录被替换返回 <code>stale_plan</code>，没有这份身份的旧显式输出计划也须重新预览。原任务回执继续只查询、不重跑。archive-only 不建立环境、不处理登录、不改变源文件。<code>work preserve plan --environment ID --categories ... [--name NAME]</code> 另行表示归档并准备新环境，成功为完成，outcome=preserved；旧登录保留，接着选新环境保护方案、正常登录与启动。归档仍为 <code>lintel.work/1</code>，包含类别、相对路径、原字节和文件 digest，不复制 credentials/settings/hooks/MCP。</p>
+<p>当前源码准入为单文件 256 MiB、所选合计 1 GiB、10,000 文件；先用 <code>work preflight</code> 读取实际 runner 的 limits，旧候选可能更低。持久 JSON 记录读写共用 16 MiB 上限；超大冻结计划在保存前返回 <code>state_limit</code>，正文容量预检通过不代替计划成立，可缩小精确选择后重新预览。work codec 流式编码、完整解密并核验所有原件，再按冻结 mapping 迁入；每页 reader 至多取 256 KiB，正文不常驻整个包。每次读取仍核验全包，state 磁盘须容纳展开原件，目的地另需密文／逐文件临时空间。正常返回清除私有暂存；强制终止可能留下 <code>.lintel-work-stage-*</code>，不会自动扫除。reader 限制 scrypt log N ≤ 20；高成本包明确返回 <code>archive_limit</code>，不会降级解密。旧 reader 仍有自己的容量限制，不能据包格式相同推断大包可在旧版本读入。 有限 SSH 的 60 秒／2 MiB 响应边界不因 core 容量增加而改变，慢包预览或阅读可能 <code>transport_unknown</code>；在目标机独立运行 CLI 核对，已接受 job 保留原 ID 查询。</p>
+<p>把<strong>密文</strong>复制到新机器/独立安装后，不需要源 inventory 或源 job：</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work archive inspect --archive-path /absolute/carried-work-package.age
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work archive read --archive-path /absolute/carried-work-package.age --path CLAUDE.md
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work import plan --environment &lt;destination-id&gt; --archive-path /absolute/carried-work-package.age --categories instructions,memory</code></pre>
+<p>inspect/read/import 必须恰好一个 source：<code>--job ID</code>（本安装记录）或 <code>--archive-path PATH</code>（目标主机已有文件）。import 预览和执行先核对整批实际父目录的当前 UID 归属与有效访问／写入权限，已知障碍在任何正文写入前拒绝，不自动 chmod/chown。计划冻结密文字节 digest 与目标文件状态；approved execute 再通过秘密 stdin 给同一口令，包改变、损坏、错误口令、超限或同名目标冲突返回具体错误，不覆盖原文件。跨主机传输由显式系统 SSH/SFTP/scp 或可移动存储完成，见 <a href="/guide/operator-guide/#work">人类迁移步骤</a>；Lintel 不自动跨主机 transfer，也不上传整个 state。</p>
+<p>保全／重建回执的 <code>new_root</code> 与 <code>new_environment_id</code> 在创建目录前持久保存；它们是 intent，只有 create 步骤完成才证明登记成功。创建或登记失败时只查询原 job，保留准确路径／ID，不因意图存在而重建或自动清理。</p>
+<p>新归档／迁入文件使用 macOS/Linux 原子不覆盖 rename；不支持的文件系统／内核返回 <code>atomic_publication_unsupported</code>，没有 hard-link 或覆盖 fallback。回执中的 archive_path 是 intent；archive_digest 或完成的 archive 步骤才证明读回。App 仅让已读回的任务归档进入查看／选择入口，独立路径仍由 core 检查原文件。</p>
+<a id="browser-adapter"></a>
+<p>工作保全、归档、迁入、旧重建及 cleanup 的 reset_client/retire 在 named/finite 请求中必须至少选择一种类别；空 JSON 数组和 <code>--categories &#39;&#39;</code> 拒绝。repair_login 不处理工作内容，categories 可省略或为空，schema 按 recipe 条件表达同一规则。protocol-1 raw request 保留历史兼容默认。</p>
+<p><code>plan_import</code> 与 <code>plan show</code> 的 <code>import_manifest</code> 是批准时应核对的最终清单：<code>package:{format,generator,sha256}</code>、<code>files:[{source,destination,category,size,sha256}]</code>。旧 <code>import_manifest</code> 的 source／destination 保持相对路径兼容；新增 <code>planned_target</code> 展示批准中的完整配置 root、准确文件落点、用途与启用选择。App 和 CLI 读回相同计划，含重名分配；摘要对应实际冻结字节。它不含文件正文或归档口令。独立 import 的 <code>task_result.coverage</code> 中，<code>planned_target: done</code> 需要冻结 manifest 的每个文件都有发布、目的地父目录同步及摘要读回之后的完成记录；冻结清单、现有可读字节或总 status 本身都不是这个完成证据。同步结果不确定时保留原 ID／落点查询，不标 done、不重发迁入。</p>
+<h2 id="分开配置目录项目目录与会话输入">分开配置目录、项目目录与会话输入</h2>
+<p><code>CLAUDE_CONFIG_DIR</code> 指向已登记配置 root；<code>project_cwd</code> 是目标主机上已存在、当前用户可用的项目目录。它们可以不同，Lintel 不代为创建或改变项目权限。新启动先预览实际目录、程序和静态版本，再批准这一份不可变请求。<code>plan_launch</code>／<code>plan_resume</code> 只读取目标与资料并保存冻结计划，不启动外部程序、不需要 TTY，可通过 runner JSON、named CLI 或有限 SSH request 预览。<code>launch_request</code>／<code>resume_request</code> 则需要准确的原计划与 hash，使用真实 TTY 专用入口，或由 macOS core 原生 adapter 请求 Terminal；runner JSON 和有限 SSH request 不执行它们。远端交互使用独立 remote launch control，绑定原请求和 runner。resume 的批准动作另会发布私有运行副本后启动，不能按只读预览处理：</p>
+<p>新 launch／resume 计划的 <code>startup</code> 投影列出有限配置候选来源、声明和只查看元数据的认证位置；不返回命令、token 或指令正文，actual_loaded 与认证仍是未核验。候选变化需要重新预览；未尝试的旧计划缺少 private startup binding 也需要新预览，已记录原 ID 仍优先查询。新 Terminal 的 shell 环境、Keychain、组织策略和工作目录外指令 imports 另行核对；<code>/status</code> 与 <code>/mcp</code> 是用户在目标终端确认的步骤。</p>
+<p>新 launch／resume 计划同时冻结目录的 device、inode、owner 与创建时间，以识别 Linux 立即复用 inode 的目录替换；普通新增／删除项目文件不改变目录创建时间。文件系统不能提供创建时间时返回 <code>directory_identity_unsupported</code>，不打开客户端。缺少这份身份的旧未启动计划须重新预览；已有原启动记录仍先只读查询，不重放。</p>
+<pre class="guide-code" data-language="sh"><code>lintel call plan_launch &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;project_cwd&quot;:&quot;/absolute/project&quot;,&quot;mode&quot;:&quot;interactive&quot;}
+JSON
+lintel plan show &lt;launch-request-id&gt;
+# 在真正的终端运行；不接受 prompt：
+lintel launch_request &lt;launch-request-id&gt; &lt;launch-plan-hash&gt;
+lintel launch query &lt;launch-request-id&gt;
+lintel launch list</code></pre>
+<p>原 <code>lintel launch ID</code> 保留旧默认 cwd=config root；新请求使用明确的项目 cwd。App 的“复制上下文并打开新会话”先复制已审阅的这一稿，再请求 Terminal／PTY；复制失败不会启动。粘贴、发送与模型接收另行确认，正文不写入普通任务记录。</p>
+<p>工作包中的会话按需只读、有界分页；请求 <code>offset</code> 使用上一响应的 <code>next_offset</code>，来源变化时重新解锁，不把旧片段选择映射到新内容。<code>session_read</code> 的 <code>content_kind: text</code> 提供 <code>raw_text</code>，不含 <code>records</code>；messages 页提供结构化数组，旧 runner 缺少数组时 App 显示阅读限制，原始文本仍可查看：</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work session read --archive-path /absolute/work.age --path projects/example/session.jsonl</code></pre>
+<p>需要继续时，从上一页的 <code>next_offset</code> 传入 <code>--offset</code>，可用 <code>--expected-digest</code> 核对原文件。未知记录、非 ASCII 与特殊换行保留原字节；原始文本显示与结构化解析都是阅读视图，不改写 transcript。thinking／signature 按不透明块处理，不进入自动生成的交接稿。</p>
+<p>结构化记录的 <code>index</code> 是页内序号；<code>offset</code> 是返回记录／片段在原文件中的起始字节，<code>block_index</code> 是已解析原行 content 数组的零基块序号，opaque／unknown 块也占据原位置。单内容或 unknown fragment 的块序号为 0；超长行的有界片段不证明完整原行已解析。新交接稿与 <code>plan_launch.input_reference.files</code> 保留 path、file／package digest、offset 与 block；元数据不含正文。引用的 <code>offset</code> 可选、限整数 0–268435456，<code>block_index</code> 可选、限整数 0–1000000 且须同时有 offset；旧缺位置引用继续接受，不补造精度，App 明示缺少字节或块位置。</p>
+<p>原生续聊是独立、有限任务，目前只完整评估不超过 8 MiB 的 transcript；大文件仍可完整保全和分页阅读，超过这个 resume 范围明确标为不支持。通过 <code>call plan_resume</code> 的一次性 JSON stdin 提交准确的 archive source、path、环境与项目，口令用 <code>getpass</code> 获取。先 <code>describe plan_resume</code>／<code>schema plan_resume</code> 核对当前版本合同；批准后使用真正终端的 <code>resume_request REQUEST_ID HASH</code>。支持范围、私有运行副本、认证／原会话未核对状态都在预览中显示。入口使用绝对 transcript 副本与固定 <code>--resume</code>／<code>--fork-session</code>；不改写 session ID、signature 或索引。读回运行副本与 inert 参数验证不能证明真实 Claude 已恢复成功。</p>
+<p>原启动查询不需要 approval 或口令，不执行 Terminal，也不重新准备运行副本。对于 SSH 使用 <code>lintel remote launch query ALIAS REQUEST_ID</code>；原启动 runner binding 保留，普通重连和 alias 升级不能重发或换绑它。</p>
+<h2 id="browser有限适配与人类等待">Browser：有限适配与人类等待</h2>
+<p>macOS CLI：</p>
+<pre class="guide-code" data-language="sh"><code>lintel browser operations --json
+lintel describe browser.submit
+lintel schema browser.submit
+lintel browser instances
+lintel browser operations --instance &lt;paired-instance-id&gt;
+lintel browser pair create
+lintel browser pair pending
+lintel browser pair approve --challenge &lt;returned-challenge&gt;</code></pre>
+<p>静态 operations 不打开 journal；指定 instance 后返回真实配对/conflict/online 事实，权限仍须扩展确认。只在 profile 所在主机使用，Linux runner 明确返回 browser_component_unavailable。完整安装/加载与 profile 配对是人工步骤，不能用 CLI 成功响应假称已加载扩展。</p>
+<p><code>browser submit</code> 与 <code>browser query</code> 从 stdin 收有限 Native Messaging control 对象。submit 必須由你生成并保留原 <code>operation_id</code> 与准确 <code>instance_id</code>，action 必须满足 schema；确认和 permission 由扩展拥有。<code>browser control</code> 保留手工 host_path 安装等既有有限操作，不复制 App resource locator 或写浏览器 preferences。</p>
+<pre class="guide-code" data-language="sh"><code>lintel browser query &lt;&lt;&#39;JSON&#39;
+{&quot;instance_id&quot;:&quot;&lt;paired-instance-id&gt;&quot;,&quot;operation_id&quot;:&quot;&lt;original-operation-id&gt;&quot;}
+JSON</code></pre>
+<p>profile 未配对、离线、等待浏览器批准、awaiting-browser-restart、uncertain/rejected/completed 分别处理。clear 先隔离准备；真正关闭整个浏览器并观察原生 runtime.onStartup 后，另行批准 finishClear。不能重启扩展 worker 或制造世代来替代真实 browser restart。不得自动重发 uncertain 的删除。网络规则暂停到期／startup 恢复与批准 mutation 共用扩展的串行队列；只消费本次读取并匹配的暂停记录，包括 operation ID，不会让旧恢复擦掉新的暂停。旧无 operation ID 记录按完整记录匹配兼容；规则已有外部改变时保留当前规则与记录；恢复读回不确定时也保留原记录继续核对。</p>
+<p>browser schema 的 instance/operation/challenge/receipt ID 与 runtime 一致：8–80 个 ASCII 字母、数字、<code>-</code> 或 <code>_</code>。Chrome/Edge 扩展 ID 为 32 个 <code>a</code>–<code>p</code> 字符，Firefox 为固定 <code>lintel@lintel.local</code>，安装 schema 按 browser 约束对应身份。manifest helper 的 <code>chromium</code> 名称不代表已有 Chromium 注册路径；当前 installer 只接受 Chrome/Edge/Firefox。</p>
+<h2 id="network明确的前台-owner">Network：明确的前台 owner</h2>
+<pre class="guide-code" data-language="sh"><code>lintel network serve --config /absolute/reviewed-channel.json</code></pre>
+<p>配置为 <a href="/guide/network/">network.md</a> 的 Config，包含显式 default_action 和精确规则。stdout 首条 listening 给出 foreground_process owner、PID、实际 loopback address 和规范化 active_config；连接事件是 NDJSON，Ctrl-C 结束进程通道。只覆盖经过代理的连接，不强制所有进程流量。App 的通道由 App 进程持有；CLI 不查询或停止 App 内通道，不声称共享状态。</p>
+<h3 id="telemetry静态目录与当前代理核验">Telemetry：静态目录与当前代理核验</h3>
+<pre class="guide-code" data-language="sh"><code>lintel telemetry catalog
+lintel network catalog
+lintel describe telemetry_catalog
+# reviewed-channel.json 必须已经显式阻止所选目录 host:443；只测试自己的 loopback 代理。
+lintel network serve --config /absolute/reviewed-channel.json --test-telemetry datadog_logs_intake</code></pre>
+<p><code>telemetry_catalog</code> 是无参数、无 state、无网络的静态 core 操作，可由 <code>lintel request</code> 或有限 <code>remote request</code> 读取。目录区分 direct Anthropic API 的可选 Datadog 入口和混合模型／认证／下载主机，版本适用性和来源日期不能当作运行证据。受控测试使用原 Proxy 实例：启动前要求 explicit block，启动后必须匹配真实拒绝与完成事件；不会解析或连接公网遥测目标。CLI 与 App 各持有自己的代理，App 测试还绑定当前 channel instance。普通客户端和受控测试来源分别记录。</p>
+<p>细粒度保护预设继续保留 Claude Code 更新路径；<code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code> 的任意非空值（包括 <code>0</code>／<code>false</code>）同时关闭自动更新、release notes 与 feature flags。配置读回不能证明外部进程已加载。详见 <a href="/guide/telemetry/">遥测指南</a>。Lintel App 自身更新由 <a href="/guide/app-updates/">App 更新指南</a> 的独立 native 入口处理，不由 CLI 自动升级 App、浏览器组件或远端 runner。</p>
+<h3 id="network有限-ip-测试与共享-ipv6-计划">Network：有限 IP 测试与共享 IPv6 计划</h3>
+<pre class="guide-code" data-language="sh"><code>lintel network inspect
+# 显式公网请求；默认两个 ipify HTTPS 回显端点，可覆盖 URL
+lintel network probe --timeout-seconds 10
+# 使用已经运行在同一主机的 CLI 通道；端口是实际读回值
+lintel network probe --proxy-url http://127.0.0.1:49152
+# macOS: ID 从 inspect 返回，不用显示名；预览会前测
+lintel network ipv6 plan --service-id &#39;&lt;SET_ID&gt;:&lt;SERVICE_UUID&gt;&#39; --mode off --baseline-id &#39;&lt;PROBE_ID&gt;&#39;
+lintel job submit --plan &#39;&lt;PLAN_ID&gt;&#39; --approval &#39;&lt;EXACT_PLAN_HASH&gt;&#39;
+lintel job show &#39;&lt;ORIGINAL_JOB_ID&gt;&#39;
+lintel network restore plan --job &#39;&lt;ORIGINAL_JOB_ID&gt;&#39;</code></pre>
+<p>这些 ID/hash 是占位，替换成实际结果。<code>network probe</code> 以及 <code>ipv6 plan</code> 支持 <code>--ipv4-url</code>、<code>--ipv6-url</code>、<code>--proxy-url</code> 和 <code>--timeout-seconds</code>；<code>--probe</code> JSON 可精确选择 nested spec，恢复同样接受该字段。<code>baseline_id</code> 复用仅限五分钟内同网络 revision、端点、通道实例与 deadline。Endpoint 必须有限 HTTPS，代理是同一目标主机的 literal loopback HTTP；strict named/SSH 校验在 transport 前拒绝未知字段与无效目标。schema/effects 可用 <code>lintel describe network_probe</code>／<code>plan_network_ipv6</code> 查看。raw protocol-1 同样进行网络字段校验。</p>
+<p>共享计划／回执的 <code>environment_id:null</code>，不依赖 Claude 配置根。预览无系统 mutation，批准包含系统配置写入、完整读回与同目标复测，持久 intent 在尝试前保存；中断按同一个 job 查询。完整恢复另行批准并拒绝外部编辑。App 的 channel instance 由 native owner 绑定；CLI 只选择自己已运行的通道，不伪造 App owner。Linux 支持 inspect/probe 与 serve 的 <code>address_family:&quot;ipv4_only&quot;</code>，不支持整机 IPv6 mutation。公共端点看到请求 IP；结果保存在目标主机私有 state，不能未经审阅放入公开支持资料。synthetic home 不允许真实 host 操作。详见 <a href="/guide/network/">网络指南</a>。</p>
+<a id="ssh-controller"></a>
+<h2 id="ssh同一个有限-controller">SSH：同一个有限 controller</h2>
+<pre class="guide-code" data-language="sh"><code>lintel remote aliases
+lintel remote control &lt;&lt;&#39;JSON&#39;
+{&quot;op&quot;:&quot;add_host&quot;,&quot;alias&quot;:&quot;approved-alias&quot;}
+JSON
+lintel remote inspect approved-alias
+lintel remote hosts</code></pre>
+<p>aliases 只解析当前 HOME 的系统 SSH config；add/remove 只改变 Lintel registry。inspect 连接已登记的字面 alias 并返回远端 discover，不修改 Claude。不接受任意 root/executable/shell script，使用固定严格 SSH options，host key 未获信任时不 bypass。</p>
+<p><code>remote request ALIAS</code> 从 stdin 接收 schema 允许的有限 core JSON；远端 execute 必须 <code>remote submit ALIAS</code>（stdin 必须是 execute 请求），先冻结本地 intent 再使用 runner submit。<code>remote job ALIAS PLAN_ID</code> 使用只读 <code>request.job</code>：已有记录保持原 ID、原 runner digest 与去重状态；未知 ID 不创建任务记录，不占用未提交计划的提交位置。remove alias 不抹掉历史任务，已有记录仍可查询。</p>
+<p>只读查找未知 ID 可通过 <code>remote request</code> 发送 <code>{&quot;command&quot;:&quot;job&quot;,&quot;job_id&quot;:&quot;&lt;id&gt;&quot;}</code>（或互斥 <code>plan_id</code>）。已有任务记录使用原冻结 runner；没有记录时采用 alias 当前 runner，不创建提交记录，也不占用尚未提交计划的提交位置。显式恢复可用 <code>remote control</code> 的 <code>reconnect</code>；没有本地记录时，它先持久记录 query-only 意图和 alias 当前 runner digest，再查询原任务，后续 alias 升级不切换 runner。它保留 no-replay 边界，不能用于探测尚未提交的计划；普通查找使用 <code>remote job</code> 或 <code>request.job</code>。已有无 digest 的旧任务记录保留 PATH 兼容，去重／不确定提交仍不得删除或重发。</p>
+<pre class="guide-code" data-language="sh"><code>lintel remote request approved-alias &lt;&lt;&#39;JSON&#39;
+{&quot;command&quot;:&quot;plan_policy&quot;,&quot;environment_id&quot;:&quot;&lt;remote-id&gt;&quot;,&quot;preset&quot;:&quot;reduce&quot;,&quot;keep_remote_control&quot;:false}
+JSON
+lintel remote submit approved-alias &lt;&lt;&#39;JSON&#39;
+{&quot;command&quot;:&quot;execute&quot;,&quot;plan_id&quot;:&quot;&lt;returned-remote-plan-id&gt;&quot;,&quot;approval&quot;:&quot;&lt;returned-remote-hash&gt;&quot;}
+JSON
+lintel remote job approved-alias &lt;original-remote-plan-id&gt;</code></pre>
+<p>远端新会话先用 <code>remote request ALIAS</code> 的 JSON stdin 准备 <code>plan_launch</code>（明确 <code>environment_id</code>、<code>project_cwd</code>、<code>mode:&quot;interactive&quot;</code>），再在 macOS 真实终端使用 <code>lintel remote launch request ALIAS REQUEST_ID HASH</code>。续聊先准备 <code>plan_resume</code>，再用 <code>lintel remote launch resume ALIAS REQUEST_ID HASH</code>；包口令在打开的 SSH Terminal 中再次无回显输入。重复调用只查询原 ID，runner 版本沿用预览绑定。只读恢复使用 <code>lintel remote launch query ALIAS REQUEST_ID</code> 或 <code>lintel remote launch list ALIAS</code>。</p>
+<p>旧 <code>lintel remote launch ALIAS ENVIRONMENT_ID</code> 保留已有 caller 的 root-as-cwd 默认：stdin/stdout 都需为终端，不接受 prompt 或额外参数；先只读 launch_context preflight，再由有限 controller 请求 Terminal。JSON <code>remote control</code> 的交互 launch/request/resume 被拒绝，不能用隐藏管道发起会话；只读 query/list 不需要 TTY。</p>
+<p>install 的 prepare_runner → install_runner → query_install 与 App 共用实现和准确计划批准，资源、原注册和 runner 绑定都再核对，提交不明时只 query_install；未核对安装会在 prepare 与上传入口同时阻止新上传，错误 diagnostic 给出原 install_id。激活要求预览冻结的 previous_binding 仍成立；superseded 表示旧安装已核实但后续绑定保留，verified 表示缺少冻结前置绑定的旧记录仅已核实。旧 preview 缺少该证据时必须重新准备；操作字段见当前 <code>remote</code> schema 和 <a href="/guide/remote/">remote.md</a>。原 Python stdlib controller 保留其已有 caller/subset，作为 legacy compatibility 入口；新增功能以共享 Rust controller 为 canonical，不再平行扩展 Python。</p>
+<p>这些路径的合成测试不替代真实 Claude 认证、正式浏览器、native WebKit、生产 VPS 或 Linux logout/reboot 验收。当前证据与完整未交付目标继续在 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state.md</a> 和 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/SPEC.md">SPEC.md</a>。</p>
+<p>迁入的 <code>migration_path_conflict</code> 表示实际目标文件系统把包内路径视为同名或文件／目录冲突。批准执行中的空文件 preflight 在新根创建／正文写入前整批拒绝，预览不写目标。实际目标已有非目录祖先时，path guard 会在任何正文写入前返回 <code>path_unreadable</code>。已有目标根和父目录的权限保持不变，新建父目录为 <code>0700</code>、文件为 <code>0600</code>。包可继续 inspect/read；整理源内容重新归档，或选择能区分这些路径的文件系统。不要重发原任务来绕过名称冲突。</p>
+<p>路径 preflight 在创建临时目录前持久记录 <code>migration_probe:{path,status}</code> 和执行中的 <code>migration_preflight</code> 步骤。正常清理确认后 status 为 <code>removed</code>；无法确认清理则为 <code>retained</code> 并停止正文迁入。worker 中断会保留 <code>executing</code> 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。</p>
+<h2 id="维护者附录构建并打包候选">维护者附录：构建并打包候选</h2>
+<h3 id="可移植候选包的生成与校验">可移植候选包的生成与校验</h3>
+<p><code>scripts/package-cli.mjs</code> 把<strong>明确提供的</strong> canonical 构建产物打成候选归档：一个 macOS arm64 Mach-O、两个静态 Linux musl ELF（x86_64 与 aarch64），以及 CLI 自己解析的 canonical <code>remote-runners</code> 目录。打包器<strong>不编译、不下载、不签名</strong>，只核对格式与字节；缺少、架构错误、带动态加载器或与 canonical runner 字节不一致的 Linux 输入会以具体错误拒绝。两个 Linux CLI 输入必须与该架构的 canonical runner 逐字节相同，旧输入／混合输入不能被标成同一个 candidate。归档是扁平的运行时布局：<code>bin/lintel</code>、<code>bin/remote-runners/manifest.json</code>、<code>bin/remote-runners/&lt;triple&gt;/lintel</code>（两个 Linux runner）、<code>candidate.json</code>、<code>SHA256SUMS</code>、<code>README.txt</code>；CLI 在 <code>dirname(executable)/remote-runners</code> 找 runner，所以是 <code>bin/remote-runners</code>，不是归档根。</p>
+<p>验证与归档使用同一次读取的 manifest bytes；资源目录在打包期间重建时，不把后读的 manifest 混入已验证的 runner snapshot。</p>
+<p>每个 canonical Linux runner 不得超过现有 SSH installer 的 32 MiB 上传上限；超限返回 <code>runner_too_large</code>，在生成任何 archive／索引之前停止。</p>
+<p>格式检查要求 macOS 输入有完整 Mach-O 64-bit header、arm64 CPU 和 <code>MH_EXECUTE</code> 类型；Linux 输入有 ELF64 executable／static PIE 类型、位于文件支持的 executable segment 内的非零入口，load segment 的 file size 不超过 memory size，且没有 <code>PT_INTERP</code> 或 <code>DT_NEEDED</code> 动态依赖。截断 header、object／dylib／无入口 shared object 拒绝；格式检查仍不替代其它架构的实际执行。probe 与显式声明的版本都先通过相同的安全版本语法，才用于候选身份与输出路径。</p>
+<p>Mach-O 逐条核对 load-command 数量、边界与 segment／section 结构，并要求 <code>LC_MAIN</code> 或 ARM64 <code>LC_UNIXTHREAD</code> 入口位于文件支持的 executable segment。只有 header、没有入口、未映射入口或不可执行 segment 的输入均拒绝。打包／最终索引发布报错时，回收本次已发布且 identity／大小／mtime 仍未变化的 links，保留既有文件与可检测到的外部替换或编辑，然后可重试；不承诺进程突然终止后的自动 transaction 恢复。</p>
+<p>macOS 输入必须带 <code>LC_BUILD_VERSION</code> 的 macOS 平台标记，或 legacy <code>LC_VERSION_MIN_MACOSX</code>；其它 Apple 平台和缺少平台标记的输入拒绝。打包器移除子进程的 <code>TAR_OPTIONS</code>，并在发布前核对归档成员恰好等于声明清单，避免继承的 tar 配置漏掉或改名 executable。</p>
+<p>先在 macOS 上用 <code>target/release/lintel</code> 作为 Mac 输入；需要跨平台输入时从源码构建。目标 Linux runner（同时作为该架构的 CLI 输入与 canonical runner）用：</p>
+<pre class="guide-code" data-language="sh"><code>rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+cargo zigbuild --locked --release -p lintel-runner --bin lintel \
+  --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
+# 生成 canonical runner 资源（写入被忽略的 runner-bundles）
+node apps/desktop/scripts/prepare-remote-runners.mjs</code></pre>
+<p>产出 <code>target/x86_64-unknown-linux-musl/release/lintel</code> 与 <code>target/aarch64-unknown-linux-musl/release/lintel</code>；macOS CLI 由 <code>cargo build --locked --release -p lintel-runner --bin lintel</code> 得到 <code>target/release/lintel</code>。生成流程见 <a href="/guide/remote/#准备-app-内置资源">remote.md</a>。在仓库根目录打包；输出目录必须是被忽略或调用方自选的临时目录。</p>
+<pre class="guide-code" data-language="sh"><code>node scripts/package-cli.mjs \
+  --macos-arm64 target/release/lintel \
+  --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
+  --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
+  --linux-runners apps/desktop/src-tauri/runner-bundles \
+  --revision &quot;$(git rev-parse HEAD)&quot; \
+  --out candidate-packages</code></pre>
+<p>candidate 的身份是 <code>&lt;version&gt;-candidate-&lt;revision 前 12 位&gt;</code>，因此裸 <code>0.1.0</code> 从来不是唯一身份；索引写成 <code>candidates-&lt;identity&gt;.json</code>，不会覆盖其它身份的索引。<code>--revision</code> 必须是精确的完整小写十六进制 git object id（40 或 64 位），它是调用方声明的构建身份，不由 digest 或探测证明。<code>candidate.json</code> 记录 product/version/protocol/catalog、<code>source_revision</code>、target、payload 文件的字节数与 SHA-256、<code>signed:false</code>、<code>release:false</code>、平台限制，以及<strong>逐目标</strong>的 <code>identity_source</code>：只有 macOS 输入成功返回身份数据时才标为 <code>macos_input_executed</code>，Linux 目标标为 <code>declared_static</code>。macOS 输入成功探测时其自报 <code>version</code> 权威并要求 manifest 一致；不能执行或未返回身份数据时（如 Linux 打包）必须显式传 <code>--version</code>，并记录 <code>identity_verified_executed:false</code>，否则拒绝。已有归档（包括悬空符号链接）或已有同身份索引都会在任何写入前被拒绝，绝不覆盖。</p>
+<p>源码构建的 debug 入口是 <code>cargo build -p lintel-runner</code> 后的 <code>target/debug/lintel</code>。独立 Native Messaging 可执行文件另行从 <code>extensions/browser/native-host</code> 安装；在 Mac 上 <code>lintel browser control</code> 的安装预览仍需准确 <code>host_path</code>，不会假定 GUI 或 PATH 已提供它。扩展开发包从 canonical extension source 准备，步骤与平台限制见 <a href="/guide/browser/">browser.md</a>。</p>
+<p>远端 runner 的静态资源与 App 使用同一 <a href="/guide/remote/#准备-app-内置资源">生成流程</a>。仅从明确核对的 canonical bundles 调用 <code>lintel remote control --bundles /absolute/runner-bundles</code>，或配置 <code>LINTEL_RUNNER_BUNDLES</code>；默认查当前 executable 旁的 <code>remote-runners</code>。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。</p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

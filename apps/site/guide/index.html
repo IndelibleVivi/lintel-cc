@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Lintel 指南：第一次使用、基本概念、排错与六任务操作路径，正文来自维护中的仓库文档。">
+  <link rel="canonical" href="https://lintel.page/guide/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="使用指南 · Lintel">
+  <meta property="og:description" content="Lintel 指南：第一次使用、基本概念、排错与六任务操作路径，正文来自维护中的仓库文档。">
+  <meta property="og:url" content="https://lintel.page/guide/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>使用指南 · Lintel</title>
+</head>
+<body class="route-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <section class="route-hero wrap">
+      <p class="eyebrow" data-route-copy="guideEyebrow">READ BY TASK / MAINTAINED GUIDES</p>
+      <h1><span data-route-copy="guideTitleA">从眼前这件事</span><br><span data-route-copy="guideTitleB">开始读。</span></h1>
+      <p class="route-intro" data-route-copy="guideIntro">从第一次试用开始，按眼前的任务继续读。遇到结果不确定时，先保留原任务 ID，再从排错页面核对；每篇指南都能回到仓库原文。</p>
+      <div class="route-actions"><a class="button primary" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明</a><a class="text-link" href="/guide/quickstart/" data-route-copy="trialCliLink">打开完整试用</a></div>
+    </section>
+    <section class="route-section wrap" aria-labelledby="start-guides-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="learnEyebrow">01 / LEARN</p><h2 id="start-guides-title" data-route-copy="learnTitle">认识与试用</h2><p data-route-copy="learnIntro">首用、完整命令示例、对象概念和排错。</p></div>
+      <div class="guide-index">
+        <a href="/guide/start-here/" data-guide="start-here"><span>01</span><div><strong data-route-guide-title="start-here">第一次使用</strong><p data-route-guide-summary="start-here">从一份合成资料开始，完成一次加密归档并重新打开它。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/quickstart/" data-guide="quickstart"><span>02</span><div><strong data-route-guide-title="quickstart">CLI 完整试用</strong><p data-route-guide-summary="quickstart">用一次性合成目录核对登记、预览、批准、原任务与独立读包。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/concepts/" data-guide="concepts"><span>03</span><div><strong data-route-guide-title="concepts">基本概念</strong><p data-route-guide-summary="concepts">分清主机、配置根、项目目录、冻结计划、任务与工作包。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/troubleshooting/" data-guide="troubleshooting"><span>04</span><div><strong data-route-guide-title="troubleshooting">排错指南</strong><p data-route-guide-summary="troubleshooting">从看到的结果开始，保留原 ID，先核对再决定下一步。</p></div><b aria-hidden="true">↗</b></a>
+      </div>
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="task-guides-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="tasksEyebrow">02 / SIX TASKS</p><h2 id="task-guides-title" data-route-copy="tasksTitle">按任务使用</h2><p data-route-copy="tasksIntro">从操作目标进入，再按需要阅读具体模块。</p></div>
+      <div class="guide-index guide-index-two">
+        <a href="/guide/operator-guide/" data-guide="operator-guide"><span>01</span><div><strong data-route-guide-title="operator-guide">操作指南</strong><p data-route-guide-summary="operator-guide">按六类实际任务进入设置、保全、清理、浏览器、SSH 与恢复。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/agents/" data-guide="agents"><span>02</span><div><strong data-route-guide-title="agents">Agent CLI</strong><p data-route-guide-summary="agents">独立 CLI、接口发现、秘密 stdin、portable work 与候选安装。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/desktop/" data-guide="desktop"><span>03</span><div><strong data-route-guide-title="desktop">桌面应用</strong><p data-route-guide-summary="desktop">App 页面、语言、目标栏、会话资料、外观与本地构建。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/browser/" data-guide="browser"><span>04</span><div><strong data-route-guide-title="browser">浏览器模块</strong><p data-route-guide-summary="browser">扩展准备、profile 配对、有限站点操作与完整重启清理。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/remote/" data-guide="remote"><span>05</span><div><strong data-route-guide-title="remote">SSH 与远端</strong><p data-route-guide-summary="remote">登记 alias、准备 runner、断线后按原任务 ID 查询。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/network/" data-guide="network"><span>06</span><div><strong data-route-guide-title="network">网络与出口</strong><p data-route-guide-summary="network">区分受控通道、IPv4／IPv6 实测、配置读回与强制约束。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/services/" data-guide="services"><span>07</span><div><strong data-route-guide-title="services">systemd 服务</strong><p data-route-guide-summary="services">检查、暂停与恢复一个明确绑定配置根的服务。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/telemetry/" data-guide="telemetry"><span>08</span><div><strong data-route-guide-title="telemetry">遥测目标</strong><p data-route-guide-summary="telemetry">区分静态目录、配置规则、受控测试与普通观察。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/app-updates/" data-guide="app-updates"><span>09</span><div><strong data-route-guide-title="app-updates">安装与更新</strong><p data-route-guide-summary="app-updates">App 更新、候选首装验收与发行记录准备的真实顺序。</p></div><b aria-hidden="true">↗</b></a>
+      </div>
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="engineering-guides-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="engineeringEyebrow">03 / UNDERSTAND</p><h2 id="engineering-guides-title" data-route-copy="engineeringTitle">理解实现</h2><p data-route-copy="engineeringIntro">共享执行核心、状态归属和源码入口。</p></div>
+      <div class="guide-index guide-index-two"><a href="/guide/core/" data-guide="core"><span>01</span><div><strong data-route-guide-title="core">Core 与 CLI</strong><p data-route-guide-summary="core">计划、批准、执行、任务记录、工作包与恢复的共享实现。</p></div><b aria-hidden="true">↗</b></a><a href="/guide/architecture/" data-guide="architecture"><span>02</span><div><strong data-route-guide-title="architecture">架构与源码地图</strong><p data-route-guide-summary="architecture">四条执行路径、状态归属与实现入口。</p></div><b aria-hidden="true">↗</b></a></div>
+    </section>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/download/" data-route-copy="download">下载</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

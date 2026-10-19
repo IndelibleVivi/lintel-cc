@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="用一次性合成目录核对登记、预览、批准、原任务与独立读包。">
+  <link rel="canonical" href="https://lintel.page/guide/quickstart/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/quickstart/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/quickstart/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/quickstart/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="CLI 完整试用 · Lintel">
+  <meta property="og:description" content="用一次性合成目录核对登记、预览、批准、原任务与独立读包。">
+  <meta property="og:url" content="https://lintel.page/guide/quickstart/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>CLI 完整试用 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/quickstart/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/quickstart/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="quickstart">
+        <h1 id="快速上手从公开源码做一次本地试用">快速上手：从公开源码做一次本地试用</h1>
+<p>简体中文（canonical） · <a href="/guide/quickstart/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>这份文档带新访客在<strong>一次性合成 fixture</strong> 里走完一条小旅程：登记一个 Claude 配置环境，生成合成的指令／记忆／会话原件（另加一个<strong>故意不选</strong>的原件）， 用精确选择预览范围，审阅原计划与其 hash，提交一次<strong>只归档</strong> （archive-only）保全，查询原 ID 和最终结果，再从明确的 <code>archive_path</code> 在 <strong>另一份独立 state</strong> 里重新检查与阅读，最后逐字节确认源原件、settings 与 占位凭据都没有被动过。</p>
+<p>目标读者：已经拿到 Lintel 源码、想在本机确认 CLI 真实行为的人。</p>
+<blockquote><p>本文覆盖的都是<strong>Lintel 0.1.0 Preview / 开发预览</strong>能力。真实认证／native resume、正式 Chrome/Edge/Firefox/AdsPower、生产 VPS 与签名发行都<strong>未验收</strong>。当前证据与 缺口见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p></blockquote>
+<p>本文的合成 home 不开放真实宿主网络观察或修改，也不进行公网出口测试。另行明确选择的网络功能及其隐私边界见 <a href="/guide/network/">网络指南</a>。</p>
+<hr>
+<h2 id="0-前置条件">0. 前置条件</h2>
+<ul><li>Rust stable（编译 CLI 与 workspace）。</li><li>Python 3（解析 JSON、无回显读取口令）。<strong>不依赖 <code>jq</code></strong>。</li><li>全程<strong>不需要</strong> Node、Tauri、GUI 或已安装 App。</li></ul>
+<p>先取得源码并构建 CLI。<code>cargo build</code> 会写入 <code>target/</code> 并可能拉取依赖，属于 正常本地构建；它<strong>不</strong>运行 Claude、不发现个人目录、不初始化 Lintel state。</p>
+<pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
+cd lintel-cc
+cargo build -p lintel-runner</code></pre>
+<p>产物是 <code>target/debug/lintel</code>。下面的命令都以 <strong>repository 根目录为当前目录</strong> 运行。</p>
+<h2 id="1-一次明确的子-shell-边界">1. 一次明确的子 shell 边界</h2>
+<p>先运行 <code>sh</code> 打开一份独立的交互 shell，再逐块执行下面的命令。每块会立即执行， 可以在批准前停下来阅读实际计划；最后用 <code>exit</code> 回到原来的 shell。 这里定义一份<strong>一次性 fixture</strong> 和只给每次 CLI 调用注入环境变量的 <code>lintel</code> 函数。原 shell 的 <code>HOME</code>、<code>PATH</code> 保持不变，已安装的 Python 3 仍可用。</p>
+<pre class="guide-code" data-language="sh"><code>sh
+set -eu
+
+# 一次性合成 fixture：完全假的原件，不是你的真实 ~/.claude
+ROOT=&quot;$(python3 -c &#39;import os,tempfile;print(os.path.realpath(tempfile.mkdtemp(prefix=&quot;lintel-quickstart.&quot;)))&#39;)&quot;
+echo &quot;fixture = $ROOT&quot;
+mkdir -p &quot;$ROOT/home&quot; &quot;$ROOT/state&quot; &quot;$ROOT/claude-root/projects/example/memory&quot;
+
+printf &#39;%s\n&#39; &#39;Synthetic instruction only.&#39;                 &gt; &quot;$ROOT/claude-root/CLAUDE.md&quot;
+printf &#39;%s\n&#39; &#39;Synthetic memory only.&#39;                      &gt; &quot;$ROOT/claude-root/projects/example/memory/MEMORY.md&quot;
+printf &#39;%s\n&#39; &#39;This synthetic memory file is NOT selected.&#39; &gt; &quot;$ROOT/claude-root/projects/example/memory/NOT_SELECTED.md&quot;
+printf &#39;%s\n&#39; &#39;{&quot;type&quot;:&quot;synthetic&quot;,&quot;message&quot;:&quot;hello&quot;}&#39;      &gt; &quot;$ROOT/claude-root/projects/example/session.jsonl&quot;
+printf &#39;%s\n&#39; &#39;{&quot;env&quot;:{&quot;SYNTHETIC_KEEP&quot;:&quot;1&quot;}}&#39;              &gt; &quot;$ROOT/claude-root/settings.json&quot;
+printf &#39;%s\n&#39; &#39;SYNTHETIC_CREDENTIAL_DO_NOT_COPY&#39;            &gt; &quot;$ROOT/claude-root/.credentials.json&quot;
+
+# CLI 绝对路径（对你的 checkout 有效）；引号保证含空格的路径也能工作
+LINTEL=&quot;$PWD/target/debug/lintel&quot;
+
+# 只给每次调用注入合成 HOME/state，不改动当前 shell
+lintel() { env HOME=&quot;$ROOT/home&quot; LINTEL_TEST_HOME=&quot;$ROOT/home&quot; LINTEL_STATE_DIR=&quot;$ROOT/state&quot; &quot;$LINTEL&quot; &quot;$@&quot;; }</code></pre>
+<p>整篇后面的代码块<strong>继续在这份交互 shell 内执行</strong>；第 8 步用 <code>exit</code> 关闭它。 若任一步报错，先保存显示的原 ID 与 fixture 路径，停止后续步骤并核对，不能重发。</p>
+<blockquote><p>本旅程的操作只针对这个合成 root，不调用 Claude、认证、浏览器或 service。 HOME 分离<strong>不是</strong> OS sandbox，也不证明其它进程或 managed sources 一定访问 不到你的真实环境；它只说明本旅程不指向它们。这是<strong>合成测试</strong>，不是生产 流程。</p></blockquote>
+<h2 id="2-登记环境">2. 登记环境</h2>
+<p><code>env register</code> 把一份已存在的配置根登记进 Lintel，返回一个环境 <code>id</code> （UUID）。后续命令都用这个 id。</p>
+<pre class="guide-code" data-language="sh"><code>lintel env register --name &#39;Synthetic quickstart&#39; --root &quot;$ROOT/claude-root&quot; &gt; &quot;$ROOT/register.json&quot;
+ID=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;id&quot;])&#39; &quot;$ROOT/register.json&quot;)&quot;
+echo &quot;environment id = $ID&quot;</code></pre>
+<p>登记只记录 inventory，不运行 Claude、不写目标文件。</p>
+<h2 id="3-只读扫描先看有什么">3. 只读扫描：先看有什么</h2>
+<p><code>work inventory</code> 是<strong>只读、分页、仅元数据</strong>的清单：它列出所选类别的相对路径、 类别与字节数，返回一个绑定这次扫描的 <code>digest</code>。它不读取文件正文。</p>
+<pre class="guide-code" data-language="sh"><code>lintel work inventory --environment &quot;$ID&quot; --categories instructions,memory,sessions --json</code></pre>
+<p>你会看到<strong>四条</strong>合成原件：</p>
+<p>| path | | --- | | <code>CLAUDE.md</code> | | <code>projects/example/memory/MEMORY.md</code> | | <code>projects/example/memory/NOT_SELECTED.md</code> | | <code>projects/example/session.jsonl</code> |</p>
+<p>以及一个 <code>digest</code>。注意 <code>NOT_SELECTED.md</code> 出现在清单里但<strong>稍后不会被选</strong>。</p>
+<p>可选的容量预检只读元数据，并标出超限文件或扫描缺口。这里先用重复的 <code>--path</code> 明确只选三条：</p>
+<pre class="guide-code" data-language="sh"><code>lintel work preflight --environment &quot;$ID&quot; --categories instructions,memory,sessions \
+  --path CLAUDE.md \
+  --path projects/example/memory/MEMORY.md \
+  --path projects/example/session.jsonl \
+  --json</code></pre>
+<p>返回的 <code>work_selection.mode</code> 为 <code>paths</code>，<code>totals.files</code> 为 3，<code>eligible</code> 为 true。当前 runner 准入为<strong>单文件 256 MiB、所选合计 1 GiB、10,000 文件</strong>， 版本化持久记录另有 <strong>16 MiB</strong> 上限。预检通过只代表元数据准入，正式计划仍会 完整读取所选原件。</p>
+<h2 id="4-生成-archive-only-计划并审阅">4. 生成 archive-only 计划并审阅</h2>
+<p><code>work archive plan</code> 生成一份<strong>冻结计划</strong>：它把选择的原件与完整内容摘要冻结 下来。<code>--output-path</code> 可省略（默认存进 Lintel state），这里显式写到 fixture 里的新文件。它<strong>不创建新配置根、不注销、不删除、不改 settings</strong>。</p>
+<pre class="guide-code" data-language="sh"><code>lintel work archive plan --environment &quot;$ID&quot; --categories instructions,memory,sessions \
+  --path CLAUDE.md \
+  --path projects/example/memory/MEMORY.md \
+  --path projects/example/session.jsonl \
+  --output-path &quot;$ROOT/carried.age&quot; --json &gt; &quot;$ROOT/plan.json&quot;</code></pre>
+<p>核对计划里的 <code>kind=archive</code>、<code>outcome=archive_only</code>、<code>file_count=3</code>，以及 <code>work_selection</code> 恰好列出这三条路径（<strong>不含</strong> <code>NOT_SELECTED.md</code>）。</p>
+<p>把 id 与 hash 取出来，再回读冻结计划：</p>
+<pre class="guide-code" data-language="sh"><code>PLAN_ID=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;id&quot;])&#39; &quot;$ROOT/plan.json&quot;)&quot;
+PLAN_HASH=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;hash&quot;])&#39; &quot;$ROOT/plan.json&quot;)&quot;
+lintel plan show &quot;$PLAN_ID&quot; --json | python3 -m json.tool</code></pre>
+<p><code>plan show</code> 只读回公共范围：<code>kind</code>、<code>hash</code>、<code>output_path</code>、选择范围，<strong>不含</strong> 文件正文或口令。</p>
+<blockquote><p><strong>批准必须匹配这一份计划的 hash</strong>。计划生成后若所选原件或冻结目标身份改变，批准会失效， 需要重新预览。没有通用 <code>--yes</code>。</p></blockquote>
+<h2 id="5-明确提交口令只经-stdin">5. 明确提交（口令只经 stdin）</h2>
+<p>提交时必须给出<strong>原计划的 hash</strong>。归档口令通过 JSON stdin 传入，<strong>绝不放在 argv、shell history、请求文件或计划／回执里</strong>。下面的 getpass 从控制终端 无回显读取口令；<code>inspect</code>／<code>read</code> 要求口令至少 12 个字符。</p>
+<p>请<strong>自己输入一个至少 12 字符的测试口令</strong>（例如一串临时字串），并在第 7 步 <strong>重复输入完全相同</strong>的口令。它是本次合成 fixture 的临时口令，不是预先存在 的固定值；不要把它用于真实场景。</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel job submit --plan &quot;$PLAN_ID&quot; --approval &quot;$PLAN_HASH&quot; &gt; &quot;$ROOT/receipt.json&quot;</code></pre>
+<p><code>job submit</code> 返回的是 <strong>durable ACK</strong>，<code>status</code> 通常是 <code>accepted</code>。</p>
+<blockquote><p><strong>accepted 不等于 completed。</strong> ACK 只说明请求已被持久接收；任务之后仍可能 失败。<code>ok:true</code> 只表示请求处理成功，任务是否完成要看 <code>data.status</code>、steps 与 coverage。</p></blockquote>
+<p>要等结果，用 <code>job wait</code>（它<strong>只轮询、不重发</strong>，超时返回非零且不重新提交）：</p>
+<pre class="guide-code" data-language="sh"><code>lintel job wait &quot;$PLAN_ID&quot; --timeout 30s --json | python3 -m json.tool</code></pre>
+<p>完成后 <code>status</code> 为 <code>completed</code>，<code>steps</code> 中的 <code>archive</code> 项为 <code>completed</code>，<code>archive_path</code> 指向 <code>$ROOT/carried.age</code>，并给出 <code>archive_digest</code>。archive-only <strong>不会</strong>出现 <code>new_root</code>。</p>
+<p>任何时刻都可以用原 ID 查询：</p>
+<pre class="guide-code" data-language="sh"><code>lintel job show &quot;$PLAN_ID&quot; --json | python3 -m json.tool</code></pre>
+<blockquote><p><strong>query-only</strong>：查询原任务只做<strong>核对、不重放</strong>。它不会自动恢复、迁入或 启动，也不需要口令；但查询本身<strong>可能更新持久的中断核对记录</strong>，因此不是 “纯只读”。中断后只按原 ID 核对，不自动再执行。</p></blockquote>
+<h2 id="6-确认源原件保留没有新建根">6. 确认源原件保留、没有新建根</h2>
+<p>archive-only 保全<strong>不触碰</strong>源目录，也不建立新环境。逐字节核对四条原件 （包括未选的 <code>NOT_SELECTED.md</code>）、settings 与占位凭据：</p>
+<pre class="guide-code" data-language="sh"><code>python3 - &quot;$ROOT&quot; &lt;&lt;&#39;PYTHON&#39;
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+expected = {
+    &quot;CLAUDE.md&quot;: b&quot;Synthetic instruction only.\n&quot;,
+    &quot;projects/example/memory/MEMORY.md&quot;: b&quot;Synthetic memory only.\n&quot;,
+    &quot;projects/example/memory/NOT_SELECTED.md&quot;: b&quot;This synthetic memory file is NOT selected.\n&quot;,
+    &quot;projects/example/session.jsonl&quot;: b&#39;{&quot;type&quot;:&quot;synthetic&quot;,&quot;message&quot;:&quot;hello&quot;}\n&#39;,
+    &quot;settings.json&quot;: b&#39;{&quot;env&quot;:{&quot;SYNTHETIC_KEEP&quot;:&quot;1&quot;}}\n&#39;,
+    &quot;.credentials.json&quot;: b&quot;SYNTHETIC_CREDENTIAL_DO_NOT_COPY\n&quot;,
+}
+for relative, original in expected.items():
+    assert (root / &quot;claude-root&quot; / relative).read_bytes() == original, relative
+ciphertext = (root / &quot;carried.age&quot;).read_bytes()
+assert ciphertext.startswith(b&quot;age-encryption.org/&quot;)
+assert expected[&quot;CLAUDE.md&quot;].strip() not in ciphertext
+print(&quot;PASS: 6 source files unchanged; age ciphertext created&quot;)
+PYTHON</code></pre>
+<p>再确认只登记了一个 environment，且密文包不含明文、可被识别为 age 包：</p>
+<pre class="guide-code" data-language="sh"><code>lintel env list --json | python3 -c &#39;import sys,json;print(&quot;environments:&quot;,len(json.load(sys.stdin)[&quot;data&quot;][&quot;environments&quot;]))&#39;
+head -c 19 &quot;$ROOT/carried.age&quot;; echo</code></pre>
+<p>environment 数量应为 1（只登记了合成根），输出以 <code>age-encryption.org/</code> 开头， 且 <code>Synthetic instruction</code> 不会以明文出现在包里。</p>
+<h2 id="7-在另一份独立-state-里-inspect--read">7. 在另一份独立 state 里 inspect / read</h2>
+<p>这是关键一步：把<strong>密文</strong>带到<strong>另一份独立 HOME/state</strong>（模拟另一台机器）， 在<strong>没有源 inventory、没有源 job</strong> 的情况下重新解锁它。仍用无回显输入口令， <strong>不要</strong>把口令放进 shell history。</p>
+<pre class="guide-code" data-language="sh"><code>mkdir -p &quot;$ROOT/independent/home&quot; &quot;$ROOT/independent/state&quot;
+
+lintel_dest() { env HOME=&quot;$ROOT/independent/home&quot; LINTEL_TEST_HOME=&quot;$ROOT/independent/home&quot; LINTEL_STATE_DIR=&quot;$ROOT/independent/state&quot; &quot;$LINTEL&quot; &quot;$@&quot;; }
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># inspect：只读清单，恰好一个来源（这里用 --archive-path）
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel_dest work archive inspect --archive-path &quot;$ROOT/carried.age&quot;
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># read：读取包内一条明确路径的正文
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel_dest work archive read --archive-path &quot;$ROOT/carried.age&quot; --path CLAUDE.md
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># 这份独立 state 自己没有记录任何工作包
+lintel_dest work archive list --json</code></pre>
+<p>用<strong>与第 5 步完全相同</strong>的测试口令。inspect 会返回恰好三条文件（含 <code>sha256</code> digest，<strong>不含</strong> <code>NOT_SELECTED.md</code>）；read 返回该文件正文；最后 <code>work archive list</code> 返回 <code>{&quot;jobs&quot;:[]}</code>，证明阅读<strong>不依赖</strong>源 job。</p>
+<p>密文跨主机传输由<strong>显式的系统文件传输</strong>（SSH/SFTP/scp 或可移动存储）完成， Lintel 不自动跨主机 transfer，也不上传整个 state。</p>
+<h2 id="8-关闭子-shell">8. 关闭子 shell</h2>
+<p>旅程结束，用 <code>exit</code> 关闭第 1 步打开的交互 shell；原 shell 环境保持不变。 合成 fixture 会保留在临时目录，便于检查；没有安装或激活真实环境。</p>
+<pre class="guide-code" data-language="sh"><code>exit</code></pre>
+<h2 id="9-连回独立的工作包可选">9. 连回独立的工作包（可选）</h2>
+<p>要在独立 state 里<strong>迁入</strong>选中的内容，用 <code>work import plan</code>（同样以 <code>--archive-path</code> 作为来源）预览最终落点，再另行批准执行。它冻结密文字节 digest 与目标文件状态，同名内容不覆盖。会话与记忆保留为资料，<strong>不宣称可以 续聊</strong>。完整流程见 <a href="/guide/agents/#portable-work">Agent CLI 指南的 portable work 一节</a>。</p>
+<h2 id="10-只读观察本地数据标识与快照可选">10. 只读观察本地数据、标识与快照（可选）</h2>
+<p>同一份合成环境还能用来确认当前源码的本地观察路径，它们都只读元数据或有限静态来源，不执行 Claude、不创建 mutation job：</p>
+<pre class="guide-code" data-language="sh"><code>lintel env residue &quot;$ID&quot; --json          # 已知位置表的元数据清单（路径/类别/大小/时间）
+lintel env identity &quot;$ID&quot; --json         # 默认只报告 userID / oauthAccount 的存在性
+lintel snapshot save --environment &quot;$ID&quot; --json   # 保存一份脱敏语义快照并返回 snapshot_id
+lintel snapshot list --environment &quot;$ID&quot; --json</code></pre>
+<p><code>env residue</code> 只覆盖已知位置表加你显式给出的 <code>extra_roots</code>；表外区域是“未覆盖”，达到深度／条目上限或读失败会保留缺口。<code>env identity</code> 默认遮蔽原值，加 <code>--reveal</code> 才会把 <code>userID</code> 原值放进本次响应（不会写入任何持久记录）。再用 <code>snapshot save</code> 得到第二个 <code>snapshot_id</code>，可以比较两份快照或两个已登记环境：</p>
+<pre class="guide-code" data-language="sh"><code>SNAP_A=&#39;&lt;first-returned-snapshot-id&gt;&#39;
+SNAP_B=&#39;&lt;second-returned-snapshot-id&gt;&#39;
+OTHER_ID=&#39;&lt;another-registered-environment-id&gt;&#39;
+lintel snapshot compare --environment &quot;$ID&quot; --old-snapshot-id &quot;$SNAP_A&quot; --new-snapshot-id &quot;$SNAP_B&quot; --json
+lintel env compare &quot;$ID&quot; --other-environment-id &quot;$OTHER_ID&quot; --json</code></pre>
+<p>比较只给相同／改变／未知；身份比较材料留在本地私有 state，不同盐域不能据此判定身份变化。即时 <code>env compare</code> 使用一次性临时盐，不保存快照或持久盐。想进一步编辑明确选择的 user／project-local 配置或查看残留清理／标识重置，见 <a href="/guide/operator-guide/#recovery">操作指南</a> 与 <a href="/guide/core/">core 与 CLI 合同</a>。</p>
+<hr>
+<h2 id="还想继续用-app">还想继续用 App？</h2>
+<p>桌面开发路径见仓库根目录 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.md">README 的本地构建章节</a>，其中 <code>npm run dev:synthetic</code> 会创建一份独立临时 home/state 并调用真实 CLI，界面明确 标注“测试空间”，不会使用你的 Claude 登录或浏览器资料。普通 <code>npm run dev</code> 不提供浏览器到本机的执行通道。</p>
+<h2 id="只想装-cli">只想装 CLI？</h2>
+<p>公开发布为空、<strong>没有正式下载链接</strong>。请从已核对的源码独立安装，或走候选包 流程（核对身份、平台与字节，再解到新的版本目录，不改 PATH／shell rc／App／ service）。见 <a href="/guide/agents/#用户安装候选包">Agent CLI 指南</a> 与 <a href="/guide/agents/#从源码独立安装">从源码独立安装</a>。</p>
+<h2 id="你应该分清的三件事">你应该分清的三件事</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">说法</th><th class="align-left">不等于</th></tr></thead><tbody><tr><td class="align-left"><code>accepted</code>（durable ACK）</td><td class="align-left">任务已完成</td></tr><tr><td class="align-left">查询原 job（query-only，不重放）</td><td class="align-left">自动恢复／迁入／启动</td></tr><tr><td class="align-left">资料完整保全</td><td class="align-left">原会话可以续聊</td></tr></tbody></table></div>
+<h2 id="平台与未验收边界">平台与未验收边界</h2>
+<ul><li><strong>macOS desktop GUI</strong>：Tauri，当前按 unsigned arm64 候选构建。</li><li><strong>macOS arm64 CLI</strong> 与 <strong>Linux headless CLI</strong>（x86_64／aarch64）：独立 CLI；</li></ul>
+<p>Linux 源码以合成旅程构建与检查。三平台候选包记录存在，<strong>不代表可下载</strong>、 也不代表 Linux runtime 全通过。</p>
+<ul><li>真实认证与 native resume、正式浏览器／AdsPower、生产 VPS 与签名发行**尚未</li></ul>
+<p>验收**。</p>
+<ul><li>每次读取都会先完整解密并私有暂存<strong>整个认证包</strong>；请留出临时磁盘与时间。</li><li>独立包 inspect 返回文件清单；read 输出私有正文，**不进入普通 job／诊断／</li></ul>
+<p>Agent 元数据**。请自行控制正文的终端显示与后续复制。</p>
+<h2 id="相关文档">相关文档</h2>
+<p><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">中英文文档入口</a> 汇集完整使用／操作指南；中文是 canonical edition，英文 siblings 同步维护命令与边界。</p>
+<p>当前源码另有 <a href="/guide/telemetry/">遥测控制</a> 和 <a href="/guide/app-updates/">App 更新与发行准备</a>。首次合成试用不访问更新 feed，也不发送遥测测试到公网；App 后台检查默认关闭，正式公钥／feed 未配置，旧安装候选不因此升级。</p>
+<ul><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>：候选／资源／证据表与未交付目标。</li><li><a href="/guide/operator-guide/">人类操作指南</a>：GUI 里按目标选入口。</li><li><a href="/guide/agents/">Agent CLI 指南</a>：接口发现、计划／批准／查询、portable work 与候选安装。</li><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/verification.md">统一验证</a>：默认 synthetic 入口与独立 runtime 关口。</li><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/.github/ISSUE_TEMPLATE/preview-feedback.yml">预览反馈模板</a>：只附合成／脱敏示例。</li></ul>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

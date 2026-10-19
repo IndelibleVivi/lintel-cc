@@ -12,7 +12,7 @@
 | 已由自己或可信提供方构建的 macOS App | 打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见[当前状态](current-state.md) |
 | Linux，或只需要 CLI | [Agent CLI](agents.md)负责安装；[CLI 完整试用](quickstart.md)提供全程合成示例 |
 
-当前仍为 0.1.0 Preview；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 `878482f`，后续源码更新尚未替换它。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
+当前仍为 0.1.0 Preview；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 10-19 的 `e822d74`，已包含当前客户端控制与界面更新。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
 
 ## 合成界面试用
 
@@ -29,7 +29,7 @@ npm run dev:synthetic
 
 打开终端报告的地址，确认页面显示**测试空间**。这个入口启动 Vite 合成模式，通过真实 CLI 使用一份新建 HOME／state。脚本准备了 `CLAUDE.md`、`projects/synthetic/memory/notes.md` 和合成 settings；目录路径会打印在终端。
 
-这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。已由 CLI 准备并打包的 `878482f` 原生 App，也曾在另一个隔离 HOME／state 中完成同一归档路径；它仍不等于真实个人认证或干净 Mac 下载首装验收。
+这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。`e822d74` 原生 App 已在另一份隔离 HOME／state 中完成精确三件归档、退出重开、原任务核对与独立文件阅读；独立 CLI state 已核对三份原文字节。它仍不等于真实个人认证或干净 Mac 下载首装验收。
 
 ### 做一次“只生成工作归档”
 
@@ -45,6 +45,8 @@ npm run dev:synthetic
 ### 结束试用
 
 在启动 Vite 的终端按 `Ctrl-C`。合成目录会留下供检查；确认不再需要、也没有相关进程使用它后，再删除终端显示的那一份临时目录。归档口令丢失后无法通过 Lintel 找回包内内容。
+
+<a id="build-native"></a>
 
 ## 构建原生 macOS App
 
@@ -65,7 +67,7 @@ apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app
 
 构建同时准备当前平台 browser host、Chromium／Firefox 扩展和第三方许可资源。它不会自动安装到 Applications，也不会替你完成 Developer ID 签名、公证或正式发行。当前仅支持匹配 Rust host 的原生构建。更多说明见[桌面指南](desktop.md)与[App 更新](app-updates.md)。
 
-本地构建来自当前源码，因此会包含晚于 `878482f` 的客户端控制、动态开关和布局更新；这只能说明源码接入了这些能力，不能把旧候选升级成同版本包。旧候选的完整回执、语言／游戏路径与新功能的原生 WebKit 覆盖仍按[当前状态](current-state.md)分别理解。
+本地构建来自你检出的源码。候选版本号相同不代表文件相同：核对 source revision、包内资源与实际操作范围；当前候选与更早候选的原生、Chromium 和 CLI 证据按[当前状态](current-state.md)分别理解。
 
 ## 接入自己的环境
 

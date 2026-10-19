@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="区分受控通道、IPv4／IPv6 实测、配置读回与强制约束。">
+  <link rel="canonical" href="https://lintel.page/guide/network/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/network/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/network/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/network/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="网络与出口 · Lintel">
+  <meta property="og:description" content="区分受控通道、IPv4／IPv6 实测、配置读回与强制约束。">
+  <meta property="og:url" content="https://lintel.page/guide/network/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>网络与出口 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/network/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/network/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="network">
+        <h1 id="ipv4--ipv6-与受控网络通道">IPv4 / IPv6 与受控网络通道</h1>
+<p>简体中文（canonical） · <a href="/guide/network/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p><code>lintel-egress</code> 是 Rust loopback HTTP proxy。它已经实现 TCP CONNECT、有限普通 HTTP 转发、每个实例固定的环境与 hostname 规则，以及 HTTP/HTTPS 上游。它只约束实际进入此代理的连接。设置 <code>HTTP_PROXY</code> / <code>HTTPS_PROXY</code>、启动一个代理或者看到一条代理事件，均不能证明目标进程无法直连。</p>
+<h2 id="ipv4--ipv6-leaf宿主与通道分别实测">IPv4 / IPv6 Leaf：宿主与通道分别实测</h2>
+<p>App 入口是“环境详情 → 外发与权限”，无 Claude 环境时首页可“查看这台主机的网络”。CLI 使用 <code>network inspect</code>、<code>network probe</code>、<code>network ipv6 plan</code> 和 <code>network restore plan</code>。这四个操作共用 <code>crates/core/src/network.rs</code>；请求 schema 来自 <code>crates/operations</code>，有限 HTTPS 请求只由 <code>crates/egress/src/probe.rs</code> 实现。完整目标见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/specs/ip-network.md">Leaf</a>。</p>
+<p><code>network_inspect</code> 离线读取所选主机的服务／接口与地址观察；网络 revision 包含配置、接口 flags、地址与路由／VPN 动态值，用于前测有效性；观察不完整明确列为 limitation，不复用该结果。未关联到配置服务的新增接口（含 VPN/TUN）也独立可见。界面在进入、重新取得焦点及可见期间每 30 秒更新 metadata，不会因此访问公网。配置、观察、实际请求与强约束是分别报告的事实。</p>
+<p>点“测试实际出口”才产生四项请求：主机默认网络 × IPv4/IPv6、所选 Lintel 通道 × IPv4/IPv6。主机默认路径保留系统 VPN/TUN 的作用；未选择通道时对应两格为 <code>not_tested</code>。回显必须是匹配族的有限 IP，结果包含所选目标、执行进程实际观察的主机名、时间、耗时与失败原因，IP 可复制；主机名不可读时不伪造。<code>peer_family</code> 只描述实际 TCP 一跳，不证明上游之后的路由。默认 <code>https://api.ipify.org</code> 与 <code>https://api6.ipify.org</code>，可显式换成自己的 HTTPS 回显端点；端点会观察本次出口 IP。拒绝 credentials/query/fragment、redirect、自定义 CA 与无界响应。每格 1–15 秒完整 deadline（默认 10），头部／正文分别有上限，DNS、连接、CONNECT、TLS、HTTP 与地址族失败不混成安全结论。</p>
+<p>macOS 操作准确的当前 SCNetworkSet／service UUID／接口，不按 Wi-Fi 等显示名猜测。预览冻结完整 IPv6 protocol 配置、协议 enabled、服务自身 enabled、服务身份及前测；关闭禁用该协议，仅链路本地选 LinkLocal。批准后只修改该服务 IPv6，保留 IPv4、DNS、系统代理与其他服务，在系统授权下写入、提交／应用、独立读回，再自动沿用冻结端点和路径复测。它是<strong>宿主共享设置</strong>，影响使用服务的所有应用，不随 Claude 环境切换或 App 退出撤销；IPv6-only／VPN 可能失连。有效前测要求同 revision／端点／通道实例／deadline 且不超过五分钟，否则重新前测；批准前若前测过期或网络变化，原计划拒绝新任务，须重新预览。</p>
+<p>完整配置恢复另行预览批准，包含手动地址、前缀与 router；后续外部修改、服务／接口变化拒绝覆盖。App 原通道停止后，可在新恢复预览中把该路径明确列为未测试。原任务 ID 持久保存，响应丢失或中断只查询原任务，不重写或重新复测；intent 或相同可读值不能单独证明完成。读回未确认时保留不确定性，不能据此自动恢复；配置已读回而后测中断或未完成时，任务标为 <code>partially_completed</code> 并保留已确认的恢复入口；后测取得有限失败结果则如实列出每格原因。后测失败独立显示，不回滚已确认配置，也不变成“零泄漏”。</p>
+<p>Linux 的 <code>network inspect/probe</code> 在所选 runner 执行，不用 Mac 的通道代替远端。只接受远端 loopback HTTP 通道；<code>network serve</code> 仍由独立前台进程持有。Linux 整机 IPv6 变更不支持，不尝试 sudo 或改变管理连接；namespace／systemd 工作负载强约束仍是独立 SPEC 目标。<code>LINTEL_TEST_HOME</code> 和开发 fixture 禁止接触真实宿主网络，本 Leaf 的系统配置验收只使用 cfg(test) adapter 与 synthetic invoke。真实 macOS 授权、系统写入／恢复、VPN 切换、公众回显互通与 Linux native runtime 保持未验证。</p>
+<h2 id="启动和停用">启动和停用</h2>
+<p>每个环境启动一个独立实例，并将该环境的受控启动入口指向输出的 loopback 地址。配置例子全部为 synthetic 值：</p>
+<pre class="guide-code" data-language="sh"><code>lintel network serve --config crates/egress/examples/policy.synthetic.json
+# Independent existing executable uses the same serve_config owner:
+cargo run -p lintel-egress -- --config crates/egress/examples/policy.synthetic.json</code></pre>
+<p>两条 CLI 共用 <code>serve_config</code>，stdout 明确为 NDJSON。首条 <code>listening</code> 报告 <code>owner=foreground_process</code>、PID、规范化 <code>active_config</code> 与实际监听地址，例如 <code>127.0.0.1:49152</code>。端口 <code>0</code> 由 OS 分配；只接受 IPv4/IPv6 loopback 绑定，不监听公网，也不自动改 shell、浏览器、服务、路由或防火墙。没有配置好的客户端不会自动经过此代理。其他同一台机器上的进程也能够连接这个端口；独立端口是配置作用域，<strong>不是进程身份验证</strong>。</p>
+<p>退出 CLI 使用 Ctrl-C。它会先停止接入，再关闭已有 tunnel / HTTP 连接。重新加载规则采用显式停止旧实例、等待停止完成、再启动新实例的流程；已经建立的 CONNECT tunnel 不会绕过新规则继续存活。代理停止或上游失败后，本代理不会尝试绕开指定上游。客户端是否自行回退直连仍需分别验证。</p>
+<p>GUI 与 CLI 使用同一 Config/Proxy crate，但 GUI 通道由 App 进程持有；CLI 不读取或停止 App 通道。两者不共享跨进程 lifecycle。</p>
+<p>GUI/runner integration 使用同一 crate：</p>
+<pre class="guide-code" data-language="rust"><code>let proxy = lintel_egress::Proxy::bind(config, observer).await?;
+let address = proxy.local_addr()?;
+// shutdown 可以是 oneshot receiver 包装成的 Future&lt;Output = ()&gt;。
+proxy.serve_until(shutdown).await?;
+// 只有返回后，调用者才能报告该实例及既有连接已停用。</code></pre>
+<p><code>Observer = Arc&lt;dyn Fn(Event) + Send + Sync&gt;</code> 接收下述固定 metadata schema。回调应迅速返回；GUI 应只保留有上限的内存事件列表。crate 默认不创建日志文件。CLI 将 metadata 写到 stdout，调用者需要持续消费输出；使用 shell 重定向后，日志的容量、保留和删除由该调用者负责。<code>serve()</code> 是没有停止信号的常驻形式；需要控制生命周期时应使用 <code>serve_until</code> 并等待它结束，不要直接丢弃 future。</p>
+<h2 id="desktop-native-bridge">Desktop native bridge</h2>
+<p>Tauri 注册 <code>network_request</code> command，调用形式为 <code>invoke(&quot;network_request&quot;, { payload })</code>。它返回标准 <code>{ &quot;ok&quot;: true, &quot;data&quot;: ... }</code> / <code>{ &quot;ok&quot;: false, &quot;error&quot;: { &quot;code&quot;, &quot;message&quot; } }</code> envelope。此处描述 native command 的 source contract；是否已在某个界面暴露需以该界面的实际实现为准。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left"><code>payload.op</code></th><th class="align-left">其他字段</th><th class="align-left">行为与返回</th></tr></thead><tbody><tr><td class="align-left"><code>start</code></td><td class="align-left"><code>environment_id</code>；可选 object <code>config</code></td><td class="align-left">先通过 core <code>inspect</code> 核对已登记环境，再建立该环境的独立代理。<code>config</code> 使用前述 Config schema；native 强制覆盖环境 ID 和 <code>127.0.0.1:0</code> bind，调用者不能选择公网监听。已有实例时返回 <code>channel_exists</code>，需要先停止再修改规则。</td></tr><tr><td class="align-left"><code>status</code></td><td class="align-left"><code>environment_id</code></td><td class="align-left">返回当前任务是否仍运行、地址、实际采用的 <code>active_config</code> 与最多 200 条连接 metadata。只保存在该应用进程内，不写入日志文件。任务已结束时 <code>running</code> 为 false、<code>active_config</code> 为 null，即使尚有旧地址 / 事件，也不显示为运行中。</td></tr><tr><td class="align-left"><code>stop</code></td><td class="align-left"><code>environment_id</code></td><td class="align-left">关闭监听及已建立连接，等待代理结束后返回 stopped 状态；释放该环境的内存事件。没有实例时返回相同 stopped 状态。不会终止已经启动的 Claude 进程，也不改系统代理。</td></tr><tr><td class="align-left"><code>launch</code></td><td class="align-left"><code>environment_id</code></td><td class="align-left">必须有运行中的通道。向共享 core 发送 <code>launch</code> 与该通道的 <code>proxy_url</code>，原样返回 core envelope。该操作属于用户明确选择的启动动作，不能在 <code>start</code> / <code>status</code> 时自动调用。</td></tr></tbody></table></div>
+<p>新 App 的“通过通道打开 Claude”进入独立启动预览：输入项目 cwd，<code>request</code> bridge 的 <code>plan_launch</code> 冻结配置 root、cwd 和当前通道地址；批准后使用同一 <code>launch_request</code>。<code>NetworkState::dispatch_core</code> 在预览及首次尝试时核对这份地址确属该环境的 live App 通道，并串行化与 stop 的竞争。已存在的原启动 record 只查询，通道停用不妨碍找回它；仅有 <code>planned</code> 预览不能跳过 live 通道核验。旧 <code>network_request.launch</code> 为已有调用者保留。</p>
+<p><code>start</code> / <code>status</code> / <code>stop</code> 的 <code>data</code> 固定包括：</p>
+<pre class="guide-code" data-language="json"><code>{
+  &quot;running&quot;: false,
+  &quot;address&quot;: null,
+  &quot;active_config&quot;: null,
+  &quot;events&quot;: [],
+  &quot;coverage&quot;: &quot;proxy_connections_only&quot;,
+  &quot;direct_connections_enforced&quot;: false
+}</code></pre>
+<p>运行中 <code>address</code> 是 OS 分配的 <code>127.0.0.1:port</code> 字符串；<code>events</code> 是上述 typed Event 的数组，部分操作附带解释性 <code>message</code>。显式停止后地址和 <code>active_config</code> 为 null、事件清空。重新启动通道可能分配不同端口，已启动客户端的代理上下文不会自动更新，需要明确重新启动客户端。<code>launch</code> 使用 core 的返回 schema，macOS 的正常响应是 <code>status: &quot;launch_requested&quot;</code> 与 <code>message</code>；这表示 Terminal 接受了启动请求，不是已观察到目标流量。</p>
+<p>运行中的 <code>active_config</code> 是 native 校验、规范化后交给 <code>Proxy::bind</code> 的完整 Config，包含 <code>environment_id</code>、<code>bind</code>、<code>default_action</code>、<code>allowed</code>、<code>blocked</code>、<code>upstream</code>、<code>address_family</code> 和三个资源限制。它不是原始请求的回显：规则主机名转为小写、去掉末尾点，IP 使用规范形式；显式规则端口保留。上游 URL 经过校验但字符串不重写。native 始终把环境 ID 设为当前目标，把 <code>bind</code> 设为 <code>127.0.0.1:0</code>；OS 实际分配的端口使用单独的 <code>address</code>，不能把 Config 的端口 0 当作可连接地址。无效配置不会建立通道，也不会留下 <code>active_config</code>。</p>
+<p>桌面面板分别展示当前生效配置和下次启动草案。重开面板先查询当前通道；停止后可基于已读回的默认动作、阻止/允许规则与端口、上游继续编辑，重新启动时保留已读回的资源限制。草案仅保留在该 webview 的内存中，按环境区分；切换环境清除旧状态展示，旧环境的延迟回复不能替换当前面板。规则文本每行一个主机，可在空格后用逗号列出端口，例如 <code>example.invalid 443,8443</code>；省略端口表示全部端口。原通道任务异常结束时必须先清除旧实例，再重新启动。</p>
+<p>core 在 macOS 只给新启动上下文设置该 loopback URL 的 <code>HTTP_PROXY</code>、<code>HTTPS_PROXY</code>、<code>http_proxy</code>、<code>https_proxy</code>。这不会修改其他环境、全局 shell 或现有进程，也不会消除目标对 <code>NO_PROXY</code> 或其他路由机制的处理。macOS Terminal / 实际 Claude 路由没有在 synthetic 测试中运行；不据此认定应用级直接连接被阻止。其他平台若 core 返回 <code>terminal_required</code>，则没有启动目标进程。</p>
+<p>低体积 native 验证命令：</p>
+<pre class="guide-code" data-language="sh"><code>CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
+CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml network::tests</code></pre>
+<p>Synthetic bridge 测试核对 inspect／启动请求形状，区分 <code>planned</code> 与已尝试 record，覆盖冻结地址变化、停止后拒绝新尝试及原请求查询；真实 loopback socket 检查拒绝与停止。它们不调用实际 Claude、Terminal、系统代理切换或公网探针。</p>
+<h2 id="规则与实际支持范围">规则与实际支持范围</h2>
+<p>配置字段参见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/egress/examples/policy.synthetic.json">synthetic 配置</a>。<code>environment_id</code> 只接受短的字母数字 / <code>-</code> / <code>_</code> 标识，不接受路径或账号名。<code>allowed</code>、<code>blocked</code> 中每项为 <code>{ &quot;host&quot;: &quot;example.invalid&quot;, &quot;ports&quot;: [443] }</code>；域名不区分大小写，使用精确 hostname / IP，不支持通配符。IP 按规范形式比较：<code>::ffff:127.0.0.1</code> 这类 IPv4-mapped IPv6 归一到其内嵌 IPv4 参与匹配，规则写一侧即可覆盖两种写法；<code>127.1</code>、纯十进制整数或 <code>0x</code> 十六进制等 inet_aton 式 IP 写法（规则或请求目的地都一样）被直接拒绝，不能借此绕过精确 IP 规则。空 <code>ports</code> 代表该主机的所有端口。显式 <code>blocked</code> 优先，其次 <code>allowed</code>，最后 <code>default_action</code>（<code>allow</code> 或 <code>deny</code>）。<code>default_action</code> 在配置 JSON 中是必填字段：省略即配置无效、拒绝启动，不会静默变成全放行。规则在建立每个请求 / tunnel 前检查，域名判断不等于对 TLS 内部 URL 的检查。</p>
+<p>产品立场上的缺省动作是 <code>allow</code>，没有未经证明的内置 telemetry 黑名单；但这不是配置缺省——如上一节所述，wire 配置必须显式写出 <code>default_action</code>。<code>api.anthropic.com</code> 是用途混合域名，默认保留；CONNECT 从不把其加密内容分类成 telemetry。若用户明确把任何主机加入 <code>blocked</code> 或选择 <code>deny</code> allowlist，它会按该显式规则阻止整个主机 / 端口，可能同时影响必要功能。减少产品可选外发应同时依赖对应产品支持的原生配置。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">能力</th><th class="align-left">当前行为</th></tr></thead><tbody><tr><td class="align-left">CONNECT</td><td class="align-left">支持 TCP 双向字节转发；不解密 TLS，不安装根证书</td></tr><tr><td class="align-left">普通 HTTP</td><td class="align-left">HTTP/1.1 absolute-form URL；转给 origin 时改为 origin-form，并核对 Host 与 URL authority</td></tr><tr><td class="align-left">HTTP 请求正文</td><td class="align-left">支持单一 Content-Length，最多 64 MiB；不保存正文</td></tr><tr><td class="align-left">HTTP keepalive / pipelining</td><td class="align-left">每个客户端连接只转发一个请求，强制 <code>Connection: close</code>；剩余请求不转发</td></tr><tr><td class="align-left">chunked upload / Upgrade / Expect</td><td class="align-left">明确返回 501；需要这些协议时由客户端通过适当 CONNECT/TLS 通道传输</td></tr><tr><td class="align-left">HTTP response</td><td class="align-left">原样流式返回；服务端需遵守 <code>Connection: close</code>，否则到连接寿命上限关闭</td></tr><tr><td class="align-left">HTTP / HTTPS 上游</td><td class="align-left"><code>http://proxy.example.invalid:8080</code> 或 <code>https://proxy.example.invalid:8443</code>；HTTPS 用 rustls 校验服务器证书与 hostname，使用 Mozilla root bundle</td></tr><tr><td class="align-left">上游认证 / 自定义 CA</td><td class="align-left">当前不支持；URL userinfo 被拒绝，客户端 Proxy-Authorization 不转发给 origin</td></tr><tr><td class="align-left">SOCKS / PAC</td><td class="align-left">不支持，配置 SOCKS URL 返回明确错误；需要单独、已验证的转换适配器</td></tr><tr><td class="align-left">IPv6</td><td class="align-left">可绑定 <code>::1</code>，可解析 IPv6 authority；不代表进程其他 IPv6 出站受控</td></tr><tr><td class="align-left">UDP / QUIC / DNS / WebRTC / 直接 socket</td><td class="align-left">不在本代理约束范围；没有自动测试或“零泄漏”结论</td></tr></tbody></table></div>
+<p>连接建立（含 DNS 与 HTTPS 上游握手）和请求头有 <code>connect_timeout_seconds</code> 上限，默认 10 秒。整个连接默认最多 3600 秒；可显式设置到 86400 秒，长 tunnel 到期会关闭。最大并发默认 64，可设置 1–1024；接入在容量满时受 backpressure。头部最多 32 KiB / 100 fields。没有后台公共网络探针、STUN、analytics、license 请求或在线规则下载。显式 IP 回显及批准后的自动复测遵循上面的有限目标合同。</p>
+<p><code>address_family</code> 为 additive Config 字段：缺少时 <code>system</code>；<code>ipv4_only</code> 仅允许 Lintel 自己向目标或上游建立 IPv4 socket，DNS 返回的 IPv6 不尝试，不进行 IPv6 或上游失败后的直连回退。IPv4-mapped IPv6 归一为 IPv4。没有可用 IPv4 返回连接失败；它不控制上游的后续连接、客户端绕过、DNS 请求地址族或其他进程。事件的 <code>peer_family</code> 来自实际 socket，建立前为 null。</p>
+<h2 id="观察语义与隐私">观察语义与隐私</h2>
+<p>事件只含 timestamp、环境 ID、目的地主机 / 端口、<code>http</code> / <code>connect</code> channel、allow / deny / reject、规则来源、完成或失败原因、分类限制与少量 byte counts。没有 URL path / query、Authorization、Cookie、请求 / 响应 headers、正文或原始错误输出。hostname 本身可能敏感；不要未经预览把原始事件当作可公开的支持包。</p>
+<p><code>coverage</code> 始终为 <code>proxy_connections_only</code>，<code>direct_connections_enforced</code> 始终为 <code>false</code>。<code>tunnel_content_unclassified</code> 表示 CONNECT 内容不检查；HTTPS 加密内容不可分类，其他 tunnel 协议也不作推断。<code>byte_counts_complete: false</code> 表示中断或错误期间 counters 不完整，零不代表没有传输。<code>completed</code> 表示本代理完成转发，不代表目标业务成功；事件是在连接关闭或中断时产生，仍在运行的 tunnel 可能尚无完成事件。</p>
+<h2 id="验证和发行限制">验证和发行限制</h2>
+<pre class="guide-code" data-language="sh"><code>cargo test -p lintel-egress</code></pre>
+<p>真实 synthetic localhost sockets 验证 CONNECT allow/deny、HTTP 请求与正文、上游 absolute-form HTTP、上游 CONNECT、上游失败无直连回退、pipeline 不穿透、显式停止关闭现有 tunnel、日志不包含 synthetic secrets。另有配置 / framing 拒绝测试。测试无需公网代理、真实 Claude 数据或管理员权限。HTTPS 上游使用维护中的 <a href="https://docs.rs/tokio-rustls/latest/tokio_rustls/">tokio-rustls</a> 和 <a href="https://docs.rs/webpki-roots/latest/webpki_roots/">webpki-roots</a>；目前没有真实部署上游的互通验收记录。</p>
+<p>macOS 强约束需要签名、entitlement、用户批准与真实 Network Extension runtime；此 crate 不提供这些能力。Linux namespace 强约束尚未实现或验证，见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/platform/linux/README.md">Linux 状态</a>。任何平台都不能据此显示“强约束已生效”。完整验收仍须执行 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/ACCEPTANCE.md#d-网络与真实覆盖">ACCEPTANCE.md 网络用例</a>。</p>
+<h2 id="精确遥测目的地">精确遥测目的地</h2>
+<p>静态目录、设置观察与受控规则测试由 <a href="/guide/telemetry/">telemetry</a> 说明。选择只合入下次启动的 blocked 草案，保留上游／地址族和其它规则；模型、登录和下载的混合域名不推荐一键阻断。受控测试只走当前 proxy 的 loopback 请求，不连接公网遥测目标，结果与 Claude 实际流量分别标记。App updater 与它独立，活跃代理会阻止 App 安装／重启；见 <a href="/guide/app-updates/">app-updates</a>。</p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/network.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

@@ -28,6 +28,7 @@ import { spawnSync } from 'node:child_process';
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { checkSiteLanguages } = await import('../scripts/prepare-site-languages.mjs');
 await checkSiteLanguages();
+const { GUIDE_ARTICLES, SITE_ROUTES, localePath } = await import('../apps/site/site-routes.mjs');
 const languageChecks = spawnSync(process.execPath, ['--test','tests/site_languages.test.mjs'], {cwd:repo,encoding:'utf8'});
 assert.equal(languageChecks.status,0,languageChecks.stdout + languageChecks.stderr);
 const { chromium } = await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE || path.join(repo, 'extensions/browser/node_modules/playwright/index.mjs')).href);
@@ -48,9 +49,10 @@ const cardLinks = {
   recover_results: ['operator-guide.md#recovery'],
 };
 const docBase = 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/';
+const localTaskGuide = (suffix, language='zh') => `${language==='en'?'/en':''}/guide/${suffix.replace('.md','/')}`;
 // Finite named asset map only: the server never serves arbitrary files.
 const assets = new Map([['/', 'index.html'], ['/en/', 'en/index.html'], ...[
-  'index.html','en/index.html','styles.css','site.mjs','site-copy.mjs','site-language.mjs',
+  'index.html','en/index.html','styles.css','site.mjs','site-copy.mjs','site-language.mjs','site-routes.mjs','site-docs.mjs',
   'film.mjs','film.vtt',
   'workflow-trail.mjs','site-world.mjs',
   'clawd-game.mjs','clawd-game.css',
@@ -58,6 +60,11 @@ const assets = new Map([['/', 'index.html'], ['/en/', 'en/index.html'], ...[
   'assets/lintel-landscape.png','assets/lintel-landscape-night.png',
   'assets/lintel-keep.png','assets/lintel-crossing.png',
 ].map(file => [`/${file}`, file])]);
+for(const route of SITE_ROUTES.filter(route=>route.path!=='/')){
+  const zh=localePath(route.path,'zh');
+  assets.set(zh,`${zh.slice(1)}index.html`);
+  assets.set(localePath(route.path,'en'),`en/${zh.slice(1)}index.html`);
+}
 // The short film and its poster never enter Git. main builds them into an ignored media dir; when
 // LINTEL_SITE_MEDIA_DIR holds lintel-intro.mp4 + lintel-film-poster.jpg this finite map serves
 // exactly those two names so the actual-media playthrough can run. Without them the page-level
@@ -230,6 +237,49 @@ try {
   // --- Without JavaScript every product section, reading example and doc link stays visible. ---
   browser = await chromium.launch({headless:true});
   {
+    const routeContext = await browser.newContext({javaScriptEnabled:false,viewport:{width:1280,height:900}});
+    const page = await routeContext.newPage();
+    page.on('request',request=>{if(!request.url().startsWith(base))external.push(request.url());});
+    page.on('response',response=>{if(response.status()>=400)errors.push(`${response.status()} ${response.url()}`);});
+    for(const routePath of ['/download/','/guide/','/inside/','/releases/','/guide/start-here/','/guide/concepts/','/guide/troubleshooting/','/guide/operator-guide/','/guide/browser/','/guide/remote/','/guide/agents/']){
+      await page.goto(base+routePath,{waitUntil:'domcontentloaded'});
+      assert.ok((await page.locator('#main').innerText()).trim().length>200,`no-JS ${routePath}: substantive body`);
+      assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),`https://lintel.page${routePath}`);
+      assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`no-JS ${routePath}: no overflow`);
+      const dead=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].map(a=>a.getAttribute('href').slice(1)).filter(id=>id&&!document.getElementById(id)));
+      assert.deepEqual(dead,[],`no-JS ${routePath}: same-page anchors resolve`);
+      await page.locator('[data-site-route-language="en"]').click();
+      assert.equal(new URL(page.url()).pathname,`/en${routePath}`);
+      assert.equal(await page.locator('html').getAttribute('lang'),'en');
+      assert.ok((await page.locator('#main').innerText()).trim().length>200,`no-JS English mirror ${routePath}: substantive body`);
+      await page.locator('[data-site-route-language="zh"]').click();
+      assert.equal(new URL(page.url()).pathname,routePath);
+    }
+    for(const article of GUIDE_ARTICLES){
+      await page.goto(base+article.path,{waitUntil:'domcontentloaded'});
+      assert.ok(await page.locator('.guide-body h1').count()===1,`${article.key}: source heading rendered`);
+      assert.ok((await page.locator('.guide-body p').first().innerText()).length>20,`${article.key}: source prose rendered`);
+      assert.equal(await page.locator('.guide-body script').count(),0,`${article.key}: source markup escaped`);
+      assert.equal(await page.locator('.guide-body[data-guide-document]').count(),1,`${article.key}: exactly one guide body`);
+      for (const language of ['zh','en']) {
+        await page.goto(base+localePath(article.path,language),{waitUntil:'domcontentloaded'});
+        await page.setViewportSize({width:390,height:844});
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${article.key}/${language}: no-JS article fits 390px; code and tables scroll locally`);
+      }
+      await page.setViewportSize({width:1280,height:900});
+    }
+    await page.goto(base+'/guide/start-here/',{waitUntil:'domcontentloaded'});
+    await page.locator('.guide-body h2').first().scrollIntoViewIfNeeded();
+    const headingId=await page.locator('.guide-body h2').first().getAttribute('id');
+    assert.ok(headingId);
+    await page.goto(`${base}/guide/start-here/#${encodeURIComponent(headingId)}`,{waitUntil:'domcontentloaded'});
+    assert.equal(await page.locator(`#${headingId}`).count(),1,'generated article anchor resolves');
+    check('no-JS: all five route families and guide articles are direct-loadable, mirrored, anchored and substantive');
+    await routeContext.close();
+  }
+
+  {
     const noJs = await browser.newContext({javaScriptEnabled:false, viewport:{width:1280,height:900}});
     const page = await noJs.newPage();
     await page.goto(base, {waitUntil:'domcontentloaded'});
@@ -300,16 +350,20 @@ try {
     assert.equal(await page.locator('html').getAttribute('lang'),'en');
     assert.match(await page.title(),/Keep your work/);
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://lintel.page/en/');
-    assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/no formal download/);
+    assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/Claude Code/);
+    assert.match(await page.locator('#try .preview-note').innerText(),/No formal download/);
     assert.equal(await page.locator('.language-links [data-site-language="en"]').getAttribute('aria-current'),'page');
+    for (const route of ['/download/','/guide/','/inside/','/releases/']) {
+      assert.ok(await page.locator(`a[href="/en${route}"]`).count(), `English home exposes /en${route}`);
+    }
     await assertCapabilityComposition(page,'English no-JS',390);
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="primary"]').getAttribute('href'),docBase+'quickstart.en.md');
     assert.equal(await page.locator('.hero-actions [data-site-quickstart="alternate"]').getAttribute('href'),docBase+'quickstart.md');
-    assert.match(await page.locator('#try .reading-links').innerText(),/Current capabilities and limits \(Chinese\)/);
+    assert.match(await page.locator('#try .reading-links:not(.site-route-links)').innerText(),/Current capabilities and limits \(Chinese\)/);
     for (const name of ['operator-guide','agents','architecture']) assert.ok(await page.locator(`#try a[href="${docBase}${name}.en.md"]`).count());
     for (const [id,links] of Object.entries(cardLinks)) {
       const href = await page.locator(`#capabilities [data-capability="${id}"] h3 a`).getAttribute('href');
-      assert.ok(links.map(link=>docBase+link.replace('.md','.en.md')).includes(href),`English ${id} links its translated guide`);
+      assert.ok(links.map(link=>localTaskGuide(link,'en')).includes(href),`English ${id} links its translated guide`);
     }
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'English no-JS mobile has no horizontal overflow');
     await assertProductCopyVisible(page,'English no-JS');
@@ -462,6 +516,9 @@ try {
   assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'ready');
   check('scene: anchored identity, hidden keyboard sky, two lower Clawd reactions, offscreen stop and no guidance');
 
+  for (const route of ['/download/','/guide/','/inside/','/releases/']) {
+    assert.ok(await page.locator(`a[href="${route}"]`).count(), `home exposes ${route}`);
+  }
   // --- Header navigation targets the real sections and every in-page anchor resolves. ---
   for (const target of ['#capabilities','#how-it-works','#try']) {
     assert.equal(await page.locator(`header nav a[href="${target}"]`).count() > 0, true, `nav links ${target}`);
@@ -600,10 +657,10 @@ try {
     const link = card.locator('h3 a');
     assert.equal(await link.count(), 1, `card ${id} has one title link`);
     const href = await link.getAttribute('href');
-    const allowed = cardLinks[id].map(suffix => `${docBase}${suffix}`);
+    const allowed = cardLinks[id].map(suffix => localTaskGuide(suffix));
     assert.ok(allowed.includes(href), `card ${id} links a real doc/anchor (${href})`);
     // The linked doc file exists in the working tree (no dangling guide); fragment stripped.
-    const [filename, anchor] = href.slice(docBase.length).split('#');
+    const [filename, anchor] = cardLinks[id].find(suffix=>localTaskGuide(suffix)===href).split('#');
     const doc = await readFile(path.join(repo, 'docs', filename), 'utf8');
     if (anchor) assert.ok(doc.includes(`<a id="${anchor}">`), `capability ${id} links an existing named anchor`);
     // Chinese copy plus a concrete result; the near-boundary paragraph is a specific limitation.
@@ -802,7 +859,7 @@ try {
   check('#try exposes scope/limits, download boundary and CN/EN quickstart + six docs links');
 
   // --- Theme preference survives reload and swaps the hero night plate. ---
-  await page.getByRole('button',{name:'切换到夜色'}).click();
+  await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
   await page.reload();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
@@ -837,11 +894,11 @@ try {
 
   // --- Desktop captures: names must match the actual theme, and the full-page plate is captured
   //     only after every story art has scrolled in and decoded. ---
-  if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.getByRole('button',{name:'切换到夜色'}).click();
+  if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'desktop-night capture is night');
   await capture(page, 'desktop-night.png');
   if(qa)await captureSection(page,'#capabilities','capabilities-zh-1440-dark.png');
-  await page.getByRole('button',{name:'切换到日光'}).click();
+  await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
   for (const character of await page.locator('.story-character').all()) assert.equal(await character.isVisible(), false, 'day keeps only the accepted original illustration');
   await capture(page, 'desktop-day.png');
@@ -898,7 +955,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#workflow-trail')?.dataset.step === '1', null, {timeout:2000});
   assert.equal(await page.locator('#workflow-trail [data-trail-step="1"]').getAttribute('aria-pressed'), 'true', '390px trail switches steps');
   await page.locator('#workflow-trail [data-trail-step="0"]').click();
-  if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.getByRole('button',{name:'切换到夜色'}).click();
+  if (await page.locator('html').getAttribute('data-theme') !== 'dark') await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark', 'mobile-night capture is night');
   await assertNightClawdEyes(page, '390px mobile crop');
   await capture(page, 'mobile-night.png');
@@ -909,7 +966,7 @@ try {
   assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'running');
   await page.locator('.cg-pause').click();
   assert.equal(await page.locator('.clawd-game').getAttribute('data-state'), 'paused');
-  if (await page.locator('html').getAttribute('data-theme') !== 'light') await page.getByRole('button',{name:'切换到日光'}).click();
+  if (await page.locator('html').getAttribute('data-theme') !== 'light') await page.locator('#theme-toggle').click();
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'light', 'mobile-day capture is day');
   await capture(page, 'mobile-day.png');
   if(qa)await captureSection(page,'#capabilities','capabilities-zh-390-light.png');
@@ -1016,7 +1073,11 @@ try {
     assert.equal(await live.locator('html').getAttribute('data-theme'),'dark');
     assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
     assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'Resume the scenery');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('title'),'Resume the scenery');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-pressed'),'true');
+    assert.equal(await live.locator('#moon-toggle').getAttribute('aria-label'),'Touch the moon to switch to daylight');
     assert.equal(await live.locator('#theme-toggle').getAttribute('aria-label'),'Switch to daylight');
+    assert.equal(await live.locator('#theme-toggle').getAttribute('title'),'Switch to daylight');
     assert.equal(await live.locator('#workflow-trail').getAttribute('data-step'),'3');
     assert.match(await live.locator('[data-trail-caption]').innerText(),/Step 4:.*accepted.*completed/);
     assert.match(await live.locator('[data-trail-next]').innerText(),/Back to step 1/);
@@ -1029,10 +1090,15 @@ try {
     assert.deepEqual(await live.evaluate(()=>Object.keys(localStorage).filter(key=>!['lintel.site.theme','lintel.site.clawd.best'].includes(key))),[],'locale switching writes no language or other new storage');
     await live.goBack();
     assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN');
+    assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'让山湖动起来');
+    assert.equal(await live.locator('#theme-toggle').getAttribute('aria-label'),'切换到日光');
     assert.equal(await live.locator('#workflow-trail').getAttribute('data-step'),'3');
     assert.equal(await live.locator('.cg-score').innerText(),score);
     await live.goForward();
     assert.equal(await live.locator('html').getAttribute('lang'),'en');
+    assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
+    assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'Resume the scenery');
     // The modal makes the page behind it inert. Browser history still changes the page language
     // while preserving the exact video, open dialog and focus; it never starts/stops playback.
     await live.locator('#film-open').click();
@@ -1171,6 +1237,57 @@ try {
   assert.equal(await blockedPage.locator('.clawd-game').getAttribute('data-state'), 'paused');
   check('touch jump/pause and blocked local storage with temporary scores');
   await blocked.close();
+
+  {
+    const routes = await browser.newContext({viewport:{width:1440,height:900},colorScheme:'light'});
+    const routePage = await routes.newPage();
+    routePage.on('pageerror', error => errors.push(error.message));
+    routePage.on('request', request => { if (!request.url().startsWith(base)) external.push(request.url()); });
+    routePage.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
+    for (const routePath of ['/download/','/guide/','/inside/','/releases/']) {
+      await routePage.goto(base+routePath, {waitUntil:'networkidle'});
+      assert.equal(await routePage.locator('html').getAttribute('lang'),'zh-CN');
+      assert.equal(await routePage.locator('#theme-toggle').count(),1,`${routePath}: shared theme control`);
+      assert.equal(await routePage.locator('.hero-overlay, #workflow-trail, #film-dialog, #clawd-game').count(),0,`${routePath}: home widgets are not mounted`);
+      assert.equal(await routePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${routePath}: desktop no overflow`);
+      await routePage.locator('[data-site-route-language="en"]').click();
+      assert.equal(new URL(routePage.url()).pathname,`/en${routePath}`);
+      assert.equal(await routePage.locator('html').getAttribute('lang'),'en');
+      assert.equal(await routePage.locator('link[rel="canonical"]').getAttribute('href'),`https://lintel.page/en${routePath}`);
+      await routePage.locator('#theme-toggle').click();
+      const theme=await routePage.locator('html').getAttribute('data-theme');
+      await routePage.goBack();
+      assert.equal(new URL(routePage.url()).pathname,routePath);
+      assert.equal(await routePage.locator('html').getAttribute('data-theme'),theme,'route history preserves the same document theme');
+      assert.equal(await routePage.locator('html').getAttribute('lang'),'zh-CN');
+      await routePage.goForward();
+      assert.equal(await routePage.locator('html').getAttribute('lang'),'en');
+      await routePage.setViewportSize({width:390,height:844});
+      assert.equal(await routePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${routePath}: mobile no overflow`);
+      assert.ok((await routePage.locator('#main').innerText()).trim().length>200,`${routePath}: bodies remain readable at mobile width`);
+      await routePage.setViewportSize({width:1440,height:900});
+    }
+    await routePage.goto(base+'/guide/start-here/?synthetic=route#create-an-archive-only',{waitUntil:'networkidle'});
+    const articleThemeBefore=await routePage.locator('html').getAttribute('data-theme');
+    await routePage.locator('[data-site-route-language="en"]').click();
+    assert.equal(new URL(routePage.url()).pathname,'/en/guide/start-here/');
+    assert.equal(new URL(routePage.url()).search,'?synthetic=route');
+    assert.equal(new URL(routePage.url()).hash,'#create-an-archive-only');
+    assert.equal(await routePage.locator('html').getAttribute('data-theme'),articleThemeBefore);
+    assert.match(await routePage.locator('.guide-body h1').innerText(),/First use of Lintel/);
+    assert.ok((await routePage.locator('.guide-body [href^="/en/guide/"]').count())>0,'article links switch to English guides');
+    assert.match(await routePage.locator('a[data-route-copy="repositoryOriginal"]').getAttribute('href'),/start-here\.en\.md$/);
+    assert.equal(await routePage.locator('.guide-body script, .guide-body style').count(),0);
+    assert.equal(await routePage.locator('#sample-pages, #workflow-trail, #film-dialog, #clawd-game').count(),0,'article does not mount home interactions');
+    assert.equal(await routePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await routePage.setViewportSize({width:390,height:844});
+    assert.equal(await routePage.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'article 390px no overflow');
+    assert.ok((await routePage.locator('.guide-body p').first().innerText()).length>20);
+    await routePage.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await routePage.locator('.cursor').evaluate(node=>getComputedStyle(node).animationName),'none','shared brand cursor respects reduced motion');
+    check('routes: exact mirrors, scoped same-page language switch, query/hash, theme/history, no home widgets and 390px readability');
+    await routes.close();
+  }
 
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
   check('no runtime/asset errors or external requests');

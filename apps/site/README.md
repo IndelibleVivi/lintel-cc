@@ -1,10 +1,40 @@
 # Lintel website
 
+The website is a finite collection of direct-loadable routes, not a single landing page:
+
+| Route | Purpose |
+| --- | --- |
+| `/` and `/en/` | The illustrated product home, film, six task entries and opt-in game |
+| `/download/` | Current source/synthetic start paths and verified App download metadata |
+| `/guide/` | Index for first use, concepts, troubleshooting, operations and module guides |
+| `/guide/<article>/` | One generated article per paired repository document |
+| `/inside/` | Product design, execution paths and state boundaries |
+| `/releases/` | Source, candidate, public bytes and formal Release as separate facts |
+
+Every route has an exact `/en/...` mirror. `apps/site/site-routes.mjs` is the finite route and guide map; it is not a content store.
+
+## Generated pages
+
+The four base Chinese route templates (`download.html`, `guide.html`, `inside.html`, `releases.html`) and the guide article shell (`guide-article.html`) are canonical source markup. `scripts/prepare-site-languages.mjs` produces their tracked Chinese route pages and English mirrors in one pass. It also generates `apps/site/en/index.html` from the canonical Chinese home and finite `site-copy.mjs` pairs.
+
+Guide article bodies are read directly from the selected paired files in `docs/`. No instruction body is hand-copied into `apps/site`. The renderer in `apps/site/site-docs.mjs` supports ATX headings, paragraphs, ordered/unordered lists, blockquotes, fenced code, GFM tables, inline code, strong text, links and image links. Unsupported block structure fails generation instead of being silently reinterpreted. Local links to the selected guides become same-site routes; other repository references become pinned `main` developer links. Images in the architecture guide are represented as explicit links to the repository original because site media is not copied implicitly.
+
+```sh
+node scripts/prepare-site-languages.mjs
+node scripts/prepare-site-languages.mjs --check
+```
+
+`site.mjs` mounts the home illustration, trail, film and game only when their hosts exist. Base routes still share theme, route-aware language navigation, focus behavior and metadata. Route language links navigate between the exact mirrors. The home keeps the tested in-place language/history behavior and mounted instances.
+
+## Packaging
+
+`scripts/prepare-site.mjs` enumerates every `SITE_ROUTES` entry explicitly. It does not copy a directory tree. The payload includes both locales for every route, the finite modules and assets, the canonical social image and the two explicitly reviewed film files. `/download/` and `/releases/` start in an unavailable state until a canonical release record with verified public bytes is supplied. A verified manual record projects its real architecture, version, bytes, SHA-256, Apple trust facts and manual-only update mode, while a signed updater record also produces the existing channel feeds. No binary is placed in the Pages payload.
+
 Lintel 的独立静态官网源码，面向 Claude Code 用户，以简洁的个人工具说明环境整理与工作保全。页面是一片**开阔的字符风景**加**简短的产品叙事**：首屏是本地 raster 插画与原生字标；正文以 [六任务映射](../../contracts/task-catalog.json) 对应的六项带原创标题小图标与交错 SVG 场景的能力说明开始，通过插画与原生合成阅读示例引出四步流程和边界说明，并提供完整简中／English 页面、quickstart 与使用指南入口，不嵌入模拟 App。当前生产站点已在 [lintel.page](https://lintel.page/) 上线，由 Cloudflare Pages 同源托管；不提供正式 App 下载。准确部署状态见 [current-state](../../docs/current-state.md)，更新程序见[官网托管说明](../../docs/site-hosting.md)。
 
 ## 本地预览
 
-`index.html` 的两条 stylesheet 入口带版本 query。修改网站或共享游戏 CSS 时同步更新该版本，再生成 English 页面；两路使用相同入口，有限静态 payload 仍只包含原 CSS 文件。
+All route templates use the same stylesheet version query. Changing `styles.css` requires bumping that query in the canonical route HTML and regenerating every route. The finite payload still contains the CSS file once.
 
 在 repository 根目录运行：
 
@@ -76,3 +106,9 @@ python3 tests/verify.py --checks clawd-app-ui --require-passed
 ## 未来 App 下载与更新资料
 
 [`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。本次只是源码准备，未创建正式下载或更改线上站点。
+
+## 语言与发行状态的唯一入口
+
+首页用 `mountSiteLanguage` 原位更新，保留游戏、短片、details 与旅程实例；次级页是完整的中英静态正文，使用普通 mirror 链接导航，同步保留 query／hash。次级页不维护第二套 runtime 翻译正文；返回历史页面时重新读取已有主题偏好。首页的六能力标题进入对应站内 guide，原 header 锚点保留，首用区与页尾连接四个次级页面。
+
+公开下载是否存在只由 `prepare-site.mjs` 的 reviewed release block 投影决定。通用介绍与元数据不重复写“没有下载”这一易过期事实；未提供公开字节核对记录时，区块明确不可下载，提供已核对记录时显示实际版本、架构、字节、SHA-256、source、记录日期与说明。manual 仍不生成 feed，签名路径保留全部通道。次级页字标从首页 canonical SVG 标记块生成，不另画身份。

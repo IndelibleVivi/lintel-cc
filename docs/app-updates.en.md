@@ -45,7 +45,7 @@ Vite's built-in `build.license` generates frontend licence and copyright texts. 
 
 ## Candidate first-use acceptance
 
-Use a Mac matching the candidate architecture and record the exact DMG, source revision, App version and macOS version. The following is a native procedure to execute; existing CLI or Chromium checks do not replace it.
+Use a Mac matching the candidate architecture and record the exact DMG, source revision, App version and macOS version. The following is a repeatable native procedure; see [current state](current-state.md) for the latest candidate results. Existing CLI or Chromium checks do not replace native acceptance.
 
 1. **Identify the tested package.** Mount the local candidate read-only and copy the App into a new test directory, preserving the DMG and existing installations. Test actual download/Gatekeeper behavior separately on a clean Mac. Record the original system message and stop if blocked; do not remove quarantine or disable security checks. Website download acceptance first requires authorization to publish downloads, then verifies that the downloaded bytes match this accepted candidate.
 2. **Prepare six synthetic originals.** In a separate child shell, follow [quickstart step 1](quickstart.en.md#1-open-a-separate-interactive-shell), creating only the fixture without continuing to CLI registration or submission. Retain the printed `ROOT`; never point at a real Claude root. Replace `APP` below with the absolute path of the copied candidate and launch through macOS LaunchServices in the background from the same child shell. Fully quit the test App before reopening with the same command and HOME/state:

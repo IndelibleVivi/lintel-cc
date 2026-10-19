@@ -45,7 +45,7 @@ Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完
 
 ## 候选首次使用验收
 
-使用与候选架构相符的 Mac，先记录确切 DMG、source revision、App 版本与 macOS 版本。以下是待执行的原生操作流程；已有 CLI／Chromium 检查不代替这份验收。
+使用与候选架构相符的 Mac，先记录确切 DMG、source revision、App 版本与 macOS 版本。以下是可重复执行的原生操作流程；最新候选的实际结果见 [当前状态](current-state.md)，已有 CLI／Chromium 检查不代替 native 验收。
 
 1. **核对所测的包。** 本地候选只读挂载后，将 App 复制到新的测试目录，保留原 DMG 与旧安装。真实下载／Gatekeeper 另在干净 Mac 上检查；记录原始系统提示，遇到阻止时停止，不移除 quarantine 或关闭安全检查。未来官网下载验收须先有公开下载授权，再核对实际下载字节与这份已验收候选一致。
 2. **准备六份假原件。** 在独立子 shell 中执行 [quickstart 第 1 步](quickstart.md#1-一次明确的子-shell-边界)，只创建 fixture，不继续 CLI 登记或提交。保留打印出的 `ROOT`，不要指向真实 Claude root。将下列 `APP` 替换为刚复制的候选绝对路径，在同一子 shell 经 macOS LaunchServices 后台启动；完全退出测试 App 后用同一命令重开，保持相同 HOME／state：

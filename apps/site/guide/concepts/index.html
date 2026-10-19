@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="分清主机、配置根、项目目录、冻结计划、任务与工作包。">
+  <link rel="canonical" href="https://lintel.page/guide/concepts/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/concepts/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/concepts/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/concepts/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="基本概念 · Lintel">
+  <meta property="og:description" content="分清主机、配置根、项目目录、冻结计划、任务与工作包。">
+  <meta property="og:url" content="https://lintel.page/guide/concepts/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>基本概念 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/concepts/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/concepts/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="concepts">
+        <h1 id="先认清这几个对象">先认清这几个对象</h1>
+<p>简体中文 · <a href="/guide/concepts/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>理解下面的区别，就能判断 Lintel 将在哪里做什么，也能在换窗口或断线后找回结果。</p>
+<h2 id="主机配置根项目目录与浏览器">主机、配置根、项目目录与浏览器</h2>
+<p><strong>主机</strong>决定执行地点与用户。本机是当前 Mac；SSH 工作空间对应远端主机及其登录用户。远端环境、计划和记录由那台主机持有。</p>
+<p><strong>环境</strong>指 Lintel 登记的 Claude Code 配置根。<strong>项目 cwd</strong>是启动 Claude 时所在的代码或工作目录。两者可以不同；换配置根不意味着搬动项目代码。</p>
+<p><strong>浏览器 profile</strong>在浏览器模块里单独选择和配对。App 的本机浏览器不会随着 SSH 目标切换而移到 VPS。配置目录分离也不自动建立账户、凭据或操作系统层面的隔离。</p>
+<h2 id="预览计划任务与结果">预览、计划、任务与结果</h2>
+<p><strong>预览</strong>让你看实际范围。对于 core 的计划型任务，<strong>冻结计划</strong>记录准确目标、选中内容或字段变化，并返回 ID 与 hash。批准必须对应那份计划；目标或相关内容变化后，要重新预览。</p>
+<p><strong>任务</strong>是已提交操作的持久记录。core job 使用原 plan ID；<code>accepted</code> 表示已持久接收，<code>completed</code> 才表示任务达到自己的完成目标。阅读 steps、coverage 和错误信息，才能知道哪部分完成。</p>
+<p>查询原任务不会重新执行破坏性动作，但可能持久记录中断核对结果。需要恢复时，另外预览恢复计划并批准。浏览器 operation、会话启动 request 与 App 更新 intent 各有自己的记录，不能互换 ID 或统一当作 core job 提交。</p>
+<h2 id="工作包迁入与继续会话">工作包、迁入与继续会话</h2>
+<p><strong>工作包</strong>是加密的 <code>.age</code> 文件，保存选中原件。只归档会保留旧目录与登录，不创建新配置根；保全并准备新环境会增加新根与选定内容的迁入步骤。</p>
+<p>工作包能够在没有源 inventory／job 的独立 state 中打开。跨机器携带时，文件传输由你明确选择的系统工具完成；SSH controller 不隐式传包。</p>
+<p><strong>迁入</strong>把明确选中的资料送到预览的落点，不覆盖同名内容。保存会话原文、阅读资料、整理交接稿、把原生会话 resume 起来，是不同的操作。原生 resume 有独立格式、版本和认证条件；当前具体范围查<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
+<p><strong>观察、基线接受与恢复。</strong> 脱敏语义快照用于比较变化；逐项接受当前值只形成比较基线，不产生可恢复的工作正文。配置恢复、残留备份恢复和工作迁入各自读取不同的来源，也各自需要预览与批准，不能用一个原 ID 代替另一类操作的恢复依据。</p>
+<h2 id="默认方案普通与批量编辑">默认方案、普通与批量编辑</h2>
+<p>保护方案先形成按主机和环境隔离的草案。普通编辑在每行选择本字段动作；批量编辑只为全部选中项提供共同适用动作，筛选之外的选中项不会悄悄消失。个人默认只保存非秘密意图，若与内置配方不同，界面按实际启用、关闭或移除的字段标注，下一次应用仍重新读取目标并生成计划。</p>
+<h2 id="配置读回与实际外发">配置读回与实际外发</h2>
+<p>设置读回证明目标字段已经按计划处理；已有 Claude 进程不会因此自动重启。受控通道的观察说明经过该代理的连接，不能覆盖直接出站。主动 IPv4／IPv6 测试说明那一次、那条路径的出口。</p>
+<p>对应入口：<a href="/guide/operator-guide/#protect">保护方案</a>、<a href="/guide/network/">网络</a>、<a href="/guide/telemetry/">遥测</a>。</p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/concepts.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

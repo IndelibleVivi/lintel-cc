@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Separate hosts, configuration roots, project directories, frozen plans, tasks and work packages.">
+  <link rel="canonical" href="https://lintel.page/en/guide/concepts/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/concepts/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/concepts/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/concepts/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Core concepts · Lintel">
+  <meta property="og:description" content="Separate hosts, configuration roots, project directories, frozen plans, tasks and work packages.">
+  <meta property="og:url" content="https://lintel.page/en/guide/concepts/">
+  <meta property="og:locale" content="en_US">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>Core concepts · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="Main navigation" data-route-attr-aria-label="nav"><a href="/en/" data-route-copy="product">Product</a><a href="/en/guide/" aria-current="page" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="/en/inside/" data-route-copy="inside">Design &amp; implementation</a><a href="/en/releases/" data-route-copy="status">Status</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="Language" data-route-attr-aria-label="language"><a href="/guide/concepts/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh">中文</a><span aria-hidden="true">/</span><a href="/en/guide/concepts/" lang="en" hreflang="en" data-site-route-language="en" aria-current="page">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to night" title="Switch to night" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <article class="guide-body" data-guide-document="concepts">
+        <h1 id="core-concepts">Core concepts</h1>
+<p><a href="/en/guide/concepts/">简体中文</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
+<p>These distinctions explain where an operation runs, what it targets and how to retrieve its result after changing windows or losing a connection.</p>
+<h2 id="host-configuration-root-project-directory-and-browser">Host, configuration root, project directory and browser</h2>
+<p>The <strong>host</strong> selects the execution machine and user. Local means the current Mac; an SSH workspace selects the remote host and login user. Remote environments, plans and records belong to that host.</p>
+<p>An <strong>environment</strong> is a Claude Code configuration root registered with Lintel. The <strong>project cwd</strong> is the code or working directory used when launching Claude. They can differ; changing the root does not move project code.</p>
+<p>A <strong>browser profile</strong> is selected and paired independently. The app&#39;s local browser does not move to a VPS when the SSH target changes. Separate configuration directories do not automatically establish account, credential or operating-system isolation.</p>
+<h2 id="preview-plan-task-and-result">Preview, plan, task and result</h2>
+<p>A <strong>preview</strong> exposes the actual scope. For plan-based core tasks, a <strong>frozen plan</strong> records the exact target, selected content or field changes, with an ID and hash. Approval must match that plan. A change in relevant target/content requires a fresh preview.</p>
+<p>A <strong>task</strong> is the persistent record of a submitted operation. Core jobs use the original plan ID. <code>accepted</code> means durably received; <code>completed</code> means the task achieved its own outcome. Inspect steps, coverage and errors for the result of each part.</p>
+<p>Querying the original task does not replay destructive actions, but it can persist interruption-reconciliation information. Restoration requires a separate reviewed and approved plan. Browser operations, launch requests and app-update intents have their own records; their IDs cannot be exchanged or submitted as generic core jobs.</p>
+<h2 id="work-package-import-and-session-continuation">Work package, import and session continuation</h2>
+<p>A <strong>work package</strong> is an encrypted <code>.age</code> file containing selected originals. Archive-only keeps the old directory/login and creates no new configuration root. Preservation with a new environment adds new-root preparation and selected import steps.</p>
+<p>A work package can open in independent state without the source inventory/job. Choose a system file-transfer tool explicitly when carrying it between machines; the SSH controller does not transfer packages implicitly.</p>
+<p><strong>Import</strong> publishes selected material to the previewed destinations without overwriting same-name content. Preserving a transcript, reading it, drafting a handoff and resuming a native session are separate operations. Native resume has its own format, version and authentication conditions; see <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current status (Chinese)</a>.</p>
+<p><strong>Observation, baseline acceptance and restoration.</strong> Sanitized semantic snapshots support comparison. Accepting current values item by item only establishes a comparison baseline and does not create recoverable work content. Configuration restore, residue-backup restore and work import read different sources and each requires its own preview and approval; one original ID cannot substitute for another kind of restoration evidence.</p>
+<h2 id="presets-ordinary-editing-and-bulk-changes">Presets, ordinary editing and bulk changes</h2>
+<p>A protection draft belongs to one host and environment. Ordinary editing chooses an action on the row for that field. Bulk edit offers only actions common to every selected item, without silently omitting selections outside the filter. A personal default stores non-secret intent only; if it differs from a built-in recipe, the label describes the fields actually enabled, disabled or removed, and the next application still reads the target and generates a fresh plan.</p>
+<h2 id="configuration-readback-and-actual-outbound-behaviour">Configuration readback and actual outbound behaviour</h2>
+<p>Settings readback verifies that the target fields were handled as planned; an existing Claude process is not restarted automatically. Controlled-channel observations cover connections through that proxy, not direct outbound traffic. An explicit IPv4/IPv6 probe describes the tested route at that time.</p>
+<p>Continue with <a href="/en/guide/operator-guide/#protect">Protection</a>, <a href="/en/guide/network/">Network</a> or <a href="/en/guide/telemetry/">Telemetry</a>.</p>
+      </article>
+      <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/concepts.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">Hold the complexity. Leave a little room.</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">Independently made; not officially affiliated with Anthropic.</span><br><span data-route-copy="footerClawd">The Clawd character belongs to Anthropic.</span></p><p data-route-copy="footerDocs">Page bodies are projected from maintained paired repository documents.</p><div><a href="/en/guide/" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">Source</a></div></div></footer>
+</body>
+</html>

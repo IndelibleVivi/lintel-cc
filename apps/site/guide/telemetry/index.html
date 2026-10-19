@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="区分静态目录、配置规则、受控测试与普通观察。">
+  <link rel="canonical" href="https://lintel.page/guide/telemetry/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/telemetry/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/telemetry/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/telemetry/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="遥测目标 · Lintel">
+  <meta property="og:description" content="区分静态目录、配置规则、受控测试与普通观察。">
+  <meta property="og:url" content="https://lintel.page/guide/telemetry/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>遥测目标 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/telemetry/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/telemetry/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="telemetry">
+        <h1 id="telemetry-目标目录与受控规则测试">Telemetry 目标目录与受控规则测试</h1>
+<p>简体中文（canonical） · <a href="/guide/telemetry/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>本文件拥有 telemetry 目标目录这一项能力的实现边界：静态目录、App 草案合并、CLI／有限 SSH 的只读目录，以及受控的规则测试。产品立场与既有受控通道（<code>docs/network.md</code>）保持不变。这里没有任何在线规则、第三方历史清单导入、通配符扩展或全域名黑名单。</p>
+<h2 id="目的与事实分离">目的与事实分离</h2>
+<p>“哪些主机承载可选 telemetry”“客户端能否真的连上它”“当前是否被显式阻止”“本机原生设置读回值”是四个不同事实：</p>
+<ul><li><strong>目录（proposed/informational）</strong>：来自官方文档的静态目标清单，含稳定 ID、用途、客户端、版本适用性（按当前文档诚实界定，不虚构最低版本）、官方来源 URL、核对日期、附带影响、精确 host/port，以及是否 <code>blockable</code>。</li><li><strong>configured</strong>：用户把某个 <code>blockable</code> 目标选进受阻通道草案并显式启动后，该 host 出现在通道的 <code>blocked</code> 规则里。这是草案／配置事实。</li><li><strong>observed blocked</strong>：真实 loopback 代理对一次实际 CONNECT 请求返回 <code>explicit_block</code> 的事件；这是唯一能说“当前这个通道阻止了它”的证据。</li><li><strong>not observed</strong>：没有连接、通道已停止／被替换、或规则只是 <code>default_deny</code> 命中时，不能当作“已阻止该 telemetry 目标”。</li></ul>
+<p>原生设置读回值只说明某个冻结设置值已写入并读出；它不是全局强制，也不等同于浏览器或系统级阻止。</p>
+<h2 id="静态目录来源与内容">静态目录来源与内容</h2>
+<p>唯一来源是 <code>contracts/telemetry-destinations.json</code>（<code>lintel.telemetry-destinations/1</code>）。它由 <code>crates/egress/src/telemetry.rs</code> 在编译期嵌入，App、root CLI 和 runner CLI 共用同一份文件。</p>
+<p>官方文档（核对日期 2026-10-09，<code>https://code.claude.com/docs/en/network-config</code>）列出两个可选 Datadog 运营 telemetry 入口，它们是当前唯一 <code>blockable</code> 的目标：</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">ID</th><th class="align-left">host:port</th><th class="align-left">用途与启用条件</th></tr></thead><tbody><tr><td class="align-left"><code>datadog_logs_intake</code></td><td class="align-left"><code>http-intake.logs.us5.datadoghq.com:443</code></td><td class="align-left">Claude Code 运营 telemetry（Datadog log intake）。<strong>仅</strong>用于使用 <strong>direct Anthropic API</strong> 的 Claude Code；Bedrock、Google Agent Platform 与 Foundry 部署不经过此入口。</td></tr><tr><td class="align-left"><code>datadog_browser_intake</code></td><td class="align-left"><code>browser-intake-us5-datadoghq.com:443</code></td><td class="align-left">运营错误回报（Datadog browser intake）。用于 direct Anthropic API 的 Claude Code，另受 Anthropic 服务端 rollout gate 控制；原生 <code>DISABLE_ERROR_REPORTING</code> 或 <code>DISABLE_TELEMETRY</code> 会将其关闭。</td></tr></tbody></table></div>
+<p><code>provider</code> 字段同时标明 telemetry sink（Datadog）与模型 provider（direct Anthropic API）两个不同事实，不把 sink 当成模型 provider。</p>
+<p>下列混合／必要主机只作为 <strong>informational</strong>，永不提供一键 telemetry 阻止：</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">host:port</th><th class="align-left">用途</th></tr></thead><tbody><tr><td class="align-left"><code>api.anthropic.com:443</code></td><td class="align-left">模型请求、安全预检查、feature flag 与 telemetry 混合</td></tr><tr><td class="align-left"><code>claude.ai:443</code>、<code>claude.com:443</code>、<code>platform.claude.com:443</code></td><td class="align-left">认证或混合用途</td></tr><tr><td class="align-left"><code>downloads.claude.ai:443</code></td><td class="align-left">安装器／更新、版本检查、插件可执行文件</td></tr></tbody></table></div>
+<p>旧 Sentry / Statsig 规则是未核验的历史线索，<strong>不是</strong>当前 <code>blockable</code> 条目；目录里不存在它们。目录只接受确切 hostname：没有通配符、路径或 scheme。未知 ID、未知字段与通配符一律拒绝。</p>
+<p>Provider 与 enablement 条件可能随官方文档变化；修改目录条目前必须重新核对上表来源与核对日期。</p>
+<h2 id="app合并进已有的受阻通道草案">App：合并进已有的受阻通道草案</h2>
+<p>入口仍是“环境详情 → 外发与权限”的受控通道面板，没有第二个代理或执行器。</p>
+<p><code>TelemetryPanel</code> 通过共享目录显示每个目标。勾选一个 <code>blockable</code> 目标，只是把它的确切 host 合并进<strong>下次启动</strong>的受阻通道草案的 <code>blocked</code> 规则：</p>
+<ul><li>保留用户已有的 <code>blocked</code>／<code>allowed</code> 规则、默认动作、上游、地址族与三个资源限制；</li><li>同 host 的全部端口规则或包含 443 的规则才视为覆盖；只有 80 的规则不覆盖 443；</li><li>从不选中 informational／混合主机；</li><li>只改草案。启动仍是显式动作；不会就地修改正在运行的通道。</li></ul>
+<p>草案按环境保留在该 webview 内存中，与其它连接详情一样不写入磁盘。待合并的选择与手写草案分别保留；取消选择不删除手写规则。<code>start</code> 时合并确切 host/443 并交给原生 bridge；代理是否采用由 <code>active_config</code> 读回证明，实际阻止由真实连接事件证明。</p>
+<p>远端映射：管理远端环境（SSH alias）时，目录来自远端 runner 的只读目录请求；勾选和受控测试不可用。旧 runner 未提供目录时明确显示失败，不用本地目录冒充远端支持。远端 UI 不得声称它的本地 App 代理在远端生效——本地通道只覆盖经过该本地通道的连接。</p>
+<h3 id="已观察的隐私设置读回值">已观察的隐私设置（读回值）</h3>
+<p><code>TelemetryPanel</code> 接受可选的 <code>settings?: Inspection[&#39;settings&#39;]</code> 与 <code>onPrivacySettings?: () =&gt; void</code>（由 <code>App.tsx</code> 提供）。有真实的 <code>inspect</code> 读回时：</p>
+<ul><li>单独显示 <code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code> 的<strong>实际观测值</strong>，并附官方 env-vars 的更新影响说明（非空即生效；同时关闭自动更新、release notes 与 feature flag 获取）；</li><li>细粒度开关（产品指标、错误回报、质量调查、主动反馈、跨工具 telemetry、feature flag）逐项分列；</li><li>没有读回时显示 <code>not_read</code>，<strong>不</strong>显示为已关闭或已强制。读回值 ≠ 全局强制，也 ≠ 当前运行证明。</li></ul>
+<p><code>onPrivacySettings</code> 只是“查看现有隐私设置”的入口，不会自动改写设置或正在运行的代理。</p>
+<h2 id="cli-与有限-ssh">CLI 与有限 SSH</h2>
+<p>只读静态目录，不初始化私有 state、不访问真实宿主网络：</p>
+<pre class="guide-code" data-language="sh"><code>lintel telemetry catalog          # 与 lintel network catalog 相同
+lintel network catalog</code></pre>
+<p>三条入口（root CLI、runner CLI、<code>lintel request</code> 的 <code>telemetry_catalog</code> 操作）都返回同一份 <code>lintel.telemetry-destinations/1</code>。有限 SSH 把 <code>telemetry_catalog</code> 当作只读 request 命令：它不创建任务记录、不重新提交、不需要 runner 绑定字段，也不接受除 <code>command</code> 之外任何字段。</p>
+<h3 id="受控规则测试--test-telemetry">受控规则测试：<code>--test-telemetry</code></h3>
+<pre class="guide-code" data-language="sh"><code>lintel network serve --config policy.synthetic.json --test-telemetry datadog_logs_intake</code></pre>
+<p><code>--test-telemetry ID[,ID...]</code> 是有限、去重、已知目录 ID 的列表（最多 8 个）。启动前，每个 ID 解析为确切 host，并只在<strong>已经显式阻止</strong>该 host 时放行：</p>
+<ul><li>任一目标不是 <code>explicit_block</code>（例如只有 <code>default_deny</code> 命中）→ 整个启动被拒绝，<code>telemetry_target_not_explicitly_blocked:&lt;host&gt;</code>；不会静默成功。</li><li>未知或通配 ID → <code>invalid_telemetry_test_ids</code> / <code>unknown_telemetry_destination</code>。</li><li>拒绝发生在<strong>绑定监听之前</strong>：非法的 <code>--test-telemetry</code> 不会打开任何 listener，也不连接目标。</li><li>通过后，前台 server 先在 <code>listening</code> 事件之后对外服务，再对<strong>自己的</strong>监听地址发起一次真实 loopback CONNECT（不是伪造事件）；只有真实 403 与完成的原事件一致（<code>provenance:explicit_block</code>、<code>outcome:blocked</code>）时，才输出成功的 <code>rule_test</code> 结果，字段 <code>owner_origin: lintel_egress_foreground</code>、<code>outcome.result: blocked_explicit</code>、<code>outcome.connection_attempted: false</code>。<strong>从不连接目标</strong>，也不发送任何 telemetry 正文。</li></ul>
+<p>受控测试由该 Proxy 自己的 <code>RuleTestRegistry</code> 约束：注册绑定<strong>私有 loopback 客户端本地端点 + 确切 host/443 + 一次性 test ID</strong>，只在该 Proxy 实例内、按实例累计有界（最多 16 次、并发 ≤ 2、单次 5 秒 deadline）。接受到的连接必须匹配该私有 peer 与确切目标才会被标记为受控来源；一次性消费；取消/错误只清理自己的注册。任意客户端 header 或 UI 时间推断都不能制造这个来源。</p>
+<h3 id="原生受控测试app">原生受控测试（App）</h3>
+<p>App 通过原生 <code>network_request</code> 的 <code>rule_test</code> op 在同一活动通道上做同样的受控证明：</p>
+<pre class="guide-code" data-language="json"><code>{&quot;op&quot;:&quot;rule_test&quot;,&quot;environment_id&quot;:&quot;&lt;ID&gt;&quot;,&quot;telemetry_id&quot;:&quot;datadog_logs_intake&quot;,&quot;channel_binding&quot;:&quot;&lt;CURRENT_CHANNEL_BINDING&gt;&quot;}</code></pre>
+<ul><li>只接受目录 ID（<code>telemetry_id</code>），不接受任意 host／port／通配；未知 ID 返回 <code>rule_test_failed</code>。</li><li>无活动通道、已停止或原 <code>channel_binding</code> 不匹配→<code>channel_missing</code> / <code>channel_stopped</code> / <code>channel_changed</code>，不冒充成功。</li><li>走的是这个<strong>正在服务的</strong>通道自身的 <code>Proxy::rule_test</code>：它先做 <code>explicit_block</code> 准入（否则不发起任何网络活动），再绑定私有 loopback 客户端、注册定向 test ID、向该通道自己的监听地址发送真实 <code>CONNECT host:443</code>。返回携带 <code>owner_origin: lintel_app_proxy</code> 与 <code>outcome.test_id</code> 作为 owner-origin 标记；普通 Claude／代理流量永远不带该标记（对应事件 <code>origin</code>/<code>test_id</code> 为 null）。</li><li>成功必须同时收到 403，并匹配已完成事件的原 test ID、目标、<code>decision:deny</code>、<code>provenance:explicit_block</code> 与 <code>outcome:blocked</code>。结果为 <code>blocked_explicit</code> 或 <code>failed</code>。若一次被误放行，服务端会把受控请求<strong>失败关闭</strong>（拒绝且不连接），报 <code>failed</code>，绝不伪造成 <code>blocked_explicit</code>。从不解析公网 DNS、不连接目标、不经过上游。</li><li>通道停止或被替换后，旧实例的 <code>rule_test</code> 不再可验证；UI 会清掉旧实例的结果并要求对新实例重测。</li></ul>
+<p>CLI 与 App 共用同一份目录与同一种受控证明（<code>serve_config_with_tests</code> 与 App 的原生 <code>rule_test</code> op 都经由该 Proxy 实例的 <code>RuleTestRegistry</code> 发起真实 loopback CONNECT）。</p>
+<h2 id="观察语义与区分">观察语义与区分</h2>
+<p>真实客户端连接事件与规则测试严格区分：</p>
+<ul><li>客户端事件：<code>provenance: explicit_block</code>（来自 <code>Config::decide</code> 的显式阻止）、<code>channel: connect</code>／<code>http</code>、<code>outcome: blocked</code>。这是 observed blocked。</li><li><code>default_deny</code> 命中的拒绝：<code>provenance: default_deny</code>，<strong>不是</strong>显式阻止证据。</li><li>规则测试：<code>kind: rule_test</code>、<code>provenance: rule_test</code>、<code>connection_attempted: false</code>。它证明的是“冻结草案把该确切目标列为显式阻止”，而不是客户端真的尝试过。</li></ul>
+<p><code>coverage</code> 始终为 <code>proxy_connections_only</code>，<code>direct_connections_enforced</code> 始终为 <code>false</code>。目录与规则测试都不构成系统级、浏览器级或桌面级强约束，也不覆盖其它进程的直连。</p>
+<h2 id="与策略评估的关系">与策略评估的关系</h2>
+<p><code>crates/core/src/policy.rs</code> 的 <code>CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</code> 仍是 <strong>nonempty</strong> 语义（<code>0</code>／<code>false</code> 也会关闭）。按官方 <code>https://code.claude.com/docs/en/env-vars</code>，它还同时关闭自动更新、release notes 与 feature flag 获取；该附带影响现在记录在每个相关 blocker 的 <code>collateral</code> 字段中。这不改变已批准的 settings 语义，也不改变 Remote Control 保证。<code>reduce</code> 预设继续使用细粒度的 <code>FLAGS</code>，不会因这条目改变既有做法。</p>
+<h2 id="验证与限制">验证与限制</h2>
+<pre class="guide-code" data-language="sh"><code>python3 tests/verify.py --checks cargo-workspace-test,desktop-rust-test,journey-agent-adapters
+# frontend 先构建，再做独立的合成 invoke UI 旅程
+python3 tests/verify.py --checks desktop-build,telemetry-ui</code></pre>
+<p>受控规则测试使用<strong>真实既有 loopback 代理</strong>：一个显式阻止的目录目标必须被拒绝（403）且不发生任何目标连接；一个不在阻止列表里的 loopback origin 仍可连接（证明块是精确的）。测试从不解析或连接公网目标，也不发送 telemetry 正文。当前沙箱可能缺少 loopback 权限：这类测试会以精确的 <code>PermissionDenied</code>／<code>listen_failed</code> 报告环境失败，而不是伪装通过。</p>
+<p>真实 host 系统设置、真实 macOS 授权、VPN 切换、Linux 强约束与公众回显互通仍需各自独立验收；目录内容只随官方文档变化重新核对。</p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/telemetry.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

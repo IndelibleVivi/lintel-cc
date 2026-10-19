@@ -8,9 +8,13 @@
 
 Lintel provides a macOS app and a standalone CLI for reviewing configuration and optional outbound traffic, preserving instructions and sessions in encrypted archives, cleaning or rebuilding environments, and managing specific browser profiles and SSH hosts. The app and CLI share an execution core: review the target and changes before modifying it, inspect the result afterwards, and preserve later edits when restoring settings.
 
-**Currently 0.1.0 Preview.** You can try the public source. There is no public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is still the 10-13 `878482f` build and is not installed in Applications; later source adds client controls and interface updates without replacing that candidate. See [current status (Chinese)](docs/current-state.md) for exact source, platform and acceptance scope.
+**Currently 0.1.0 Preview.** You can try the public source. There is no public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the 10-19 `e822d74` build, including client controls, individual/bulk policy editing and distinct sidebar icons. A copy extracted from its DMG runs in an isolated synthetic workspace; it has not been installed in Applications. See [current status (Chinese)](docs/current-state.md) for exact source, platform and acceptance scope.
 
 [First use](docs/start-here.en.md) · [Choose a task](docs/operator-guide.en.md) · [Use with an agent](docs/agents.en.md) · [Architecture](docs/architecture.en.md)
+
+![The real Lintel macOS app: synthetic environment, English interface](assets/preview/screenshots/native-home.en.jpg)
+
+A real WebKit capture of the local unsigned candidate, using synthetic data. See [visual provenance and scope](assets/preview/asset-index.json).
 
 ## Start with your goal
 
@@ -60,13 +64,13 @@ cargo build -p lintel-runner --locked
 
 These static entry points describe the executable, context and interfaces. Continue with the [Agent CLI guide](docs/agents.en.md) to choose a target, plan and execute. The [complete CLI trial](docs/quickstart.en.md) provides a synthetic archive journey with byte-level checks. Linux uses the standalone CLI/runner without a desktop environment. The current three-platform standalone CLI candidate remains `bb9fa824`, with no formal download link; a CLI built from source is independent of the App candidate.
 
-## How the parts work together
+## From originals to your next session
 
-![Architecture overview: app and CLI, shared core, SSH controller, browser and proxy paths](docs/assets/architecture-overview.en.svg)
+![Work journey: select instructions, memory and sessions, review and approve, then read the encrypted package independently; importing needs separate approval](assets/preview/diagrams/work-journey.en.png)
 
-Local file tasks run in the local core. SSH requests go to the target host's runner and core. The browser extension operates its own profile; the controlled proxy handles connections routed through it. An encrypted work package can travel through your chosen file-transfer tool and open in independent state.
+Select the originals you need, review the frozen plan, and approve encrypted preservation. The source files remain intact. Carry the package with your chosen file-transfer tool and open it in independent state. Importing into an environment is a separate decision; opening the package never imports it or starts Claude automatically.
 
-[See the full architecture and source map](docs/architecture.en.md).
+Local file tasks run in the local core. SSH requests go to the target host’s runner and core. The browser extension operates its own profile; the controlled proxy handles connections routed through it. See the [architecture and source map](docs/architecture.en.md) for those boundaries.
 
 ## Data and scope
 
@@ -76,7 +80,13 @@ Identify the **host, configuration root and browser profile** before acting. Sel
 
 Selective egress configuration currently covers the 27 fields recognized by the v5 rule. Ordinary App editing offers an action directly on each row, with explicit Bulk edit for only common applicable actions and a count for hidden selections. Three quick recipes retain non-secret intent and regenerate a plan on every run; a personal default whose intent differs is labelled from its actual choices. See [protection operations](docs/operator-guide.en.md#protect) and [desktop custom protection](docs/desktop.en.md#custom-protection).
 
-In a bounded isolated HOME/state, 10-15 used the same `878482f` release WebKit to register an environment, make an exact selection, approve one archive task and observe a completed receipt, then read the package after reopening the App and in an independent state. The full language/game matrix, real personal authentication, production browsers, clean-Mac download installation and signing/notarization remain separate unverified layers.
+On 10-19, the `e822d74` release WebKit app completed registration from an empty workspace, exact three-file selection, one archive approval, quit/reopen and original-job lookup in a new synthetic HOME/state. Its independent-file entry read instructions, memory and structured session messages. A separate CLI state read all three originals back byte for byte; configuration editing and original-task restoration retained two later edits. Personal authentication, production browsers, download/install on a clean Mac and Apple signing/notarization remain separately unverified. See [current state](docs/current-state.md) for the exact coverage.
+
+## A glimpse of its world
+
+[![Lintel concept-film cover: character landscape, wordmark and a small Clawd](assets/preview/lintel-social-preview.png)](https://lintel.page/media/lintel-intro.mp4)
+
+[Watch the 20-second concept film](https://lintel.page/media/lintel-intro.mp4). Work, review and crossing the bridge are conceptual animation, with original music and locally generated English narration. This is separate from an App operation recording. See [production provenance](scripts/preview-film/README.md).
 
 ## Development and documentation
 

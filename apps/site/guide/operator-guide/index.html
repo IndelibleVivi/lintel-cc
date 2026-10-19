@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="按六类实际任务进入设置、保全、清理、浏览器、SSH 与恢复。">
+  <link rel="canonical" href="https://lintel.page/guide/operator-guide/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/operator-guide/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/operator-guide/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/operator-guide/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="操作指南 · Lintel">
+  <meta property="og:description" content="按六类实际任务进入设置、保全、清理、浏览器、SSH 与恢复。">
+  <meta property="og:url" content="https://lintel.page/guide/operator-guide/">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>操作指南 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/operator-guide/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/operator-guide/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <article class="guide-body" data-guide-document="operator-guide">
+        <h1 id="lintel-操作指南">Lintel 操作指南</h1>
+<p>简体中文（canonical） · <a href="/guide/operator-guide/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
+<p>适用版本：Lintel 0.1.0 Preview / 开发预览。依据当前源码与各模块合同；这是尚未正式发行的操作说明，候选与 runtime 状态见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。首次试用可先读 <a href="/guide/quickstart/">中文 quickstart</a> / <a href="/guide/quickstart/">English quickstart</a>。</p>
+<p>Lintel 帮你处理具体的 Claude 使用环境：减少指定的可选外发、管理浏览器权限与站点状态、保住工作内容、清理已识别的旧状态，以及在 Mac 上管理 Linux VPS 的同类任务。每次先认准目标，再查看实际变化，最后根据执行回执继续工作或恢复。</p>
+<p>当前版本是 <strong>0.1.0 Preview</strong>，可以按以下路径理解与试用已经接通的能力。正式浏览器安装、真实 Claude 认证、生产 VPS、真实首次使用与非开发者安装仍有验收缺口；相应步骤会说明，不把某个模块的测试结果当作整套使用环境已验证。</p>
+<h2 id="如何开始">如何开始</h2>
+<p>如果你已经拿到 Lintel 的本地构建 App，打开后从下面的任务表进入。当前仍是开发候选，源码仓库没有把正式签名、公证和非开发者安装验收视为完成。需要自己构建时，按照 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.md#本地构建与试用">README 的本地构建与试用</a> 准备 Rust、Node 和 macOS 构建环境。</p>
+<p>Linux 只使用独立 runner/CLI，不需要安装桌面环境。Mac 可以在主机面板批准准备 App 内置的 Linux runner，见第 5 节。独立 CLI 候选提供 macOS arm64、Linux x86_64 与 aarch64 包，取得匹配的候选后不需要 Rust 或 GUI；按 <a href="/guide/agents/">Agent CLI 指南</a> 校验并解包到新版本目录，明确选择 executable，升级保留旧目录与原任务。自行从源码取得 CLI 可用 <code>cargo build -p lintel-runner</code>，二进制在 <code>target/debug/lintel</code>。App 存在不代表终端已经能用 <code>lintel</code>，先确认所使用的二进制路径。</p>
+<p>第一次只想熟悉操作，可按 README 启动 <code>dev:synthetic</code>；页面会明确显示测试空间。</p>
+<p>当前 App 源码支持简体中文 / English。“设置与模块”里的语言选择默认跟随系统，也可明确选择并在本机记住；本指南使用中文控件名称。语言切换保留当前目标、已填写表单与批准计划，不提交操作。工作原文、文件路径、CLI 命令与原始诊断保持原样。旧本地候选不会随源码更新，具体版本见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
+<h2 id="先选一件要做的事">先选一件要做的事</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">你的目标</th><th class="align-left">当前从哪里进入</th><th class="align-left">完成后应得到什么</th></tr></thead><tbody><tr><td class="align-left">减少外发，然后继续用 Claude</td><td class="align-left">首页“开始一项任务”→“选择保护方案”，或侧栏“保护方案”</td><td class="align-left">具体设置变更与读回结果；再打开所选环境的新会话</td></tr><tr><td class="align-left">管理浏览器暴露、权限或旧登录</td><td class="align-left">首页“浏览器”</td><td class="align-left">指定 profile 的配对、设置或站点清理回执</td></tr><tr><td class="align-left">保住工作，换一个配置环境</td><td class="align-left">“工作保全”→“只生成工作归档”或“保全并准备新环境”</td><td class="align-left">加密工作归档、新配置目录、选定内容的迁入结果</td></tr><tr><td class="align-left">处理登录异常、清理旧状态或退役</td><td class="align-left">“清理与重建”→相应配方</td><td class="align-left">准确文件范围的处理结果；必要时新环境或退役状态</td></tr><tr><td class="align-left">从 Mac 管理 VPS 与后台服务</td><td class="align-left">顶部主机名称，或“设置与模块”→“主机与 SSH 连接”</td><td class="align-left">远端工作空间、原任务可查询的回执、独立服务恢复入口</td></tr><tr><td class="align-left">检查变化、恢复配置或找回中断结果</td><td class="align-left">“环境详情”→“检查变化”；“记录与恢复”</td><td class="align-left">具体差异、接受或恢复的决定，以及原任务最新结果</td></tr></tbody></table></div>
+<p>首页先让 Clawd 安静陪着你，用原创时段问候与留白迎接。点“开始一项任务”再展开这六条路径；“继续上次的目标”回到相应工作区，待核对入口只查看原任务。侧栏保留专业工作区，并增加“会话与资料”和“终端与 Agent”。页眉下的“当前目标”持续显示正在做的任务；页面导航不会提交操作或调用模型。任务名称与 <code>lintel tasks --json</code> 来自同一份有限映射。</p>
+<h2 id="开始前认准三个不同的目标">开始前：认准三个不同的目标</h2>
+<p><strong>主机</strong>决定在哪里执行。顶部“当前操作目标”中，“本机”是当前 Mac；SSH alias 是那台主机的当前登录用户。远程横幅会显示“环境、计划与记录均来自这台主机”。没有任何环境时也能使用顶部主机按钮；侧栏底部“设置与模块”同样提供“主机与 SSH 连接”。</p>
+<p><strong>环境</strong>主要是登记的 Claude Code 配置目录。它不是项目代码目录，也不是自动隔离全部凭据的账号容器。进入“环境详情 → 概况 → 配置来源与验证范围”可以查看配置目录；“启动与来源”展示程序与配置根。操作前用主机、环境名称和完整路径一起确认目标。</p>
+<p>顶栏常显主机和环境名称，主机按钮左侧是没有外框的橙色 <code>&gt;_</code>，光标默认静止。点击后完整配置路径、环境 ID 与客户端路径向下展开，可复制路径；再次点击图标、关闭按钮或 Escape 收起。展开时正文顺势下移，外部点击保留详情，切换目标自动收起；默认收起不影响计划预览中的准确目标核对。</p>
+<p>在“设置与模块 → 外观 → 动态效果”分别开关界面动画、Logo 光标慢闪与终端光标慢闪。默认保留 Logo 慢闪、终端静止；三项只在本机保存，系统减少动态始终优先。关闭界面动画保留拖动与主动游戏操作，跑道背景和装饰静止。</p>
+<p><strong>浏览器 profile</strong>在“浏览器”面板单独选择和授权。它属于运行桌面 App 的这台 Mac；切到 SSH 工作空间不会把本机浏览器或本机代理变成 VPS 的浏览器或网络。一个配置根与一个浏览器 profile 也不会自动建立身份隔离关系。</p>
+<p>进入“环境详情 → 关联组件”可检查当前 root 的有限配置来源、静态 CLI 选择、认证位置，以及原任务中的确切服务与处理记录。可填写当前目标主机上的项目绝对目录，再点“刷新组件”核对 project/local/MCP 来源；不会创建目录或启动它们。账号仍显示未知，Desktop／IDE 显示暂不支持，浏览器保持本机独立模块。原服务记录会重新检查 unit；无法核验时保留未知，不把旧暂停结果当作当前状态。点“核对原任务”只查询当前主机上的原 ID。</p>
+<h3 id="添加已有环境或建立空白环境">添加已有环境，或建立空白环境</h3>
+<p>已有 Claude Code 配置目录：点“添加现有环境”，或侧栏“你的环境”旁的加号；在“登记已有目录”填写“环境名称”和“配置目录完整路径”，再点“添加环境”。登记本身不修改目录中的设置。</p>
+<p>想从空白配置目录开始：点侧栏“新建环境”，选择“建立新环境”，输入名称后点“建立环境”。空清单也保留侧栏“新建环境”和首页“添加现有环境”。这个动作创建新配置根，不复制旧登录、设置、hooks 或 MCP；随后仍需为它选择方案、启动 Claude，并按正常流程登录。想带走工作内容，使用第 3 节的“工作保全”。</p>
+<p>新目录用于分开本地状态，不能阻止同一用户进程读取其他文件，目录外认证也可能共享。如果界面显示“测试空间 · 操作仅作用于合成数据”，你正在操作独立测试数据；这不是个人环境的扫描结果。普通网页显示“从桌面应用开始”时，没有本机执行通道。</p>
+<a id="protect"></a>
+<h2 id="1-减少外发然后继续使用-claude">1. 减少外发，然后继续使用 Claude</h2>
+<h3 id="11-选择你愿意接受的功能取舍">1.1 选择你愿意接受的功能取舍</h3>
+<ol><li>顶部选择目标主机与环境，打开侧栏“保护方案”。首页可点“开始一项任务”→“选择保护方案”进入；需要检查 Remote Control 或逐项选择时，进入完整页面。</li><li>选择“保持功能”“减少外发”或“自定义”。它们先修改草案；草案按主机和环境保存，不会随着切换目标直接应用。</li><li>如果使用 Remote Control，展开“Remote Control 与版本条件”，勾选“保留 Remote Control”，填写“组织是否要求 Trusted Devices？”；不知道就保留“尚未确认”。Lintel 静态读取已安装版本，组织条件来自你的声明，页面的“当前配置条件 / 执行后预计条件”解释本次组合。</li><li>如果页面列出已有冲突值，先决定是否允许解除。普通方案中的“允许在预览中解除……”会把准确字段删除纳入计划；自定义方案用“移除本环境覆盖”表达这一决定。</li><li>点“预览变更”，核对“配置字段”“将保留”“实际步骤”，确认目标后点“批准并执行”。如果结果或影响不合适，点“返回调整”。</li></ol>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">方案</th><th class="align-left">当前会做什么</th><th class="align-left">适合什么时候</th></tr></thead><tbody><tr><td class="align-left">保持功能</td><td class="align-left">关闭错误回报与质量调查；保持产品指标与主动反馈的当前设置</td><td class="align-left">想做较少修改，并保留现有功能取舍</td></tr><tr><td class="align-left">减少外发</td><td class="align-left">分别控制产品指标、错误回报、主动反馈与质量调查；按所选 Remote Control 条件处理冲突</td><td class="align-left">想明确减少这几类可选外发</td></tr><tr><td class="align-left">自定义</td><td class="align-left">对 v5 规则识别的 27 项控制直接选择适用动作，可单项或显式进入批量编辑</td><td class="align-left">只想改特定项，或已有自己的取舍</td></tr></tbody></table></div>
+<p>自定义列表由当前 core 的 v5 规则驱动，共 27 个已识别字段：七项隐私开关（产品指标、错误回报、主动反馈、质量调查、跨工具 telemetry 开关、feature-flag 获取和非必要流量总开关）加上 OTel 数据收集、内容记录、exporter／接收端、指标身份属性、调查改走自设 OTel 与 WebFetch 控制。每行直接选择动作；按类别、关键词或“只看待改”筛选。批量编辑单独进入，只提供全部所选项共同适用的动作，隐藏在其他筛选结果中的选择会明确计数；更新的是草案，仍须预览批准。每项“说明与原值”保留完整当前值、来源与数据去向，规则详情保留准确变量、语义、默认值、版本与依赖。原始 API 正文直接选择关闭／内联／本机目录，目录只填路径。逐项撤销与整体撤销可回到未修改状态。不要单凭 <code>0</code> 或 <code>false</code> 判断是否开启：其中部分变量只要是非空字符串就表示关闭；界面会按该变量的规则解释。<code>OTEL_EXPORTER_OTLP_HEADERS</code> 只显示“已遮蔽（凭据）”，其值永不进入普通输出。</p>
+<p>“不更改”保留原字段；全部不更改时 App 不启用空预览。“开启”对 DISABLE_* 开关与 default_on 字段都是删除该键。“关闭”按语义写关闭值：隐私开关写 <code>&quot;1&quot;</code>，正向 Boolean 内容开关写 <code>&quot;0&quot;</code>，default_on 写 <code>&quot;false&quot;</code>，exporter 写 <code>&quot;none&quot;</code>，其余自由取值字段只能移除。“移除本环境覆盖”只删除当前 root 的 user settings 字段，其他 shell、项目或组织来源仍可能影响运行。“设为指定值”通过单独的 <code>custom_values</code> 通道给出合法字符串，请求头不接受新值；遮蔽的原接收端可替换为普通地址，新凭据／查询参数地址须从私有高级配置编辑。若移除或替换已有遮蔽值，预览会要求归档口令，先加密保全再修改，恢复使用原任务的所选字段。勾选“保留 Remote Control”不会暗中改写自定义的明确选择。WebFetch 工具控制已作为 <code>CLAUDE_CODE_DISABLE_WEB_FETCH</code> 进入目录；官方更新与 marketplace 自动安装控制仍不在这份编辑器里，用户自设 OTel、通用代理与执行配置不会随这些方案被通配清除。</p>
+<p>保存个人默认时，只保存支持的普通意图与有限值；地址、目录和凭据值不会保存。页面显示被省略的字段，本次草案仍保留，不能把保存默认当作执行计划。完整操作和类型区别见<a href="/guide/desktop/#自定义保护">桌面自定义保护</a>。</p>
+<h3 id="12-看读回结果再打开新会话">1.2 看读回结果，再打开新会话</h3>
+<p>执行后看每个步骤的结果及“下一次新启动”要求。<strong>“已配置”或“已读回”说明配置值已经处理；当前打开的 Claude 会话不会自动退出或重新读取。</strong> 回执中的“打开 Claude”，或“环境详情 → 启动与来源 → 打开 Claude”，会使用这个环境的配置根打开新会话；没有找到 Claude 程序时，按钮不可用，先按你的正常安装流程准备 Claude，再“重新检查”。</p>
+<p>macOS 的“已请求启动”表示请求已交给 Terminal。实际登录、会话是否可用以及其他 IDE／服务入口的行为，要在相应入口确认。当前没有把这次设置读回自动升级为实际 Claude 网络效果的验证结果。</p>
+<p><strong>需要恢复：</strong>到“记录与恢复”找到本次任务，点“查看结果 → 预览恢复”，查看将恢复的准确字段，再“批准并执行”。若字段在任务后被修改，Lintel 会保留后续编辑并提示冲突；先查看来源，按现状重新选择方案。恢复配置不是恢复整个旧目录。</p>
+<h3 id="13-还想控制经过代理的连接">1.3 还想控制经过代理的连接</h3>
+<p>在本机环境打开“环境详情 → 外发与权限 → 受控通道”。展开“下次启动的配置草案”，选择默认放行或阻止，再按需填写“显式阻止规则”“显式允许规则”和上游 HTTP / HTTPS 代理。</p>
+<p>规则每行一个确切主机，后面可用空格与英文逗号列出端口，例如：</p>
+<pre class="guide-code" data-language="text"><code>example.invalid 443,8443</code></pre>
+<p>这是格式示例，不是需要添加的实际规则。省略端口适用于该主机全部端口；不自动匹配子域。显式阻止优先于允许，再看默认动作。没有内置“全部遥测黑名单”；阻止用途混合的 API 主机可能连正常请求一起阻止。</p>
+<ol><li>编辑好草案后点“启动通道”。</li><li>核对“当前生效的通道配置”和实际“本地地址”；它们来自运行中的代理读回。</li><li>点“通过通道打开 Claude”，明确开启带代理上下文的新会话。</li><li>点“刷新连接”查看实际经过通道的连接。没有完成事件不等于没有流量，仍保持的连接可能还未形成完成记录。</li></ol>
+<p><strong>改规则或恢复使用：</strong>先“停止通道”，等待停止，再编辑草案、启动并重新打开客户端。通道重启可能换端口，旧客户端不会自动采用新地址。原任务已结束时先“清除旧通道”；关闭 Lintel 会停止通道，但不会退出已打开的 Claude。</p>
+<p>这条路径约束的是经过代理的连接。直接 socket、UDP、全部 DNS、<code>NO_PROXY</code>、其他进程与客户端自行直连不在这个证明范围。当前没有进程级网络强约束；SSH 工作空间也不能从这里启动远端代理。需要控制浏览器站点时，接着使用下一节的“站点代理”，并填入实际在本机运行的端口。</p>
+<h3 id="14-查看-ipv4--ipv6-出口审阅共享设置">1.4 查看 IPv4 / IPv6 出口，审阅共享设置</h3>
+<p>打开“环境详情 → 外发与权限”，或无环境时在首页“查看这台主机的网络”。先展开“本次测试目标与路径”确认 HTTPS 回显端点；点“测试实际出口”查看主机默认与当前通道的四格 IP、耗时和具体失败。没有通道显示未测试；这一次请求不证明其他应用的路由。测试会向目标暴露出口 IP，没有后台公网请求。</p>
+<p>Mac 每个服务旁的“预览关闭 IPv6”／“预览仅链路本地”冻结服务身份、完整原配置和前测。核对“宿主共享”、影响和完整配置后，批准写入与同目标复测；可能出现系统授权。它影响此服务的其他应用，退出 App 不撤销。结果分别显示配置步骤和出口前后对照；超时或 IPv4 成功不算防泄漏证明。“查看结果 → 预览恢复”独立批准完整恢复，后续改动冲突会保留。响应丢失时“查询原任务”，不再次提交。</p>
+<p>网络或通道变化、重新启动到同端口、目标变化或结果超过五分钟会使前测失效，预览重新测试。严格 IPv4 在受控通道“下次启动的配置草案”里选择，停止／启动后核对读回；只控制 Lintel 建立的目标／上游 socket。Linux 工作空间只读观察和实测，在目标 runner 执行；没有整机关闭按钮。详细边界及 CLI 见 <a href="/guide/network/">网络指南</a>。</p>
+<a id="browser"></a>
+<h2 id="2-管理浏览器暴露权限或旧登录">2. 管理浏览器暴露、权限或旧登录</h2>
+<h3 id="21-第一次连接一个-profile">2.1 第一次连接一个 profile</h3>
+<p>在首页点“浏览器”，展开“连接一个新的 profile”。当前 App 自带扩展与本地连接组件，按页面三步走；普通使用这套 App 内置资源时不需要先下载源码或在终端编译。</p>
+<p><strong>第一步：准备并加载扩展。</strong>选择“目标浏览器”，点“预览扩展目录”，核对版本、文件范围与目录，再点“批准准备扩展目录”。完成后可以“在 Finder 中打开”或“复制目录路径”；Firefox 显示“复制 manifest 路径”。然后到你真正要操作的 profile 加载：</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">浏览器</th><th class="align-left">在目标 profile 打开</th><th class="align-left">按页面选择</th></tr></thead><tbody><tr><td class="align-left">Chrome</td><td class="align-left"><code>chrome://extensions</code></td><td class="align-left">开发者模式 → “加载已解压的扩展 / Load unpacked” → 已准备目录</td></tr><tr><td class="align-left">Edge</td><td class="align-left"><code>edge://extensions</code></td><td class="align-left">开发者模式 → “加载已解压的扩展 / Load unpacked” → 已准备目录</td></tr><tr><td class="align-left">Firefox</td><td class="align-left"><code>about:debugging#/runtime/this-firefox</code></td><td class="align-left">“Load Temporary Add-on” → 目录内 <code>manifest.json</code></td></tr></tbody></table></div>
+<p>Chrome / Edge 共用一份稳定的 Chromium 扩展目录，但每个 profile 都要单独加载和配对。Firefox 当前为临时开发加载，退出浏览器会移除扩展；长期签名安装仍未交付。Chrome / Edge 仍需开发者模式，三种正式浏览器的完整非开发者安装旅程尚未验收。</p>
+<p><strong>第二步：安装本地连接。</strong>将目标 profile 管理页的准确 ID 填入“已安装扩展的 ID”；Firefox 使用页面给出的固定 ID。点“预览本地连接安装”，核对浏览器、授权扩展与注册位置，再“批准安装本地连接”。安装到稳定的当前用户目录，之后移动 App 不会改变注册所指的组件位置。</p>
+<p><strong>第三步：核对这份 profile。</strong>点“生成配对请求”，复制 App 显示的 12 位“配对短码”。在扩展的“连接桌面应用”中填入“应用内的配对短码”和“这份 profile 的名字”，点“提交配对请求”。回到 App，点“检查配对”，核对名字、实例和两端短码，然后点“短码一致，批准此 profile”。</p>
+<p><strong>这一步的完成标准：</strong>App 列出所选 profile 的“已配对”，并能看到“最近 20 秒收到轮询”。“当前离线”与“已配对”可以同时成立；前者表示最近没有连接，后者表示持久授权还在。准备目录、组件注册、profile 配对、当前在线是四件事。</p>
+<p><strong>连不上或更新时：</strong>先检查目标 profile 是否真的加载了扩展、本地连接是否给了准确 ID，再“检查配对”。短码过期就重新“生成配对请求”。出现“身份冲突，需重新配对”时，在需要使用的扩展里点“重复实例冲突：生成新身份重新配对”，重新完成上述配对。App 可预览并批准更新其拥有的扩展目录与本地连接；更新扩展文件后还要在浏览器重新加载。外部目录、被改动的组件或不一致的注册不会被覆盖，先看冲突详情；中断目录准备有“批准继续准备扩展”的独立恢复预览。</p>
+<p>当前安装器只提供 Chrome、Edge、Firefox 的固定路径。选择 Chrome 不代表已经安装到 AdsPower，其他 Chromium 浏览器也不能借名称相近推断已支持。</p>
+<h3 id="22-选择一个实际需要的浏览器动作">2.2 选择一个实际需要的浏览器动作</h3>
+<p>在“目标 profile”选中已配对、在线且无冲突的实例，再选操作。App 中点“送到浏览器预览”只提交请求；到目标扩展中打开“查看来自桌面的待确认操作”，核对“确认实际影响”，勾选“我确认以上范围与功能影响”，再点“授予必要权限并执行一次”。扩展会按需要请求原生权限。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">当前按钮</th><th class="align-left">作用范围与取舍</th><th class="align-left">如何恢复或继续</th></tr></thead><tbody><tr><td class="align-left">WebRTC</td><td class="align-left">整个 profile；“限制非代理 UDP”等策略可能影响通话</td><td class="align-left">完成后“提交恢复预览”，在扩展再次批准；有效值或控制者改变时会提示冲突</td></tr><tr><td class="align-left">站点权限</td><td class="align-left">所选站点的定位、摄像头、麦克风或通知设为阻止</td><td class="align-left">独立恢复本扩展所写规则；Firefox 当前需到浏览器权限面板手动处理</td></tr><tr><td class="align-left">站点代理</td><td class="align-left">所选站点使用本机 <code>127.0.0.1</code> 的实际 HTTP 代理端口，没有 DIRECT 回退</td><td class="align-left">先确保代理已启动；恢复也需预览批准；Firefox 当前未接入</td></tr><tr><td class="align-left">阻断站点</td><td class="align-left">阻止所选站点全部请求，会影响整个站点功能</td><td class="align-left">“提交恢复预览”，或按下一行临时暂停</td></tr><tr><td class="align-left">暂停规则</td><td class="align-left">暂停本扩展的阻断规则 1–60 分钟</td><td class="align-left">到期恢复；浏览器离线时在下次启动恢复；不会解除清理隔离</td></tr><tr><td class="align-left">全 profile 缓存</td><td class="align-left">删除整个所选 profile 的 HTTP cache，包含其他站点</td><td class="align-left">这是独立不可恢复动作，需要单独确认</td></tr><tr><td class="align-left">清理站点数据</td><td class="align-left">处理选定站点与存储类型，需要准备、浏览器重启和再次批准</td><td class="align-left">按下一小节完成两阶段流程；删除后不能恢复 Cookie 或站点数据</td></tr></tbody></table></div>
+<p>默认目标是 <code>https://claude.ai</code>，<code>https://console.anthropic.com</code> 需要主动勾选。邮箱、Google、Apple 或其他 SSO 站点不在这个内置清单中。浏览器设置读回不等于设备级 IP 隐藏，站点代理也不覆盖全部 DNS、WebRTC 或其他程序。</p>
+<h3 id="23-清理站点数据两次确认中间完整重启">2.3 清理站点数据：两次确认，中间完整重启</h3>
+<ol><li>选择“清理站点数据”，核对“目标站点”和“将清理的数据类别”。Cookie 会影响相关登录；Chromium 的 Cookie 处理可能扩大到完整可注册域，扩展预览会列出实际扩大范围。</li><li>“送到浏览器预览”，在目标扩展核对并批准。第一阶段隔离请求、关闭目标标签及嵌入目标 iframe 的宿主标签，注销所选 Service Worker。</li><li>看到“等待浏览器重启后继续”时，<strong>其余存储尚未删除</strong>。完整退出并重新启动这个浏览器；仅关一个窗口或重启扩展 worker 不等价于浏览器启动证据。</li><li>在原准备回执选择“预览重启后继续删除”；也可从 App 原任务点“送到浏览器预览重启后继续”。在扩展再次核对并批准，这次才执行其余存储删除。</li><li>查询并看清删除回执；确认结果后，在扩展原回执点“已核对结果，解除站点隔离”。然后自行重访站点、按正常流程登录。</li></ol>
+<p>不要用“暂停规则”代替解除清理隔离。两阶段隔离会继续保留，避免在尚未核对时自动重访；新的登录数据也不会因为查询旧任务而被再次删除。完整重启后如果扩展未重新加载或未记录启动世代，工具会拒绝继续，先恢复扩展的有效连接，保留原准备记录。</p>
+<p>Firefox 不支持本版本的站点级 Cache Storage / HTTP cache 清理，也未完成容器后台停写验证。当前临时扩展退出会被移除，不能把这条开发加载路径当作已验收的持久重启清理方案。独立 Chromium 临时测试 profile 已有真实完整重启与合成站点存储的验证；这不证明正式 Chrome、Edge、Firefox 或真实 claude.ai 的认证清理已完成。</p>
+<p><strong>回复丢失：</strong>在“浏览器”面板的原任务点“查询原任务”；“其他浏览器任务”可选更早记录。不要为同一不确定删除另发新操作。设置恢复与数据删除的边界见第 6 节。</p>
+<a id="work"></a>
+<h2 id="3-保住工作或换一个配置环境">3. 保住工作，或换一个配置环境</h2>
+<h3 id="31-只把工作收好">3.1 只把工作收好</h3>
+<p>首页任务选择中的“工作保全”和侧栏“工作保全”进入同一个独立入口。默认“只生成工作归档”：选择个人指令、记忆文本、会话资料，核对元数据概览，再点“预览保全计划”。归档准入会另行完整核对内容；概览不是备份。</p>
+<p>“工作容量预检”随所选范围重新检查元数据，列出单文件超过 256 MiB、所选合计超过 1 GiB、文件超过 10,000 或扫描未完整覆盖的阻塞项。受阻时不能点“预览保全计划”；取消类别或排除具体原件后可重新检查。预检通过只是容量判断，正式计划仍会读取并核对全部所选原件。冻结计划另受 16 MiB 持久记录预算约束，深路径与大量完整落点也可能触及上限；预览在保存前明确拒绝，缩小精确选择后可重新预览，不生成不可读计划或接收任务。当前源码沿流式路线完整保全限额内的大文件；超过新限额仍明确拒绝，排除它不会删除或截断原件。旧 runner 可能仍报告更低限额，以本次容量报告为准。</p>
+<p>点“按项目／会话／文件选择”会分页读取原件元数据，首次列出时选中当前类别内全部原件。项目组选框选择该路径组内的文件；标准会话与它的 <code>subagents</code> 文件共同列为一个会话组，其他会话按准确路径独立显示，单文件选框可分别调整。“排除超限文件”只取消当前类别中大于该 runner 单文件限额的原件；缺少容量报告时这个按钮不可用。分组不读取正文、不猜实际项目 cwd。搜索只改变显示，搜索结果中的组选框只作用于匹配原件；“选择当前类别全部原件”始终作用于整个当前类别。</p>
+<p>文件勾选只保留在当前主机／环境的本次页面；离开页面后重新选择，口令和原件内容不保存到草案。刷新不会加入新文件；已选路径消失时须核对并移除失效选择，不能把缺失当通过。扫描不完整或 runner 不支持文件清单时无法进入精确批准；可显式改回整类保留再预览。精确预览显示“批准中的原件范围”，归档和新环境准备使用同一冻结清单；执行前选中内容改变会拒绝，未选文件改变不会扩大清单。没有权限、链接、特殊文件或扫描预算不足都不能当作空目录或完整覆盖。</p>
+<p>“另存加密包的完整路径”可留空，归档保存在 Lintel 的 state；填写时须是<strong>当前目标主机</strong>上的完整文件路径，父目录已经存在、无符号链接且文件名尚未使用。已有文件不覆盖。预览中能查看冻结的目的地与文件数量；执行还会核对同一个目录对象，目录被替换或更换挂载时须重新预览。升级前没有冻结目录身份的旧显式输出计划也须重新预览，已完成的原任务仍可查询。</p>
+<p>设置至少 12 个字符的归档口令并再输入一次，核对计划后“批准并执行”。自己保管口令；Lintel 不保存，遗失后无法解锁。成功回执为“完成”，给出工作归档路径、所选类别和文件数。此任务只生成加密工作包，不建立环境、不注销、不修改原 settings 或工作文件。</p>
+<h3 id="32-保全后准备新环境">3.2 保全后准备新环境</h3>
+<p>在同一页选择“保全并准备新环境”，选择工作类别，按需填写新环境名称。预览显示加密归档、创建配置根、选择性迁入的实际顺序，以及已冻结的新环境 ID、完整配置 root 和逐文件落点。规划不会创建该 root；若批准前目录被外部占用或父目录身份改变，须重新预览。批准后先生成归档，再建立新根并读回迁入文件；成功属于该任务自己的“完成”。</p>
+<p>本轮 App 默认将所有选中内容准备为待用资料；只有明确勾选“启用已审阅的个人指令”才将 <code>CLAUDE.md</code> 放在客户端会发现的根指令位置。旧 raw protocol-1 caller 保留原来的指令默认。<code>projects</code> 中的记忆 Markdown 与会话 JSONL 进入 <code>lintel-imports</code> 待用区。已有待用区的参考指令、记忆和会话可再次保全而不产生重复嵌套；活跃与参考指令并存时分别保留，重名参考仍按个人指令分类，不自动启用。活跃工作与待用区出现同名内容或文件／目录冲突时，内容都保留，重复项在待用区加 <code>lintel-N-</code> 文件名前缀；独立包迁入的计划按同一规则冻结实际目标，已有目标文件仍不覆盖。批准执行时会在目标文件系统的临时空文件目录复核整批名称；例如 Linux 包的大小写不同文件在 macOS 被视为同名时，会在创建新环境或迁入正文前整批拒绝，显示 <code>migration_path_conflict</code>。原包仍可阅读；整理源内容重新归档或选择区分这些名称的文件系统。不复制凭据、settings、hooks、MCP 或插件，不宣称可直接续聊旧会话。旧目录、旧登录与原运行进程保留，它们是覆盖范围的说明。</p>
+<p>结果页可“为新环境选择保护方案”，随后在准确配置根正常登录、启动并核验。如果原环境由 systemd service 运行，创建新根<strong>不会改绑 service</strong>；原 service 仍指向旧环境。恢复旧服务、调整新环境的启动配置是分别核对的动作。</p>
+<p>旧版 <code>plan_reset</code> / TUI 的“新环境重建”仍为已有调用者保留，历史回执继续显示“部分完成”（旧状态尚未清理），不会重写为新任务状态。App 的工作保全使用新任务语义。</p>
+<h3 id="33-读取或迁入已有工作包">3.3 读取或迁入已有工作包</h3>
+<p>迁入计划中的“这些文件，会放在这里”列出本次选中文件的包内来源和最终完整位置（旧计划使用相对上方配置 root 的路径）。同名文件的新名称已在这里确定；展开可检查逐文件摘要与加密包身份。核对这份清单后再批准，解锁包的文件列表本身不是最终落点。</p>
+<p>侧栏“会话与资料”、工作保全页“阅读或迁入已有工作包”和“记录与恢复 → 查看归档”进入同一阅读工作区。任务回执的“查看工作归档”会选中当前包。</p>
+<ol><li>选择“当前主机的任务归档”，或“独立加密包”并填写当前目标主机上的 <code>.age</code> 完整路径。即使这里没有原任务记录，独立包也能读取。</li><li>输入口令，点“解锁并查看”；核对清单、类别、容量，点击文件按需阅读。“结构化阅读”显示已识别的角色、时间、正文与工具记录，“原始文本”保留未知格式回退；普通文本文件只启用原始文本，旧消息响应缺少结构化记录时显示限制并可返回原始文本；“下一页”显示明确字节位置。每页有界，完整原文件仍在包中；文件数不等于可恢复会话数。 首次读取立即显示“正在核验工作包并读取这一页”；翻页期间标明下方仍是上一页，新页完成后才替换。顶部状态持续显示正在核验的主机与操作，以及同一队列中的等待请求。离开页面会清除页面中的口令、正文和选择，但已提交的读取仍继续；等待期间其他同队列请求要等它结束。迟到结果不会恢复已离开的资料页。</li><li>在“准备到另一个配置环境”选择已登记的目标环境和类别，单独决定是否启用已审阅的个人指令，点“预览迁入计划”。已有目标目录须属于当前执行器用户，并允许访问／写入；已知归属或权限障碍会在整批正文写入前拒绝，Lintel 不自动修改权限。批准前核对目标根、文件清单和冻结包。</li><li>再用同一口令批准执行。包在预览后变化会拒绝；同名目标文件不覆盖。独立迁入的“计划目标已完成”须由冻结清单的全部文件完成发布、目的地父目录同步和读回确认；有落点或可读字节不等于迁入已完成，同步不确定时只核对原任务。整批目标路径在写入正文前核对，已有文件挡住父目录时先拒绝；已有目录权限保留，新建父目录为 <code>0700</code>，迁入文件为 <code>0600</code>。冲突时换一个专用环境或缩小类别后重新预览。</li></ol>
+<p>保全／重建若在新 root 创建或登记时中断，先查询原任务：<code>new_root</code> 和 <code>new_environment_id</code> 是创建前保存的准确意图，create 步骤完成才证明登记成功。目录可能已产生，但未登记时界面不提供新环境保护方案入口；先核对该路径与原回执，不重跑创建。</p>
+<p>工作归档与状态备份的路径也可能只是发布意图。回执会将未读回的路径标为“待核对”；只有工作归档读回完成才提供查看按钮和任务归档选择。原路径继续保留，可按原任务核对，或将确认存在的包作为独立文件检查；不会因查询重跑发布。新文件使用系统原子不覆盖 rename；目标文件系统／内核不支持时返回 <code>atomic_publication_unsupported</code>，已有内容保留。</p>
+<p>口令只驻留当前面板或待批准计划的临时内存；关闭后清除。解锁不会运行归档内容。独立工作包保持 <code>lintel.work/1</code> 兼容，旧合法包和历史任务来源仍可读取。</p>
+<h3 id="34-同机与-mac--vps-的迁入">3.4 同机与 Mac ↔ VPS 的迁入</h3>
+<p>同机直接使用已有任务或独立包路径。跨主机先把<strong>加密包文件</strong>通过你已经信任的系统 SSH/SFTP/scp 或可移动存储带到目标机器，再切到该主机，用那里的绝对路径解锁和计划迁入；不要传整个 Lintel state、凭据或明文请求。App 不自动搬运文件，也不把本机路径映射到 VPS。</p>
+<p>例如明确确认系统 SSH alias 与目标目录后，可以从系统终端使用：</p>
+<pre class="guide-code" data-language="sh"><code>scp -o StrictHostKeyChecking=yes /absolute/path/work-package.age approved-alias:/absolute/destination/work-package.age</code></pre>
+<p>选择未使用的目标文件名并独立检查 transfer 结果；这是系统文件传输，执行与覆盖规则由该工具拥有，不属于 Lintel 的冻结 import 计划。随后在目标执行器读取、校验、选择类别和批准 import。CLI 的无明文落盘输入方式见 <a href="/guide/agents/#portable-work">Agent 指南</a>。本机 browser / proxy 不随工作包迁移。</p>
+<p><strong>大文件或归档失败：</strong>当前源码准入是单文件 256 MiB、合计 1 GiB、10,000 文件，另有扫描条目与时间预算。超限会明确拒绝，不把截断结果称为完整归档；保留原资料，重新选择类别或有限原件，可单独排除超限会话。中途失败先看原任务的已完成步骤和产物，不重新创建包或重复迁入。执行中的归档步骤会记录目的地；路径存在不等于写后核验已完成，包实际存在时可用原任务解锁，核对原回执与产物。</p>
+<p>大文件仍使用兼容的 <code>lintel.work/1</code> 加密包。每次解锁、清单、阅读或迁入都会完整认证包内所有文件和尾部，再从私有暂存中取有限页面；只选某个类别也不跳过其他内容的校验。因此大包的一页阅读仍会花费完整解密与核验时间。Lintel state 所在磁盘需要容纳全部展开原件；另有目标磁盘上的密文或逐文件发布临时空间。正常结束和返回错误会清除当前操作的解密暂存；进程被强制结束时可能留下 state 下 <code>.lintel-work-stage-*</code> 的私有暂存，Lintel 不自动扫除历史目录。不要把临时空间当作又一份长期备份。 远端预览／阅读仍受单次 SSH 的 60 秒及 2 MiB 响应边界限制；较慢的大包可能返回 <code>transport_unknown</code>，这不证明包损坏。可在目标机用独立 CLI 核对；若原执行已接受，只查询原 ID，不重复提交。</p>
+<p>reader 另设有限 JSON 元数据／密文预算及 scrypt <code>log N ≤ 20</code> 的成本上限；过高成本包明确拒绝，不降低其加密强度。age 的 KDF 自身需要内存，流式正文不代表零内存占用。旧版本的 reader 可能拒绝新容量的大包；先用匹配的新版本核对。</p>
+<p>“状态备份”与“工作归档”是不同产物：清理时保存的混合客户端状态备份不支持自动迁入。工作包不包含全部认证、执行配置或云端资料，也没有“恢复全部”。</p>
+<p>回执中的状态备份路径会在写入前保存；有路径不等于备份已完成。以对应步骤的写后读回结果为准，中断时查询原任务并核对该目标，勿重复提交清理。</p>
+<h3 id="35-从旧原件整理新上下文">3.5 从旧原件整理新上下文</h3>
+<p>在“会话与资料”解锁包，选择一个或多个用户／Claude／工具／未知记录片段，点“用选定片段生成交接稿”。稿件包含目标、约束、决定、关键文件、状态、下一步、待验证事项和可回看的来源摘要；请填完并审阅。它是确定性整理与手工编辑，不请求外部模型，不回写 JSONL，也不生成伪造 transcript。opaque thinking、signature 与 redacted thinking 原件继续保全，不进入新上下文。</p>
+<p>选定来源带有工作包／文件摘要、原文件中的字节位置和原 content 块序号；跨页不会把两页各自的“记录 0”当成同一个来源。块序号从 0 开始，opaque 块仍保留其位置，隐藏正文不会重新编号。旧 runner 未提供字节或块位置时，界面与稿件明确显示缺少精度；超长行的有限片段不等于完整原行已解析。正文只用于当前交互与明确复制，持久启动引用仅保留这些有限来源元数据。</p>
+<p>选择实际继续的配置环境，点“审阅稿件与继续目标”，填写这台目标主机上的<strong>项目工作目录</strong>。配置 root 与项目 cwd 单独列出：前者作为 <code>CLAUDE_CONFIG_DIR</code>，后者作为客户端 cwd。Lintel 检查目录存在、可访问及身份，不创建项目、不搬代码、不修改权限。已记住的路径仍要逐次核对。</p>
+<p>“启动前，再看一眼来源”列出有限 root／cwd／上级候选和系统 managed 文件／drop-ins。它只显示存在状态、hooks／MCP／helper／plugin 声明及有限认证变量名称，不显示命令、token 或指令正文。已检查但未发现的候选可展开；访问受限、超限、目录内资产和尚未核验的来源都有单独标注。新 root 不会让旧项目配置消失；上级候选也不能直接解释成当前版本已加载。旧 runner 没有该清单时，App 会要求更新后重新预览。</p>
+<p>首次启动或续聊请求在持久 intent、运行副本和 Terminal 前重新核对这份私有绑定；相关文件新出现、删除、修改或对象替换会拒绝旧批准。无关项目正文变化不冻结；组织服务器／MDM、worktree 主 checkout、指令 imports、目录内容、Keychain 与 Terminal shell 环境仍有未核验项，复查也不是对外部 writer 的 OS CAS。已请求过的原 ID 保持只查询，不因来源后来变化重开一次会话。</p>
+<p>请求报错后先点“核对原启动请求”。只有读回原计划明确显示尚未请求启动／续聊时，才出现“重新核对启动目标”：保留项目目录与交接稿，生成新的来源预览和请求 ID，并重新要求审阅批准。已有启动 intent 或结果不会获得这个入口；查询不重放原请求。</p>
+<p>打开后，在目标终端用 <code>/status</code> 核对配置来源与 Login，用 <code>/mcp</code> 核对连接。需要认证时显式在目标终端登录；Lintel 不代登录，也不会自动发送工作稿。</p>
+<p>启动预览需要文件系统提供目录创建时间，以识别删除后重建、甚至 inode 被复用的目录。遇到 <code>directory_identity_unsupported</code> 时改选支持这项元数据的项目／配置目录；资料仍可阅读和整理。旧未启动预览缺少身份时重新核对；已发生启动的原 ID 继续只查询。</p>
+<p>点“核对启动目标”，审阅准确程序、静态版本、项目、配置 root 和最终稿件，再“复制上下文并打开新会话”。复制失败即停止，稿件保留；复制成功与打开失败分别呈现。启动结果不确定只“核对原启动请求”，不会重新复制或新建第二次启动。改变稿件、目标或项目使审阅失效。普通 launch 无 prompt；打开后由你粘贴并发送，App 不显示模型已接收。预览 launch／resume 不需要终端、不会打开客户端；批准后的启动请求需要准确的冻结计划与 hash，并进入真实 Terminal／TTY。不能把这份计划交给通用执行或后台 submit；此类新提交在接受前返回 <code>invalid_plan_kind</code>，已有原任务仍只查询。</p>
+<p>归档口令、解密正文和工作稿只留在当前交互；离开、锁定或切换来源即清除。工作稿可明确复制到系统剪贴板，不后台复制，不监听或清除你后来复制的内容。工作正文可能含秘密，选择范围本身不证明已经脱敏；普通任务记录和 Agent 操作交接包只持有来源元数据。</p>
+<h3 id="36-独立检查-claude-原生续聊">3.6 独立检查 Claude 原生续聊</h3>
+<p>原生 resume 与新上下文分开：在 JSONL 阅读区点“检查这一原件的原生续聊”，不需要先生成工作交接稿。选择目标环境和项目目录，再“核对启动目标”。预览列出格式识别、静态版本、有限 adapter 的支持证据、私有运行副本位置和状态恢复影响。未知或不支持的组合会给出具体限制，仍可阅读原件或整理新上下文。当前原生 resume 只核对不超过 8 MiB 的 transcript；更大的原件完整保全与分页阅读可用，预览明确标为原生续聊暂不支持，不从截断前缀推断成功。</p>
+<p>只有明确批准才能准备运行副本与请求交互启动；import／preserve 不自动 resume。原归档按字节保留，副本为私有权限并读回核对。副本存在只证明准备完成，不能证明真实 Claude 已恢复。客户端可按自身规则更新所选配置环境、恢复部分权限／模型状态及读取当前项目设置、hooks、MCP；认证来源和原会话是否还运行分别核对。重复点击或回复丢失后查询原启动 ID，不静默换模式。</p>
+<p>SSH 续聊在远端 Terminal 再次输入包口令，输入不回显。App 中的口令用于当前阅读与预览，不放进远端启动脚本、参数或普通记录。若窗口已打开而查询仍是计划状态，先核对那个终端，不再次请求打开。</p>
+<p>本轮开发不使用真实登录。官方入口存在、inert 客户端参数正确与实际原生恢复成功是三层证据；只有最后一层可以标“实际续聊已验证”。适用支持范围见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>与<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/specs/product-baseline-status.md">18 项验收</a>。</p>
+<p><strong>Thinking 与身份：</strong>2026-10-05 核对的 <a href="https://platform.claude.com/docs/en/build-with-claude/preserved-thinking">preserved thinking 资料</a> 区分模型兼容、对话前缀和适用模型的账户规则；Sonnet 5.5 的 originating／linked account 约束 thinking 可用性，不会让当前请求自动采用旧认证。Lintel 保全不透明原件，不解析或修复协议签名；包 checksum 仅证明字节一致。新目录、新 session ID 或移除字段都不能证明独立身份或不可关联。</p>
+<a id="cleanup"></a>
+<h2 id="4-处理登录异常清理旧状态或退役环境">4. 处理登录异常、清理旧状态或退役环境</h2>
+<p>先确认你想处理的范围。Lintel 不把网络错误或一个失败响应自动判定为封禁；这条路径处理本地可识别状态，不改变服务端账号状态。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">“清理与重建”中的配方</th><th class="align-left">当前实际范围</th><th class="align-left">做完还要确认什么</th></tr></thead><tbody><tr><td class="align-left">修复本地登录</td><td class="align-left">处理预览中的本地凭据文件；可显式选择官方注销</td><td class="align-left">Keychain、目录外认证与服务端撤销分别看结果</td></tr><tr><td class="align-left">清理并重建</td><td class="align-left">加密归档工作及已识别混合客户端状态，处理准确文件，建立新环境并迁入</td><td class="align-left">新环境启动、正常登录，以及浏览器等独立范围</td></tr><tr><td class="align-left">退役此环境</td><td class="align-left">处理准确状态文件并停用该环境的 Lintel 启动入口；保留原工作目录</td><td class="align-left">不是卸载 Claude、删除整目录或恢复已删凭据</td></tr></tbody></table></div>
+<p>“修复本地登录”当前针对已识别 <code>.credentials.json</code>；后两种还处理预览列出的混合 <code>.claude.json</code>。默认 root 和专用 root 的路径可能不同，必须以“已识别的本地范围”为准。不要把名称中的“清理”理解成扫描并删除整机所有 Claude 文件。</p>
+<p>本地范围的文件行默认显示文件名与存在状态，点击可展开完整路径；预览前仍需核对具体目标。</p>
+<h3 id="按顺序准备执行与核对">按顺序准备、执行与核对</h3>
+<ol><li>顶部确认主机、环境和配置目录，选择配方。</li><li>先停止这个环境的终端、IDE 与自动重启来源。如果它由 Linux systemd 服务运行，在“目标后台服务”按第 5.3 节单独检查并批准暂停。</li><li>点“刷新范围”，看准确文件路径、存在状态与写入者提示。确认后勾选“已关闭目标的终端、IDE 与自动重启来源”。检测到仍运行或无法归属的 Claude 写入者时，预览会被阻止；不要只靠勾选绕过复查。</li><li>需要核对认证时，点“显式检查认证来源”。这个动作会执行该环境的官方认证状态命令，普通发现不会自动执行它。需要官方注销时，再勾选“同时请求官方注销”。共享认证范围、外部认证来源或无法核对的输出会阻止该注销路径；它可能联系服务端。</li><li>“清理并重建”与“退役此环境”还要至少选择一种工作类别并设置归档口令；全部取消时 App 会阻止预览并提示重新选择。“修复本地登录”不要求工作归档。点“预览这份计划”，核对“将处理 / 将保留”、不可恢复步骤和所有准确对象，再“批准并执行”。</li><li>查看回执的逐步结果、“本地清理”“服务端撤销”、归档路径与新配置目录。所选本地步骤完成时主要结果写“所选本地清理已完成”；覆盖区仍说明官方注销“未请求”、服务端状态“未检查”。兼容 status 保留在证据中。即使官方 CLI 报告已退出，服务端 token 撤销仍单独是“未验证”。</li><li>如果旧登录也存在于浏览器，点“浏览器工作空间”，按第 2.3 节独立处理所选 profile。新环境的登录由你在官方入口正常完成。</li></ol>
+<p><strong>认证防误操作：</strong>官方注销预览要求已登录的 <code>claude.ai</code> 状态提供非空主体字段 <code>email</code>，否则返回 <code>auth_identity_unverified</code>；可取消官方注销，只处理预览内的本地文件。core 仅在私有计划保存带本计划随机值的认证状态摘要，不保存邮箱或原始输出，App 只显示主体能否核对。执行前及保全后、注销前会重新核对完整状态与冻结文件；账号、组织或其他状态字段变化返回 <code>stale_auth</code>，本地凭据更新或新出现 fallback 文件返回 <code>stale_plan</code>。已经完成的归档和新环境保留。未执行的旧注销计划缺少绑定时须重新预览；已经接受的任务仍查询原 ID，不重放注销。</p>
+<p>CLI 状态绑定只证明观察字段一致；它不认证来源，也不能识别只发生在 Keychain 内且没有反映到状态输出的同账号 token 世代变化，最终复查到 logout 之间仍没有覆盖所有外部写入者的原子保证。真实 Keychain、文件 fallback 与服务端撤销仍需独立验收。</p>
+<p><strong>实际顺序：</strong>状态备份与工作加密归档 →（清理并重建）创建新环境并迁入 →（若选择）官方注销与状态核验 → 精确旧文件移除 →（退役）停用启动入口。预览与回执采用这个顺序。后续注销失败时归档和新环境可能已经存在；回执保留完成步骤、路径、结构化错误 code/phase/recovery，后续删除停止。查询原任务不会再次创建环境或注销。</p>
+<p><strong>遇到冲突：</strong>如果预览后文件、程序或登录来源改变，重新核对当前范围并生成新预览；如果已经提交且结果不确定，先按原任务 ID 查询。操作中发现新文件或旧状态重新出现，会保留新状态并停止后续动作，不自动再次删除。若回执记录隔离目录，保留它并按所列路径核对，不要把恢复等同于直接覆盖当前新文件。</p>
+<p><strong>需要恢复：</strong>可恢复的配置走原任务“预览恢复”；删除的凭据和浏览器数据没有自动恢复。退役后可回“环境”页点“重新启用环境”，恢复登记与启动资格，但不会复原已删凭据；必要时重新登录。已暂停服务的恢复仍是独立任务，不会因为清理完成或关闭窗口自动发生。</p>
+<p>当前完整 Desktop、IDE、macOS 服务及其他 supervisor 的定位与停写尚未完成。它们出现在你的真实使用链路时，需要独立核对；不要把 Claude Code 的已识别文件处理结果当成这些入口已经清场。</p>
+<a id="remote"></a>
+<h2 id="5-从-mac-管理-vps-与后台服务">5. 从 Mac 管理 VPS 与后台服务</h2>
+<h3 id="51-连接正确的-ssh-用户">5.1 连接正确的 SSH 用户</h3>
+<p>打开“主机与 SSH 连接”。先展开“连接前需要什么？”，确认已有可用的系统 SSH Host alias、可信的主机身份记录，以及 OpenSSH 或系统 agent 已能提供密钥。Lintel 的非交互连接不会弹出密码输入框。</p>
+<ol><li>在“SSH Host alias”选择或填写已有别名，点“登记主机”。这里填写 alias，例如 <code>writing-server</code>，不是 <code>user@host</code>、命令或 SSH 参数。</li><li>已有可用 PATH runner 时，点“连接并管理”。只有 Claude Code、没有 Lintel runner 的主机不能直接管理。</li><li>需要准备 runner 时，点“检查并准备运行器”。核对系统、架构、SSH 用户、版本、大小，再展开“查看安装与校验详情”。</li><li>确认准确目标后点“批准并安装这个运行器”。App 上传自身携带的静态 runner，完成文件、权限与实际能力核验后显示“运行器已就绪”。</li><li>点“连接并管理”，进入远程工作空间；再登记或选择该用户的 Claude 配置环境。</li></ol>
+<p>安装范围属于<strong>当前 SSH 登录用户</strong>。如果 Claude 由另一个用户运行，使用那个用户的 alias；以 root 登录不等于自动管理每个普通用户环境。当前支持 Linux x86_64 / arm64 的候选资源；App 缺包或目标条件不满足时会给出限制。准备过程不修改 PATH、shell 启动文件、sshd、Claude 配置，也不在 VPS 上编译或自动 sudo。</p>
+<p>旧安装显示“已核实 · 当前绑定已更新”时，表示当前运行器继续保持后来选定的版本；核对旧记录不会切回去。“已核实 · 尚未绑定”的历史记录需要重新预览与批准才能启用。</p>
+<p><strong>安装中断：</strong>从“安装记录”点“核对原安装”，确认原目标和同一文件。它只核验原安装，不重新上传。也可直接点错误提示下的“核对这份未确认安装”；原结果未确认前，已经提前生成的另一份安装预览同样不能上传。不要通过移除并重新登记主机绕过未核对记录。运行器版本更新后，有版本绑定的旧任务继续使用其冻结的旧 runner；较早的无绑定记录保留原兼容路径。</p>
+<p><strong>连接失败：</strong>按错误中的阶段和具体原因排查。需要时打开“查看本次错误输出”，或“复制排查摘要”；修复后点“重新检查连接”。host key 未知或变化时，先用你的系统 SSH 流程核对主机身份，Lintel 不自动忽略。若已经提交执行，连接恢复后查询原任务；重连成功后也不要重复提交原操作。</p>
+<h3 id="52-执行任务断线查询与打开会话">5.2 执行任务、断线查询与打开会话</h3>
+<p>连接后，保护方案、清理、工作归档与记录使用同一套界面，计划由远端 core 针对远端状态生成。确认框会持续显示所属 alias。</p>
+<p>远端任务先持久接收，再在后台执行。“已接收”表明原任务已记下，不等于修改已经完成。回执会显示实际托管方式：符合当前主机条件时使用 systemd 单任务后台服务；其他条件下显示“断线后的继续执行未获保证”。这些托管事实不构成重启后续跑承诺。</p>
+<p>断线或 App 重开后：</p>
+<ol><li>打开“主机与 SSH 连接 → 持久提交记录”。</li><li>找到原 alias 和原任务 ID，点“查询原任务”。</li><li>点“查看完整回执与恢复”，进入原主机、原环境的完整结果。</li><li>若仍“已接收 / 执行中 / 待核对”，继续核对原结果；只有看到明确的逐步结果后，才决定恢复或另建新的后续计划。</li><li>配置恢复点“预览恢复”，服务恢复点“预览恢复服务”，各自批准。</li></ol>
+<p>远端结果窗的“查询最新结果”使用原任务 reconnect。记录页手填 ID 与 CLI <code>remote job</code> 使用只读 job lookup；共同 controller 会保留已有提交记录的冻结 runner，主机升级后仍使用原绑定。未知 ID 不创建提交记录，误查尚未提交的计划不会阻止它按原批准提交。已有但无 digest 的旧记录保留 PATH 查询兼容路径；已提交／不确定任务仍只核对，不删除记录或重发。</p>
+<p>主机列表的“移除”只移除 Lintel 登记，原任务、系统 SSH 配置与远端文件保留。“撤销移除”可重新登记。已经移除的 alias 仍可查原任务，要打开完整恢复流程需先重新登记；移除不是取消或删除任务。</p>
+<p>要开始交互使用，从“环境详情 → 启动与来源 → 打开 Claude”，或结束状态的任务回执点“打开 Claude”。App 请求 macOS Terminal 通过同一严格 SSH alias、绑定 runner 和真实终端启动选定环境，不发送 prompt。<strong>这个交互会话随 SSH 连接结束，与后台变更任务不同。</strong> “已请求启动”以后，去 Terminal 确认真实会话。</p>
+<p>隔离 OpenSSH 与真实 disposable Linux VM 已验证符合既有条件的 system/user manager 在真实 PAM logout 后继续并完成原任务，以及 reboot 后按原 ID 核对；不符合条件的 setsid 路径受限。生产 VPS、aarch64 runtime 与所有普通用户 manager 场景仍未验收。遇到中断只核对原任务，Lintel 不自动启用 linger、改登录策略或换一种启动方式再发一次。</p>
+<h3 id="53-暂停一个明确绑定的-systemd-服务">5.3 暂停一个明确绑定的 systemd 服务</h3>
+<p>在远端“清理与重建”选择“修复本地登录”“清理并重建”或“退役此环境”，展开“目标后台服务”。单纯“工作保全”不显示这个面板。</p>
+<ol><li>“管理器”选“当前用户”，或在 runner 已是 root 时选“系统服务（需 root）”。</li><li>填写完整“服务 unit”，如 <code>example.service</code>，点“检查服务”。不接受通配符或命令。</li><li>核对“配置绑定”是否就是当前 root，以及自动重启、主进程和触发来源。</li><li>点“预览暂停服务”，查看准确 unit、原状态与持久暂停项，然后“批准并执行”。</li><li>核对暂停结果，再返回“清理与重建”；仍需关闭该环境的交互终端、IDE 和其他写入者。</li></ol>
+<p>暂停会阻止这个服务重新启动，并读取实际服务状态与 cgroup 证据。它持续到你独立批准恢复，不因关闭 App、SSH 断开或窗口关闭自动撤销。适配器只接受能明确绑定配置根的有限 systemd 服务，无法确认绑定、存在可能影响邻居的关系或使用不支持来源时，会拒绝而不扩大范围。</p>
+<p><strong>恢复：</strong>在暂停回执点“预览恢复服务”，或重新“检查服务”后选同名按钮。它核对原 unit 与暂停项，只移除原任务拥有的暂停项；原先运行的服务才重新启动，原先停止的保持停止。外部编辑冲突会保留现状与暂停项，先核对来源，不删除记录后强行重试。</p>
+<p><strong>清理并重建后的服务选择：</strong>新环境产生新 root，当前流程不会自动将原 service 改绑到新 root。“恢复服务”恢复的是原服务与原绑定。决定继续旧服务还是配置一个指向新环境的服务之前，先看清回执和绑定；当前没有把“重建客户端 → 改绑服务 → 新环境验证”做成自动完成的闭环。</p>
+<a id="recovery"></a>
+<h2 id="6-检查变化恢复配置找回结果">6. 检查变化、恢复配置、找回结果</h2>
+<h3 id="61-手动检查漂移">6.1 手动检查漂移</h3>
+<p>在“环境”页展开“环境详情”，找到“上次之后，有什么变化？”，点“检查变化”。结果列出已管理设置相对基线的差异：</p>
+<ul><li>想恢复之前的取舍，点“重新应用方案”，回到保护方案重新预览并批准。</li><li>接受现在的值，点“接受当前值”；这会把当前值记为此环境的基线，不会把设置重新改回去。</li><li>没有差异，表示当前检查范围内没有待处理变化，不是全机、浏览器或网络都已受控。</li></ul>
+<p>当前没有已启用的后台定时漂移、菜单栏快速动作或自动规则更新。软件升级、切换入口或外部工具改过设置后，主动“重新检查”和“检查变化”。</p>
+<h3 id="62-按任务记录恢复不恢复整套旧状态">6.2 按任务记录恢复，不恢复整套旧状态</h3>
+<p>记录页的“待处理”集中显示执行中、中断和未完成任务；打开回执后看“配置写入核对”。确认属于原任务的写入才出现“预览恢复”；未写入或归属无法证明时，当前文件保留，说明不会变成自动恢复。恢复始终另行预览、批准。回执的“接下来”列出该任务已有的后续步骤。</p>
+<p>“记录与恢复”可按“全部环境 / 当前环境 / 待处理”筛选，或搜索“记录、环境或任务 ID”。“全部环境”仍属于当前主机。点“查看结果”阅读逐步回执，再选可用的后续动作。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">想恢复什么</th><th class="align-left">用什么入口</th><th class="align-left">恢复边界</th></tr></thead><tbody><tr><td class="align-left">Lintel 写入或删除的设置字段</td><td class="align-left">任务回执“预览恢复”</td><td class="align-left">只处理原任务字段；保护后续编辑</td></tr><tr><td class="align-left">工作资料</td><td class="align-left">“查看工作归档”→解锁→“预览迁入计划”</td><td class="align-left">选择类别和目标；拒绝覆盖同名内容；不恢复凭据和执行配置</td></tr><tr><td class="align-left">systemd 服务状态</td><td class="align-left">原暂停任务“预览恢复服务”</td><td class="align-left">原 unit、原任务拥有的暂停项与原 active/inactive 状态</td></tr><tr><td class="align-left">退役环境的启动资格</td><td class="align-left">“环境”页“重新启用环境”</td><td class="align-left">恢复登记状态，不能恢复已删凭据</td></tr><tr><td class="align-left">浏览器可恢复设置</td><td class="align-left">浏览器任务“提交恢复预览”，或扩展“预览恢复此项设置”</td><td class="align-left">核对当前控制者／有效值，撤回本扩展拥有的改动</td></tr><tr><td class="align-left">Cookie、已删除站点数据、官方注销</td><td class="align-left">没有通用撤销</td><td class="align-left">使用正常重新登录流程；不要期待“预览恢复”找回这些数据</td></tr></tbody></table></div>
+<h3 id="63-看懂状态再决定下一步">6.3 看懂状态，再决定下一步</h3>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">看到的状态</th><th class="align-left">目前能说明什么</th><th class="align-left">下一步</th></tr></thead><tbody><tr><td class="align-left">已配置 / 已读回</td><td class="align-left">指定配置或设置已处理、读回</td><td class="align-left">按新启动要求继续；不推断全部运行效果</td></tr><tr><td class="align-left">已接收</td><td class="align-left">远端已持久记录原任务</td><td class="align-left">查询最终结果</td></tr><tr><td class="align-left">执行中，或 <code>verifying</code></td><td class="align-left">任务仍处于执行／核验阶段</td><td class="align-left">保留原 ID，查询最新结果</td></tr><tr><td class="align-left">已完成</td><td class="align-left">回执所列步骤完成</td><td class="align-left">看范围、限制与后续启动要求</td></tr><tr><td class="align-left">部分完成</td><td class="align-left">某个已请求的步骤未完成，或旧回执保留历史状态</td><td class="align-left">分开查看所选任务结果、检查覆盖与原始 status；保全成功不因旧登录保留而失败</td></tr><tr><td class="align-left">未完成</td><td class="align-left">至少一部分未成功</td><td class="align-left">查看已经完成的步骤、错误和可恢复项</td></tr><tr><td class="align-left">待核对 / 结果待核对</td><td class="align-left">请求或副作用状态不能确定</td><td class="align-left">查询原任务；不重复提交清理</td></tr><tr><td class="align-left">等待浏览器重启后继续</td><td class="align-left">清理准备完成，其余存储尚未删除</td><td class="align-left">完整重启目标浏览器，再批准继续删除</td></tr><tr><td class="align-left">已请求启动</td><td class="align-left">Terminal 接受了启动请求</td><td class="align-left">在真实终端确认启动与登录</td></tr></tbody></table></div>
+<p>当前少数状态可能保留英文，如 <code>verifying</code>；不要仅凭颜色推断成功。执行窗有“查询最新结果”时，用它查询原任务。关闭结果窗后，可展开“执行连接中断？用原任务 ID 找回结果”，输入原计划或任务 ID，点“查询原任务”。远端 App 重开后的入口见第 5.2 节。</p>
+<p>会话启动另保留原请求：在“会话启动记录”按原 ID 只读核对，或从列表找回。关闭启动面板不会丢掉 core 已写入的 intent；结果待核对时不另开同一次会话。可把此原启动 ID 交给 Agent，命令为 <code>launch query</code>／SSH 的 <code>remote launch query</code>。这些查询与 mutation job 回执分别呈现。</p>
+<h3 id="64-准备支持资料">6.4 准备支持资料</h3>
+<p>在“记录与恢复”底部点“预览支持资料”，先看脱敏结果，再按面板提供的复制或保存动作取得 JSON。它只包含白名单内的平台、版本、计数和能力信息，不包含环境名、目录、设置正文、令牌或会话；分享由你决定，不自动上传。SSH 的“复制排查摘要”是另一项手动排障动作。</p>
+<p>帮助入口还提供开发者 GitHub、Lintel 源码说明、VPS 101 与 SSH 排障手册。Day / Night / System 是外观选项；首页 Clawd、“陪它玩”、风景册与小游戏不会执行环境操作。</p>
+<h3 id="65-管理本地数据身份与配置然后用配方连续操作">6.5 管理本地数据、身份与配置，然后用配方连续操作</h3>
+<p>这一小节把单项目标收成一条常见旅程：选环境 → 关闭不需要的内容记录 → 保全并清理选中残留 → 执行并复查 → 继续启动使用。常规同目标任务一份完整预览、一次批准；中间的备份、修改、校验由工具完成。</p>
+<p><strong>本地数据与身份：</strong>“环境详情 → 本地状态 → 本地数据与身份”列出已知位置表（加你明确加入、最多 8 个的绝对目录）中的工作内容、运行残留、身份材料与插件配置，只读路径、类别、大小和时间，可按类别、项目片段、时间与大小筛选并分页。默认只勾选可清理的运行残留；工作内容需另选，<code>unclassified</code> 位置不默认删除，身份位置只报存在性、不进入清理目标。选中后可“仅精确清理”或“归档并清理”，后者先写独立 <code>lintel.residue/1</code> 加密备份再删除。选中的原件若属于工作内容，需要显式“允许选择工作原件进行删除”或改用工作保全。身份区默认遮蔽，点“显示原始值”才在本页内存读取 <code>userID</code> 并可复制，不写入 localStorage、普通快照、支持导出或日志；“重置本地客户端标识”先将完整原始客户端状态与明确选中的备份加密保全，再移除 <code>userID</code> 并逐值保留其他键，不顺带注销或清凭据。已有的 <code>lintel.residue/1</code> 备份可用“读取与恢复残留备份”独立解锁并按包内原路径恢复，已有文件不覆盖，不作为工作 import。</p>
+<p><strong>可选：一份计划、一次批准。</strong> 本地数据面板可勾选“同时减少正文记录”“同时重置本地客户端标识”，把内容记录关闭、标识重置与所选残留合成一份 <code>client_workflow</code> 清单；同一文件不能同时属于配置、身份和残留步骤。执行仍是一次预览、一次批准，执行中各步骤的成功与跳过分别记录。</p>
+<p><strong>变化与对照：</strong>“环境详情 → 变化与对照”的“变化与对照”保存脱敏语义快照并比较两份快照或两个已登记环境，可按新增／删除／修改筛选。逐项“接受所选当前值”只形成比较基线，不是恢复来源；想恢复原值仍用原任务或加密备份。“将普通配置应用到目标环境”只复制已识别普通字段并显示目标 diff，登录凭据与本地身份不随普通配置方案复制。轻量变化检查在打开环境或经 Lintel 启动时只读有限配置来源，有变化或读取不完整时留提示；没有常驻 watcher。</p>
+<p><strong>高级配置编辑：</strong>对明确选择的 user／project-local JSON 配置提供严格校验、逐字段遮蔽 diff 与原任务恢复。写入复用现有计划链：批准前复查摘要，写前生成 age 加密 <code>lintel.config/1</code> 备份，发布后读回；恢复只改原任务字段并保留后续无关编辑，凭据值（如 <code>OTEL_EXPORTER_OTLP_HEADERS</code>、带凭据的接收端 URL）与未识别键默认遮蔽。组织强制配置保留其权限边界。</p>
+<p><strong>快捷配方：</strong>“保护方案”和“清理重建”页内提供三条可编辑配方。“减少正文记录”关闭已知内容记录字段并保留指标；“清理运行残留”使用本地数据视图当前选中的残留；“保住工作并重建”归档并迁入选中的工作内容。配方只保存方案与有限字段选择等非秘密意图，切换主机或环境后草稿与原任务绑定不漂移；每次运行都按当前主机与环境重新生成计划，绝不重放旧审批。保存了不同意图的个人默认（例如开启内容记录）会改按实际意图标注为“个人默认”，不沿用内置名称承诺。</p>
+<h2 id="在-app-交给-agent">在 App 交给 Agent</h2>
+<p>侧栏“终端与 Agent”，以及环境、计划、回执中的“交给 Agent”携带当时的准确目标。按“选定 CLI → 核对执行上下文 → 审阅 → 复制”进行：输入实际 executable 完整路径，点“核对 CLI 与上下文”。检查只执行固定静态命令，有限时间／输出，无 shell、不发现个人目录、不初始化 state、不启动 Claude。</p>
+<p>核对 product、协议、平台、候选身份以及 App／CLI 的 HOME、state、uid/euid。sidecar 缺失显示候选未知；checksum 匹配不等于来源认证。App 有原环境、计划或任务时必须沿用 App state 与原用户，保留 ID 与 runner 绑定；Lintel 不迁移 state 或修改 PATH。选定 CLI 自己的 state 只适用于没有原对象的独立接口核对。</p>
+<p>操作交接包包含任务、目标、执行器、state、原 ID/hash、已观察状态和准确查询命令。accepted／uncertain 指向原 ID 查询，没有新提交。它不含口令、工作正文、完整 state 或凭据；复制不会产生新的执行授权。需要正文时使用第 3.5 节独立选择和审阅。取得 CLI 与可复制命令见<a href="/guide/agents/">Agent 指南</a>。</p>
+<p>App 本地短帮助随构建，帮助页显示版本与 docs revision。已知 clean revision 的完整指南链接锁定该提交；dirty／未知构建明确显示“最新开发说明”，不冒充候选对应文档。</p>
+<h2 id="只有终端时独立-cli">只有终端时：独立 CLI</h2>
+<p>CLI 不依赖 GUI 启动或 Tauri。候选包校验／独立版本安装与升级、源码构建、机器可读 schema、秘密 stdin、批准、原任务 wait、恢复、browser/SSH/network 的有限适配见 <a href="/guide/agents/">Agent CLI 指南</a>。候选是明确选择的本地版本，未提供自动更新或正式签名发行。</p>
+<pre class="guide-code" data-language="sh"><code>lintel version --json
+lintel capabilities --json
+lintel describe plan_policy --json
+lintel env list --json
+lintel policy plan --environment &lt;environment-id&gt; --preset reduce --no-keep-remote-control
+lintel plan show &lt;returned-plan-id&gt;
+lintel job submit --plan &lt;returned-plan-id&gt; --approval &lt;returned-plan-hash&gt;
+lintel job wait &lt;returned-plan-id&gt; --timeout 30s
+lintel restore plan --job &lt;original-job-id&gt;</code></pre>
+<p>静态 version/capabilities/schema/describe 不发现个人目录、不运行 Claude，也不初始化 state。显式 <code>env list</code> / <code>discover</code> 可能登记默认根并保存 inventory；快捷 discover 和 raw <code>request</code> 返回同一 runner 能力。</p>
+<p>普通 JSON 命令 stdout 只有一个 <code>ok/data</code> 或 <code>ok/error</code> 对象；拒绝退出非零。成功提交只表示 durable ACK，必须查询 <code>data.status</code>。接受后失败保留原任务回执和 code，不变成重新提交理由。<code>job wait</code> 超时返回 <code>wait_timeout</code> 与原 plan ID，永不重发。<code>network serve</code> 明确是前台 NDJSON stream，独立于 App 通道。</p>
+<p>旧的 <code>request</code>、<code>submit</code>、<code>inspect ID</code>、<code>jobs</code>、<code>job ID</code>、<code>tui</code>、<code>launch ID</code> 继续可用。TUI 的 <code>apply</code> 仍是明确批准，无回显口令从真实 TTY 读取；<code>launch</code> 只在真实 TTY 打开准确程序与配置根，不接受 prompt 或伪装为 detached mutation job。不存在通用 <code>--yes</code> 或 <code>restore --all</code>。</p>
+<h2 id="当前证据怎样理解">当前证据怎样理解</h2>
+<p>本文描述的是源码已连接的操作路径。下面只转述仓库记录的证据，<strong>不表示本次在所审阅 HEAD 上重新跑过这些检查</strong>。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">范围</th><th class="align-left">仓库已经记录的证据</th><th class="align-left">仍不能直接推出</th></tr></thead><tbody><tr><td class="align-left">配置、归档、清理与恢复</td><td class="align-left">合成目录中的真实 core／CLI 执行、字段冲突、加密归档、TUI 等旅程</td><td class="align-left">真实 Claude 登录、Keychain、全部 Desktop／IDE 入口已经验收</td></tr><tr><td class="align-left">浏览器</td><td class="align-left">独立 Chromium 真进程、持久安装、原生启动世代与合成站点数据；真实 Native Messaging 往返</td><td class="align-left">正式 Chrome／Edge／Firefox／AdsPower、真实 claude.ai 认证与非开发者安装全部通过</td></tr><tr><td class="align-left">网络通道</td><td class="align-left">真实 loopback socket 的规则与停止检查；native 配置读回</td><td class="align-left">真实 Claude 公网效果、直接连接无法绕过、进程级强约束</td></tr><tr><td class="align-left">远端</td><td class="align-left">隔离 OpenSSH 上的真实 x86_64 runner 安装、原任务查询、PTY；真实 disposable VM 的有限服务、符合条件的 system/user manager 在 PAM logout 后完成及 reboot 核对</td><td class="align-left">生产 VPS、aarch64 runtime 与所有 user manager 行为已完成</td></tr><tr><td class="align-left">桌面 UI</td><td class="align-left">构建页面及真实 core／host 配合合成 invoke／SSH／clipboard 的旅程；部分历史 native 观察</td><td class="align-left">所有最新界面都已经在 native WebKit、Finder、Terminal 与真实账号环境完整验收</td></tr></tbody></table></div>
+<p>完整目标仍包括更多认证与入口适配、系统级网络约束、浏览器持久安装与专用启动、服务迁移闭环、定时漂移、菜单栏、升级卸载与正式签名分发。这些继续属于 Lintel 的范围，不能通过从使用指南中删掉它们就视为整版完成。</p>
+<p>路径 preflight 在创建临时目录前持久记录 <code>migration_probe:{path,status}</code> 和执行中的 <code>migration_preflight</code> 步骤。正常清理确认后 status 为 <code>removed</code>；无法确认清理则为 <code>retained</code> 并停止正文迁入。worker 中断会保留 <code>executing</code> 与原路径；按原 job 查询核对目录，查询不删除或重跑它。App 回执显示尚需核对的检查目录。只核对原任务创建的空文件范围，额外内容保留，不把临时目录当成新配置环境。</p>
+<h2 id="遥测目标与-app-自身更新">遥测目标与 App 自身更新</h2>
+<p>环境详情“外发与权限”的受控通道草案可以选择官方目录中的精确遥测目标；合入现有 blocked 后仍须显式启动。测试结果标明是 Lintel 受控请求，未观察到 Claude 请求不等于全局零遥测。fine-grained 设置与 NONESSENTIAL 总开关的自动更新／feature flags 影响分别核对，详见 <a href="/guide/telemetry/">telemetry</a>。</p>
+<p>“设置与模块 → Lintel 版本与更新”管理本 App。后台检查默认关闭；检查错误不能证明最新；下载签名与版本核验通过后审阅安装，最后保存工作并显式重启。native 层拒绝正在执行操作或有活跃代理时安装／重启。原安装中断保留原记录，不重放；旧无 updater 的 App 需要手动升级一次。当前源码没有正式公钥／feed 或 Release 激活；未来准备与精确发布顺序见 <a href="/guide/app-updates/">app-updates</a>。独立 CLI、浏览器组件与远端 runner 不由 App updater 自动安装。</p>
+      </article>
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Standalone CLI, interface discovery, secret stdin, portable work and candidate installation.">
+  <link rel="canonical" href="https://lintel.page/en/guide/agents/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/agents/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/agents/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/agents/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Agent CLI · Lintel">
+  <meta property="og:description" content="Standalone CLI, interface discovery, secret stdin, portable work and candidate installation.">
+  <meta property="og:url" content="https://lintel.page/en/guide/agents/">
+  <meta property="og:locale" content="en_US">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>Agent CLI · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="Main navigation" data-route-attr-aria-label="nav"><a href="/en/" data-route-copy="product">Product</a><a href="/en/guide/" aria-current="page" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="/en/inside/" data-route-copy="inside">Design &amp; implementation</a><a href="/en/releases/" data-route-copy="status">Status</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="Language" data-route-attr-aria-label="language"><a href="/guide/agents/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh">中文</a><span aria-hidden="true">/</span><a href="/en/guide/agents/" lang="en" hreflang="en" data-site-route-language="en" aria-current="page">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to night" title="Switch to night" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <article class="guide-body" data-guide-document="agents">
+        <h1 id="lintel-agent-cli">Lintel Agent CLI</h1>
+<p><a href="/en/guide/agents/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
+<p>For coding agents/script authors with existing operation authorization. Lintel 0.1.0 Preview is a source development preview, protocol 1/catalog 1, without signed formal distribution/public Release downloads. CLI is GUI-independent; configuration/plans/execution/archive/restoration share core. Self-description is the current binary&#39;s contract; inspect target applicability rather than infer permission from implementation.</p>
+<p>Start with <a href="/en/guide/quickstart/">English quickstart</a> / <a href="/en/guide/quickstart/">中文 quickstart</a> for disposable synthetic preservation/original-query/independent package reading, then prepare real operations here.</p>
+<h2 id="from-app-to-terminal-or-agent">From App to terminal or Agent</h2>
+<p>Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. No formal download link; website/App main-doc links mean latest development documentation.</p>
+<p>App never downloads silently, changes PATH or copies journals. Missing sidecar means unknown identity; byte agreement authenticates neither signatures nor source. Wrong architecture/protocol/digest/static-probe failure shows specific errors.</p>
+<p>Handoff must use original task state. Accepted/uncertain jobs query the original ID; launches use readonly original-request query. Different CLI does not mean different state or rebind remote runner. Handoff text confers no new authorization.</p>
+<a id="install-candidate"></a>
+<h2 id="installing-a-candidate-package">Installing a candidate package</h2>
+<p>Obtain platform archive/index from a trusted provider, verify identity/platform, unpack with system tools into a new version. Identity below is synthetic; replace with actual index. Create only parent first; ordinary mkdir fails if the <strong>new identity directory</strong> exists, preventing overwrite:</p>
+<pre class="guide-code" data-language="sh"><code>parent=&quot;${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}&quot;
+mkdir -p &quot;$parent&quot;
+# Replace with actual index identity: &lt;version&gt;-candidate-&lt;first 12 revision characters&gt;
+identity=&quot;0.1.0-candidate-a239123903b6&quot;
+dest=&quot;$parent/$identity&quot;
+mkdir &quot;$dest&quot; &amp;&amp; tar -xzf &quot;candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz&quot; -C &quot;$dest&quot;</code></pre>
+<p>Verify installed bytes from selected directory; <strong>targets need no Node</strong>. System shasum/sha256sum checks SHA256SUMS covering payload/candidate.json/README.txt, excluding itself. This proves bytes, not signature/trusted provenance; then run absolute executable:</p>
+<pre class="guide-code" data-language="sh"><code>cd &quot;$dest&quot;
+shasum -a 256 -c SHA256SUMS      # macOS
+# On Linux use: sha256sum -c SHA256SUMS
+&quot;$dest/bin/lintel&quot; version --json
+&quot;$dest/bin/lintel&quot; capabilities --json</code></pre>
+<p>Upgrade into <strong>another</strong> identity directory, repeat checks/version/capabilities, explicitly switch caller path. No old executable replacement or PATH/rc/App/settings/service/Claude/credentials/browser-registration changes. State/IDs remain. Candidates are unsigned; Linux archives checked on Mac have format/byte evidence only, no Linux runtime. Execute locally only on matching architecture.</p>
+<p>Uninstall after ceasing use/checking no executing tasks, deleting only your unpacked version directory. Retain state/packages/IDs. Removing executable neither restores approved config nor removes independent hosts/runners. Their restoration/management remains separate; never delete state instead.</p>
+<a id="install-version"></a>
+<h2 id="independent-source-installation">Independent source installation</h2>
+<p>From reviewed checkout, install into an explicitly chosen user directory with Rust stable/native toolchain, without Node/Tauri/GUI/App:</p>
+<pre class="guide-code" data-language="sh"><code>cargo install --path apps/runner --locked --root &quot;$HOME/.local/share/lintel-cli/chosen-candidate&quot;
+&quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; version --json
+&quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; capabilities --json</code></pre>
+<p>Prefer absolute paths. A shorthand lintel requires explicitly adding this bin to your PATH. No automatic rc/services/Claude/profiles/App edits. Linux compiles no Tauri/browser; macOS includes finite host-control library.</p>
+<p>Upgrade reviewed source into <strong>another version directory</strong>, check version/capabilities/schema, then select new executable. Equal 0.1.0 does not identify equal builds; catalog owns support. Old tasks query original state/ID/pinned runner despite upgrades.</p>
+<h2 id="discover-interfaces-then-targets">Discover interfaces, then targets</h2>
+<pre class="guide-code" data-language="sh"><code>lintel --help
+lintel version --json
+lintel capabilities --json
+lintel context --json
+lintel tasks --json
+lintel work session read --help
+lintel launch query --help
+lintel describe plan_policy --json
+lintel schema plan_policy
+lintel env list --json
+lintel env inspect &lt;environment-id&gt; --json
+lintel env components &lt;environment-id&gt; --project-cwd /synthetic/project --json
+lintel work preflight --environment &lt;environment-id&gt; --categories instructions,memory,sessions --json
+lintel work inventory --environment &lt;environment-id&gt; --categories memory,sessions --json
+lintel work archive plan --environment &lt;environment-id&gt; --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
+lintel capabilities --environment &lt;environment-id&gt;</code></pre>
+<p>Static help/version/capabilities/describe/schema/tasks/context never runs Claude/discovers personal roots/initializes state. describe returns stable operation ID, finite transports, schema, platform/target conditions, target/state effects, approval, secrets, results/recovery. Target capabilities adds real inspection; service unit/manager still service_inspect, browser still profile inspection.</p>
+<p>Units require exact .service, e.g. claude.service/claude@synthetic.service, never uninstantiated template/path/glob/command. Shared names validate before target-state initialization; core still verifies actual ownership/binding/manager.</p>
+<p>inspect_components returns finite exact-root sources/original records, optional target-host cwd, without Claude/credential bodies/job reconciliation. It checks ≤8 recorded units, not global supervisors; ≤50 records with scan/display gaps separate. Historical coverage is not live status. Browser ownership is independent of root.</p>
+<p>work_preflight metadata reports count/bytes/limits/blocking relative paths/completeness. eligible means current admission only, no freeze/approval. Links/restricted/budget gaps remain unknown/incomplete; truncated blockers never pass. Actual archive/preserve fully reads/digests/rechecks. Streaming preserves sessions within runner limits; larger refusals remain. Resume&#39;s ≤8 MiB assessment is independent of archives/read pages.</p>
+<p>work_inventory returns exact root/files path/category/bytes/total/complete/digest/next_offset. Continue with offset and same expected_digest; stale_inventory prevents mixed snapshots. Digest binds metadata only, never content/approval.</p>
+<p>Repeatable --path on preflight/archive plan/preserve plan is additive selected_paths. Omission retains categories; provided arrays are nonempty/unique/canonical relative/category-matching, no dot/parent/absolute/control/fuzzy paths. ≤4096 UTF8 bytes each, 10,000 entries, 512 KiB serialized array. Core checks originals/ancestors/bounds and reads selected only; missing/special objects refuse, no category fallback. Public work_selection/planned_target shows exact selection/full destinations. Execute rechecks selected manifest; other changes cannot expand it. Cleanup/reset/import reject selected_paths; reader --path still means package entry.</p>
+<p>Named/finite environment_id/plan_id/job_id follow UUID 8-4-4-4-12 hex, either case, invalid_request before state/SSH. Always use returned originals; raw protocol-1 retains rules. Outer remote execute/reconnect plan_id and launch environment_id share UUID checks before records/SSH. install_id has separate bounded rules and comes from preview.</p>
+<p>Named execute/new finite remote approval requires 64 lowercase hex. Bad syntax refuses before state/intent/SSH; valid syntax still exact hash/target checked by core. Existing remote execute stays query-only without deletion/replay, reconnect is recovery. TTY launch/target capabilities also validate IDs before core; launch first requires stdin/stdout TTY and no prompt.</p>
+<p>env list/discover may register roots/save inventory; job may persist interruption. auth_probe explicitly runs official status, returning identity_observed; missing logout subject refuses, changed auth stales approval, unattempted legacy needs preview, accepted query-only. archive_read returns text. These are not all effect-free metadata. discover shortcut/request share capabilities.</p>
+<p>Ordinary stdout is one envelope, ok:false nonzero, stderr diagnostics. Launch takes interactive process control with stderr failures. network serve is the explicit long-running NDJSON exception. ok:true is request success; data.status/steps/coverage/error determine task completion.</p>
+<h2 id="local-inventory-and-sanitized-snapshots">Local inventory and sanitized snapshots</h2>
+<p>These source-level observations share core. For SSH, check the target runner&#39;s <code>describe</code> and <code>schema</code> first; upgrading the App does not upgrade an older runner.</p>
+<pre class="guide-code" data-language="sh"><code>lintel env residue &#39;&lt;environment-id&gt;&#39;
+lintel env identity &#39;&lt;environment-id&gt;&#39;
+lintel env compare &#39;&lt;environment-id&gt;&#39; --other-environment-id &#39;&lt;other-environment-id&gt;&#39;
+lintel snapshot save --environment &#39;&lt;environment-id&gt;&#39;
+lintel snapshot list --environment &#39;&lt;environment-id&gt;&#39;
+lintel snapshot compare --environment &#39;&lt;environment-id&gt;&#39; --old-snapshot-id &#39;&lt;old-snapshot-id&gt;&#39; --new-snapshot-id &#39;&lt;new-snapshot-id&gt;&#39;</code></pre>
+<p><code>residue_inventory</code> reads metadata at known locations. Uncovered locations, scan limits and read failures remain explicit. <code>identity_inspect</code> returns recognized field presence by default. All six commands also support <code>lintel call OPERATION</code> with JSON stdin and the shared finite SSH contract; the current runner&#39;s schema defines the accepted fields.</p>
+<p><code>snapshot_save</code> stores an immutable sanitized observation and returns its ID and public summary. <code>snapshot_list</code> displays up to 200 records and inspects up to 2,000 directory entries per call; <code>scan_complete</code> and item errors state coverage. One damaged record does not hide readable neighbors. Snapshots retain ordinary settings, finite declarations and residue counts. Headers, credential-bearing collector addresses and raw identities are excluded. Identity comparison material stays in private local state; responses expose only same/changed/unknown, and different salt domains cannot attest identity changes. Immediate <code>env_compare</code> shares one temporary salt and saves neither a snapshot nor a persistent salt.</p>
+<p>Missing, malformed or unreadable configuration never becomes an off verdict: that area is incomplete while independent observations remain available. Hidden values cannot attest equality. Sanitized snapshots support comparison; restoration still needs the original task or an encrypted backup and a new approval. A digest cannot reconstruct content. Ordinary state/lock behavior remains; these observations do not start Claude, run hooks or contact public endpoints.</p>
+<p><code>lintel snapshot accept --environment &#39;&lt;environment-id&gt;&#39; --old-snapshot-id &#39;&lt;old-snapshot-id&gt;&#39; --new-snapshot-id &#39;&lt;new-snapshot-id&gt;&#39; --selected-changes &#39;[&quot;&lt;returned-change-id&gt;&quot;]&#39;</code> accepts only selected <code>changes[].id</code> values returned by <code>snapshot compare</code> as a comparison baseline, without editing configuration. It rechecks the current selected values; stale observations and masked values cannot be accepted. Once a semantic baseline exists, legacy <code>accept_drift</code> returns <code>semantic_baseline_selection_required</code>; continue with per-item <code>snapshot accept</code>. Legacy field baselines remain only for callers that have not adopted a semantic baseline.</p>
+<h3 id="writable-advanced-configuration-local-data-and-recipe-entries">Writable advanced configuration, local data and recipe entries</h3>
+<p>The named entries below all use the same plan/approval/job/receipt chain and write only after an explicit approval; secrets (archive passphrases) still travel only through JSON stdin, never argv.</p>
+<pre class="guide-code" data-language="sh"><code>lintel config inspect --environment &#39;&lt;environment-id&gt;&#39; [--project-cwd /abs/project]
+lintel config read --environment &#39;&lt;environment-id&gt;&#39; --config-path /abs/settings.json
+lintel config edit plan --environment &#39;&lt;environment-id&gt;&#39; --config-path /abs/settings.json   # stdin: {&quot;document&quot;:&quot;&lt;JSON text&gt;&quot;,&quot;expected_digest&quot;:&quot;&lt;current digest&gt;&quot;}
+lintel config apply plan --environment &#39;&lt;environment-id&gt;&#39; --source-environment-id &#39;&lt;other-id&gt;&#39; --selected-keys &#39;[&quot;OTEL_LOG_USER_PROMPTS&quot;]&#39;
+lintel config restore inspect --environment &#39;&lt;environment-id&gt;&#39; --job &#39;&lt;original-job-id&gt;&#39;
+lintel config restore plan --environment &#39;&lt;environment-id&gt;&#39; --job &#39;&lt;original-job-id&gt;&#39; --selected-keys &#39;[&quot;/env/OTEL_LOG_USER_PROMPTS&quot;]&#39;
+lintel data clear plan --environment &#39;&lt;environment-id&gt;&#39; --writers-confirmed-stopped   # stdin: {&quot;residue_paths&quot;:[...],&quot;archive_before_clear&quot;:true,&quot;delete_work&quot;:false}
+lintel data identity-reset plan --environment &#39;&lt;environment-id&gt;&#39;   # stdin: {&quot;writers_confirmed_stopped&quot;:true,&quot;identity_backup_paths&quot;:[...]}
+lintel data workflow plan --environment &#39;&lt;environment-id&gt;&#39;   # stdin: {&quot;writers_confirmed_stopped&quot;:true,&quot;policy&quot;:{...},&quot;reset_identity&quot;:true,&quot;residue_paths&quot;:[...]}</code></pre>
+<p><code>plan_config_edit</code> needs a strict JSON <code>document</code> plus the read-time <code>expected_digest</code> and computes a per-field diff; an unrecognized or credential value (<code>OTEL_EXPORTER_OTLP_HEADERS</code>, a credential-bearing receiver URL) is only <code>masked: true</code> with <code>before</code>/<code>after</code> null. Execution seals an independent age <code>lintel.config/1</code> backup (<code>config_archive_path</code>) before writing and reads it back; <code>plan_config_restore</code> touches only the fields the original task changed and requires the current value to still equal the written value (else <code>restore_conflict</code>), preserving unrelated later edits. <code>config_inspect</code> reads finite configuration sources and masks public values without reading identity/credential-file bodies. Explicit <code>config_read</code> returns the selected configuration text; use a private terminal/editor and keep its response out of ordinary logs. Managed and identity files cannot be advanced-edit write targets.</p>
+<p><code>plan_cleanup</code>&#39;s <code>clear_residue</code> needs non-empty <code>residue_paths</code>; both operations require <code>writers_confirmed_stopped: true</code>. Clearing uses <code>archive_before_clear</code> to select a backup before deletion or direct deletion; <code>archive_only: true</code> archives without deletion. <code>plan_identity_reset</code> always encrypts the complete original client state and selected backups into <code>lintel.residue/1</code> before removing only <code>userID</code>, without logging out or clearing credentials. The backup can contain sensitive original text; keep it encrypted. Its manifest and restoration open independently:</p>
+<pre class="guide-code" data-language="sh"><code># every field comes through stdin; secrets never travel in argv
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;job_id&quot;:&quot;&lt;original-job-id&gt;&quot;,&quot;archive_passphrase&quot;:getpass.getpass(&quot;Passphrase: &quot;)}))&#39; |
+  lintel call residue_archive_inspect
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;environment_id&quot;:&quot;&lt;id&gt;&quot;,&quot;job_id&quot;:&quot;&lt;original-job-id&gt;&quot;,&quot;selected_paths&quot;:[&quot;/abs/original&quot;],&quot;archive_passphrase&quot;:getpass.getpass(&quot;Passphrase: &quot;)}))&#39; |
+  lintel call plan_residue_restore</code></pre>
+<p><code>lintel.residue/1</code> is separate from the work package: a valid original-environment binding is required for a new restore plan, while older unbound material remains manifest-readable. It restores only the recorded original paths and refuses to overwrite an existing file (<code>restore_conflict</code>), never as a work import. <code>plan_client_workflow</code> composes configuration edits, residue clearing and identity reset into one plan and one approval; a file cannot belong to two steps (<code>overlapping_actions</code>), and an interruption is queried by the original ID only. The App side is Local data and identity, Changes and comparison, Advanced configuration editing and the three quick recipes; see the <a href="/en/guide/desktop/">desktop guide</a> and <a href="/en/guide/operator-guide/#recovery">operator guide</a>.</p>
+<h2 id="complete-preview-approval-query-and-restoration">Complete preview, approval, query and restoration</h2>
+<p>Use returned IDs/hash from <strong>current host/target</strong>, registering exact config root, never project code directory:</p>
+<pre class="guide-code" data-language="sh"><code>lintel env register --name &#39;Example workspace&#39; --root /absolute/claude-config
+lintel policy plan --environment &lt;environment-id&gt; --preset reduce --no-keep-remote-control
+lintel plan show &lt;returned-plan-id&gt;
+lintel job submit --plan &lt;returned-plan-id&gt; --approval &lt;returned-plan-hash&gt;
+lintel job show &lt;returned-plan-id&gt;
+lintel job wait &lt;returned-plan-id&gt; --timeout 30s
+lintel restore plan --job &lt;original-job-id&gt;
+lintel plan show &lt;restore-plan-id&gt;
+lintel job submit --plan &lt;restore-plan-id&gt; --approval &lt;restore-plan-hash&gt;
+lintel job wait &lt;restore-plan-id&gt; --timeout 30s</code></pre>
+<p>Policy must explicitly choose keep/no-keep Remote Control, optional declared trusted-devices required/not_required/unknown. Custom uses --preset custom --custom-settings &#39;{&quot;DISABLE_TELEMETRY&quot;:&quot;disable&quot;}&#39;, 27 schema fields with keep/enable/disable/remove/set; masked keys admit only keep/disable/remove, and set requires paired custom_values. Noncustom rejects custom_settings; custom rejects nonempty release_settings. Version/policy/target changes invalidate approval.</p>
+<p>Plans persist frozen previews without settings edits; plan show reads public frozen scope without refresh. Approval needs exact hash and existing user authority for those actions, no generic --yes. Restoration preserves later edits/refuses conflicts, never forced overwrite.</p>
+<p>Generic execute/job submit admits supported configuration/preservation/archive/cleanup/import/restoration/service mutation kinds only. Launch/resume/unknown invalid_plan_kind before new job/ACK; existing IDs remain query-only without record erasure/retry. Use exact separate launch/resume entries.</p>
+<p>Submit is durable ACK, usually accepted, not completion. Independent processes with same HOME/state can query. wait validates UUID before polling/state; invalid_request nonzero. Default 30s, 0–3600s or milliseconds; timeout returns nonzero wait_timeout/original plan_id/latest data without resubmit. needs_reconciliation/interrupted are terminal attention states, without automatic restore.</p>
+<p>Accepted error persists code/message/phase/recovery and completed artifacts. Query, never parse Chinese warnings/reexecute. Check actual execution hosting; disconnect/parent exit/logout/reboot differ, ACK has no reboot guarantee, runner no sudo/linger/login edits. Settings interruptions query original settings_recovery: written staged-object/plan proof permits new restore, not_written/ownership_unproven retain files without replay. Normal field restoration preserves unrelated edits.</p>
+<h2 id="all-core-operations-and-legacy-callers">All core operations and legacy callers</h2>
+<p>Other operations use finite call OPERATION with stdin params/shared schema. call launch/launch_request/resume_request and JSON cannot bypass real TTY; App uses finite native adapter:</p>
+<pre class="guide-code" data-language="sh"><code>lintel call cleanup_inspect &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;}
+JSON
+lintel call service_inspect &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;manager&quot;:&quot;user&quot;,&quot;unit&quot;:&quot;example.service&quot;}
+JSON</code></pre>
+<p>Describe/schema then real inspect before plans. Cleanup order backup/archive → new-root import(reset_client) → approved logout → exact files → selected retirement. No full-environment export/global killing/restore-all. Service pause/resume separately approved, no auto root rebind.</p>
+<p>Legacy request/submit/discover/inspect ID/jobs/job ID/launch ID/tui remain. Raw protocol-1 defaults stay; named/SSH strict fields never silently tighten raw callers. request execute foreground, submit detached/original query. launch TTY/no prompt, not background mutation. Old rebuild/partial receipts never become preservation outcomes.</p>
+<a id="portable-work"></a>
+<h2 id="secret-stdin-and-portable-work">Secret stdin and portable work</h2>
+<p>Secrets use one-time JSON stdin, never argv/history/permanent request files/plans/receipts. Manual Python getpass reads no-echo control terminal, or use an approved secret pipe; disable input-printing shell tracing:</p>
+<pre class="guide-code" data-language="sh"><code>lintel work archive plan --environment &lt;source-id&gt; --categories instructions,memory,sessions --output-path /absolute/new-work-package.age
+lintel plan show &lt;archive-plan-id&gt;
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel job submit --plan &lt;archive-plan-id&gt; --approval &lt;archive-plan-hash&gt;
+lintel job wait &lt;archive-plan-id&gt; --timeout 30s
+lintel work archive list</code></pre>
+<p>Optional output_path otherwise private state. Explicit parent must exist/destination absent; parent device/inode freezes/rechecks, replacement/legacy missing identity stale_plan. Original receipts query-only. Archive-only touches no root/login/original. Separate preserve creates new environment and completes outcome preserved, retains old login, then protect/login/launch normally. lintel.work/1 retains category/path/bytes/digest without credentials/settings/hooks/MCP.</p>
+<p>Source limits 256 MiB/file, 1 GiB total, 10,000 files; actual runner preflight may report older lower limits. Persisted JSON ≤16 MiB, state_limit before saving; body preflight does not guarantee full plan, narrow exact selection. Streaming fully decodes/verifies then imports frozen mapping; pages ≤256 KiB without full body residency. Each read still verifies whole package, state disk needs expansion and target cipher/temp space. Normal cleanup removes private staging; kills may retain .lintel-work-stage-* without sweeping. scrypt log N≤20, archive_limit without weakened decryption. Same format does not guarantee old-reader large capacity. SSH 60s/2MiB bounds remain; slow preview/read may transport_unknown, inspect with target CLI and query accepted originals.</p>
+<p>Transfer <strong>ciphertext</strong> to independent machine/install without source inventory/job:</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work archive inspect --archive-path /absolute/carried-work-package.age
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work archive read --archive-path /absolute/carried-work-package.age --path CLAUDE.md
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work import plan --environment &lt;destination-id&gt; --archive-path /absolute/carried-work-package.age --categories instructions,memory</code></pre>
+<p>Inspect/read/import require exactly --job or --archive-path (file already on target). Import preview/execution checks all parents/current UID/access/write before bodies without chmod/chown. Freeze ciphertext/targets; approved execute gets same passphrase stdin. Changed/corrupt/bad-passphrase/oversized/conflicting targets refuse without overwrite. Explicit SSH/SFTP/scp/removable transfer: <a href="/en/guide/operator-guide/#work">operator work</a>, no auto transfer/full-state upload.</p>
+<p>Preserve/rebuild new_root/new_environment_id persist before mkdir, intent only until create completes. Failures query original/path/ID, no recreate/auto-clean. Atomic no-replace Mac/Linux publication unsupported returns atomic_publication_unsupported, no hardlink/overwrite. archive_path is intent; completed step/archive_digest is readback proof. App task-archive selection requires proof; independent paths core verifies.</p>
+<p>Named/finite preserve/archive/import/rebuild/cleanup reset_client/retire need ≥1 category; empty arrays/categories refuse. repair_login can omit/empty; raw defaults stay.</p>
+<p>Import approval manifest package format/generator/sha256 and files source/destination/category/size/sha256 retains legacy relative fields; planned_target adds full root/destinations/purpose/activation, shared App/CLI and allocated collisions. No text/passphrase. Independent planned_target:done requires every frozen file&#39;s publication/parent sync/readback completed records, not frozen list/readable bytes/overall status. Sync uncertainty retains IDs/destinations without done/reimport.</p>
+<h2 id="configuration-roots-project-directories-and-session-input">Configuration roots, project directories and session input</h2>
+<p>CLAUDE_CONFIG_DIR is registered root; project_cwd is existing usable target-host project. They differ; Lintel creates no project/permissions. New launch previews exact directories/program/static version then immutable approval. plan_launch/plan_resume only reads/freezes, no external execution/TTY, via JSON/named/finite SSH. launch_request/resume_request need exact plan/hash, real TTY or macOS core Terminal adapter, never runner JSON/finite requests. Remote interactive control pins request/runner. Resume additionally publishes private copy, a mutation.</p>
+<p>startup lists finite candidates/declarations/auth metadata without commands/tokens/instructions; actual_loaded/auth unknown. Changes/legacy missing binding need preview; original records query-first. Terminal shell/Keychain/organization/outside-cwd imports need separate checks; user /status and /mcp in target terminal.</p>
+<p>Directories freeze device/inode/owner/birth time against immediate Linux reuse, without freezing ordinary project contents. Missing birth time directory_identity_unsupported/no launch; legacy unattempted repreview, originals query-only.</p>
+<pre class="guide-code" data-language="sh"><code>lintel call plan_launch &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;project_cwd&quot;:&quot;/absolute/project&quot;,&quot;mode&quot;:&quot;interactive&quot;}
+JSON
+lintel plan show &lt;launch-request-id&gt;
+# Run in a real terminal; no prompt argument:
+lintel launch_request &lt;launch-request-id&gt; &lt;launch-plan-hash&gt;
+lintel launch query &lt;launch-request-id&gt;
+lintel launch list</code></pre>
+<p>Old lintel launch ID keeps root-as-cwd; new requests explicit cwd. App copies the reviewed draft before opening, copy failure blocks launch. User separately pastes/sends/verifies model receipt; no ordinary journal text.</p>
+<p>Readonly session pages continue prior next_offset, re-unlock on source changes without mapping old fragments. content_kind:text gives raw_text/no records; message pages arrays, legacy missing arrays show limit with raw text available:</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; |
+  lintel work session read --archive-path /absolute/work.age --path projects/example/session.jsonl</code></pre>
+<p>Continue --offset/optional expected-digest. Unknown/nonASCII/newlines retain original bytes; text/structure are views, no transcript edits. Opaque thinking/signature never auto handoff. index is page-local; offset original record/fragment byte; block_index zero-based original content array including opaque/unknown. Single/unknown block is 0; bounded long-line fragments do not prove full parse. Handoff/plan_launch.input_reference.files retain path/file/package digests/offset/block without text. Optional offset integer 0–268435456, block_index 0–1000000 requires offset; old imprecise references remain without invented precision, App labels missing positions.</p>
+<p>Native resume separately assesses ≤8 MiB transcripts; larger remain archived/readable but unsupported for resume. call plan_resume stdin passes exact source/path/environment/project/getpass; describe/schema first, then real TTY resume_request REQUEST_ID HASH. Preview shows support/private copy/unverified auth/original session. Absolute copy/fixed resume/fork flags, no ID/signature/index edits. Copy/inert args do not prove authenticated recovery. Original query needs no approval/passphrase/Terminal/copy; remote query pins original runner across upgrades.</p>
+<a id="browser-adapter"></a>
+<h2 id="browser-finite-adapter-and-human-waits">Browser: finite adapter and human waits</h2>
+<p>macOS CLI:</p>
+<pre class="guide-code" data-language="sh"><code>lintel browser operations --json
+lintel describe browser.submit
+lintel schema browser.submit
+lintel browser instances
+lintel browser operations --instance &lt;paired-instance-id&gt;
+lintel browser pair create
+lintel browser pair pending
+lintel browser pair approve --challenge &lt;returned-challenge&gt;</code></pre>
+<p>Static operations opens no journal; targeted instances return real pairing/conflict/online, permissions still extension-confirmed. Run on profile host; Linux browser_component_unavailable. Installation/loading/pairing remain human, not implied by CLI success. Submit/query stdin finite host objects; generate/retain original operation_id/exact instance_id/action schema. Host_path control remains independent, no copied App locator/preferences writes.</p>
+<pre class="guide-code" data-language="sh"><code>lintel browser query &lt;&lt;&#39;JSON&#39;
+{&quot;instance_id&quot;:&quot;&lt;paired-instance-id&gt;&quot;,&quot;operation_id&quot;:&quot;&lt;original-operation-id&gt;&quot;}
+JSON</code></pre>
+<p>Handle unpaired/offline/confirmation/restart/uncertain/rejected/completed separately. Clear preparation then full quit/native onStartup/new finishClear approval; no worker restart/generation fabrication/uncertain-delete replay. Expiry/startup rule restoration shares serialization, consumes matching record/ID only, legacy full-record matching retained. Changed rules/uncertain readback preserve records without overwriting newer pause.</p>
+<p>IDs 8–80 ASCII alphanumeric/hyphen/underscore; Chrome/Edge IDs 32 a–p, Firefox lintel@lintel.local. Manifest chromium name implies no installer path; installer only Chrome/Edge/Firefox.</p>
+<h2 id="network-explicit-foreground-ownership">Network: explicit foreground ownership</h2>
+<pre class="guide-code" data-language="sh"><code>lintel network serve --config /absolute/reviewed-channel.json</code></pre>
+<p><a href="/en/guide/network/">Config</a> requires default_action/exact rules. First NDJSON listening returns owner/PID/actual address/normalized config; Ctrl-C ends CLI channel. Proxy coverage only, no all-process enforcement. App independently owns its channel; CLI cannot query/stop it.</p>
+<h3 id="telemetry-catalog-and-current-proxy-proof">Telemetry catalog and current-proxy proof</h3>
+<pre class="guide-code" data-language="sh"><code>lintel telemetry catalog
+lintel network catalog
+lintel describe telemetry_catalog
+# reviewed-channel.json must explicitly block the catalog host:443; test only this proxy.
+lintel network serve --config /absolute/reviewed-channel.json --test-telemetry datadog_logs_intake</code></pre>
+<p>telemetry_catalog takes no params/state/network, through request/finite remote. Direct-API Datadog vs mixed model/auth/download hosts, applicability/source date never runtime proof. Original Proxy requires explicit block before startup and actual matching refusal/event afterward, no public DNS/target. App/CLI independent; App binds instance. Client/test origins separate. Fine presets retain Claude updates; any nonempty NONESSENTIAL, including 0/false, disables updates/release notes/flags. Readback never proves external loading. <a href="/en/guide/telemetry/">Telemetry</a>, independent <a href="/en/guide/app-updates/">App updates</a>, no CLI auto App/component/runner upgrades.</p>
+<h3 id="finite-ip-tests-and-shared-ipv6-plans">Finite IP tests and shared IPv6 plans</h3>
+<pre class="guide-code" data-language="sh"><code>lintel network inspect
+# Explicit public request; defaults to two ipify HTTPS echoes, URLs can be overridden.
+lintel network probe --timeout-seconds 10
+# Use an already-running same-host CLI channel and its actual read-back port.
+lintel network probe --proxy-url http://127.0.0.1:49152
+# macOS: use inspect-returned IDs, not display names; preview includes a baseline.
+lintel network ipv6 plan --service-id &#39;&lt;SET_ID&gt;:&lt;SERVICE_UUID&gt;&#39; --mode off --baseline-id &#39;&lt;PROBE_ID&gt;&#39;
+lintel job submit --plan &#39;&lt;PLAN_ID&gt;&#39; --approval &#39;&lt;EXACT_PLAN_HASH&gt;&#39;
+lintel job show &#39;&lt;ORIGINAL_JOB_ID&gt;&#39;
+lintel network restore plan --job &#39;&lt;ORIGINAL_JOB_ID&gt;&#39;</code></pre>
+<p>Replace placeholders. Probe/ipv6 plan accept ipv4-url/ipv6-url/proxy-url/timeout-seconds; --probe JSON chooses nested spec, also restoration. Baseline ≤5 minutes same revision/endpoints/instance/deadline. Finite HTTPS endpoint/literal same-host HTTP loopback, strict pretransport fields/targets. Describe network_probe/plan_network_ipv6; raw validates too. environment_id:null/no root. Preview no system writes; approval includes write/full readback/same retest, durable intent then query on interruption. Restore separate/outside-edit refusal. Native App owns binding; CLI only own live channel. Linux inspect/probe/serve ipv4_only, no host mutation. Echo IP exposed, private target state requires review before support sharing; synthetic no host actions. <a href="/en/guide/network/">Network</a>.</p>
+<a id="ssh-controller"></a>
+<h2 id="ssh-one-finite-controller">SSH: one finite controller</h2>
+<pre class="guide-code" data-language="sh"><code>lintel remote aliases
+lintel remote control &lt;&lt;&#39;JSON&#39;
+{&quot;op&quot;:&quot;add_host&quot;,&quot;alias&quot;:&quot;approved-alias&quot;}
+JSON
+lintel remote inspect approved-alias
+lintel remote hosts</code></pre>
+<p>Aliases reads current HOME config; add/remove registry only. inspect connects registered literal/discover, no Claude changes. Fixed strict options/no arbitrary paths/programs/scripts/key bypass. remote request stdin finite schema; mutations require remote submit execute with intent before runner. remote job readonly request.job uses original pin/deduplication; unknown IDs create no records/consume no submission. Removed originals remain.</p>
+<p>Unknown lookup request job accepts exactly job_id or plan_id, current runner without intent. Explicit reconnect saves query-only intent/current digest if absent, then pins it despite upgrades; not for speculative unsubmitted plans. Use job/request.job there. Legacy PATH remains, never delete/resend uncertain records.</p>
+<pre class="guide-code" data-language="sh"><code>lintel remote request approved-alias &lt;&lt;&#39;JSON&#39;
+{&quot;command&quot;:&quot;plan_policy&quot;,&quot;environment_id&quot;:&quot;&lt;remote-id&gt;&quot;,&quot;preset&quot;:&quot;reduce&quot;,&quot;keep_remote_control&quot;:false}
+JSON
+lintel remote submit approved-alias &lt;&lt;&#39;JSON&#39;
+{&quot;command&quot;:&quot;execute&quot;,&quot;plan_id&quot;:&quot;&lt;returned-remote-plan-id&gt;&quot;,&quot;approval&quot;:&quot;&lt;returned-remote-hash&gt;&quot;}
+JSON
+lintel remote job approved-alias &lt;original-remote-plan-id&gt;</code></pre>
+<p>Remote new plan_launch specifies environment/cwd/interactive, then real macOS TTY remote launch request ALIAS REQUEST_ID HASH. Resume plan then launch resume, passphrase reentered SSH no-echo. Repeat queries/pins. Query/list readonly without TTY. Legacy remote launch ALIAS ENV_ID keeps root-as-cwd, both TTY/exact args/no prompt, readonly preflight then Terminal. JSON interactive controls refuse hidden-pipe sessions.</p>
+<p>prepare/install/query share App frozen approval/resources/prior registration/binding. Unresolved blocks both prepare/upload with original install_id. Activation requires previous_binding; superseded retains newer, verified legacy unbound; missing-preview evidence requires preparation. <a href="/en/guide/remote/">Remote</a>/schema own fields. Legacy Python subset retains callers, new features canonical Rust. Synthetic evidence never replaces real auth/browser/WebKit/VPS/logout/reboot; <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">state (Chinese)</a>/<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/SPEC.md">SPEC (Chinese)</a>.</p>
+<p>migration_path_conflict means actual case/Unicode/path equivalence; approved empty-file preflight rejects before root/body, preview readonly. Existing nondirectory ancestors path_unreadable before body. Existing root/parent modes remain, new dirs0700/files0600. Packages remain readable; reorganize or different filesystem, never original replay. migration_probe path/status/executing step persists before temp creation; removed after confirmed cleanup, retained stops bodies. Killed executing retains path, query never deletes/retests. App exposes pending directory; only owned empty scope, extras retained, not new environment.</p>
+<h2 id="maintainer-appendix-building-and-packaging-candidates">Maintainer appendix: building and packaging candidates</h2>
+<h3 id="portable-package-creation-and-verification">Portable package creation and verification</h3>
+<p>package-cli.mjs packages <strong>explicitly supplied canonical outputs</strong>: arm64 macOS Mach-O, x86_64/aarch64 static Linux musl ELF and canonical remote-runners. No compile/download/signing; missing/wrong-arch/dynamic/mismatched Linux refuses. Linux CLI inputs must byte-match canonical runner, no mixed candidate. Flat runtime: bin/lintel, bin/remote-runners/manifest.json, bin/remote-runners//lintel (both), candidate.json/SHA256SUMS/README.txt. Lookup is dirname(executable)/remote-runners, not archive root. Verify/archive same-read manifest bytes to avoid resource rebuild mixing.</p>
+<p>Each runner ≤32 MiB installer upload, runner_too_large before any archives/index. Mac needs full 64-bit header/arm64/MH_EXECUTE. ELF64 executable/static PIE requires nonzero entry in file-backed executable segment, file size≤memory and no PT_INTERP/DT_NEEDED. Truncated/object/dylib/no-entry shared objects refuse; formats are not other-architecture runtime. Probed/declared versions share safe syntax before filenames.</p>
+<p>Mach-O validates command counts/bounds/segments/sections and LC_MAIN or ARM64 LC_UNIXTHREAD mapped executable entry. Header-only/unmapped/nonexecutable refuses. Publication failure retracts only this attempt&#39;s unchanged-identity/size/mtime links, preserving preexisting/outside edits/replacements, allowing retry; abrupt kills have no automatic transaction recovery. Mac platform LC_BUILD_VERSION or legacy LC_VERSION_MIN_MACOSX required, others/missing refuse. Child TAR_OPTIONS removed; exact declared archive members verified to prevent inherited omission/rename.</p>
+<p>Mac input target/release/lintel; cross inputs build from source. Linux CLI/canonical runner:</p>
+<pre class="guide-code" data-language="sh"><code>rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+cargo zigbuild --locked --release -p lintel-runner --bin lintel \
+  --target x86_64-unknown-linux-musl --target aarch64-unknown-linux-musl
+# Generate canonical resources in ignored runner-bundles.
+node apps/desktop/scripts/prepare-remote-runners.mjs</code></pre>
+<p>Outputs target//release/lintel. Mac cargo build --locked --release -p lintel-runner --bin lintel produces target/release/lintel. <a href="/en/guide/remote/#prepare-app-resources">Resource preparation</a>. Package from root into ignored/caller temp directory:</p>
+<pre class="guide-code" data-language="sh"><code>node scripts/package-cli.mjs \
+  --macos-arm64 target/release/lintel \
+  --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
+  --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
+  --linux-runners apps/desktop/src-tauri/runner-bundles \
+  --revision &quot;$(git rev-parse HEAD)&quot; \
+  --out candidate-packages</code></pre>
+<p>Identity <code>&lt;version&gt;-candidate-&lt;first 12 revision characters&gt;</code>, never bare 0.1.0; candidates-.json separate indices. --revision exact lowercase 40/64 hex Git object declaration, not digest-proven source. candidate.json product/version/protocol/catalog/revision/target/payload bytes/SHA/signed:false/release:false/limits/per-target identity_source: macos_input_executed only successful Mac probe, Linux declared_static. Probed Mac version authoritative/matches manifest. Failed/no probe (e.g. Linux packaging) needs explicit --version with identity_verified_executed:false or refuses. Existing archives/dangling links/same-identity index refuse before writes.</p>
+<p>Debug source cargo build -p lintel-runner → target/debug/lintel. Native host installed separately; Mac browser control requires exact host_path, no GUI/PATH assumptions. Canonical extension source/<a href="/en/guide/browser/">browser guide</a>. Remote resources share <a href="/en/guide/remote/#prepare-app-resources">generation</a>; explicit reviewed --bundles or LINTEL_RUNNER_BUNDLES, default beside executable remote-runners. Missing refuses without download/VPS compilation. Reading grants no real-host installation/update.</p>
+      </article>
+      <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">Hold the complexity. Leave a little room.</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">Independently made; not officially affiliated with Anthropic.</span><br><span data-route-copy="footerClawd">The Clawd character belongs to Anthropic.</span></p><p data-route-copy="footerDocs">Page bodies are projected from maintained paired repository documents.</p><div><a href="/en/guide/" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">Source</a></div></div></footer>
+</body>
+</html>

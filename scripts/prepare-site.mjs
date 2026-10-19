@@ -6,6 +6,7 @@ import {spawnSync} from 'node:child_process';
 import {validatePublicRelease,validateManualPublicRelease} from './app-release.mjs';
 import {checkSiteLanguages} from './prepare-site-languages.mjs';
 import {RELEASE_COPY,releaseSecurityCopy} from '../apps/site/site-copy.mjs';
+import {SITE_ROUTES,localePath} from '../apps/site/site-routes.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 let mediaDir,out;const appRecords=[];const manualRecords=[];
 const args=process.argv.slice(2);
@@ -22,8 +23,26 @@ try{await lstat(out);throw new Error('Output must be absent')}catch(e){if(e.code
 if(out.startsWith(repo+path.sep)&&spawnSync('git',['check-ignore','-q',out],{cwd:repo}).status!==0)throw new Error('Repository output must be ignored; use candidate-packages');
 const site=path.join(repo,'apps/site');
 await checkSiteLanguages();
-const names=['index.html','en/index.html','styles.css','site.mjs','site-copy.mjs','site-language.mjs','film.mjs','film.vtt','site-world.mjs','workflow-trail.mjs','clawd-game.mjs','clawd-game.css','404.html','_headers','robots.txt','sitemap.xml','assets/favicon.svg','assets/lintel-landscape.png','assets/lintel-landscape-night.png','assets/lintel-keep.png','assets/lintel-crossing.png'];
-const inputs=names.map(name=>[name,path.join(site,name)]);
+const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function releaseDirectoryBlock(release,language,updater){
+ const links=release.downloads.map(a=>{
+  const platform=a.platform==='darwin-aarch64'?'Apple Silicon':'Intel';
+  return `<a class="button primary" href="${escape(a.url)}">macOS ${platform} · ${escape(release.version)} DMG <span aria-hidden="true">↗</span></a>`;
+ }).join('');
+ const security=`<span data-site-release-security data-developer-id="${escape(release.apple_security.developer_id)}" data-notarization="${escape(release.apple_security.notarization)}">${escape(releaseSecurityCopy(language,release.apple_security.developer_id,release.apple_security.notarization))}</span>`;
+ const facts=release.downloads.map(a=>`<div><dt>${a.platform==='darwin-aarch64'?'Apple Silicon':'Intel'} DMG</dt><dd>${escape(a.bytes)} bytes · <code>${escape(a.sha256)}</code></dd></div>`).join('');
+ const source=`<div><dt>Source revision</dt><dd><code>${escape(release.source_revision)}</code></dd></div><div><dt>${language==='en'?'Record date':'记录日期'}</dt><dd><time datetime="${escape(release.pub_date)}">${escape(release.pub_date)}</time></dd></div>`;
+ const update=`<div><dt>${language==='en'?'Updates':'更新'}</dt><dd>${updater?(language==='en'?'Signed updater feed':'已签名 updater feed'):(language==='en'?'Manual download only; no updater feed':'仅手动下载；没有 updater feed')}</dd></div>`;
+ return `<!-- lintel-app-release:start --><div class="release-facts" data-download-app="verified" data-release-channel="${escape(release.channel)}" data-release-version="${escape(release.version)}"><p class="release-state"><span>${release.channel==='stable'?'STABLE':'PREVIEW'}</span><strong>${escape(release.version)}</strong></p><div class="download-choice"><h3>${language==='en'?'Verified manual download record':'已核对的手动下载记录'}</h3><div class="trial-actions">${links}</div><p>${updater?(language==='en'?'These records also include a signed updater feed.':'这些记录同时包含已签名 updater feed。'):RELEASE_COPY.manual[language]}</p></div><dl class="fact-list">${facts}${source}${update}</dl><p class="release-notes">${escape(release.notes)}</p><p class="route-note">${security}</p><p class="route-note">${RELEASE_COPY.privacy[language]}<a href="${language==='en'?'/en/guide/app-updates/':'/guide/app-updates/'}">${language==='en'?'Installation and updates':'安装与更新'} ↗</a></p></div><!-- lintel-app-release:end -->`;
+}
+const routeFiles=[];
+for(const route of SITE_ROUTES){
+  const zh=localePath(route.path,'zh'),en=localePath(route.path,'en');
+  routeFiles.push([zh,zh==='/'?path.join(repo,'apps/site/index.html'):path.join(repo,'apps/site',...zh.split('/').filter(Boolean),'index.html')]);
+  routeFiles.push([en,zh==='/'?path.join(repo,'apps/site/en/index.html'):path.join(repo,'apps/site/en',...zh.split('/').filter(Boolean),'index.html')]);
+}
+const names=['styles.css','site.mjs','site-copy.mjs','site-language.mjs','site-routes.mjs','site-docs.mjs','film.mjs','film.vtt','site-world.mjs','workflow-trail.mjs','clawd-game.mjs','clawd-game.css','404.html','_headers','robots.txt','sitemap.xml','assets/favicon.svg','assets/lintel-landscape.png','assets/lintel-landscape-night.png','assets/lintel-keep.png','assets/lintel-crossing.png'];
+const inputs=[...routeFiles.map(([name,file])=>[name==='/'?'index.html':name==='/en/'?'en/index.html':`${name.slice(1)}index.html`,file]),...names.map(name=>[name,path.join(site,name)])];
 inputs.push(['assets/lintel-social-preview.png',path.join(repo,'assets/preview/lintel-social-preview.png')]);
 for(const name of ['lintel-intro.mp4','lintel-film-poster.jpg'])inputs.push(['media/'+name,path.join(mediaDir,name)]);
 const files=[];
@@ -56,7 +75,6 @@ if(releases.length&&manualReleases.length)throw new Error('Choose one download s
 await mkdir(out,{recursive:true});
 for(const [name,file] of inputs){const target=path.join(out,name);await mkdir(path.dirname(target),{recursive:true});await copyFile(file,target);}
 if(releases.length){
- const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const primary=releases.find(r=>r.channel==='stable')??releases[0];
  const links=primary.downloads.map(a=>`<a class="button primary" href="${escape(a.url)}">macOS ${a.platform==='darwin-aarch64'?'Apple Silicon':'Intel'} · ${escape(primary.version)} DMG <span aria-hidden="true">↗</span></a>`).join('');
  if(!html.includes('<!-- lintel-app-release:start -->')||!html.includes('<!-- lintel-app-release:end -->'))throw new Error('Missing canonical App release block');
@@ -75,9 +93,15 @@ if(releases.length){
   const name=`updates/${release.channel}.json`,bytes=JSON.stringify(value,null,2);await writeFile(path.join(out,name),bytes,{flag:'wx'});files.push({path:name,bytes:Buffer.byteLength(bytes)});
  }
  const data=JSON.stringify({schema:'lintel.app-downloads/1',releases},null,2);await writeFile(path.join(out,'app-downloads.json'),data,{flag:'wx'});files.push({path:'app-downloads.json',bytes:Buffer.byteLength(data)});
+ for(const [language,routePath] of [['zh','download/'],['en','en/download/'],['zh','releases/'],['en','en/releases/']]){
+  const target=path.join(out,routePath,'index.html');
+  const source=await readFile(target,'utf8');
+  const block=releaseDirectoryBlock(primary,language,true);
+  await writeFile(target,source.replace(/<!-- lintel-app-release:start -->[\s\S]*?<!-- lintel-app-release:end -->/,block));
+  const item=files.find(file=>file.path===`${routePath}index.html`);item.bytes=(await readFile(target)).length;
+ }
 }
 if(manualReleases.length){
- const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const primary=manualReleases.find(r=>r.channel==='stable')??manualReleases[0];
  const links=primary.downloads.map(a=>`<a class="button primary" href="${escape(a.url)}">macOS ${a.platform==='darwin-aarch64'?'Apple Silicon':'Intel'} · ${escape(primary.version)} DMG <span aria-hidden="true">↗</span></a>`).join('');
  if(!html.includes('<!-- lintel-app-release:start -->')||!html.includes('<!-- lintel-app-release:end -->'))throw new Error('Missing canonical App release block');
@@ -90,7 +114,15 @@ if(manualReleases.length){
   await writeFile(path.join(out,name),projected);files.find(f=>f.path===name).bytes=Buffer.byteLength(projected);
  }
  const data=JSON.stringify({schema:'lintel.app-downloads/1',releases:manualReleases},null,2);await writeFile(path.join(out,'app-downloads.json'),data,{flag:'wx'});files.push({path:'app-downloads.json',bytes:Buffer.byteLength(data)});
+ for(const [language,routePath] of [['zh','download/'],['en','en/download/'],['zh','releases/'],['en','en/releases/']]){
+  const target=path.join(out,routePath,'index.html');
+  const source=await readFile(target,'utf8');
+  const block=releaseDirectoryBlock(primary,language,false);
+  await writeFile(target,source.replace(/<!-- lintel-app-release:start -->[\s\S]*?<!-- lintel-app-release:end -->/,block));
+  const item=files.find(file=>file.path===`${routePath}index.html`);item.bytes=(await readFile(target)).length;
+ }
 }
-const manifest={schema:'lintel.site-build/1',source_revision:head.stdout.trim(),source_dirty:status.stdout.trim().length>0,created_at:new Date().toISOString(),origin:'https://lintel.page',locales:[{language:'zh-CN',path:'/'},{language:'en',path:'/en/'}],kind:releases.length?'Static website with explicitly verified App release metadata; binaries stay on GitHub':manualReleases.length?'Static website with explicitly verified manual App download metadata; binaries stay on GitHub; no updater feed':'Static product website; concept movie; no native operations or App Release',app_release_versions:[...releases,...manualReleases].map(r=>({channel:r.channel,version:r.version})),files};
+const locales=[{language:'zh-CN',path:'/'},{language:'en',path:'/en/'},...SITE_ROUTES.filter(route=>route.path!=='/').flatMap(route=>[{language:'zh-CN',path:route.path},{language:'en',path:localePath(route.path,'en')}])];
+const manifest={schema:'lintel.site-build/1',source_revision:head.stdout.trim(),source_dirty:status.stdout.trim().length>0,created_at:new Date().toISOString(),origin:'https://lintel.page',locales,kind:releases.length?'Static website with explicitly verified App release metadata; binaries stay on GitHub':manualReleases.length?'Static website with explicitly verified manual App download metadata; binaries stay on GitHub; no updater feed':'Static product website; concept movie; no native operations or App Release',app_release_versions:[...releases,...manualReleases].map(r=>({channel:r.channel,version:r.version})),files};
 await writeFile(path.join(out,'site-build.json'),JSON.stringify(manifest,null,2),{flag:'wx'});
 console.log(JSON.stringify({output:out,source_revision:manifest.source_revision,source_dirty:manifest.source_dirty,files:files.length,total_bytes:files.reduce((n,f)=>n+f.bytes,0)},null,2));

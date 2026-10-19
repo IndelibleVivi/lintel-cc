@@ -1,0 +1,54 @@
+{
+  "index_version": 1,
+  "updated": "2026-10-19",
+  "note": "Selected public README visuals only. Chinese README owns the entrance; English has its actual native locale capture. No release or owner aesthetic acceptance is implied.",
+  "assets": [
+    {
+      "id": "native.home",
+      "files": [
+        "screenshots/native-home.zh-CN.jpg",
+        "screenshots/native-home.en.jpg"
+      ],
+      "source_revision": "e822d748c96cc3d5da8822aebf17e50347e5cf30",
+      "version": "0.1.0 Preview",
+      "capture": "Real arm64 release WebKit app extracted from a read-only local DMG, macOS 26.5.2; unedited full-window screenshots.",
+      "fixture": "Synthetic native trial in an isolated synthetic HOME/state. No personal root, transcript, identity or credential is shown.",
+      "languages": [
+        "zh-CN",
+        "en"
+      ],
+      "purpose": "Show the actual quiet home and navigation before choosing one of the six tasks."
+    },
+    {
+      "id": "diagram.work-journey",
+      "sources": [
+        "diagrams/work-journey.zh-CN.svg",
+        "diagrams/work-journey.en.svg"
+      ],
+      "exports": [
+        "diagrams/work-journey.zh-CN.png",
+        "diagrams/work-journey.en.png"
+      ],
+      "languages": [
+        "zh-CN",
+        "en"
+      ],
+      "size": "1600x900",
+      "purpose": "Originals → review/approval → encrypted work package → independent reading. Import is a separate approved branch; SSH is a scope note.",
+      "generation": "Hand-authored SVG; existing canonical identity geometry; local Chromium via scripts/render-preview-svg.mjs. No screenshot or generated interface.",
+      "alt_text": {
+        "zh-CN": "工作旅程：精确选择指令、记忆和会话，审阅批准后加密成包，可独立阅读；迁入环境另行批准。",
+        "en": "Work journey: select instructions, memory and sessions, review and approve, then read the encrypted package independently; import requires separate approval."
+      }
+    },
+    {
+      "id": "film.link-cover",
+      "file": "lintel-social-preview.png",
+      "editable_source": "lintel-social-preview.svg",
+      "generator": "scripts/prepare-preview-art.mjs",
+      "purpose": "Existing landscape/share composition used as a link cover for the concept film, not a native UI frame.",
+      "film_source": "film.tsx",
+      "production_guide": "../../scripts/preview-film/README.md"
+    }
+  ]
+}

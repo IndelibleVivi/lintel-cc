@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Four execution paths, state ownership and implementation entry points.">
+  <link rel="canonical" href="https://lintel.page/en/guide/architecture/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/architecture/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/architecture/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/architecture/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Architecture and source map · Lintel">
+  <meta property="og:description" content="Four execution paths, state ownership and implementation entry points.">
+  <meta property="og:url" content="https://lintel.page/en/guide/architecture/">
+  <meta property="og:locale" content="en_US">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>Architecture and source map · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="Main navigation" data-route-attr-aria-label="nav"><a href="/en/" data-route-copy="product">Product</a><a href="/en/guide/" aria-current="page" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="/en/inside/" data-route-copy="inside">Design &amp; implementation</a><a href="/en/releases/" data-route-copy="status">Status</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="Language" data-route-attr-aria-label="language"><a href="/guide/architecture/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh">中文</a><span aria-hidden="true">/</span><a href="/en/guide/architecture/" lang="en" hreflang="en" data-site-route-language="en" aria-current="page">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to night" title="Switch to night" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <article class="guide-body" data-guide-document="architecture">
+        <h1 id="lintel-architecture-execution-paths-and-state-ownership">Lintel architecture: execution paths and state ownership</h1>
+<p><a href="/en/guide/architecture/">简体中文</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
+<p>This view answers three questions: where requests enter, who executes an operation, and who owns its result. It describes the source architecture; delivery and runtime evidence remain in <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current status (Chinese)</a>.</p>
+<p><a class="guide-image-fallback" href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.en.svg">Full Lintel architecture: environment/remote execution, browser, network and app updating</a></p>
+<p><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.en.svg">Full SVG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.en.png">PNG</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture.en.mmd">Mermaid source</a></p>
+<p>On a phone, zoom the original image or read the four paths below. The README uses a <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/assets/architecture-overview.en.svg">smaller overview</a>.</p>
+<h2 id="four-execution-paths">Four execution paths</h2>
+<p><strong>Environment and file tasks.</strong> The app&#39;s native request and standalone CLI call the same <code>crates/core</code>. The local core owns inventory, frozen plans, configuration/file operations, original task records and field restoration. Remote requests pass through shared <code>crates/remote</code> over OpenSSH with finite JSON requests to the target runner. The target core executes with its own state. The controller keeps task mappings but cannot declare remote completion itself. <code>crates/operations</code> defines interfaces and strict field contracts without executing file side effects.</p>
+<p><strong>Browser.</strong> The app and macOS CLI use a Native Messaging host for pairing and task coordination. The paired extension owns profile-native operations and its operation journal. Final browser clearing requires a real restart and a second approval. Switching SSH environments does not move this local browser path; the Linux runner does not provide local browser-host control.</p>
+<p><strong>Network.</strong> <code>crates/egress</code> implements loopback CONNECT channels and explicit HTTPS egress probes. App and CLI own separate channels. Client connections are covered by a channel only when routed through it. Configuration readback, observed proxy connections and IPv4/IPv6 tests provide distinct evidence. The core owns host-network plans and restoration: current macOS support includes IPv6 changes for explicitly selected services, while Linux provides read-only observation and tests. See <a href="/en/guide/network/">Network</a>.</p>
+<p><strong>App updates.</strong> Native <code>app_updates.rs</code> and the Tauri updater handle candidate checks, download/signature verification, approved installation and explicit restart. Original update intents live in app data, separately from core jobs. The activity gate coordinates app operations against installation; active proxies block updating separately. There is no public Release download, formal signing or active release key/feed. <code>e822d74</code> is a local release-preparation candidate, not a public update source. The website may derive manual-download metadata only from a <code>lintel.app-release-public/1</code> record after public-byte verification; the source feed path does not establish activation.</p>
+<p><code>apps/site</code> independently presents documentation, artwork and the shared game. It has no execution call into the core, SSH controller or browser host. A work package can travel using an explicitly selected system file-transfer tool. The target core can unlock, inspect and selectively import it in independent state without the source job.</p>
+<h2 id="completion-of-a-plan-based-core-task">Completion of a plan-based core task</h2>
+<p><code>Generate/persist plan → review exact scope/hash → durable accepted → execute → verify</code></p>
+<p>Outcomes include <code>completed</code>, <code>partially_completed</code>, <code>failed</code> and <code>needs_reconciliation</code>. Query the original ID to track or reconcile; a query may persist reconciliation information but does not replay destructive actions. Restoration uses a separate reviewed plan, checking field ownership and current values.</p>
+<p>This lifecycle describes plan-based core tasks. Session launch/resume uses dedicated requests and real-TTY execution; generic execute/submit does not accept those plans. Browser operations and app-update intents retain separate records rather than sharing one universal job lifecycle.</p>
+<h2 id="source-map">Source map</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">Area</th><th class="align-left">Entry point</th></tr></thead><tbody><tr><td class="align-left">App UI and native dispatch</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop"><code>apps/desktop</code></a>, <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/main.rs"><code>src-tauri/src/main.rs</code></a></td></tr><tr><td class="align-left">CLI/TUI, submit and interactive launch</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/runner/src/main.rs"><code>apps/runner/src/main.rs</code></a></td></tr><tr><td class="align-left">Plans, inventory, files, packages, task records and restore</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/core"><code>crates/core</code></a></td></tr><tr><td class="align-left">Static operations/schema and field validation</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/operations"><code>crates/operations</code></a></td></tr><tr><td class="align-left">Shared SSH controller</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/remote"><code>crates/remote</code></a></td></tr><tr><td class="align-left">Extension and Native Messaging host</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/extensions/browser"><code>extensions/browser</code></a></td></tr><tr><td class="align-left">CONNECT, egress probes and controlled rule tests</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/crates/egress"><code>crates/egress</code></a></td></tr><tr><td class="align-left">App updating and activity exclusion</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/app_updates.rs"><code>app_updates.rs</code></a>, <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/desktop/src-tauri/src/activity.rs"><code>activity.rs</code></a></td></tr><tr><td class="align-left">User task navigation and operation mapping</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/contracts/task-catalog.json"><code>contracts/task-catalog.json</code></a></td></tr><tr><td class="align-left">Website and shared verification entry point</td><td class="align-left"><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/apps/site"><code>apps/site</code></a>, <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/tests/verify.py"><code>tests/verify.py</code></a></td></tr></tbody></table></div>
+<p><code>platform/ssh</code> retains a compatibility subset for the original Python caller; shared new remote functionality belongs to the Rust controller. Continue with <a href="/en/guide/core/">Core / CLI</a> and the <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/contracts/protocol.md">protocol (Chinese)</a> for protocol and storage details.</p>
+<p> Expand Mermaid for GitHub reading and editing</p>
+<pre class="guide-code" data-language="mermaid"><code>flowchart TB
+  subgraph execution[&quot;01  Environment and file operations: execute on the selected host&quot;]
+    direction LR
+    entry[&quot;Entry points&lt;br/&gt;macOS app / standalone CLI&quot;]
+    local[&quot;Local core&lt;br/&gt;plan / approve / execute / verify&quot;]
+    localstate[&quot;Local state&lt;br/&gt;inventory / frozen plans / original jobs&quot;]
+    targets[&quot;Local targets&lt;br/&gt;config / work files / encrypted packages&lt;br/&gt;host network and bound services&quot;]
+    controller[&quot;Shared SSH controller&lt;br/&gt;crates/remote&quot;]
+    runner[&quot;Target runner + shared core&lt;br/&gt;apps/runner + crates/core&quot;]
+    remoteowned[&quot;Target host and user&lt;br/&gt;state / plans / original jobs&lt;br/&gt;config / work / bound services&quot;]
+    entry --&gt;|&quot;Local request&quot;| local
+    entry --&gt;|&quot;Remote request&quot;| controller
+    local --&gt;|&quot;Persist&quot;| localstate
+    local --&gt;|&quot;Inspect / apply&quot;| targets
+    controller --&gt;|&quot;OpenSSH / finite JSON&quot;| runner
+    runner --&gt;|&quot;Execute / persist remotely&quot;| remoteowned
+  end
+  subgraph browser[&quot;02  Browser: a separately paired local profile&quot;]
+    direction LR
+    browserentry[&quot;App / macOS CLI&quot;]
+    host[&quot;Native Messaging host&lt;br/&gt;pairing / task coordination&quot;]
+    extension[&quot;Paired extension&lt;br/&gt;native API / operation journal&quot;]
+    profile[&quot;Exact browser profile&lt;br/&gt;permissions / site state&quot;]
+    browserentry --&gt;|&quot;Finite control&quot;| host
+    host --&gt;|&quot;Native Messaging / original ID&quot;| extension
+    extension --&gt;|&quot;Browser-native operations&quot;| profile
+  end
+  subgraph network[&quot;03  Network: routed connections and explicitly requested tests&quot;]
+    direction LR
+    netentry[&quot;App / CLI&lt;br/&gt;start channel / request test&quot;]
+    client[&quot;Client routed through proxy&lt;br/&gt;separate from control requests&quot;]
+    egress[&quot;crates/egress&lt;br/&gt;loopback CONNECT / HTTPS probe&quot;]
+    destination[&quot;Allowed destination&lt;br/&gt;or upstream proxy&quot;]
+    echo[&quot;Listed echo endpoint&lt;br/&gt;observe IPv4 / IPv6 egress&quot;]
+    netentry --&gt;|&quot;Control / explicit probe&quot;| egress
+    client --&gt;|&quot;Proxied connection&quot;| egress
+    egress --&gt;|&quot;Host / port rules&quot;| destination
+    egress --&gt;|&quot;Explicit HTTPS request&quot;| echo
+  end
+  subgraph updates[&quot;04  App updating: separate records and release configuration&quot;]
+    direction LR
+    updateentry[&quot;macOS app&quot;]
+    updater[&quot;app_updates.rs&lt;br/&gt;Tauri updater / activity gate&quot;]
+    intent[&quot;App data&lt;br/&gt;original update intent / install result&lt;br/&gt;explicit restart&quot;]
+    feed[&quot;Fixed feed / signed asset&lt;br/&gt;currently inactive&quot;]
+    updateentry --&gt;|&quot;Check / approve&quot;| updater
+    updater --&gt;|&quot;Persist / reconcile&quot;| intent
+    updater -.-&gt;|&quot;Requires release key / feed&quot;| feed
+  end
+  transfer[&quot;Explicit system file transfer · work package&quot;]
+  website[&quot;Separate website · no execution connection&quot;]</code></pre>
+<p></p>
+      </article>
+      <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/architecture.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">Hold the complexity. Leave a little room.</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">Independently made; not officially affiliated with Anthropic.</span><br><span data-route-copy="footerClawd">The Clawd character belongs to Anthropic.</span></p><p data-route-copy="footerDocs">Page bodies are projected from maintained paired repository documents.</p><div><a href="/en/guide/" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">Source</a></div></div></footer>
+</body>
+</html>

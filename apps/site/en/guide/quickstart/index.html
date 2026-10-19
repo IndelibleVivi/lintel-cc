@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Use a disposable synthetic root to check registration, preview, approval, original tasks and independent reading.">
+  <link rel="canonical" href="https://lintel.page/en/guide/quickstart/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/quickstart/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/quickstart/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/quickstart/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Complete CLI trial · Lintel">
+  <meta property="og:description" content="Use a disposable synthetic root to check registration, preview, approval, original tasks and independent reading.">
+  <meta property="og:url" content="https://lintel.page/en/guide/quickstart/">
+  <meta property="og:locale" content="en_US">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261019-routes-3">
+  <script type="module" src="/site.mjs"></script>
+  <title>Complete CLI trial · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="Main navigation" data-route-attr-aria-label="nav"><a href="/en/" data-route-copy="product">Product</a><a href="/en/guide/" aria-current="page" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="/en/inside/" data-route-copy="inside">Design &amp; implementation</a><a href="/en/releases/" data-route-copy="status">Status</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="Language" data-route-attr-aria-label="language"><a href="/guide/quickstart/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh">中文</a><span aria-hidden="true">/</span><a href="/en/guide/quickstart/" lang="en" hreflang="en" data-site-route-language="en" aria-current="page">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to night" title="Switch to night" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <article class="guide-body" data-guide-document="quickstart">
+        <h1 id="quickstart-a-first-local-trial-from-public-source">Quickstart: a first local trial from public source</h1>
+<p><a href="/en/guide/quickstart/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
+<p>This page walks a new visitor through one small journey inside a <strong>disposable synthetic fixture</strong>: register a Claude config environment, generate synthetic instruction / memory / session originals (plus one file you will deliberately <strong>not</strong> select), preview the scope with an exact selection, review the original plan and its hash, submit an <strong>archive-only</strong> preservation, query the original ID and the final result, then re-inspect and read from the explicit <code>archive_path</code> in a <strong>separate independent state</strong> — and finally verify byte-for-byte that the source originals, settings and placeholder credential were never touched.</p>
+<p>Audience: someone who has the Lintel source and wants to confirm the CLI&#39;s real behavior on their own machine.</p>
+<blockquote><p>This is <strong>Lintel 0.1.0 Preview / development preview</strong>. Real authentication and native resume, production Chrome/Edge/Firefox/AdsPower, production VPS and signed distribution are <strong>not verified</strong>. See <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current state (Chinese)</a> for exact evidence and gaps.</p></blockquote>
+<p>This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the <a href="/en/guide/network/">network guide</a>.</p>
+<hr>
+<h2 id="0-prerequisites">0. Prerequisites</h2>
+<ul><li>Rust stable (to build the CLI and workspace).</li><li>Python 3 (to parse JSON and read a passphrase without echo). <strong>No <code>jq</code>.</strong></li><li>No Node, Tauri, GUI or installed App is needed anywhere.</li></ul>
+<p>Get the source and build the CLI. <code>cargo build</code> writes to <code>target/</code> and may fetch dependencies — that is a normal local build; it does <strong>not</strong> run Claude, discover personal directories, or initialize Lintel state.</p>
+<pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
+cd lintel-cc
+cargo build -p lintel-runner</code></pre>
+<p>The artifact is <code>target/debug/lintel</code>. Run every command below with the <strong>repository root as the current directory</strong>.</p>
+<h2 id="1-open-a-separate-interactive-shell">1. Open a separate interactive shell</h2>
+<p>Run <code>sh</code> to open a separate interactive shell, then execute the blocks one at a time. Each block runs immediately, so you can read the actual plan before approving it. Finish with <code>exit</code> to return to your original shell. We define a <strong>disposable fixture</strong> and a <code>lintel</code> function that injects the environment only for each CLI call. Your original shell&#39;s <code>HOME</code> and <code>PATH</code> stay unchanged; your installed Python 3 remains available.</p>
+<pre class="guide-code" data-language="sh"><code>sh
+set -eu
+
+# Disposable synthetic fixture: fully fake originals, not your real ~/.claude
+ROOT=&quot;$(python3 -c &#39;import os,tempfile;print(os.path.realpath(tempfile.mkdtemp(prefix=&quot;lintel-quickstart.&quot;)))&#39;)&quot;
+echo &quot;fixture = $ROOT&quot;
+mkdir -p &quot;$ROOT/home&quot; &quot;$ROOT/state&quot; &quot;$ROOT/claude-root/projects/example/memory&quot;
+
+printf &#39;%s\n&#39; &#39;Synthetic instruction only.&#39;                 &gt; &quot;$ROOT/claude-root/CLAUDE.md&quot;
+printf &#39;%s\n&#39; &#39;Synthetic memory only.&#39;                      &gt; &quot;$ROOT/claude-root/projects/example/memory/MEMORY.md&quot;
+printf &#39;%s\n&#39; &#39;This synthetic memory file is NOT selected.&#39; &gt; &quot;$ROOT/claude-root/projects/example/memory/NOT_SELECTED.md&quot;
+printf &#39;%s\n&#39; &#39;{&quot;type&quot;:&quot;synthetic&quot;,&quot;message&quot;:&quot;hello&quot;}&#39;      &gt; &quot;$ROOT/claude-root/projects/example/session.jsonl&quot;
+printf &#39;%s\n&#39; &#39;{&quot;env&quot;:{&quot;SYNTHETIC_KEEP&quot;:&quot;1&quot;}}&#39;              &gt; &quot;$ROOT/claude-root/settings.json&quot;
+printf &#39;%s\n&#39; &#39;SYNTHETIC_CREDENTIAL_DO_NOT_COPY&#39;            &gt; &quot;$ROOT/claude-root/.credentials.json&quot;
+
+# Absolute CLI path (valid for your checkout); quoting keeps a path with spaces working
+LINTEL=&quot;$PWD/target/debug/lintel&quot;
+
+# Inject the synthetic HOME/state only per call; never modify the current shell
+lintel() { env HOME=&quot;$ROOT/home&quot; LINTEL_TEST_HOME=&quot;$ROOT/home&quot; LINTEL_STATE_DIR=&quot;$ROOT/state&quot; &quot;$LINTEL&quot; &quot;$@&quot;; }</code></pre>
+<p>The remaining blocks <strong>continue in this interactive shell</strong>; step 8 closes it with <code>exit</code>. If any step fails, keep the displayed original ID and fixture path, stop the later steps and reconcile the result. Do not resubmit.</p>
+<blockquote><p>This journey&#39;s operations target only this synthetic root and do not invoke Claude, authentication, browser or services. Separating HOME is <strong>not</strong> an OS sandbox and does not prove other processes or managed sources cannot reach your real environment; it only means this journey does not point at them. This is a <strong>synthetic test</strong>, not a production workflow.</p></blockquote>
+<h2 id="2-register-the-environment">2. Register the environment</h2>
+<p><code>env register</code> records an existing config root in Lintel and returns an environment <code>id</code> (UUID). Later commands use that id.</p>
+<pre class="guide-code" data-language="sh"><code>lintel env register --name &#39;Synthetic quickstart&#39; --root &quot;$ROOT/claude-root&quot; &gt; &quot;$ROOT/register.json&quot;
+ID=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;id&quot;])&#39; &quot;$ROOT/register.json&quot;)&quot;
+echo &quot;environment id = $ID&quot;</code></pre>
+<p>Registration only records inventory; it does not run Claude or write to the target.</p>
+<h2 id="3-read-only-scan-see-what-is-there">3. Read-only scan: see what is there</h2>
+<p><code>work inventory</code> is a <strong>read-only, paged, metadata-only</strong> listing: it returns the relative path, category and byte size of the selected categories, plus a <code>digest</code> bound to that one scan. It does not read file bodies.</p>
+<pre class="guide-code" data-language="sh"><code>lintel work inventory --environment &quot;$ID&quot; --categories instructions,memory,sessions --json</code></pre>
+<p>You should see <strong>four</strong> synthetic originals:</p>
+<p>| path | | --- | | <code>CLAUDE.md</code> | | <code>projects/example/memory/MEMORY.md</code> | | <code>projects/example/memory/NOT_SELECTED.md</code> | | <code>projects/example/session.jsonl</code> |</p>
+<p>plus a <code>digest</code>. Note that <code>NOT_SELECTED.md</code> appears in the listing but will <strong>not</strong> be selected later.</p>
+<p>The optional capacity preflight is metadata-only and flags over-limit files or scan gaps. Here we use repeated <code>--path</code> to select exactly three:</p>
+<pre class="guide-code" data-language="sh"><code>lintel work preflight --environment &quot;$ID&quot; --categories instructions,memory,sessions \
+  --path CLAUDE.md \
+  --path projects/example/memory/MEMORY.md \
+  --path projects/example/session.jsonl \
+  --json</code></pre>
+<p>The response has <code>work_selection.mode</code> = <code>paths</code>, <code>totals.files</code> = 3 and <code>eligible</code> = true. The current runner admission is <strong>256 MiB per file, 1 GiB total, 10,000 files</strong>, with a separate <strong>16 MiB</strong> versioned persisted-record limit. A passing preflight is only metadata admission; the real plan still re-reads every selected original.</p>
+<h2 id="4-generate-and-review-the-archive-only-plan">4. Generate and review the archive-only plan</h2>
+<p><code>work archive plan</code> builds a <strong>frozen plan</strong>: it freezes the selected files and their full content digests. <code>--output-path</code> may be omitted (then it is stored in Lintel state); here we write to a new file in the fixture. It <strong>creates no new config root, logs out nothing, deletes nothing, and changes no settings</strong>.</p>
+<pre class="guide-code" data-language="sh"><code>lintel work archive plan --environment &quot;$ID&quot; --categories instructions,memory,sessions \
+  --path CLAUDE.md \
+  --path projects/example/memory/MEMORY.md \
+  --path projects/example/session.jsonl \
+  --output-path &quot;$ROOT/carried.age&quot; --json &gt; &quot;$ROOT/plan.json&quot;</code></pre>
+<p>Check the plan&#39;s <code>kind=archive</code>, <code>outcome=archive_only</code>, <code>file_count=3</code>, and that <code>work_selection</code> lists exactly those three paths (<strong>not</strong> <code>NOT_SELECTED.md</code>).</p>
+<p>Pull out its id and hash, then read the frozen plan back:</p>
+<pre class="guide-code" data-language="sh"><code>PLAN_ID=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;id&quot;])&#39; &quot;$ROOT/plan.json&quot;)&quot;
+PLAN_HASH=&quot;$(python3 -c &#39;import json,sys;print(json.load(open(sys.argv[1]))[&quot;data&quot;][&quot;hash&quot;])&#39; &quot;$ROOT/plan.json&quot;)&quot;
+lintel plan show &quot;$PLAN_ID&quot; --json | python3 -m json.tool</code></pre>
+<p><code>plan show</code> reads back only the public scope: <code>kind</code>, <code>hash</code>, <code>output_path</code>, the selection — <strong>no</strong> file bodies or passphrase.</p>
+<blockquote><p><strong>Approval must match this plan&#39;s hash.</strong> If a selected original or frozen target identity changes after the plan is generated, the approval is invalidated and you must preview again. There is no blanket <code>--yes</code>.</p></blockquote>
+<h2 id="5-submit-explicitly-passphrase-via-stdin-only">5. Submit explicitly (passphrase via stdin only)</h2>
+<p>Submission must include the <strong>original plan hash</strong>. The archive passphrase goes in via JSON stdin and <strong>never</strong> in argv, shell history, request files, the plan or the receipt. The <code>getpass</code> call below reads the passphrase without echo from the controlling terminal; <code>inspect</code> / <code>read</code> require at least 12 characters.</p>
+<p>Type <strong>your own test passphrase of at least 12 characters</strong> (for example a temporary string) and <strong>repeat exactly the same one</strong> in step 7. It is a temporary passphrase for this synthetic fixture, not a pre-existing fixed value; do not use it for real.</p>
+<pre class="guide-code" data-language="sh"><code>python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel job submit --plan &quot;$PLAN_ID&quot; --approval &quot;$PLAN_HASH&quot; &gt; &quot;$ROOT/receipt.json&quot;</code></pre>
+<p><code>job submit</code> returns a <strong>durable ACK</strong>, usually with <code>status</code> = <code>accepted</code>.</p>
+<blockquote><p><strong>accepted is not completed.</strong> The ACK only means the request was durably received; the task can still fail afterwards. <code>ok:true</code> means the request was handled, not that the task finished — check <code>data.status</code>, steps and coverage.</p></blockquote>
+<p>To wait for the result, use <code>job wait</code> (it <strong>only polls, never resubmits</strong>; a timeout returns non-zero without resubmitting):</p>
+<pre class="guide-code" data-language="sh"><code>lintel job wait &quot;$PLAN_ID&quot; --timeout 30s --json | python3 -m json.tool</code></pre>
+<p>On completion <code>status</code> is <code>completed</code>, the <code>archive</code> step has status <code>completed</code>, <code>archive_path</code> points at <code>$ROOT/carried.age</code>, and there is an <code>archive_digest</code>. An archive-only plan does <strong>not</strong> produce a <code>new_root</code>.</p>
+<p>At any time you can query by the original ID:</p>
+<pre class="guide-code" data-language="sh"><code>lintel job show &quot;$PLAN_ID&quot; --json | python3 -m json.tool</code></pre>
+<blockquote><p><strong>Query-only</strong>: querying the original job only <strong>verifies, never replays</strong>. It does not auto-recover, migrate or launch, and needs no passphrase; but the query itself <strong>can update a persisted interruption-reconciliation record</strong>, so it is not purely read-only. After an interruption you only verify by the original ID.</p></blockquote>
+<h2 id="6-confirm-the-source-is-intact-and-no-root-was-created">6. Confirm the source is intact and no root was created</h2>
+<p>Archive-only preservation <strong>does not touch</strong> the source directory and creates no new environment. Verify all four originals byte-for-byte (including the unselected <code>NOT_SELECTED.md</code>), plus settings and the placeholder credential:</p>
+<pre class="guide-code" data-language="sh"><code>python3 - &quot;$ROOT&quot; &lt;&lt;&#39;PYTHON&#39;
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+expected = {
+    &quot;CLAUDE.md&quot;: b&quot;Synthetic instruction only.\n&quot;,
+    &quot;projects/example/memory/MEMORY.md&quot;: b&quot;Synthetic memory only.\n&quot;,
+    &quot;projects/example/memory/NOT_SELECTED.md&quot;: b&quot;This synthetic memory file is NOT selected.\n&quot;,
+    &quot;projects/example/session.jsonl&quot;: b&#39;{&quot;type&quot;:&quot;synthetic&quot;,&quot;message&quot;:&quot;hello&quot;}\n&#39;,
+    &quot;settings.json&quot;: b&#39;{&quot;env&quot;:{&quot;SYNTHETIC_KEEP&quot;:&quot;1&quot;}}\n&#39;,
+    &quot;.credentials.json&quot;: b&quot;SYNTHETIC_CREDENTIAL_DO_NOT_COPY\n&quot;,
+}
+for relative, original in expected.items():
+    assert (root / &quot;claude-root&quot; / relative).read_bytes() == original, relative
+ciphertext = (root / &quot;carried.age&quot;).read_bytes()
+assert ciphertext.startswith(b&quot;age-encryption.org/&quot;)
+assert expected[&quot;CLAUDE.md&quot;].strip() not in ciphertext
+print(&quot;PASS: 6 source files unchanged; age ciphertext created&quot;)
+PYTHON</code></pre>
+<p>Then confirm only one environment is registered, and the package is recognizable as an age package with no plaintext:</p>
+<pre class="guide-code" data-language="sh"><code>lintel env list --json | python3 -c &#39;import sys,json;print(&quot;environments:&quot;,len(json.load(sys.stdin)[&quot;data&quot;][&quot;environments&quot;]))&#39;
+head -c 19 &quot;$ROOT/carried.age&quot;; echo</code></pre>
+<p>The environment count should be 1 (only the synthetic root was registered), the output starts with <code>age-encryption.org/</code>, and <code>Synthetic instruction</code> never appears as plaintext inside the package.</p>
+<h2 id="7-inspect--read-in-a-separate-independent-state">7. Inspect / read in a separate independent state</h2>
+<p>This is the key step: carry the <strong>ciphertext</strong> to a <strong>separate independent HOME/state</strong> (simulating another machine) and unlock it again with <strong>no source inventory and no source job</strong>. Still use no-echo input; <strong>never</strong> put the passphrase in shell history.</p>
+<pre class="guide-code" data-language="sh"><code>mkdir -p &quot;$ROOT/independent/home&quot; &quot;$ROOT/independent/state&quot;
+
+lintel_dest() { env HOME=&quot;$ROOT/independent/home&quot; LINTEL_TEST_HOME=&quot;$ROOT/independent/home&quot; LINTEL_STATE_DIR=&quot;$ROOT/independent/state&quot; &quot;$LINTEL&quot; &quot;$@&quot;; }
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># inspect: read-only manifest, requires exactly one source (here --archive-path)
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel_dest work archive inspect --archive-path &quot;$ROOT/carried.age&quot;
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># read: read the body of one explicit path inside the package
+python3 -c &#39;import getpass,json; print(json.dumps({&quot;archive_passphrase&quot;:getpass.getpass(&quot;Archive passphrase: &quot;)}))&#39; \
+  | lintel_dest work archive read --archive-path &quot;$ROOT/carried.age&quot; --path CLAUDE.md
+</code></pre>
+<pre class="guide-code" data-language="sh"><code># this independent state holds no work-package record of its own
+lintel_dest work archive list --json</code></pre>
+<p>Use <strong>exactly the same</strong> test passphrase as step 5. <code>inspect</code> returns exactly three files (with <code>sha256</code> digests, <strong>not</strong> including <code>NOT_SELECTED.md</code>); <code>read</code> returns that file&#39;s body; and <code>work archive list</code> returns <code>{&quot;jobs&quot;:[]}</code>, proving that reading does <strong>not</strong> depend on the source job.</p>
+<p>Ciphertext transfer between hosts is done by an <strong>explicit system file transfer</strong> (SSH/SFTP/scp or removable storage). Lintel does not transfer across hosts automatically, and does not upload the whole state.</p>
+<h2 id="8-close-the-interactive-shell">8. Close the interactive shell</h2>
+<p>The journey is done; close the interactive shell opened in step 1 with <code>exit</code>. Your original shell environment stays unchanged. The synthetic fixture is retained in the temporary directory for inspection; no real environment is installed or activated.</p>
+<pre class="guide-code" data-language="sh"><code>exit</code></pre>
+<h2 id="9-connect-to-the-independent-work-package-optional">9. Connect to the independent work package (optional)</h2>
+<p>To <strong>import</strong> selected content in the independent state, use <code>work import plan</code> (also with <code>--archive-path</code> as the source) to preview the final destinations, then separately approve execution. It freezes the ciphertext byte digest and the target file state, and never overwrites a same-name file. Sessions and memory are kept as data; there is <strong>no claim that a conversation can be resumed</strong>. See the portable-work section of the <a href="/en/guide/agents/#portable-work">Agent CLI guide</a>.</p>
+<h2 id="10-read-local-data-identity-and-snapshots-optional">10. Read local data, identity and snapshots (optional)</h2>
+<p>The same synthetic environment also exercises the current source&#39;s local observation paths. They read metadata or finite static sources only, never run Claude and never create a mutation job:</p>
+<pre class="guide-code" data-language="sh"><code>lintel env residue &quot;$ID&quot; --json          # metadata inventory of the known-location table (path/class/size/mtime)
+lintel env identity &quot;$ID&quot; --json         # presence of userID / oauthAccount only by default
+lintel snapshot save --environment &quot;$ID&quot; --json   # store a sanitized semantic snapshot, return snapshot_id
+lintel snapshot list --environment &quot;$ID&quot; --json</code></pre>
+<p><code>env residue</code> covers only the known-location table plus the <code>extra_roots</code> you name explicitly; anything outside it is not covered, and depth/entry limits or read failures keep the gap explicit. <code>env identity</code> masks the raw value by default; only <code>--reveal</code> places the <code>userID</code> value in this response, and it never enters a persistent record. Then take a second <code>snapshot_id</code> with <code>snapshot save</code> and compare two snapshots or two registered environments:</p>
+<pre class="guide-code" data-language="sh"><code>SNAP_A=&#39;&lt;first-returned-snapshot-id&gt;&#39;
+SNAP_B=&#39;&lt;second-returned-snapshot-id&gt;&#39;
+OTHER_ID=&#39;&lt;another-registered-environment-id&gt;&#39;
+lintel snapshot compare --environment &quot;$ID&quot; --old-snapshot-id &quot;$SNAP_A&quot; --new-snapshot-id &quot;$SNAP_B&quot; --json
+lintel env compare &quot;$ID&quot; --other-environment-id &quot;$OTHER_ID&quot; --json</code></pre>
+<p>Comparison returns same/changed/unknown only; identity comparison material stays in private local state, and different salt domains cannot attest a change. An immediate <code>env compare</code> uses one temporary salt and saves neither a snapshot nor a persistent salt. To edit an explicitly chosen user/project-local configuration or review residue clearing/identity reset, see the <a href="/en/guide/operator-guide/#recovery">operator guide</a> and the <a href="/en/guide/core/#local-data-identity-snapshots-and-configuration-editing">core and CLI contract</a>.</p>
+<hr>
+<h2 id="want-to-use-the-app-instead">Want to use the App instead?</h2>
+<p>The desktop dev path is the local-build section of the repository <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/README.en.md">README</a>. <code>npm run dev:synthetic</code> creates a separate temporary home/state and calls the real CLI; the interface clearly labels it a &quot;test space&quot; and never uses your Claude login or browser data. Plain <code>npm run dev</code> does not provide a browser-to-host execution channel.</p>
+<h2 id="just-want-the-cli-installed">Just want the CLI installed?</h2>
+<p>Public releases are empty; there is <strong>no formal download link</strong>. Install independently from verified source, or use the candidate-package flow (verify identity, platform and bytes, unpack into a new version directory, change no PATH / shell rc / App / service). See <a href="/en/guide/agents/#install-candidate">obtaining a candidate</a> and <a href="/en/guide/agents/#independent-source-installation">independent source install</a>.</p>
+<h2 id="three-distinctions-to-keep-straight">Three distinctions to keep straight</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">Statement</th><th class="align-left">Is not</th></tr></thead><tbody><tr><td class="align-left"><code>accepted</code> (durable ACK)</td><td class="align-left">the task is complete</td></tr><tr><td class="align-left">querying the original job (query-only, no replay)</td><td class="align-left">auto recovery / migration / launch</td></tr><tr><td class="align-left">fully preserved data</td><td class="align-left">the original conversation can be resumed</td></tr></tbody></table></div>
+<h2 id="platforms-and-unverified-boundaries">Platforms and unverified boundaries</h2>
+<ul><li><strong>macOS desktop GUI</strong>: Tauri, currently built as an unsigned arm64 candidate.</li><li><strong>macOS arm64 CLI</strong> and <strong>Linux headless CLI</strong> (x86_64 / aarch64): standalone</li></ul>
+<p>CLI; Linux source is built and checked synthetically. Three-platform candidate package records exist, but that does <strong>not</strong> mean they are downloadable or that the Linux runtime fully passes.</p>
+<ul><li>Real authentication, native resume, production browsers / AdsPower,</li></ul>
+<p>production VPS and signed distribution are <strong>not yet verified</strong>.</p>
+<ul><li>Every read first fully decrypts and privately stages the **entire</li></ul>
+<p>authenticated package**; allow temporary disk and time.</p>
+<ul><li>Independent package inspect returns file metadata; read outputs private</li></ul>
+<p>bodies that <strong>do not enter ordinary job / diagnostic / Agent metadata</strong>. Control their terminal display and any later copying yourself.</p>
+<h2 id="related-documentation">Related documentation</h2>
+<p>The <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">English documentation hub</a> links the maintained user/operator editions. Chinese remains canonical; specifications and evidence retain their original Chinese authority.</p>
+<p>Current source also includes <a href="/en/guide/telemetry/">telemetry control</a> and <a href="/en/guide/app-updates/">App update preparation</a>. This synthetic first trial does not contact an update feed or a public telemetry endpoint. Background checks default off; a formal release key/feed is unconfigured and existing installed candidates are not upgraded.</p>
+<ul><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">Current state (Chinese)</a>: candidate / resource / evidence table and undelivered goals.</li><li><a href="/en/guide/operator-guide/">Human operator guide</a>: pick an entry by goal in the GUI.</li><li><a href="/en/guide/agents/">Agent CLI guide</a>: interface discovery, plan / approval / query, portable work and candidate install.</li><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/verification.md">Unified verification (Chinese)</a>: default synthetic entry point and independent runtime gates.</li><li><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/.github/ISSUE_TEMPLATE/preview-feedback.yml">Preview feedback template</a>: attach synthetic / redacted examples only.</li></ul>
+      </article>
+      <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/quickstart.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/en/" aria-label="Lintel home" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">Hold the complexity. Leave a little room.</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">Independently made; not officially affiliated with Anthropic.</span><br><span data-route-copy="footerClawd">The Clawd character belongs to Anthropic.</span></p><p data-route-copy="footerDocs">Page bodies are projected from maintained paired repository documents.</p><div><a href="/en/guide/" data-route-copy="guide">Guides</a><a href="/en/download/" data-route-copy="download">Download</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">Source</a></div></div></footer>
+</body>
+</html>

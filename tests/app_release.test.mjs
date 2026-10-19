@@ -69,6 +69,21 @@ test('site projects manual downloads without any updater feed',async()=>{
  const names=(await import('node:fs/promises')).readdir;assert.equal((await names(path.join(dir,'manual'))).includes('updates'),false,'Manual packaging must not write an updater feed');
  const build=JSON.parse(await readFile(path.join(dir,'manual/site-build.json')));assert.match(build.kind,/no updater feed/);assert.deepEqual(build.app_release_versions,[{channel:'preview',version:'0.2.0'}]);
  const downloads=JSON.parse(await readFile(path.join(dir,'manual/app-downloads.json')));assert.equal(downloads.releases[0].schema,'lintel.app-release-manual-public/1');
+ const downloadPage=await readFile(path.join(dir,'manual/download/index.html'),'utf8');
+ const downloadEn=await readFile(path.join(dir,'manual/en/download/index.html'),'utf8');
+ const releasesPage=await readFile(path.join(dir,'manual/releases/index.html'),'utf8');
+ for(const page of [downloadPage,downloadEn,releasesPage]){
+  assert.match(page,/data-download-app="verified"/);
+  assert.match(page,/data-release-version="0\.2\.0"/);
+  assert.match(page,/\b[a-f0-9]{64}\b/,'verified page carries the asset digest');
+  assert.match(page,/Manual download|仅手动|notarization|公证|In-app updates|未启用 App 内更新/);
+  assert.ok(page.includes(outputs.release.source_revision));
+  assert.ok(page.includes('Synthetic test only'),'release notes remain visible');
+  assert.ok(page.includes('2026-10-09T00:00:00Z'),'the declared record date remains visible');
+  assert.doesNotMatch(page,/现在还没有公开二进制|尚无公开 App 下载|没有一个可下载的正式 App Release|there is no public App binary/,'verified downloads do not retain unavailable page claims');
+ }
+ for(const page of [downloadPage,releasesPage])assert.match(page,/Apple Silicon/);
+ assert.match(downloadEn,/In-app updates are not enabled/);
  const signedRec=path.join(dir,'signed.json');await writeFile(signedRec,JSON.stringify({...reviewed,schema:'lintel.app-release/1'}));
  assert.notEqual(pack('mixed',['--app-release',signedRec,'--app-manual',rec]).status,0,'Signed and manual download stories must not mix');
 });
@@ -78,6 +93,23 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  const rec=path.join(dir,'release.json');await writeFile(rec,JSON.stringify(outputs.release));
  const pack=(out,extra=[])=>spawnSync(process.execPath,[path.join(repo,'scripts/prepare-site.mjs'),'--media-dir',media,'--out',path.join(dir,out),...extra],{cwd:repo,encoding:'utf8'});
  assert.equal(pack('plain').status,0);const plain=await readFile(path.join(dir,'plain/index.html'),'utf8');assert.match(plain,/没有正式 Release/);
+ const plainBuild=JSON.parse(await readFile(path.join(dir,'plain/site-build.json')));
+ assert.equal(plainBuild.files.length,64);
+ assert.equal(plainBuild.locales.length,40);
+ assert.equal(plainBuild.files.filter(file=>file.path==='index.html'||file.path.endsWith('/index.html')).length,40);
+ assert.equal(plainBuild.files.some(file=>/\/(?:lintel-intro\.mp4|lintel-film-poster\.jpg)$/.test(file.path)),true);
+ assert.equal(plainBuild.files.some(file=>/(?:^|\/)\.\.\/|(?:^|\/)qa\/|\.app\.tar\.gz$|\.dmg$/.test(file.path)),false);
+ assert.equal(JSON.stringify(plainBuild).includes(repo),false);
+ for(const name of ['download/index.html','en/download/index.html','releases/index.html','en/releases/index.html','guide/start-here/index.html','en/guide/start-here/index.html','guide/operator-guide/index.html','en/guide/operator-guide/index.html']){
+  assert.ok(plainBuild.files.some(file=>file.path===name),`plain payload includes ${name}`);
+ }
+ const plainDownload=await readFile(path.join(dir,'plain/download/index.html'),'utf8');
+ assert.match(plainDownload,/data-download-app="unavailable"/);
+ assert.doesNotMatch(plainDownload,/releases\/download\/v|\b[a-f0-9]{64}\b/);
+ assert.match(plainDownload,/0\.1\.0 Preview/);
+ const plainArticle=await readFile(path.join(dir,'plain/guide/operator-guide/index.html'),'utf8');
+ assert.match(plainArticle,/Lintel 操作指南/);
+ assert.match(plainArticle,/data-guide-document="operator-guide"/);
  const refused=pack('unverified',['--app-release',rec]);assert.notEqual(refused.status,0);assert.match(refused.stderr,/Verify public release bytes/);
  const reviewed={...outputs.release,publication_verified:true,status:'public_bytes_verified',public_checked_at:'2026-10-09T00:00:00Z'};await writeFile(rec,JSON.stringify(reviewed));
  validatePublicRelease(reviewed);
@@ -85,6 +117,13 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  const duplicate=structuredClone(reviewed);duplicate.downloads[0].platform='darwin-x86_64';assert.throws(()=>validatePublicRelease(duplicate),/platform/);
  assert.equal(pack('metadata',['--app-release',rec]).status,0);
  const html=await readFile(path.join(dir,'metadata/index.html'),'utf8');assert.match(html,/Apple Silicon/);assert.match(html,/公证状态：unverified/);
+ const verifiedDownload=await readFile(path.join(dir,'metadata/download/index.html'),'utf8');
+ const verifiedReleases=await readFile(path.join(dir,'metadata/en/releases/index.html'),'utf8');
+ for(const page of [verifiedDownload,verifiedReleases]){
+  assert.match(page,/data-download-app="verified"/);
+  assert.match(page,/data-release-version="0\.2\.0"/);
+  assert.ok(page.includes(outputs.release.source_revision));
+ }
  const feed=JSON.parse(await readFile(path.join(dir,'metadata/updates/preview.json')));assert.equal(feed.version,'0.2.0');assert.deepEqual(feed.platforms,outputs.updaterFeed.platforms);
  const build=JSON.parse(await readFile(path.join(dir,'metadata/site-build.json')));assert.equal(build.files.some(f=>f.path.endsWith('.dmg')||f.path.endsWith('.app.tar.gz')),false);
  const headers=await readFile(path.join(dir,'metadata/_headers'),'utf8'),rules=new Map();let current;

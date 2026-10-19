@@ -2,4 +2,42 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url><loc>https://lintel.page/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/"/></url>
   <url><loc>https://lintel.page/en/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/"/></url>
+  <url><loc>https://lintel.page/download/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/download/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/download/"/></url>
+  <url><loc>https://lintel.page/en/download/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/download/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/download/"/></url>
+  <url><loc>https://lintel.page/guide/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/"/></url>
+  <url><loc>https://lintel.page/en/guide/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/"/></url>
+  <url><loc>https://lintel.page/inside/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/inside/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/inside/"/></url>
+  <url><loc>https://lintel.page/en/inside/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/inside/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/inside/"/></url>
+  <url><loc>https://lintel.page/releases/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/releases/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/releases/"/></url>
+  <url><loc>https://lintel.page/en/releases/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://lintel.page/releases/"/><xhtml:link rel="alternate" hreflang="en" href="https://lintel.page/en/releases/"/></url>
+  <url><loc>https://lintel.page/guide/start-here/</loc></url>
+  <url><loc>https://lintel.page/en/guide/start-here/</loc></url>
+  <url><loc>https://lintel.page/guide/quickstart/</loc></url>
+  <url><loc>https://lintel.page/en/guide/quickstart/</loc></url>
+  <url><loc>https://lintel.page/guide/concepts/</loc></url>
+  <url><loc>https://lintel.page/en/guide/concepts/</loc></url>
+  <url><loc>https://lintel.page/guide/troubleshooting/</loc></url>
+  <url><loc>https://lintel.page/en/guide/troubleshooting/</loc></url>
+  <url><loc>https://lintel.page/guide/operator-guide/</loc></url>
+  <url><loc>https://lintel.page/en/guide/operator-guide/</loc></url>
+  <url><loc>https://lintel.page/guide/agents/</loc></url>
+  <url><loc>https://lintel.page/en/guide/agents/</loc></url>
+  <url><loc>https://lintel.page/guide/browser/</loc></url>
+  <url><loc>https://lintel.page/en/guide/browser/</loc></url>
+  <url><loc>https://lintel.page/guide/remote/</loc></url>
+  <url><loc>https://lintel.page/en/guide/remote/</loc></url>
+  <url><loc>https://lintel.page/guide/desktop/</loc></url>
+  <url><loc>https://lintel.page/en/guide/desktop/</loc></url>
+  <url><loc>https://lintel.page/guide/network/</loc></url>
+  <url><loc>https://lintel.page/en/guide/network/</loc></url>
+  <url><loc>https://lintel.page/guide/services/</loc></url>
+  <url><loc>https://lintel.page/en/guide/services/</loc></url>
+  <url><loc>https://lintel.page/guide/telemetry/</loc></url>
+  <url><loc>https://lintel.page/en/guide/telemetry/</loc></url>
+  <url><loc>https://lintel.page/guide/app-updates/</loc></url>
+  <url><loc>https://lintel.page/en/guide/app-updates/</loc></url>
+  <url><loc>https://lintel.page/guide/core/</loc></url>
+  <url><loc>https://lintel.page/en/guide/core/</loc></url>
+  <url><loc>https://lintel.page/guide/architecture/</loc></url>
+  <url><loc>https://lintel.page/en/guide/architecture/</loc></url>
 </urlset>

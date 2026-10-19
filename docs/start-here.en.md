@@ -12,7 +12,7 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 | A macOS app built by you or a trusted provider | Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against [current status (Chinese)](current-state.md) |
 | Linux, or a CLI-only workflow | Use [Agent CLI](agents.en.md) for installation and the [complete CLI trial](quickstart.en.md) for a synthetic example |
 
-This remains 0.1.0 Preview, without a public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is `878482f`; later source changes have not replaced it. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
+This remains 0.1.0 Preview, without a public Release download, formal signing or activated update feed. The latest local macOS arm64 release-preparation candidate is the 10-19 `e822d74` build, including current client controls and UI updates. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
 
 ## Synthetic interface trial
 
@@ -29,7 +29,7 @@ npm run dev:synthetic
 
 Open the URL printed by the terminal and confirm the interface identifies a **test space**. This starts Vite fixture mode with the real CLI and a fresh HOME/state. The script creates `CLAUDE.md`, `projects/synthetic/memory/notes.md` and synthetic settings. It prints the temporary directory path.
 
-This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial path. The packaged `878482f` native app also completed this archive path previously in a separate isolated HOME/state; that is still not real personal authentication or clean-Mac download acceptance.
+This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial path. The `e822d74` native app completed exact three-file archiving, quit/reopen, original-job lookup and independent-file reading in another isolated HOME/state. A separate CLI state verified all three originals byte for byte. That still does not establish personal authentication or download/install on a clean Mac.
 
 ### Create an archive only
 
@@ -45,6 +45,8 @@ For independent-state reading, exclusion of unselected files and byte-for-byte p
 ### End the trial
 
 Press `Ctrl-C` in the terminal running Vite. The synthetic directory remains for inspection. After confirming it is no longer needed and no related process uses it, remove only the temporary directory printed by this run. Lintel cannot recover the contents of an encrypted package without its passphrase.
+
+<a id="build-native"></a>
 
 ## Build the native macOS app
 
@@ -65,7 +67,7 @@ apps/desktop/src-tauri/target/release/bundle/macos/Lintel.app
 
 The build prepares the native browser host, Chromium/Firefox extensions and third-party notices. It does not install into Applications, perform Developer ID signing/notarization or publish a release. Only a native build matching the Rust host is currently supported. See [Desktop](desktop.en.md) and [App updates](app-updates.en.md).
 
-This local build uses current source and therefore includes client controls, motion switches and layout updates newer than `878482f`. That establishes source wiring only and does not upgrade the older candidate into the same package. Treat the candidate receipt, language/game paths and native WebKit coverage of newer features separately under [current status (Chinese)](current-state.md).
+A local build uses the source you checked out. Matching version numbers do not establish identical files: check the source revision, bundled resources and actual operation coverage. [Current state](current-state.md) keeps native, Chromium and CLI evidence for the current and older candidates separate.
 
 ## Connect your own environment
 

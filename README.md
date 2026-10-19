@@ -8,11 +8,15 @@
 
 Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、加密保全指令和会话、清理重建环境，以及管理具体浏览器 profile 和 SSH 主机。App 与 CLI 共用执行核心；修改前查看目标与变化，执行后核对结果，需要恢复时保留后续编辑。
 
-**当前为 0.1.0 Preview。** 可以从公开源码试用；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选仍为 10-13 构建的 `878482f`，未安装到 Applications；后续源码实现了客户端控制与界面更新，但没有替换这个候选。准确来源、平台与验收范围见[当前状态](docs/current-state.md)。
+**当前为 0.1.0 Preview。** 可以从公开源码试用；尚无公开 Release 下载、正式签名或已启用的更新 feed。最新本地 macOS arm64 发行准备候选是 10-19 的 `e822d74`，已包含客户端控制、逐项／批量保护编辑和新版侧栏图标。它从 DMG 取出后在隔离测试空间运行，未安装到 Applications。准确来源、平台与验收范围见[当前状态](docs/current-state.md)。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
 <a id="现在可以做什么"></a>
+
+![Lintel 真实 macOS App：首页使用合成环境，中文界面](assets/preview/screenshots/native-home.zh-CN.jpg)
+
+上图为本地未签名候选的真实 WebKit 界面，数据为合成示例；[配图来源与范围](assets/preview/asset-index.json)。
 
 ## 从眼前的目标开始
 
@@ -60,13 +64,13 @@ cargo build -p lintel-runner --locked
 
 这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选仍为 `bb9fa824`，没有正式下载链接；从源码构建的 CLI 不受 App 候选版本约束。
 
-## 怎样协作
+## 从原件到下一次工作
 
-![Lintel 总览：App 与 CLI 调用共享 core、SSH controller，以及独立浏览器和网络通道](docs/assets/architecture-overview.svg)
+![工作旅程：选择指令、记忆和会话，审阅并批准，加密成包后独立阅读；迁入环境另行批准](assets/preview/diagrams/work-journey.zh-CN.png)
 
-本机文件任务由本机 core 执行；SSH 请求交给目标主机的 runner 和 core。浏览器扩展操作它所属的 profile，受控代理只处理经过它的连接。工作包可以通过你选择的文件传输工具带走，再在独立 state 中打开。
+选择需要的原件，先看冻结计划，再批准加密保全。源资料保留，工作包可通过你选择的文件传输工具带走，在另一份独立 state 中打开阅读。迁入环境是另一次明确选择，打开包不会自动迁入或启动 Claude。
 
-[查看完整架构图与源码入口](docs/architecture.md)。
+本机文件任务由本机 core 执行；SSH 请求交给目标主机的 runner 和 core。浏览器扩展操作它所属的 profile，受控代理只处理经过它的连接。[架构图与源码入口](docs/architecture.md)解释这些边界。
 
 ## 数据与边界
 
@@ -76,7 +80,13 @@ Lintel 无需自身账号、模型 key 或在线激活，默认不发送 analyti
 
 当前已接通的选择性外发配置使用 v5 规则识别的 27 个字段。App 普通编辑可直接在每行选动作，也可明确进入批量编辑；只提供共同适用的动作，并显示筛选之外选择的数量。三条快捷配方只保存非秘密意图，每次重新生成计划；与内置意图不同的个人默认按实际选择标注。详细边界在[保护方案操作](docs/operator-guide.md#protect)与[桌面自定义保护](docs/desktop.md#自定义保护)。
 
-在有限隔离 HOME／state 中，10-15 已用同一 `878482f` release WebKit 完成登记、精确选择、一次批准归档与 completed 回执，并在重开 App 和独立 state 中读回工作包。完整语言／游戏矩阵、真实个人认证、正式浏览器、干净 Mac 下载首装及签名公证仍分别未验收。
+10-19 已在新的合成 HOME／state 中用 `e822d74` release WebKit 完成空白登记、精确三件选择、一次批准归档、退出重开和原任务核对，并从独立文件入口阅读指令、记忆与结构化会话。另一份独立 state 的 CLI 逐字节读回三份原文；配置字段的修改与恢复保留了两处后续编辑。真实个人认证、正式浏览器、干净 Mac 下载首装及签名公证仍分别未验收；完整范围见[当前状态](docs/current-state.md)。
+
+## 看一眼它的世界
+
+[![Lintel 概念短片封面：字符山湖、字标与小小的 Clawd](assets/preview/lintel-social-preview.png)](https://lintel.page/media/lintel-intro.mp4)
+
+[播放 20 秒概念短片](https://lintel.page/media/lintel-intro.mp4)。这是工作资料、审阅与过桥的概念动画，含原创音乐与本地生成的英文配音，不是 App 操作录像。[制作来源](scripts/preview-film/README.md)与真实界面截图分别维护。
 
 ## 开发与文档
 

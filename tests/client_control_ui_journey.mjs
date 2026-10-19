@@ -502,12 +502,20 @@ try{
  await page.getByRole('button',{name:'重新检查环境',exact:true}).click();
  await waitForResult('inspect',beforeInspect);
  const editor=page.locator('.custom-policy');
+ // A completed core response precedes React's reinspection commit. Wait for
+ // the remounted editor before deciding whether a prior draft needs clearing.
+ await editor.waitFor();
  const row=key=>editor.locator(`.custom-policy-row[data-key="${key}"]`);
  const choice=key=>row(key).locator('.policy-rule-choice select');
  const previewButton=policyDock.getByRole('button',{name:L.previewPolicy,exact:true});
- if(await editor.getByRole('button',{name:'撤销全部改动',exact:true}).count())await editor.getByRole('button',{name:'撤销全部改动',exact:true}).click();
+ const resetDraftButton=editor.getByRole('button',{name:'撤销全部改动',exact:true});
+ if(await resetDraftButton.count()){
+  await resetDraftButton.click();
+  await resetDraftButton.waitFor({state:'hidden'});
+ }
  assert.equal(await editor.locator('.policy-rule-selection').count(),0,'selection checkboxes are absent until the explicit bulk mode');
  assert.equal(await editor.locator('.custom-policy-row').count(),27,'all current finite policy fields remain reachable');
+ assert.equal(await editor.locator('.custom-policy-row.is-changed').count(),0,'the reobserved custom editor is actually empty before checking its preview guard');
  assert.equal(await previewButton.isDisabled(),true,'an empty custom draft cannot produce an unexplained empty preview');
  const originalSettings=await readFile(path.join(rootA,'settings.json'),'utf8');
  await editor.getByRole('button',{name:'批量编辑',exact:true}).click();

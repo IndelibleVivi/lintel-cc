@@ -1,12 +1,25 @@
 import { SITE_COPY, ENGLISH_GUIDES, RELEASE_COPY, releaseSecurityCopy } from './site-copy.mjs';
+import { SITE_ROUTES } from './site-routes.mjs';
 
 export const siteLanguageFromPath = pathname => /^\/en(?:\/|$)/.test(pathname) ? 'en' : 'zh';
-const languagePath = language => language === 'en' ? '/en/' : '/';
+const routePath = (pathname, language = siteLanguageFromPath(pathname)) => {
+  const logical = pathname.replace(/^\/en(?=\/|$)/, '') || '/';
+  const normalized = logical === '/' || logical.endsWith('/') || /\.[a-z0-9]+$/i.test(logical) ? logical : `${logical}/`;
+  return language === 'en' ? `/en${normalized}` : normalized;
+};
 const docBase = 'https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/';
 const guidePattern = new RegExp(`^(${docBase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})(${ENGLISH_GUIDES.join('|')})(?:\\.en)?\\.md(#[a-z-]+)?$`);
 
 export function siteGuideHref(href, language) {
   return href.replace(guidePattern, (_, base, guide, anchor = '') => `${base}${guide}${language === 'en' ? '.en' : ''}.md${anchor}`);
+}
+
+export function siteRouteHref(href, language) {
+  const match = /^(\/[^?#]*)([?#].*)?$/.exec(href);
+  if (!match) return href;
+  const logical = match[1].replace(/^\/en(?=\/|$)/, '');
+  if (!SITE_ROUTES.some(route => route.path !== '/' && route.path === logical)) return href;
+  return routePath(logical, language) + (match[2] || '');
 }
 
 // Change only marked copy, finite guide links and metadata. Existing DOM and module instances
@@ -32,7 +45,7 @@ export function applySiteLanguage(language, root = document) {
     }
   }
   for (const node of root.querySelectorAll('a[href]')) {
-    node.setAttribute('href', siteGuideHref(node.getAttribute('href'), language));
+    node.setAttribute('href', siteRouteHref(siteGuideHref(node.getAttribute('href'), language), language));
   }
   for (const link of root.querySelectorAll('[data-site-quickstart]')) {
     const alternate = link.dataset.siteQuickstart === 'alternate';
@@ -50,8 +63,9 @@ export function applySiteLanguage(language, root = document) {
     html.lang = language === 'en' ? 'en' : 'zh-CN';
     html.dataset.language = language;
   }
-  root.querySelector('link[rel="canonical"]')?.setAttribute('href', `https://lintel.page${languagePath(language)}`);
-  root.querySelector('meta[property="og:url"]')?.setAttribute('content', `https://lintel.page${languagePath(language)}`);
+  const currentPath = routePath(location.pathname, language);
+  root.querySelector('link[rel="canonical"]')?.setAttribute('href', `https://lintel.page${currentPath}`);
+  root.querySelector('meta[property="og:url"]')?.setAttribute('content', `https://lintel.page${currentPath}`);
   root.querySelector('meta[property="og:locale"]')?.setAttribute('content', language === 'en' ? 'en_US' : 'zh_CN');
   root.querySelector('meta[property="og:locale:alternate"]')?.setAttribute('content', language === 'en' ? 'zh_CN' : 'en_US');
   return language;
@@ -69,7 +83,8 @@ export function mountSiteLanguage(onLanguageChange, root = document) {
     const language = event.currentTarget.dataset.siteLanguage;
     if (language !== current) {
       // Preserve the reader's query and section anchor, as well as the current scroll/focus.
-      history.pushState(null, '', languagePath(language) + location.search + location.hash);
+      const target = routePath(location.pathname, language);
+      history.pushState(null, '', target + location.search + location.hash);
       render(language);
     }
   };
@@ -83,3 +98,5 @@ export function mountSiteLanguage(onLanguageChange, root = document) {
     removeEventListener('popstate', pop);
   };
 }
+
+export function languagePath(pathname, language) { return routePath(pathname, language); }
