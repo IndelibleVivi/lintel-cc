@@ -55,6 +55,27 @@ test('manual download records: strict shape, verified DMG metadata, no feed',asy
  const dup=structuredClone(outputs.release);dup.downloads.push({...dup.downloads[0]});assert.throws(()=>validateManualPublicRelease(dup),/platform/);
  const extra={...outputs.release,private_path:dir};assert.throws(()=>validateManualPublicRelease(extra),/fields/);
 });
+test('verify-public CLI dispatches prepared manual and signed records and rejects wrong bytes',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-release-cli-')),f=fixture(path.join(dir,'fixture'));
+ const signed=await prepare(record(f));
+ const manual=await prepareManual({schema:'lintel.app-release-manual/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),notes:'Synthetic CLI test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{dmg_path:f.dmg,dmg_name:'Lintel_0.2.0_aarch64.dmg'}}});
+ // Exercise the real child-process entrypoint without any public requests.
+ // Each finite release URL maps to its matching synthetic artifact bytes.
+ const preload=path.join(dir,'synthetic-fetch.mjs');
+ const mapping=Object.fromEntries([...Object.values(signed.release.platforms).map(a=>[a.url,f.archive]),...signed.release.downloads.map(a=>[a.url,f.dmg])]);
+ await writeFile(preload,`import {readFileSync} from 'node:fs';const files=${JSON.stringify(mapping)};globalThis.fetch=async url=>{if(!Object.hasOwn(files,url))throw new Error('Unexpected synthetic URL');return {ok:true,url,body:[readFileSync(files[url])]};};`);
+ for(const [name,release] of [['manual',manual.release],['signed',signed.release]]){
+  const input=path.join(dir,`${name}.json`),output=path.join(dir,`${name}-verified`);
+  await writeFile(input,JSON.stringify(release));
+  const run=out=>spawnSync(process.execPath,['--import',preload,path.join(repo,'scripts/app-release.mjs'),'verify-public','--record',input,'--out',out],{cwd:repo,encoding:'utf8',timeout:15000});
+  const result=run(output);assert.equal(result.status,0,result.stderr);
+  const verified=JSON.parse(await readFile(path.join(output,'release.json')));
+  assert.equal(verified.schema,release.schema);assert.equal(verified.status,'public_bytes_verified');assert.equal(verified.publication_verified,true);assert.ok(verified.public_checked_at);
+  const names=await(await import('node:fs/promises')).readdir(output);assert.deepEqual(names,['release.json'],'Verification alone must not activate an updater feed');
+  const changed=structuredClone(release);changed.downloads[0].sha256='0'.repeat(64);await writeFile(input,JSON.stringify(changed));
+  const refused=run(path.join(dir,`${name}-wrong`));assert.notEqual(refused.status,0);assert.match(refused.stderr,/digest differs/);
+ }
+});
 test('site projects manual downloads without any updater feed',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'lintel-manual-site-')),f=fixture(path.join(dir,'fixture'));
  const outputs=await prepareManual({schema:'lintel.app-release-manual/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{dmg_path:f.dmg,dmg_name:'Lintel_0.2.0_aarch64.dmg'}}});

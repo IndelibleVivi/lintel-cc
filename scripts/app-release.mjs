@@ -224,7 +224,7 @@ async function main(){
  for(let i=0;i<args.length;i++){if(args[i]==='--record')input=args[++i];else if(args[i]==='--out')out=args[++i];else if(args[i]==='--platform')platform=args[++i];else fail('Unknown release argument');}
  if(!['configure','build','prepare','verify-public'].includes(mode)||!input||(mode!=='build'&&!out))fail('Usage: app-release.mjs configure|prepare|verify-public --record FILE --out ABSENT_DIRECTORY; build --record FILE');
  await regular(input,64*1024);const record=JSON.parse(await readFile(input,'utf8'));
- const manual=record&&record.schema==='lintel.app-release-manual/1';
+ const manual=record&&record.schema===(mode==='verify-public'?'lintel.app-release-manual-public/1':'lintel.app-release-manual/1');
  if(manual&&(mode==='configure'||mode==='build'))fail('Manual download records have no updater configuration or signed build');
  if(mode==='build'){
   validateRecord(record);
