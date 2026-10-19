@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="network">
         <h1 id="ipv4--ipv6-与受控网络通道">IPv4 / IPv6 与受控网络通道</h1>
 <p>简体中文（canonical） · <a href="/guide/network/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -96,6 +97,7 @@ CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path apps/d
 <h2 id="精确遥测目的地">精确遥测目的地</h2>
 <p>静态目录、设置观察与受控规则测试由 <a href="/guide/telemetry/">telemetry</a> 说明。选择只合入下次启动的 blocked 草案，保留上游／地址族和其它规则；模型、登录和下载的混合域名不推荐一键阻断。受控测试只走当前 proxy 的 loopback 请求，不连接公网遥测目标，结果与 Claude 实际流量分别标记。App updater 与它独立，活跃代理会阻止 App 安装／重启；见 <a href="/guide/app-updates/">app-updates</a>。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/network.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

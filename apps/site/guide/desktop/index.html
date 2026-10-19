@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="desktop">
         <h1 id="桌面使用与界面约定">桌面使用与界面约定</h1>
 <p>简体中文（canonical） · <a href="/guide/desktop/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -127,6 +128,7 @@ npm run desktop:build</code></pre>
 <h2 id="遥测与-app-更新">遥测与 App 更新</h2>
 <p>环境的“外发与权限”保留 IPv4／IPv6 与受控通道；通道草案中的 <a href="/guide/telemetry/">遥测目录</a> 只提供确切可选目标，设置读回、测试请求与实际流量分别显示。App 自身更新位于“设置与模块 → Lintel 版本与更新”，当前源码默认未配置发行，后台检查默认关闭。下载核验／批准安装／显式重启由 <code>AppUpdates.tsx</code> 与 native <code>app_updates.rs</code> 接线；<code>activity.rs</code> 和活跃通道检查阻止事务中安装或重启。浏览器／VPS runner 沿用各自的审阅安装入口。操作及发行准备见 <a href="/guide/app-updates/">app-updates</a>，源码与实际安装状态见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state</a>。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/desktop.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

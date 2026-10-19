@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="telemetry">
         <h1 id="telemetry-目标目录与受控规则测试">Telemetry 目标目录与受控规则测试</h1>
 <p>简体中文（canonical） · <a href="/guide/telemetry/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -88,6 +89,7 @@ python3 tests/verify.py --checks desktop-build,telemetry-ui</code></pre>
 <p>受控规则测试使用<strong>真实既有 loopback 代理</strong>：一个显式阻止的目录目标必须被拒绝（403）且不发生任何目标连接；一个不在阻止列表里的 loopback origin 仍可连接（证明块是精确的）。测试从不解析或连接公网目标，也不发送 telemetry 正文。当前沙箱可能缺少 loopback 权限：这类测试会以精确的 <code>PermissionDenied</code>／<code>listen_failed</code> 报告环境失败，而不是伪装通过。</p>
 <p>真实 host 系统设置、真实 macOS 授权、VPN 切换、Linux 强约束与公众回显互通仍需各自独立验收；目录内容只随官方文档变化重新核对。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/telemetry.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="agents">
         <h1 id="lintel-agent-cli">Lintel Agent CLI</h1>
 <p>简体中文（canonical） · <a href="/guide/agents/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -292,6 +293,7 @@ node apps/desktop/scripts/prepare-remote-runners.mjs</code></pre>
 <p>源码构建的 debug 入口是 <code>cargo build -p lintel-runner</code> 后的 <code>target/debug/lintel</code>。独立 Native Messaging 可执行文件另行从 <code>extensions/browser/native-host</code> 安装；在 Mac 上 <code>lintel browser control</code> 的安装预览仍需准确 <code>host_path</code>，不会假定 GUI 或 PATH 已提供它。扩展开发包从 canonical extension source 准备，步骤与平台限制见 <a href="/guide/browser/">browser.md</a>。</p>
 <p>远端 runner 的静态资源与 App 使用同一 <a href="/guide/remote/#准备-app-内置资源">生成流程</a>。仅从明确核对的 canonical bundles 调用 <code>lintel remote control --bundles /absolute/runner-bundles</code>，或配置 <code>LINTEL_RUNNER_BUNDLES</code>；默认查当前 executable 旁的 <code>remote-runners</code>。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

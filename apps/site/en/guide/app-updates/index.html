@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="app-updates">
         <h1 id="lintel-app-updates-and-release-preparation">Lintel App updates and release preparation</h1>
 <p><a href="/en/guide/app-updates/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
@@ -131,6 +132,7 @@ node scripts/prepare-site.mjs \
 <p>Browser extension/native host and remote runner installation are outside automatic App updates. A new App may carry new resources, but they still require their own frozen preview, explicit approval and original-installation reconciliation. Older remote tasks keep their frozen runner.</p>
 <p>Protocol/API references: <a href="https://v2.tauri.app/plugin/updater/">Tauri updater</a>. Runtime behavior follows the pinned <code>tauri-plugin-updater</code>, the current CLI&#39;s <code>signer sign --app-version</code>, and repository checks. Source acceptance criteria are in the <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/specs/telemetry-updates.md">telemetry and updates Leaf (Chinese)</a>.</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/app-updates.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

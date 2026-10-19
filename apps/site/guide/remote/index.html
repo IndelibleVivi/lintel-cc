@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="remote">
         <h1 id="ssh-远程控制与断线核对">SSH 远程控制与断线核对</h1>
 <p>简体中文（canonical） · <a href="/guide/remote/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -167,6 +168,7 @@ python3 -m unittest discover -s platform/ssh/tests -v</code></pre>
 <p><code>remote aliases/hosts/inspect</code>、<code>request ALIAS</code>、<code>submit ALIAS</code>、<code>job ALIAS PLAN_ID</code> 的 stdin、批准与资源目录见 <a href="/guide/agents/#ssh-controller">agents.md</a>。旧 <code>platform/ssh/lintel_ssh.py</code> 为已有 caller/subset 保留，新功能以共享 Rust 路径为 canonical；两者不共享 submission 去重 state，不能跨 controller 重发未核对任务。</p>
 <p>工作包 <code>archive_path/output_path</code> 始终是<strong>远端主机</strong>的路径，不是本机文件选择。跨主机先显式传输密文，再在目标主机读取/预览/批准 import，详见 <a href="/guide/operator-guide/#work">迁移步骤</a>。这个 controller 不增加任意文件上传/下载 endpoint；runner install 仍只上传冻结的 canonical static resource。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

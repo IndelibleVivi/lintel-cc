@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="browser">
         <h1 id="browser-extension-and-local-bridge">Browser extension and local bridge</h1>
 <p><a href="/en/guide/browser/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
@@ -138,6 +139,7 @@ python3 tests/verify.py --checks browser-smoke,browser-pairing-ui --json /tmp/li
 <p>macOS <code>lintel browser operations</code> / <code>describe browser.OP</code> / <code>schema browser.OP</code> statically describe control/actions without browser-state initialization. <code>browser operations --instance ID</code> inspects pairing/conflict/online; extension confirmation still decides permissions. <code>browser instances</code>, <code>pair create/pending/approve</code>, <code>submit/query/control</code> reuse the host with original-ID query-only recovery.</p>
 <p>Linux runner explicitly lacks this component; use the independent host CLI on the profile&#39;s host. Manual host_path CLI installation and App bundled-resource approval remain separate entries, without assuming GUI installation. See <a href="/en/guide/agents/#browser-adapter">Agent CLI browser adapter</a> for installation/stdin/human waits, and <a href="/en/guide/operator-guide/">operator guide</a> for pairing/clear.</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/browser.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

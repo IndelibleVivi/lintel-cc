@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="telemetry">
         <h1 id="telemetry-destination-catalog-and-controlled-rule-tests">Telemetry destination catalog and controlled rule tests</h1>
 <p><a href="/en/guide/telemetry/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
@@ -88,6 +89,7 @@ python3 tests/verify.py --checks desktop-build,telemetry-ui</code></pre>
 <p>Controlled tests use the <strong>real existing loopback proxy</strong>. An explicitly blocked catalog destination must return 403 with no target connection; an unblocked loopback origin remains reachable, proving exact scope. Tests never resolve/connect to public destinations or send telemetry bodies. An environment without loopback permission reports an exact <code>PermissionDenied</code>/<code>listen_failed</code> environment failure rather than passing.</p>
 <p>Real host settings, macOS authorization, VPN transitions, Linux enforcement and public echo connectivity each need independent acceptance. Catalog content is rechecked when official documentation changes.</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="Guide navigation"><a href="/en/guide/" data-route-copy="allGuides">All guides</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/telemetry.en.md" data-route-copy="repositoryOriginal">Repository source <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

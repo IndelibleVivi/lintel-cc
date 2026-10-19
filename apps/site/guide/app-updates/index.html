@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="app-updates">
         <h1 id="lintel-app-更新与发行准备">Lintel App 更新与发行准备</h1>
 <p>简体中文（canonical） · <a href="/guide/app-updates/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -131,6 +132,7 @@ node scripts/prepare-site.mjs \
 <p>浏览器 extension/native host、远端 runner 不在 App updater 的自动安装边界。新 App 可能带新资源，但必须继续各自的 frozen preview、明确批准与原安装核对；旧远端任务仍使用自己冻结的 runner。</p>
 <p>协议与 API 依据 <a href="https://v2.tauri.app/plugin/updater/">Tauri updater</a>；运行行为以锁定的 <code>tauri-plugin-updater</code>、当前 CLI 的 <code>signer sign --app-version</code> 和本仓库检查为准。源码验收标准见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/specs/telemetry-updates.md">遥测与更新 Leaf</a>。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/app-updates.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>

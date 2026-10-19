@@ -33,6 +33,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
       <article class="guide-body" data-guide-document="operator-guide">
         <h1 id="lintel-操作指南">Lintel 操作指南</h1>
 <p>简体中文（canonical） · <a href="/guide/operator-guide/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
@@ -241,6 +242,7 @@ lintel restore plan --job &lt;original-job-id&gt;</code></pre>
 <p>环境详情“外发与权限”的受控通道草案可以选择官方目录中的精确遥测目标；合入现有 blocked 后仍须显式启动。测试结果标明是 Lintel 受控请求，未观察到 Claude 请求不等于全局零遥测。fine-grained 设置与 NONESSENTIAL 总开关的自动更新／feature flags 影响分别核对，详见 <a href="/guide/telemetry/">telemetry</a>。</p>
 <p>“设置与模块 → Lintel 版本与更新”管理本 App。后台检查默认关闭；检查错误不能证明最新；下载签名与版本核验通过后审阅安装，最后保存工作并显式重启。native 层拒绝正在执行操作或有活跃代理时安装／重启。原安装中断保留原记录，不重放；旧无 updater 的 App 需要手动升级一次。当前源码没有正式公钥／feed 或 Release 激活；未来准备与精确发布顺序见 <a href="/guide/app-updates/">app-updates</a>。独立 CLI、浏览器组件与远端 runner 不由 App updater 自动安装。</p>
       </article>
+      <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
     </div>
   </main>
