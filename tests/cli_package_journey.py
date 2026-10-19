@@ -235,7 +235,7 @@ class PackageJourney:
 
     def package(self, out: Path, inputs: dict, *, version: str | None = None,
                 revision: str = REVISION, x86: Path | None = None,
-                env: dict | None = None) -> subprocess.CompletedProcess[str]:
+                env: dict | None = None, notices: Path | None = None) -> subprocess.CompletedProcess[str]:
         argv = [NODE, str(SCRIPT),
                 "--macos-arm64", str(inputs["macos"]),
                 "--linux-x86_64", str(x86 if x86 is not None else inputs["x86"]),
@@ -245,6 +245,8 @@ class PackageJourney:
                 "--out", str(out)]
         if version is not None:
             argv += ["--version", version]
+        if notices is not None:
+            argv += ["--notices", str(notices)]
         return subprocess.run(argv, text=True, capture_output=True, cwd=ROOT, timeout=180, check=False, env=env)
 
     @staticmethod
@@ -523,6 +525,48 @@ def manifest_snapshot(journey: PackageJourney, inputs: dict, version: str) -> No
             proc.wait()
 
 
+def distribution_notices(journey: PackageJourney, inputs: dict, version: str) -> None:
+    notices = journey.base / "distribution-notices"
+    (notices / "licenses").mkdir(parents=True)
+    inventory = {"schema": 1, "standard_library": {"licenses": ["licenses/MIT.txt"]}}
+    (notices / "inventory.json").write_text(json.dumps(inventory))
+    names = ["README.md", "frontend.md", "rust.md", "rust-standard-library.html", "rust-native-runtime.md", "licenses/MIT.txt"]
+    for name in names:
+        (notices / name).write_text(f"Synthetic retained notice: {name}\n")
+    expected = {p.relative_to(notices).as_posix(): p.read_bytes() for p in notices.rglob("*") if p.is_file()}
+    # Unselected adjacent material must never leak into an archive.
+    (notices / "private-unselected.txt").write_text("synthetic private marker")
+    output = journey.base / "notices-out"
+    result = journey.package(output, inputs, version=version, notices=notices)
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(next(output.glob("candidates-*.json")).read_text())
+    assert summary["notices_included"] is True, summary
+    for record in summary["archives"]:
+        extracted = journey.base / "notices-extract" / record["target"]
+        journey.extract(output / record["archive"], extracted)
+        manifest = journey.verify_files(extracted)
+        assert manifest["notices_included"] is True
+        actual = {p.relative_to(extracted / "third-party-notices").as_posix(): p.read_bytes()
+                  for p in (extracted / "third-party-notices").rglob("*") if p.is_file()}
+        assert actual == expected
+        journey.check_sums(extracted)
+    for name, mutate in [
+        ("missing", lambda: (notices / "rust.md").unlink()),
+        ("escape", lambda: (notices / "inventory.json").write_text(json.dumps({"schema": 1, "standard_library": {"licenses": ["licenses/../../private-unselected.txt"]}}))),
+        ("symlink", lambda: (notices / "rust.md").symlink_to(notices / "private-unselected.txt")),
+    ]:
+        (notices / "inventory.json").write_text(json.dumps(inventory))
+        if not (notices / "rust.md").exists():
+            (notices / "rust.md").write_bytes(expected["rust.md"])
+        if name == "symlink":
+            (notices / "rust.md").unlink()
+        mutate()
+        rejected = journey.base / f"notices-rejected-{name}"
+        result = journey.package(rejected, inputs, version=version, notices=notices)
+        assert result.returncode != 0, name
+        assert not rejected.exists(), name
+
+
 def main() -> int:
     journey = PackageJourney()
     base = journey.base
@@ -547,6 +591,7 @@ def main() -> int:
     assert native_version["protocol"] == 1 and native_version["catalog_version"] == 1, native_version
     inputs = journey.native_inputs(version, native_bytes)
     try:
+        distribution_notices(journey, inputs, version)
         # --- native candidate: always packaged, extracted and executed --------
         out = base / "native-out"
         result = journey.package(out, inputs, version=version)

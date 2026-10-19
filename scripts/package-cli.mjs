@@ -9,6 +9,7 @@
 //     --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
 //     --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
 //     --linux-runners apps/desktop/src-tauri/runner-bundles \
+//     --notices apps/desktop/src-tauri/third-party-notices \
 //     --revision "$(git rev-parse HEAD)" \
 //     --out candidate-packages
 //
@@ -27,6 +28,7 @@
 //   candidate.json                      truthful candidate metadata
 //   SHA256SUMS                          shasum/sha256sum -c verifiable digests
 //   README.txt                          install/upgrade instructions
+//   third-party-notices/                retained distribution texts, when supplied
 //
 // The output directory is created only after every input validates. Archives
 // and the identity-specific index are published with true no-replace semantics,
@@ -273,6 +275,38 @@ async function verifyRunnerBundles(dir) {
 
 const HELP = 'See the header of scripts/package-cli.mjs for usage.';
 
+// Preserve generated texts and relative stdlib links. The caller binds this
+// dependency superset to the supplied binaries' build toolchains; it does not
+// authenticate source or describe an exact linked SBOM. Existing synthetic
+// callers may omit it for local tests. Release preparation supplies --notices.
+async function noticeFiles(directory) {
+  if (!directory) return [];
+  if (!(await lstat(directory)).isDirectory()) fail('invalid_notices', 'notice root must be a regular directory');
+  async function bounded(relative) {
+    const info = await lstat(path.join(directory, relative));
+    if (!info.isFile() || info.size === 0 || info.size > 8 * 1024 * 1024) {
+      fail('invalid_notices', 'notice must be a bounded nonempty regular file');
+    }
+    return { archive: `third-party-notices/${relative}`, bytes: await readFile(path.join(directory, relative)) };
+  }
+  const inventory = await bounded('inventory.json');
+  if (inventory.bytes.length > 1024 * 1024) fail('invalid_notices', 'notice inventory exceeds its limit');
+  const declaration = JSON.parse(inventory.bytes.toString('utf8'));
+  const licenses = declaration.standard_library?.licenses;
+  if (declaration.schema !== 1 || !Array.isArray(licenses) || !licenses.length || licenses.length > 64
+    || licenses.some(file => typeof file !== 'string' || !/^licenses\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(file))
+    || new Set(licenses).size !== licenses.length) fail('invalid_notices', 'invalid standard-library notice paths');
+  if (!(await lstat(path.join(directory, 'licenses'))).isDirectory()) fail('invalid_notices', 'license directory must not be a symlink');
+  const files = [inventory];
+  for (const relative of ['README.md', 'frontend.md', 'rust.md', 'rust-standard-library.html', 'rust-native-runtime.md', ...licenses]) {
+    files.push(await bounded(relative));
+  }
+  if (files.reduce((total, file) => total + file.bytes.length, 0) > 16 * 1024 * 1024) {
+    fail('invalid_notices', 'notice set exceeds 16 MiB');
+  }
+  return files;
+}
+
 // Ask the macOS binary for its true static identity. This executes only the
 // "version" command, which is documented not to initialize state. Returns null
 // when it cannot run here or returns no successful identity data.
@@ -351,6 +385,7 @@ async function main() {
   };
   const runnerDir = required(flags, 'linux-runners');
   const outDir = required(flags, 'out');
+  const notices = await noticeFiles(flags.has('notices') ? required(flags, 'notices') : null);
   // The source revision is an explicit caller declaration used for build
   // identity; it is never inferred from a digest or probe.
   const revision = flags.get('revision');
@@ -435,7 +470,7 @@ async function main() {
   const publishDir = await mkdtemp(path.join(outDir, '.lintel-publish-'));
   const published = [];
   try {
-    const archives = await buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed, published });
+    const archives = await buildArchives({ outDir, identity, version, revision, cli, runners, notices, publishDir, probed, published });
     const summary = {
       schema: 'lintel.cli-candidates/1',
       version,
@@ -444,6 +479,7 @@ async function main() {
       catalog_version: CATALOG_VERSION,
       source_revision: revision,
       source_revision_note: 'caller-declared build identity; not derived from a digest or probe',
+      notices_included: notices.length > 0,
       archives,
     };
     await publishNoReplace(indexPath, Buffer.from(`${JSON.stringify(summary, null, 2)}\n`), 0o644, publishDir, published);
@@ -472,7 +508,7 @@ async function main() {
   }
 }
 
-async function buildArchives({ outDir, identity, version, revision, cli, runners, publishDir, probed, published }) {
+async function buildArchives({ outDir, identity, version, revision, cli, runners, notices, publishDir, probed, published }) {
 
   const archives = [];
   // Refuse every occupied archive path (regular file, directory, dangling
@@ -495,10 +531,10 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
     // The CLI resolves its remote runners at `dirname(current_exe)/remote-runners`,
     // so the executable lives at bin/lintel and the bundles at bin/remote-runners.
     const entries = [{ archive: 'bin/lintel', bytes: cli[targetId].bytes }];
-    for (const file of runners.files) {
+    for (const file of [...runners.files, ...notices]) {
       const destination = path.join(stage, file.archive);
       await mkdir(path.dirname(destination), { recursive: true });
-      await writeFile(destination, file.bytes, { mode: 0o700 });
+      await writeFile(destination, file.bytes, { mode: file.archive.startsWith('third-party-notices/') ? 0o644 : 0o700 });
       entries.push({ archive: file.archive, bytes: file.bytes });
     }
     await writeFile(path.join(stage, 'bin', 'lintel'), cli[targetId].bytes, { mode: 0o755 });
@@ -526,6 +562,7 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
       identity_verified_executed: targetId === 'macos-arm64' && probed !== null,
       signed: false,
       release: false,
+      notices_included: notices.length > 0,
       limits: target.platform === 'macos'
         ? ['requires macOS arm64 (Apple silicon); not notarized or signed']
         : ['static musl build; remote browser component reports browser_component_unavailable'],
@@ -538,7 +575,9 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
     const readme = [
       `${PRODUCT} CLI candidate ${identity} (${targetId})`,
       '',
-      'This is an unsigned development candidate, not a formal release.',
+      'This is an unsigned Preview candidate; packaging does not attest public release or signing.',
+      notices.length ? 'Retain third-party-notices with this installation; it is a dependency superset, not an exact linked SBOM.'
+        : 'Third-party distribution notices were omitted: this package is for local testing only.',
       `Product version: ${version}  Protocol: ${PROTOCOL}  Catalog: ${CATALOG_VERSION}`,
       `Source revision (declared build identity): ${revision}`,
       `Input identity source: ${manifest.identity_source} (executed=${manifest.identity_verified_executed})`,

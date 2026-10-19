@@ -2,7 +2,7 @@
 
 2026-10-20 · **Lintel 0.1.0 Preview / 开发预览，尚无正式 Release**。最新本地 macOS arm64 **发行准备候选**是 clean source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 的 App／DMG；随包文档编译 revision 也是该值，包含当前客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。DMG 13,217,299 bytes，SHA-256 `7017b1d0a88068d54956c76b50511ff9503f132ad8d796079f43572e1038cb03`，完整性校验与只读挂载后 App 全文件读回一致；取出 executable 与构建输出相同。App 为 arm64／ad-hoc linker signature，无 Developer ID Team ID，未安装到 Applications、无公证、无公开二进制或 updater feed。本地手动形态记录为 `prepared_local`／`publication_verified:false`；其中 source revision 是构建者声明，准备日期不是公开发行日期。
 
-独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 已准备。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。官网新增五类路由与 English 共 40 页已在本地准备，生产仍只有 clean `c80a783` payload 的历史部署证据，本轮未部署。
+独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 已准备。10-20 发行整理版在不改变任何 executable 字节的前提下，为各 CLI 包加入 18 份与已核验 App 相同的第三方声明及校验覆盖；此前未含声明的本地包保留作历史测试候选。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。官网新增五类路由与 English 共 40 页已在本地准备，生产仍只有 clean `c80a783` payload 的历史部署证据，本轮未部署。
 
 新 `fcae6cb` 已完成真实 native 首用、归档、退出重开、独立阅读与 CLI 交接；配置恢复和残留清理的完整 native 操作先在 `e822d74` 完成，下面保留各自的 source 范围。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 

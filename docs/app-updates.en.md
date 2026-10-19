@@ -43,6 +43,8 @@ The second command only packages the just-built native App; do not reuse an old 
 
 Vite's built-in `build.license` generates frontend licence and copyright texts. The full build runs Vite before the notice generator validates and collects its output; missing or empty text refuses preparation. Native tests may use the resource directory containing only its tracked README, which is not a distribution. Both sets ship under `Contents/Resources/third-party-notices`; retain subdirectories and HTML relative links. Generated output stays out of Git. Third-party terms do not select a licence for Lintel original code, documentation or independent assets. Rights for third-party identity/assets such as Clawd still require separate confirmation.
 
+Standalone CLI distribution archives also retain third-party notices. `package-cli.mjs --notices` reuses the complete directory above, freezes its finite notice/license files and includes them in each archive’s metadata and checksums. First verify that the notices match the actual executables’ build toolchains; current texts cannot attest an unknown older build. Existing synthetic packaging callers that omit notices remain for local testing only.
+
 ## Candidate first-use acceptance
 
 Use a Mac matching the candidate architecture and record the exact DMG, source revision, App version and macOS version. The following is a repeatable native procedure; see [current state](current-state.md) for the latest candidate results. Existing CLI or Chromium checks do not replace native acceptance.

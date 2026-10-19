@@ -365,7 +365,9 @@ migration_path_conflict means actual case/Unicode/path equivalence; approved emp
 
 ### Portable package creation and verification
 
-package-cli.mjs packages **explicitly supplied canonical outputs**: arm64 macOS Mach-O, x86_64/aarch64 static Linux musl ELF and canonical remote-runners. No compile/download/signing; missing/wrong-arch/dynamic/mismatched Linux refuses. Linux CLI inputs must byte-match canonical runner, no mixed candidate. Flat runtime: bin/lintel, bin/remote-runners/manifest.json, bin/remote-runners/<triple>/lintel (both), candidate.json/SHA256SUMS/README.txt. Lookup is dirname(executable)/remote-runners, not archive root. Verify/archive same-read manifest bytes to avoid resource rebuild mixing.
+package-cli.mjs packages **explicitly supplied canonical outputs**: arm64 macOS Mach-O, x86_64/aarch64 static Linux musl ELF and canonical remote-runners. No compile/download/signing; missing/wrong-arch/dynamic/mismatched Linux refuses. Linux CLI inputs must byte-match canonical runner, no mixed candidate. Redistribution preparation supplies `--notices` with the complete notice directory matching the binaries’ build toolchains; see [distribution preparation](app-updates.en.md#local-unsigned-dmg-and-third-party-notices). The finite inventory-listed licenses and notice texts are retained under `third-party-notices/` and covered by candidate file metadata and `SHA256SUMS`. Existing synthetic callers may omit the option; those packages explicitly record `notices_included:false` and are for local testing only. The notice collection is a dependency superset, not an exact linked SBOM.
+
+Flat runtime: bin/lintel, bin/remote-runners/manifest.json, bin/remote-runners/<triple>/lintel (both), candidate.json/SHA256SUMS/README.txt. Lookup is dirname(executable)/remote-runners, not archive root. Verify/archive same-read manifest bytes to avoid resource rebuild mixing.
 
 Each runner ≤32 MiB installer upload, runner_too_large before any archives/index. Mac needs full 64-bit header/arm64/MH_EXECUTE. ELF64 executable/static PIE requires nonzero entry in file-backed executable segment, file size≤memory and no PT_INTERP/DT_NEEDED. Truncated/object/dylib/no-entry shared objects refuse; formats are not other-architecture runtime. Probed/declared versions share safe syntax before filenames.
 
@@ -389,6 +391,7 @@ node scripts/package-cli.mjs \
   --linux-x86_64 target/x86_64-unknown-linux-musl/release/lintel \
   --linux-aarch64 target/aarch64-unknown-linux-musl/release/lintel \
   --linux-runners apps/desktop/src-tauri/runner-bundles \
+  --notices apps/desktop/src-tauri/third-party-notices \
   --revision "$(git rev-parse HEAD)" \
   --out candidate-packages
 ```

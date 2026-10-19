@@ -43,6 +43,8 @@ npm run tauri -- bundle --bundles dmg --ci --no-sign
 
 Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完整构建先运行 Vite，再由同一 notices 生成器验证并收集 frontend 正文，缺失／空正文会拒绝；原生测试可使用只含 tracked README 的资源目录，不能把它当作发行包。两者随 App 放在 `Contents/Resources/third-party-notices`；保留子目录与 HTML 相对引用。生成正文不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。
 
+独立 CLI 分发包也必须随包保留第三方声明。`package-cli.mjs --notices` 复用上述完整目录，冻结其有限正文与 license 文件并纳入各 archive 的 metadata／checksum；应先核对声明对应实际 executable 的构建 toolchain，不能拿新的声明补证未知旧构建。未传声明的既有合成打包调用仍只用于本地测试。
+
 ## 候选首次使用验收
 
 使用与候选架构相符的 Mac，先记录确切 DMG、source revision、App 版本与 macOS 版本。以下是可重复执行的原生操作流程；最新候选的实际结果见 [当前状态](current-state.md)，已有 CLI／Chromium 检查不代替 native 验收。
