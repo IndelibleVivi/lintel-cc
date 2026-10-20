@@ -4,7 +4,7 @@
 
 独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 仍由原 [v0.1.0 prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供；包名保留原候选身份，Linux 为 experimental。10-20 发行整理版在不改变任何 executable 字节的前提下，为各 CLI 包加入 18 份与已核验 App 相同的第三方声明及校验覆盖；此前未含声明的本地包保留作历史测试候选。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。
 
-[官网](https://lintel.page/) 当前线上仍是 clean `815f24be349752b0242cc1fc9a35232d766e4cf3` 的旧下载 payload；0.1.1 下载记录与双语安装指南正在准备本次更新，尚未生产激活。原 [production 8442c39c](https://8442c39c.lintel-aue.pages.dev/) 与 [preview d9718bd4](https://d9718bd4.lintel-aue.pages.dev/) 的 40 路、手机日夜、完整影片和技术 @ 标识保护已分别验收；这些历史观察不代替新 payload 的线上读回。新站点继续使用同一影片和有限静态清单，不启用 updater feed。
+[官网](https://lintel.page/) 已更新到 0.1.1 下载与双语安装指南。当前 payload 来自 clean `d4a92dd22c4185e77257ef882fa8e03c27aed859`；[production cd231fbc](https://cd231fbc.lintel-aue.pages.dev/) 与 [preview b52810ea](https://b52810ea.lintel-aue.pages.dev/) 使用同一 66 项有限 ZIP，经现有 Pages project 的 Dashboard Direct Upload 发布。正式域名 40 路均为 HTTP 200：10 页 HTML 原样一致，30 篇指南仅消费两条自有 `email_off` 注释，正文与技术标识保持原字节、无邮箱解码脚本。下载／来源记录、robots／sitemap、实际脚本与 CSS 均匹配冻结包；未知路径及两条 updater feed 为真正 404。390px 中英日夜下载页无横向溢出，按钮实际下载到 0.1.1 DMG，大小／SHA-256 匹配且保留 Chrome quarantine。首页无第三方 HTTP 资源请求；没有启用 updater。影片沿用原字节，同包 Preview 已完整播放 20.01 秒，关闭暂停／归零／焦点返回通过；本轮不冒认字幕 cue 正文或正式域名 Range 已另行复验。
 
 先前 `fcae6cb` 已完成真实 native 首用、归档、退出重开、独立阅读与 CLI 交接；配置恢复和残留清理的完整 native 操作先在 `e822d74` 完成，下面保留各自的 source 范围。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 
@@ -28,15 +28,15 @@
 | 新包资源与日常入口（`fcae6cb`，10-20） | DMG／全 App／executable 与资源字节核对通过；帮助中的 clean docs revision 及实际打开链接均为 fcae6cb。中英原生菜单、Day／Night／System、动态默认、风景册及跑道跳跃／暂停／重试通过；手动更新检查明确返回 updater_unconfigured，默认后台检查关闭 |
 | 原生 CLI 交接（`fcae6cb`，10-20） | 实际交付 CLI 的本机临时副本字节相同；静态核对返回候选匹配、同 HOME／UID／state，审阅后复制成功且无新 job。原外置宗卷路径读取曾停在 macOS 可移动宗卷隐私授权；未更改权限，该路径未验收，不把系统等待当作 CLI 子进程超时 |
 | 本机回归 | desktop Rust 通过，2 项既有 ignored 不算通过；App matrix 20 项原为 19 passed／1 failed。失败来自 client-control-ui 在 React reinspection 重挂前跳过清草案，补真实挂载／清空等待后完整检查两次通过；保留原 empty-preview 断言并增加零改动行断言。原失败报告仍保留，不标为全绿 |
-| 官网与阅读路径 | 五类路由、15 篇 repo 单源指南及精确 English mirrors，共 40 路静态页面。首页六任务标题进入站内指南；语言／历史保留原游戏、短片、details 与风景状态。真实 20 秒同源影片播放、全部 30 篇中英 guide 的 390px 无 JS 布局、首页 1440／390／320 日夜、无运行错误／第三方请求通过。manual／签名记录的 finite payload 与多通道／无 feed 边界通过合成检查；正式域名最新 40 路／手机日夜／完整影片与无 feed 独立验收通过 |
+| 官网与阅读路径（`d4a92dd`） | 五类路由、15 篇 paired 指南／40 locale 页；正式域名 HTML、元数据与实际 CSS／脚本读回通过，技术 @ 标识保留。中英 390px 日夜、真实官网按钮下载与新 DMG 摘要通过；同 payload 的 Preview 影片完整播放、关闭复位通过。前次网站完整交互与字幕／Range 验收仍保留其原 source 范围 |
 | CLI 与资源 | 当前 native release CLI 的 canonical `cli-candidate` 打包、解包、实际执行、保留 state 升级及实际三平台输入 smoke 通过。两份新 musl runner 为 static ELF／正确架构；其他架构实际执行仍是独立验收，不能从格式检查推断 |
-| 发行与实机边界 | 0.1.1 App 修复版的 4 资产已公开并读回；原 0.1.0 的 8 资产与 CLI 仍保留，App DMG 已标注替代。新官网 payload 尚未激活；Preview 的单 App 信任、干净 Mac、真实认证与生产 browser／SSH 验收分别保留 |
+| 发行与实机边界 | 0.1.1 App 的 4 资产公开并读回，官网 production 已切到同一新 DMG；原 0.1.0 的 8 资产与 CLI 保留，旧 App DMG 标注替代。完整 ad-hoc 封装与 native synthetic 启动通过；Preview 的单 App 信任、干净 Mac、真实认证与生产 browser／SSH 验收分别保留 |
 
 ## 能力与验证 owner
 
 App／CLI 共用 core、有限 SSH 与原任务查询；v5 的 27 项保护字段、客户端配置／残留／身份控制、精确工作选择、流式加密包、独立阅读、有限启动来源、systemd、browser、IPv4／IPv6 与遥测已在源码接通。六任务合同与完整目标分别由 [product baseline](specs/product-baseline.md)、[SPEC](SPEC.md) 维护，不能把源码支持扩大为所有平台实效。
 
-GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。0.1.1 App source／tag target `ebbe237` 的 [GitHub CI 39399056140](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39399056140) 已完成，14 个 jobs（含 aggregate、两平台 heavy 和 Linux VM）全部 success。后续仅维护安装指南与官网的源码、候选和激活另行记录；没有接入自动部署。
+GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。0.1.1 App source／tag target `ebbe237` 的 [GitHub CI 39399056140](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39399056140) 已完成，14 个 jobs（含 aggregate、两平台 heavy 和 Linux VM）全部 success。网站 payload source `d4a92dd` 的 [CI 39403317467](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39403317467) 也已 14 个 jobs 全部 success，包含新 macOS 检查的非 Darwin skip 回归；未把跳过记作通过。没有接入自动部署，以上 production 为本次明确授权的手动激活。
 
 逐轮 source、旧候选资源、CI 和隔离 runtime 证据已移入 [候选历史](candidate-history.md#2026-10-19-归档的阶段证据)，[基线验收](specs/product-baseline-status.md) 保留 A01–A18；具体命令和证据边界见 [验证说明](verification.md)。历史通过不会把本轮未测层标成通过。
 
@@ -51,7 +51,7 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 | 关联组件、保全与完整收尾的后续实现 | [环境覆盖与使用收尾方案](specs/environment-completion-plan.md)；组件清单、容量预检、精确选择、流式包与有限启动来源已接通源码；更多资产、独立完整退场、IDE/Desktop 和发行保留依赖与验收 gates |
 | App 自身更新／本地发行准备 | [App 更新](app-updates.md)；源码可用、发行配置未激活，实际首装／升级独立验收 |
 | 当前 native／browser／Linux 验证边界 | [验证说明](verification.md)、[验收记录](specs/product-baseline-status.md) |
-| 官网、示例与 opt-in 共享游戏 | [正式官网](https://lintel.page/)、[源码说明](../apps/site/README.md)、[托管程序](site-hosting.md)；本轮 40 路、HTTPS／headers、手动下载、手机日夜与真实影片已验收 |
+| 官网、示例与 opt-in 共享游戏 | [正式官网](https://lintel.page/)、[源码说明](../apps/site/README.md)、[托管程序](site-hosting.md)；本轮正式域名 40 路、HTTPS／headers、手动下载与手机日夜已验收；同包 Preview 影片完整播放 |
 | core／SSH／systemd／browser／network | [core](core.md)、[remote](remote.md)、[services](services.md)、[browser](browser.md)、[network](network.md)、[telemetry](telemetry.md) |
 
 统一验证 owner 是 `python3 tests/verify.py`；UI／browser startup／Linux runtime 为独立 selections。dirty 开发 App 的 docs revision 为 unknown；干净候选的 Lintel 文档资源指向自己的源码 revision，main 入口标为最新开发说明；独立 Infra Field Guide 使用自己的 main，标为独立指南最新版。不会开放任意 URL 或 shell。
