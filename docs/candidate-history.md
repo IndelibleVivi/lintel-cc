@@ -1,5 +1,13 @@
 # 开发候选历史证据
 
+<a id="preview-0-1-0-release-history"></a>
+
+## 2026-10-20 · 已被修复版替代的 0.1.0 Preview
+
+2026-10-20 · **[Lintel 0.1.0 开发者 Preview 已发布](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)**。公开 macOS arm64 App／DMG 沿用 clean source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 的已验收产品字节；随包文档编译 revision 也是该值，包含当前客户端控制、逐项／批量保护编辑、动态开关和新版侧栏图标。DMG 13,217,299 bytes，SHA-256 `7017b1d0a88068d54956c76b50511ff9503f132ad8d796079f43572e1038cb03`，完整性校验与只读挂载后 App 全文件读回一致；取出 executable 与构建输出相同。App 为 arm64／ad-hoc linker signature，无 Developer ID Team ID，原发行验收未安装到 Applications、无公证或 updater feed。10-20 后续从官网下载并安装的副本已暴露下述签名封装缺陷。Release 于 `2026-10-19T20:50:02Z` 公开，tag 固定 `2181e72db1ddb4e468226270e05546c62175d471`；8 个资产均经无需登录的公开下载逐字节核对，manual 记录为 `public_bytes_verified`／`publication_verified:true`。构建 source revision 仍是构建者声明，字节一致不构成来源签名。
+
+这份旧 DMG 下载／安装副本字节一致但 bundle 签名无效，后来确认 `Info.plist` 未绑定、资源未封签；不能用原 native 合成试用或字节一致证明官网下载首装。0.1.1 已用完整 ad-hoc bundle 签名修复，旧 Release／tag／8 资产保留并加替代说明，CLI 不受 App 封装缺陷影响。当前发行、安装与 Apple 信任边界见 [current-state](current-state.md)。
+
 ## 2026-10-19 · 已替换的 e822d74 本地包
 
 该轮 App／DMG 的 source 声明为 `e822d748c96cc3d5da8822aebf17e50347e5cf30`，DMG 12,558,680 bytes，SHA-256 `1e6ad6870cadfd3a8f1b421f1a6975bef64091dfbb0b22091cbc98f4a30a25ae`。只读挂载取出后完成了本机 synthetic 首用、工作包、配置恢复与残留恢复，具体范围由 [验证说明](verification.md#2026-10-19-本地候选与官网收束)保留。该 App 的文档资源实际为 latest development/main，未钉定 clean revision；prepare 的 source 声明不改变这一事实。旧包保留，未安装到 Applications、无 Developer ID／公证／公开下载／更新 feed；当前候选已由 [current-state](current-state.md)单独维护。

@@ -347,6 +347,8 @@ def run_check(check: Check, args: argparse.Namespace) -> Dict[str, object]:
     explicit = bool(args.all or getattr(args, "checks", None) or getattr(args, "category", None))
     if check.independent and not explicit:
         return finish(DEFER, check.reason)
+    if check.id == "macos-bundle-signature-test" and platform.system() != "Darwin":
+        return finish(SKIP, "unsupported host; requires macOS codesign and Xcode Command Line Tools")
     if check.id == "cli-candidate" and _cli_package_binary(platform.system(), platform.machine()) is None:
         return finish(SKIP, f"unsupported host {platform.system()}/{platform.machine()}; requires macOS arm64 or Linux x86_64/aarch64")
     if not check.cwd.is_dir():
@@ -507,6 +509,11 @@ def run_self_test(require_passed: bool = False) -> int:
                "opted-in independent check skips (not passes) when prerequisites are missing")
 
         from unittest.mock import patch
+        with patch.object(platform, "system", return_value="Linux"), \
+                patch(__name__ + ".run", side_effect=AssertionError("macOS fixture launched on Linux")):
+            signature_check = next(c for c in CHECKS if c.id == "macos-bundle-signature-test")
+            expect(run_check(signature_check, opted_in)["status"] == SKIP,
+                   "macOS signature fixture skips unsupported hosts instead of recording a pass")
         for machine, arch in (("x86_64", "x86_64"), ("aarch64", "aarch64"), ("arm64", "aarch64")):
             expect(_cli_package_binary("Linux", machine) == ROOT / f"target/{arch}-unknown-linux-musl/release/lintel",
                    f"candidate selects native Linux {machine} binary")

@@ -2,7 +2,7 @@
 
 简体中文（canonical） · [English](app-updates.en.md) · [文档入口](index.md)
 
-本指南说明当前源码中的 macOS App 手动安装、updater 与发行流程。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 的公开 DMG 已确认有 bundle 签名封装缺陷，下载字节虽然一致，安装后仍可能提示“已损坏”。请勿把该旧 DMG 当作已验证安装包；当前源码准备 0.1.1 修复版，是否已发布以 [current-state](current-state.md) 为准。App 没有 Developer ID 签名或 Apple 公证，**没有发行公钥或已激活 feed**。源码、合成检查、候选安装、公开下载与干净 Mac 首装分别记录。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
+本指南说明当前源码中的 macOS App 手动安装、updater 与发行流程。[v0.1.1 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1) 已修复 0.1.0 DMG 的 bundle 签名封装缺陷；新 DMG、双语安装说明与校验清单共四个公开资产已核对实际字节，Chrome 下载副本也已只读挂载并通过内部 App 的严格签名校验。旧 0.1.0 DMG 保留为历史，不应继续安装。App 使用完整 ad-hoc 签名，没有 Developer ID 或 Apple 公证，**没有发行公钥或已激活 feed**。未公证下载仍可能被 Gatekeeper 拒绝；本次观察到“仍要打开”入口，未把单 App 信任例外当作干净 Mac 验收。准确证据见 [current-state](current-state.md)。CLI 仍使用 [Agent CLI](agents.md) 的独立流程与原候选版本。
 
 ## 手动安装开发者 Preview
 
