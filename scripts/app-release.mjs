@@ -235,7 +235,7 @@ async function main(){
   if(record.previous_version!==current)fail('Build previous_version must match current source App version');
   const actual=spawnSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8'}),dirty=spawnSync('git',['status','--porcelain'],{cwd:repo,encoding:'utf8'});
   if(actual.status!==0||dirty.status!==0||actual.stdout.trim()!==record.source_revision||dirty.stdout.trim())fail('Release build requires a clean exact source revision declaration');
-  const result=spawnSync(process.execPath,[path.join(repo,'apps/desktop/node_modules/@tauri-apps/cli/tauri.js'),'build','--target',target,'--config',JSON.stringify(buildConfiguration(record))],{cwd:path.join(repo,'apps/desktop'),stdio:'inherit',env:{...process.env,LINTEL_APP_VERSION:record.version}});
+  const result=spawnSync(process.execPath,[path.join(repo,'apps/desktop/scripts/build-macos-app.mjs'),'--target',target,'--config',JSON.stringify(buildConfiguration(record)),'--require-developer-id'],{cwd:path.join(repo,'apps/desktop'),stdio:'inherit',env:{...process.env,LINTEL_REQUIRE_FORMAL_SIGNING:'1'}});
   if(result.status!==0)fail('Release build failed');return;
  }
  out=path.resolve(out);await absent(out);

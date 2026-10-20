@@ -1,6 +1,6 @@
 {
   "name": "lintel-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "prepare:third-party-notices": "node ../../scripts/prepare-rust-notices.mjs",
     "build:desktop-resources": "npm run prepare:browser-host && npm run prepare:browser-extension && npm run build && npm run prepare:third-party-notices",
     "tauri": "tauri",
-    "desktop:build": "tauri build --bundles app"
+    "desktop:build": "node scripts/build-macos-app.mjs",
+    "desktop:build:macos-preview": "node scripts/build-macos-app.mjs --bundles app,dmg --ci"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",

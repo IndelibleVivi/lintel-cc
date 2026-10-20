@@ -2,7 +2,21 @@
 
 简体中文（canonical） · [English](app-updates.en.md) · [文档入口](index.md)
 
-本指南说明当前源码中的 macOS App updater 与发行流程。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已公开 8 个手动下载资产并核对实际字节；App 没有 Developer ID 签名或 Apple 公证，**没有发行公钥或已激活 feed**。干净 Mac 下载首装仍未验收。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 [current-state](current-state.md)。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
+本指南说明当前源码中的 macOS App 手动安装、updater 与发行流程。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 的公开 DMG 已确认有 bundle 签名封装缺陷，下载字节虽然一致，安装后仍可能提示“已损坏”。请勿把该旧 DMG 当作已验证安装包；当前源码准备 0.1.1 修复版，是否已发布以 [current-state](current-state.md) 为准。App 没有 Developer ID 签名或 Apple 公证，**没有发行公钥或已激活 feed**。源码、合成检查、候选安装、公开下载与干净 Mac 首装分别记录。CLI 版本安装仍使用 [Agent CLI](agents.md) 的独立流程。
+
+## 手动安装开发者 Preview
+
+1. 从 [官网](https://lintel.page/download/) 或当前 GitHub Preview Release 下载对应架构的 DMG，并阅读同一 Release 的安装说明；目前 App 仅提供 Apple Silicon。先将 DMG 的 `shasum -a 256` 结果与该 Release 的 `SHA256SUMS` 对照。校验和只证明下载字节一致，不证明 Apple 认证或可安装。
+2. 退出其它 Lintel 副本，打开 DMG，将 `Lintel.app` 拖入“应用程序”。需要替换旧版本时先保留旧 App；用户资料和任务记录独立于 App bundle，不要删除它们来重试启动。
+3. 首次打开可能遇到未认证开发者／未公证提示。仅当你已核对来源并决定信任这份 Preview 时，按 [Apple 的单 App 例外说明](https://support.apple.com/102445)，到“系统设置 → 隐私与安全性”查看“仍要打开”，再由你确认。这个选择不关闭全局 Gatekeeper；不同系统或管理策略可能不提供该选项。
+4. 如果仍提示“已损坏”，先取消，不反复重装或修改全局安全设置。核对版本与下载校验和，并运行下面的只读检查；保留完整错误供报告。严格签名通过仍不代表 Developer ID、公证或 Gatekeeper 接受。
+
+   ```sh
+   codesign --verify --deep --strict --verbose=4 /Applications/Lintel.app
+   codesign -dvvv /Applications/Lintel.app
+   ```
+
+本机移除单个 App 下载隔离标记属于另一项明确的信任例外，构建、安装器和 App 不会自动执行。项目不会提供关闭全局 Gatekeeper 的安装步骤。
 
 ## 在 App 中使用
 
@@ -27,17 +41,29 @@
 
 SemVer 只按 precedence 比较：`0.1.0-preview.1` 低于 `0.1.0`，`+build` 不提高优先级，相同版本不能作为升级。下一次 preview 可使用高于当前版本的 `0.2.0-preview.1`。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub `releases/latest` 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。
 
-## 本地未签名 DMG 与第三方说明
+<a id="本地未签名-dmg-与第三方说明"></a>
 
-没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。它是本地开发候选，不能据此宣称 Gatekeeper 首装通过或激活下载／updater。先准备两种 Linux runner（如需内置安装能力），在 clean source 上运行：
+## 本地 Preview DMG 与第三方说明
+
+没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。Preview 仍必须有完整的 bundle 级 ad-hoc 签名：`Info.plist` 要进入签名，`Contents/Resources` 要被封签。它不同于 Developer ID，也不证明 Gatekeeper 首装或公证通过；构建本身不会发布下载或激活 updater。不要使用 `--no-sign`；统一入口在 App 资源组装完成后签名，再生成 DMG。
+
+先准备两种 Linux runner（如需内置安装能力），并在 clean source 上运行受控入口。它沿用调用者的 Tauri/Cargo target 缓存和工具链环境；只有 `tauri.conf.json` 的非空 `signingIdentity`、`APPLE_SIGNING_IDENTITY` 与 `APPLE_CERTIFICATE` 均不存在时，才为本次本地构建增加 ad-hoc fallback：
 
 ```sh
 cd apps/desktop
-npm run desktop:build
-npm run tauri -- bundle --bundles dmg --ci --no-sign
+npm run desktop:build:macos-preview -- \
+  --out "/path/to/new/lintel-preview-$(date +%Y%m%d-%H%M%S)"
 ```
 
-第二条命令只包装刚构建的 native App；不要在源码改变后复用旧 executable。默认输出在 `src-tauri/target/release/bundle/dmg/`。把候选另存到一个新的 ignored 目录，记录 source revision、架构和实际检查结果，保留旧包；不自动覆盖 Applications，不绕过 Gatekeeper。Apple 签名、公证、真实首装、GitHub Release、官网下载和 feed 仍是独立步骤。
+该入口要求候选目录尚不存在，不覆盖已有内容；同一次 `tauri build --bundles app,dmg` 完成 App 封装签名与 DMG 生成，然后调用 `scripts/verify-macos-bundle.mjs`。gate 会拒绝 linker-only、plist 未进入签名、没有资源封签或严格验证失败的 App，并通过 `codesign -dvvv` 读取 `Info.plist entries`、`Sealed Resources version/files`，不靠忽略 `codesign --verify` 输出来放大成功范围。资源或 plist 在签名后被改动会失败。复制到候选目录的 App 会再次通过 gate；DMG 只复制，不声称已有 DMG 签名、只读挂载或内部 App 读回证据。
+
+如果只需要检查已存在的受控 bundle：
+
+```sh
+node scripts/verify-macos-bundle.mjs /path/to/Lintel.app
+```
+
+记录 source revision、架构、实际检查结果并保留旧包；不自动覆盖 Applications，不绕过 Gatekeeper。Apple Developer ID、公证、真实首装、GitHub Release、官网下载和 feed 仍是独立步骤。`macos-bundle-signature-test` 用 synthetic App 证明旧 linker-only 失败、完整 bundle ad-hoc 通过以及 resource/plist tamper 被拒绝；它不运行 native App，也不替代真实候选构建。
 
 `build:desktop-resources` 自动运行 `scripts/prepare-rust-notices.mjs`，从三个锁定 Cargo manifest 离线收集目标相关的 normal/build 依赖和当前 Rust 标准库许可；需要 `rust-docs` 与已缓存的依赖，缺少正文或精确 upstream 证据会拒绝准备。它包含 build/proc-macro 依赖超集，不是 exact linked SBOM。`contracts/third-party-notices` 保存版本绑定的补充正文与来源；旧 runner 必须保留其原 toolchain 说明，不能把当前 toolchain 说明当成旧二进制的构建证明。
 

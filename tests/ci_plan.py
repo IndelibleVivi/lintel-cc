@@ -203,6 +203,7 @@ VM_CHECKS: Tuple[str, ...] = ("linux-vm-runtime",)
 EXCLUDED_FROM_CI: Dict[str, str] = {
     "work-scale": "release-capacity runtime evidence (four 256 MiB members, >=16 GiB temp free); explicitly local/manual, not routine CI",
     "desktop-tauri-bundle": "native macOS Tauri bundle + real WebKit build; needs macOS/Xcode and stays out of the synthetic Linux-first matrix",
+    "macos-bundle-signature-test": "macOS codesign/clang synthetic bundle proof; not available on Linux and not a native App launch",
 }
 
 LINUX = "ubuntu-24.04"

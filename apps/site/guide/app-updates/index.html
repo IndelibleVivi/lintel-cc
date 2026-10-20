@@ -37,7 +37,12 @@
       <article class="guide-body" data-guide-document="app-updates">
         <h1 id="lintel-app-更新与发行准备">Lintel App 更新与发行准备</h1>
 <p>简体中文（canonical） · <a href="/guide/app-updates/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
-<p>本指南说明当前源码中的 macOS App updater 与发行流程。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 已公开 8 个手动下载资产并核对实际字节；App 没有 Developer ID 签名或 Apple 公证，<strong>没有发行公钥或已激活 feed</strong>。干净 Mac 下载首装仍未验收。源码接通、合成测试、构建、安装、公开 Release 和生产 feed 分别成立；准确证据见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state</a>。CLI 版本安装仍使用 <a href="/guide/agents/">Agent CLI</a> 的独立流程。</p>
+<p>本指南说明当前源码中的 macOS App 手动安装、updater 与发行流程。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 的公开 DMG 已确认有 bundle 签名封装缺陷，下载字节虽然一致，安装后仍可能提示“已损坏”。请勿把该旧 DMG 当作已验证安装包；当前源码准备 0.1.1 修复版，是否已发布以 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state</a> 为准。App 没有 Developer ID 签名或 Apple 公证，<strong>没有发行公钥或已激活 feed</strong>。源码、合成检查、候选安装、公开下载与干净 Mac 首装分别记录。CLI 版本安装仍使用 <a href="/guide/agents/">Agent CLI</a> 的独立流程。</p>
+<h2 id="手动安装开发者-preview">手动安装开发者 Preview</h2>
+<ol><li>从 <a href="https://lintel.page/download/">官网</a> 或当前 GitHub Preview Release 下载对应架构的 DMG，并阅读同一 Release 的安装说明；目前 App 仅提供 Apple Silicon。先将 DMG 的 <code>shasum -a 256</code> 结果与该 Release 的 <code>SHA256SUMS</code> 对照。校验和只证明下载字节一致，不证明 Apple 认证或可安装。</li><li>退出其它 Lintel 副本，打开 DMG，将 <code>Lintel.app</code> 拖入“应用程序”。需要替换旧版本时先保留旧 App；用户资料和任务记录独立于 App bundle，不要删除它们来重试启动。</li><li>首次打开可能遇到未认证开发者／未公证提示。仅当你已核对来源并决定信任这份 Preview 时，按 <a href="https://support.apple.com/102445">Apple 的单 App 例外说明</a>，到“系统设置 → 隐私与安全性”查看“仍要打开”，再由你确认。这个选择不关闭全局 Gatekeeper；不同系统或管理策略可能不提供该选项。</li><li>如果仍提示“已损坏”，先取消，不反复重装或修改全局安全设置。核对版本与下载校验和，并运行下面的只读检查；保留完整错误供报告。严格签名通过仍不代表 Developer ID、公证或 Gatekeeper 接受。</li></ol>
+<pre class="guide-code" data-language="sh"><code>   codesign --verify --deep --strict --verbose=4 /Applications/Lintel.app
+   codesign -dvvv /Applications/Lintel.app</code></pre>
+<p>本机移除单个 App 下载隔离标记属于另一项明确的信任例外，构建、安装器和 App 不会自动执行。项目不会提供关闭全局 Gatekeeper 的安装步骤。</p>
 <h2 id="在-app-中使用">在 App 中使用</h2>
 <p>打开“设置与模块 → Lintel 版本与更新”。版本来自 native App 的 package metadata；通道由构建固定，不能通过 Webview 请求任意 URL、公钥、降级或安装器参数。</p>
 <ol><li><strong>检查更新。</strong> 手动检查访问固定的 <code>https://lintel.page/updates/preview.json</code> 或 <code>stable.json</code>。未配置构建明确显示不可用；离线、无 feed、响应不合规均是错误，不显示“已经最新”。成功检查只说明该通道没有更高版本或有候选。</li><li><strong>下载并核验。</strong> 使用官方 Tauri updater 验证下载字节与签名，再核对签名 trusted comment 中的版本。下载完成事件还不是核验通过。候选冻结版本、签名、URL 与本次 ID；重新检查会使旧候选失效。</li><li><strong>审阅并安装。</strong> 勾选当前候选并批准后才替换 App。native 层排除本 App 正在执行的 core、browser、SSH 和 network 操作，并拒绝仍有活跃受控代理的安装。下载与检查可以独立进行。安装前持久化原意图；写入未确认则不进入安装。</li><li><strong>保存好工作后重启。</strong> 安装不自动重启。再次检查 native activity 与代理后才接受显式重启；请先保存编辑中的交接稿。外部 Claude 会话和已 detached 的远端任务不由 updater 杀掉，原任务仍按原 ID 查询。</li></ol>
@@ -48,12 +53,17 @@
 <p>同用户多个 App 副本共用记录时，锁与读回比较阻止旧副本覆盖新意图。activity 与代理检查只覆盖当前 App 进程，不能证明其它 App 副本、CLI 或外部程序已停；安装前关闭其它 Lintel 副本。记录损坏或外部改写会明确拒绝，保留文件供核对。</p>
 <p>取消操作等待不会提前释放仍在运行的 blocking core 检查；通道停止等待被取消时，未结束的原通道仍挡住安装，后续显式停止继续核对同一任务。</p>
 <p>SemVer 只按 precedence 比较：<code>0.1.0-preview.1</code> 低于 <code>0.1.0</code>，<code>+build</code> 不提高优先级，相同版本不能作为升级。下一次 preview 可使用高于当前版本的 <code>0.2.0-preview.1</code>。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub <code>releases/latest</code> 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。</p>
-<h2 id="本地未签名-dmg-与第三方说明">本地未签名 DMG 与第三方说明</h2>
-<p>没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。它是本地开发候选，不能据此宣称 Gatekeeper 首装通过或激活下载／updater。先准备两种 Linux runner（如需内置安装能力），在 clean source 上运行：</p>
+<a id="本地未签名-dmg-与第三方说明"></a>
+<h2 id="本地-preview-dmg-与第三方说明">本地 Preview DMG 与第三方说明</h2>
+<p>没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。Preview 仍必须有完整的 bundle 级 ad-hoc 签名：<code>Info.plist</code> 要进入签名，<code>Contents/Resources</code> 要被封签。它不同于 Developer ID，也不证明 Gatekeeper 首装或公证通过；构建本身不会发布下载或激活 updater。不要使用 <code>--no-sign</code>；统一入口在 App 资源组装完成后签名，再生成 DMG。</p>
+<p>先准备两种 Linux runner（如需内置安装能力），并在 clean source 上运行受控入口。它沿用调用者的 Tauri/Cargo target 缓存和工具链环境；只有 <code>tauri.conf.json</code> 的非空 <code>signingIdentity</code>、<code>APPLE_SIGNING_IDENTITY</code> 与 <code>APPLE_CERTIFICATE</code> 均不存在时，才为本次本地构建增加 ad-hoc fallback：</p>
 <pre class="guide-code" data-language="sh"><code>cd apps/desktop
-npm run desktop:build
-npm run tauri -- bundle --bundles dmg --ci --no-sign</code></pre>
-<p>第二条命令只包装刚构建的 native App；不要在源码改变后复用旧 executable。默认输出在 <code>src-tauri/target/release/bundle/dmg/</code>。把候选另存到一个新的 ignored 目录，记录 source revision、架构和实际检查结果，保留旧包；不自动覆盖 Applications，不绕过 Gatekeeper。Apple 签名、公证、真实首装、GitHub Release、官网下载和 feed 仍是独立步骤。</p>
+npm run desktop:build:macos-preview -- \
+  --out &quot;/path/to/new/lintel-preview-$(date +%Y%m%d-%H%M%S)&quot;</code></pre>
+<p>该入口要求候选目录尚不存在，不覆盖已有内容；同一次 <code>tauri build --bundles app,dmg</code> 完成 App 封装签名与 DMG 生成，然后调用 <code>scripts/verify-macos-bundle.mjs</code>。gate 会拒绝 linker-only、plist 未进入签名、没有资源封签或严格验证失败的 App，并通过 <code>codesign -dvvv</code> 读取 <code>Info.plist entries</code>、<code>Sealed Resources version/files</code>，不靠忽略 <code>codesign --verify</code> 输出来放大成功范围。资源或 plist 在签名后被改动会失败。复制到候选目录的 App 会再次通过 gate；DMG 只复制，不声称已有 DMG 签名、只读挂载或内部 App 读回证据。</p>
+<p>如果只需要检查已存在的受控 bundle：</p>
+<pre class="guide-code" data-language="sh"><code>node scripts/verify-macos-bundle.mjs /path/to/Lintel.app</code></pre>
+<p>记录 source revision、架构、实际检查结果并保留旧包；不自动覆盖 Applications，不绕过 Gatekeeper。Apple Developer ID、公证、真实首装、GitHub Release、官网下载和 feed 仍是独立步骤。<code>macos-bundle-signature-test</code> 用 synthetic App 证明旧 linker-only 失败、完整 bundle ad-hoc 通过以及 resource/plist tamper 被拒绝；它不运行 native App，也不替代真实候选构建。</p>
 <p><code>build:desktop-resources</code> 自动运行 <code>scripts/prepare-rust-notices.mjs</code>，从三个锁定 Cargo manifest 离线收集目标相关的 normal/build 依赖和当前 Rust 标准库许可；需要 <code>rust-docs</code> 与已缓存的依赖，缺少正文或精确 upstream 证据会拒绝准备。它包含 build/proc-macro 依赖超集，不是 exact linked SBOM。<code>contracts/third-party-notices</code> 保存版本绑定的补充正文与来源；旧 runner 必须保留其原 toolchain 说明，不能把当前 toolchain 说明当成旧二进制的构建证明。</p>
 <p>Vite 使用内置 <code>build.license</code> 生成 frontend 的许可与版权正文。完整构建先运行 Vite，再由同一 notices 生成器验证并收集 frontend 正文，缺失／空正文会拒绝；原生测试可使用只含 tracked README 的资源目录，不能把它当作发行包。两者随 App 放在 <code>Contents/Resources/third-party-notices</code>；保留子目录与 HTML 相对引用。生成正文不进入 Git。第三方声明不改变 Lintel 原创代码、文档或独立资产的许可选择；Clawd 等第三方身份／资产的授权仍需独立核对。</p>
 <p>独立 CLI 分发包也必须随包保留第三方声明。<code>package-cli.mjs --notices</code> 复用上述完整目录，冻结其有限正文与 license 文件并纳入各 archive 的 metadata／checksum；应先核对声明对应实际 executable 的构建 toolchain，不能拿新的声明补证未知旧构建。未传声明的既有合成打包调用仍只用于本地测试。</p>

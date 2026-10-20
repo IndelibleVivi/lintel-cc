@@ -64,7 +64,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared connected silhouette, tap/hold-release jumps, normal/high reachable stars, collision/cancellation, four obstacle families, generated pacing and 320px visible-input clearance/landing at 30/60/144fps, no dependencies) |
 | `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
-| `app-release-test` | js | strict SemVer, actual disposable Ed25519 artifact/comment/version verification, synthetic App identity/architecture and finite website metadata packaging |
+| `app-release-test` | js | strict SemVer, actual disposable Ed25519 artifact/comment/version verification, synthetic App identity/architecture, macOS build/signing argument priority and output selection, and finite website metadata packaging |
+| `macos-bundle-signature-test` | independent | synthetic macOS App with a linker-only signature, a bundle-level ad-hoc signature, and resource/Info.plist tamper; Darwin/Xcode only |
 | `rust-notices-test` | js, explicit-only | locked Cargo graph selection, exact-version upstream evidence and missing/invalid notice rejection; no network or production licence changes |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
 | `python-ssh-test` | python | `python3 -m unittest discover -s platform/ssh/tests` (fake SSH transport, synthetic state) |
@@ -377,6 +378,7 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `clawd-app-ui` | Built desktop frontend and Playwright Chromium; shared game lifecycle through the App with an empty synthetic inventory. |
 | `linux-vm-runtime` | Linux x86_64, static musl runner, QEMU, cloud-image-utils, OpenSSH client, gpgv and Ubuntu cloud-image public keyring. Creates a disposable Ubuntu guest with real systemd/PAM, synthetic services and users; host policy and production VPS remain outside the test. |
 | `desktop-tauri-bundle` | macOS host and Xcode Command Line Tools; builds the native app bundle (`npm run desktop:build`). |
+| `macos-bundle-signature-test` | macOS host, Xcode Command Line Tools and a temporary synthetic App. It proves only signature gate behavior; it does not build or launch a product App. |
 
 CLI candidate packaging has its own explicit selection:
 

@@ -2,7 +2,21 @@
 
 [简体中文 (canonical)](app-updates.md) · English · [Documentation](index.en.md)
 
-This guide describes the macOS App updater in current source and the release procedure. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) publishes eight manual-download assets whose public bytes were checked. The App has no Developer ID signing or Apple notarization, and **no release public key or activated feed**. Clean-Mac download/install remains unverified. Source integration, synthetic tests, builds, installation, public Releases and production feeds are separate facts; see [current state (Chinese)](current-state.md) for exact evidence. CLI version installation retains the separate [Agent CLI](agents.en.md) procedure.
+This guide covers manual installation, the macOS App updater and release preparation. The public DMG in the [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) has a confirmed bundle-signing defect: matching download bytes can still produce a damaged-app warning after installation. Do not treat that old DMG as an accepted installer. Current source prepares the 0.1.1 repair; see [current state (Chinese)](current-state.md) for publication status. The App has no Developer ID signing or Apple notarization, and **no release public key or activated feed**. Source, synthetic checks, candidate installation, public downloads and clean-Mac first installation are recorded separately. CLI installation retains the separate [Agent CLI](agents.en.md) procedure.
+
+## Manually installing the developer Preview
+
+1. Download the matching DMG from the [website](https://lintel.page/en/download/) or current GitHub Preview Release, and read that Release's installation notes. The App currently supports Apple Silicon only. Compare `shasum -a 256` for the DMG with `SHA256SUMS` from the same Release. A checksum establishes matching bytes, not Apple authentication or installability.
+2. Quit other Lintel copies, open the DMG and drag `Lintel.app` into Applications. Keep the previous App before replacing it. User materials and task records live separately from the App bundle; do not delete them to retry startup.
+3. First launch may show an unidentified-developer or notarization warning. Only after checking the source and deciding to trust this Preview, follow [Apple's per-App exception instructions](https://support.apple.com/102445): look for Open Anyway in System Settings → Privacy & Security, then confirm it yourself. This does not disable global Gatekeeper. Some systems or management policies may not offer the option.
+4. If the App is still reported as damaged, cancel first. Do not repeatedly reinstall or change global security settings. Check the version and download checksum, then run the read-only checks below and retain the full error for a report. A valid strict signature still does not establish Developer ID, notarization or Gatekeeper acceptance.
+
+   ```sh
+   codesign --verify --deep --strict --verbose=4 /Applications/Lintel.app
+   codesign -dvvv /Applications/Lintel.app
+   ```
+
+Removing one App's download quarantine is a separate, explicit trust exception. The build, installer and App never do it automatically. This project does not provide instructions to disable global Gatekeeper.
 
 ## Using the App
 
@@ -27,17 +41,29 @@ Cancelling an operation wait does not release a still-running blocking core chec
 
 SemVer comparisons use precedence only: `0.1.0-preview.1` is lower than `0.1.0`; `+build` does not increase precedence; an equal version is not an upgrade. A next preview can use `0.2.0-preview.1`, higher than the current version. Preview and stable feeds are separate; stable accepts no prereleases. Preview selection does not use GitHub `releases/latest`. Older installed Apps without the updater/public key need one manual upgrade.
 
-## Local unsigned DMG and third-party notices
+<a id="local-unsigned-dmg-and-third-party-notices"></a>
 
-A DMG can still be built locally without Developer ID for retention and inspection. It remains a local development candidate; packaging does not establish Gatekeeper first-install acceptance or activate downloads/the updater. Prepare both Linux runners first if bundling their installation capability, then use clean source:
+## Local Preview DMG and third-party notices
+
+A DMG can still be built locally without Developer ID for inspection. A Preview must have a complete bundle-level ad-hoc signature: `Info.plist` must be included and `Contents/Resources` sealed. This is distinct from Developer ID and does not establish notarization or Gatekeeper first-install acceptance. A build alone neither publishes downloads nor activates the updater. Do not use `--no-sign`; the shared entry signs the fully assembled App before generating the DMG.
+
+Prepare both Linux runners first if bundling their installation capability, then use clean source and the controlled entry below. It reuses the caller's Tauri/Cargo target cache and toolchain environment. Only when the config has no nonempty `signingIdentity` and neither `APPLE_SIGNING_IDENTITY` nor `APPLE_CERTIFICATE` is present does it add an ad-hoc fallback for this local build:
 
 ```sh
 cd apps/desktop
-npm run desktop:build
-npm run tauri -- bundle --bundles dmg --ci --no-sign
+npm run desktop:build:macos-preview -- \
+  --out "/path/to/new/lintel-preview-$(date +%Y%m%d-%H%M%S)"
 ```
 
-The second command only packages the just-built native App; do not reuse an old executable after changing source. Default output is `src-tauri/target/release/bundle/dmg/`. Preserve each candidate in a new ignored directory with its source revision, architecture and actual checks, retaining previous packages. This neither replaces Applications nor bypasses Gatekeeper. Apple signing, notarization, real first installation, GitHub Release, website downloads and feed activation remain separate steps.
+The entry requires a new candidate directory and never overwrites existing content. One `tauri build --bundles app,dmg` signs the assembled App and generates the DMG, then `scripts/verify-macos-bundle.mjs` rejects linker-only output, an unsigned Info.plist, an absent resource seal and strict-verification failures. It reads `Info.plist entries` and `Sealed Resources version/files` from `codesign -dvvv`; it never turns success by filtering `codesign --verify` output. Changing a signed resource or the plist fails. The copied App passes the gate again; the DMG is copied only, with no claim of DMG signing, read-only mounting or verification of its contained App.
+
+To check an already controlled bundle:
+
+```sh
+node scripts/verify-macos-bundle.mjs /path/to/Lintel.app
+```
+
+Preserve each candidate with its source revision, architecture and actual checks, retaining previous packages. This neither replaces Applications nor bypasses Gatekeeper. Apple Developer ID, notarization, real first installation, GitHub Release, website downloads and feed activation remain separate steps. `macos-bundle-signature-test` uses a synthetic App to prove that the old linker-only state fails, a complete bundle-level ad-hoc signature passes, and resource/plist tamper is rejected. It neither runs the native App nor replaces a real candidate build.
 
 `build:desktop-resources` automatically runs `scripts/prepare-rust-notices.mjs` to collect target-relevant normal/build dependencies from three locked Cargo manifests offline, plus current Rust standard-library notices. It requires `rust-docs` and cached dependencies; missing text or exact upstream evidence refuses preparation. The collection includes build/proc-macro dependencies and is not an exact linked SBOM. `contracts/third-party-notices` retains version-bound supplements and sources. Reused runners require their original toolchain notices; current toolchain text is not proof of how an older binary was built.
 

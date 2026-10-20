@@ -8,7 +8,7 @@
 
 Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、加密保全指令和会话、清理重建环境，以及管理具体浏览器 profile 和 SSH 主机。App 与 CLI 共用执行核心；修改前查看目标与变化，执行后核对结果，需要恢复时保留后续编辑。
 
-**0.1.0 开发者 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 手动下载 Apple Silicon macOS App 或三平台 CLI，先阅读对应 INSTALL 与 SHA256SUMS。8 个公开资产已逐一下载核对；App 沿用已验收的 clean `fcae6cb` 产品字节。当前没有 Developer ID 签名、Apple 公证或 updater feed；干净 Mac 下载首装未验证，系统阻止时停止并使用下方源码试用。准确来源、平台与 native 验收范围见[当前状态](docs/current-state.md)。
+**0.1.0 开发者 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 手动下载 Apple Silicon macOS App 或三平台 CLI，先阅读对应 INSTALL 与 SHA256SUMS。8 个公开资产已逐一下载核对；App 沿用已验收的 clean `fcae6cb` 产品字节。**当前 macOS DMG 已确认存在 App bundle 签名封装缺陷，下载后可能提示“已损坏”；请暂缓使用该 DMG，先使用下方源码试用。** 下载字节一致不能证明可安装。修复中的候选与公开包分开记录；当前没有 Developer ID 签名、Apple 公证或 updater feed。准确来源、平台与 native 验收范围见[当前状态](docs/current-state.md)。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
