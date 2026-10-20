@@ -28,6 +28,12 @@ App 顶栏保留主机／环境；主机选择器左侧的终端入口只用橙�
 
 概念短片由 [`film.tsx`](../assets/preview/film.tsx) 与[本地制作入口](../scripts/preview-film/README.md)维护：20 秒 1080p／60fps 的字符空间与连续镜头，原创音乐／SFX 和可选本地英文配音；生成媒体不进 Git，也不是 App 操作录像。身份图形仍为原始平面投影，镜头可以穿过开口；独立橙色光标在叙事中跟随原件、审阅和过桥动作，收尾回到 canonical 字标完整橙脚。动态投影不改变静态身份源或官网字标行为。文件汇入工作包、Preview／Approve／Verify 和带包过桥是概念说明，不制造 App 回执。电影角色从 shared runner 的 connected Sprite／深色眼睛生成清晰矢量，不放大插画里的低分辨率小裁片；脚跟随同一桥拱，前栏可遮挡下部，背景字符不会透进身体。仅整体微小起伏，不另画脚或摆腿，包裹随身。音乐、动作音与 speech 独立保留；原生演示的真实截图、合成数据和剪辑标记保持单独说明。官网首屏只留安静的短片链接，主动打开深色原生 dialog 后再播放；保留原生声音／字幕／全屏控件，关闭停声并复位，同源托管且不预取电影。
 
+## 社交介绍材料
+
+[`assets/preview/launch/cards.mjs`](../assets/preview/launch/cards.mjs) 维护三组双语图文：产品概览六页、工作资料五页、环境配置与本地状态五页；[`prepare-social-posts.mjs`](../scripts/prepare-social-posts.mjs) 分别排版 1080×1440 和 1920×1080。产品全称为 **Claude Code 环境与资料管理器**；总览同时覆盖环境配置、工作会话、本地状态、变化恢复、浏览器网络和 SSH／CLI／Agent，不能用归档迁移替代完整产品身份。页面用具体对象与动作说明用途，不新增含糊口号。
+
+原生截图、裁切编辑、合成示例与概念插画分别标注；英文图使用中文阅读器时明确写 Chinese UI。视频封面由 [`prepare-video-covers.mjs`](../scripts/prepare-video-covers.mjs) 维护中英 1920×1080、1080×1440、1080×1920 三种构图，使用原概念片画面与 canonical 字标，不把成品横图整体裁成竖图。PNG、可编辑 HTML 和 QA 留在本地导出目录；真实生成、视觉检查、owner 审美接受与社交上传分别记录。操作与导出说明见[组图](../assets/preview/launch/README.md)和[视频封面](../assets/preview/video-covers/README.md)。
+
 ## 保留的关系
 
 - **纸面外壳：** 温暖纸色、serif 标题、细线与留白。

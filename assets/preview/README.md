@@ -10,7 +10,9 @@ a Release, configure hosting or upload a GitHub social preview.
 | `lintel-social-preview.svg` / `.png` | Share composition, 1280 × 720 |
 | `film.tsx` / `player.html` | Editable 20-second concept intro and opt-in local player; MP4/audio/bundle outputs stay ignored |
 | `diagrams/` | Selected user work journey, zh-CN + en editable SVG/portable PNG pairs |
-| `screenshots/` | Unedited native App captures using synthetic data, with source and locale provenance |
+| `screenshots/` | Native App captures and one visibly cropped/edited detail, using synthetic data with locale/source provenance |
+| `launch/` | Paired 6/5/5 social-card copy and code-rendered portrait/landscape compositions; generated exports stay outside Git |
+| `video-covers/` | Dedicated bilingual 16:9, 3:4 and 9:16 concept-film cover compositions; generated exports stay outside Git |
 | `asset-index.json` | Finite source/purpose index for the selected README visuals |
 
 The composition follows the supplied concept's fine character forest, layered

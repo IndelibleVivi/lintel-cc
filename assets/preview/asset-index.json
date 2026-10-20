@@ -1,7 +1,7 @@
 {
   "index_version": 1,
   "updated": "2026-10-20",
-  "note": "Selected public README visuals only. Chinese README owns the entrance; English has its actual native locale capture. No release or owner aesthetic acceptance is implied.",
+  "note": "Selected public README and publication-source visuals. Chinese README owns the product entrance; English home captures show their actual locale. Publication artwork and rendering do not imply owner aesthetic acceptance or social upload.",
   "assets": [
     {
       "id": "native.home",
@@ -50,6 +50,27 @@
       "purpose": "Existing landscape/share composition used as a link cover for the concept film, not a native UI frame.",
       "film_source": "film.tsx",
       "production_guide": "../../scripts/preview-film/README.md"
+    },
+    {
+      "id": "native.archive-selection-detail",
+      "file": "screenshots/native-archive-selection-crop.zh-CN.png",
+      "source_revision": "fcae6cb1efb50c6384a31ddce161bee6a39646e0",
+      "captured_at": "2026-10-20",
+      "version": "0.1.0 Preview",
+      "language": "zh-CN",
+      "capture": "Actual native WebKit archive plan using synthetic files. Fixed selection-region crop with visible REAL APP / SYNTHETIC DATA / CROPPED / EDITED label.",
+      "edit": "Crop and explicit caption only; no native text/control replacement. Private source-root header excluded.",
+      "purpose": "Show the three exact selected synthetic files; does not depict the complete target/approval dialog."
+    },
+    {
+      "id": "native.work-reader",
+      "file": "screenshots/native-reader.zh-CN.jpg",
+      "source_revision": "fcae6cb1efb50c6384a31ddce161bee6a39646e0",
+      "captured_at": "2026-10-20",
+      "version": "0.1.0 Preview",
+      "language": "zh-CN",
+      "capture": "Unedited complete actual native WebKit window; independent work-package reader, synthetic session and memory data.",
+      "purpose": "Show actual source-file indexing and structured synthetic messages. English artwork must label the Chinese UI."
     }
   ]
 }
