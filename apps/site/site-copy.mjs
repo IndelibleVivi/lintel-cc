@@ -3,9 +3,8 @@
 // Brand mottos, synthetic source bytes, paths, IDs and commands stay outside this catalog.
 // Keep cNNN bindings stable. Retire unused pairs without renumbering the surviving keys.
 const pairs = [
-  ["c001","Lintel：简洁的 Claude Code 个人工具。把工作收好，再往前走——审阅配置变化，保全选中的资料，核对操作结果。macOS App 与独立 CLI。","Lintel: a focused personal tool for Claude Code. Keep your work and move forward: review configuration changes, preserve selected materials, and check results. macOS App and standalone CLI."],
-  ["c002","Lintel — 把工作收好，再往前走。","Lintel — Keep your work. Know what changes."],
-  ["c003","简洁的 Claude Code 个人工具：审阅变化，保全选中的指令、记忆与会话，独立阅读工作包并核对原任务。准确版本、安装与验收范围见状态说明。","A focused personal tool for Claude Code: review changes, preserve selected instructions, memories and sessions, read work packages independently, and check original tasks. See the status and installation notes for exact versions and scope."],
+  ["c001","Lintel 是 Claude Code 环境与资料管理器，提供 macOS App 与独立 CLI：审阅环境配置，保全指令、记忆与会话，管理本地状态，并核对原任务结果。开发者 Preview。","Manage Claude Code environments and data with Lintel: review configuration, preserve instructions, memories and sessions, and check task results. macOS App and CLI. Developer Preview."],
+  ["c002","Lintel — Claude Code 环境与资料管理器","Lintel — Claude Code environment and data manager"],
   ["c004","跳到正文","Skip to content"],
   ["c005","Lintel 首页","Lintel home"],
   ["c006","主导航","Main navigation"],
@@ -199,6 +198,40 @@ const pairs = [
 ];
 export const SITE_COPY = Object.freeze(Object.fromEntries(pairs.map(([key,zh,en]) => [key,Object.freeze({zh,en})])));
 export const SITE_LOCALES = Object.freeze(['zh','en']);
+export const PAGE_METADATA = Object.freeze({
+  home:Object.freeze({
+    title:SITE_COPY.c002,
+    description:SITE_COPY.c001,
+  }),
+  download:Object.freeze({
+    title:Object.freeze({zh:'下载与安装 · Lintel',en:'Download and install · Lintel'}),
+    description:Object.freeze({
+      zh:'查看 Lintel 的 macOS App 安装状态、平台范围与公开下载入口；没有核验记录时，从源码构建或试用独立 CLI。',
+      en:'Check Lintel macOS App installation status, platform scope and verified downloads; otherwise build from source or try the standalone CLI.',
+    }),
+  }),
+  guide:Object.freeze({
+    title:Object.freeze({zh:'Lintel 使用指南',en:'Lintel guides'}),
+    description:Object.freeze({
+      zh:'从合成资料开始试用 Lintel，再按任务阅读设置、工作保全、浏览器、SSH、网络、服务与恢复指南。',
+      en:'Start with a synthetic trial, then follow task guides for setup, work preservation, browser profiles, SSH, networking, services and recovery.',
+    }),
+  }),
+  inside:Object.freeze({
+    title:Object.freeze({zh:'Lintel 的设计与实现',en:'Lintel design and implementation'}),
+    description:Object.freeze({
+      zh:'了解 Lintel 的共享 core、四条执行路径、冻结计划、原任务记录与可独立阅读的加密工作包，以及各层证据边界。',
+      en:'See how Lintel separates a shared core, four execution paths, frozen plans, original task records and independently readable work packages.',
+    }),
+  }),
+  releases:Object.freeze({
+    title:Object.freeze({zh:'Lintel 版本与发行状态',en:'Lintel release status'}),
+    description:Object.freeze({
+      zh:'分别核对 Lintel 源码、本地候选、公开下载字节与正式发行；未验证的安装或更新能力不会被标成已发布。',
+      en:'Check Lintel source, local candidates, verified public download bytes and formal releases separately; unverified installation or update capabilities are not presented as released.',
+    }),
+  }),
+});
 export const ENGLISH_GUIDES = Object.freeze(['start-here','quickstart','concepts','troubleshooting','operator-guide','agents','desktop','browser','remote','network','services','telemetry','app-updates','core','architecture']);
 export const ROUTE_COPY = Object.freeze({
   nav: Object.freeze({zh:'主导航',en:'Main navigation'}),

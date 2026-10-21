@@ -4,9 +4,12 @@
 // projects finite paired copy and documentation bodies into the English mirror.
 // Guide bodies are never copied here: each route points at one repository file.
 
+import { PAGE_METADATA } from './site-copy.mjs';
+
 export const SITE_ORIGIN = 'https://lintel.page';
 export const REPOSITORY = 'https://github.com/IndelibleVivi/lintel-cc';
 export const REPOSITORY_BLOB = `${REPOSITORY}/blob/main`;
+export const SOCIAL_IMAGE_PATH = '/assets/lintel-social-preview.png';
 
 export const GUIDE_ARTICLES = Object.freeze([
   Object.freeze({
@@ -189,6 +192,53 @@ export const SITE_ROUTES = Object.freeze([
     article,
   })),
 ]);
+
+export function sitePageMetadata(route, language = 'zh') {
+  const metadata = route.article
+    ? { title: route.article.title, description: route.article.summary }
+    : PAGE_METADATA[route.key];
+  if (!metadata?.title?.[language] || !metadata?.description?.[language]) {
+    throw new Error(`Missing website metadata: ${route.key}/${language}`);
+  }
+  return Object.freeze({
+    title: route.article ? `${metadata.title[language]} · Lintel` : metadata.title[language],
+    description: metadata.description[language],
+    image: `${SITE_ORIGIN}${SOCIAL_IMAGE_PATH}`,
+    imageAlt: PAGE_METADATA.home.title[language],
+    type: route.article ? 'article' : 'website',
+  });
+}
+
+// Only the real site identity and localized home are described. Release records,
+// prices, ratings and licensing remain with their independent authorities.
+export function homeStructuredData(language = 'zh') {
+  const home = SITE_ROUTES.find(route => route.key === 'home');
+  const metadata = sitePageMetadata(home, language);
+  const url = `${SITE_ORIGIN}${localePath('/', language)}`;
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_ORIGIN}/#website`,
+        name: 'Lintel',
+        url: `${SITE_ORIGIN}/`,
+        inLanguage: ['zh-CN', 'en'],
+      },
+      {
+        '@type': 'WebPage',
+        '@id': `${url}#webpage`,
+        url,
+        name: metadata.title,
+        description: metadata.description,
+        inLanguage: language === 'en' ? 'en' : 'zh-CN',
+        isPartOf: { '@id': `${SITE_ORIGIN}/#website` },
+      },
+    ],
+  };
+}
+
+export const serializeStructuredData = value => JSON.stringify(value, null, 2).replace(/</g, '\\u003c');
 
 export const GUIDE_GROUPS = Object.freeze([
   Object.freeze({

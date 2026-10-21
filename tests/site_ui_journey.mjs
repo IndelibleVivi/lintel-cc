@@ -56,7 +56,7 @@ const assets = new Map([['/', 'index.html'], ['/en/', 'en/index.html'], ...[
   'film.mjs','film.vtt',
   'workflow-trail.mjs','site-world.mjs',
   'clawd-game.mjs','clawd-game.css',
-  'assets/favicon.svg',
+  'assets/favicon.svg','assets/favicon.png',
   'assets/lintel-landscape.png','assets/lintel-landscape-night.png',
   'assets/lintel-keep.png','assets/lintel-crossing.png',
 ].map(file => [`/${file}`, file])]);
@@ -348,7 +348,7 @@ try {
     page.on('response',response=>{if(response.status()>=400)errors.push(`${response.status()} ${response.url()}`);});
     await page.goto(base + '/en/');
     assert.equal(await page.locator('html').getAttribute('lang'),'en');
-    assert.match(await page.title(),/Keep your work/);
+    assert.equal(await page.title(),'Lintel — Claude Code environment and data manager');
     assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://lintel.page/en/');
     assert.match(await page.locator('meta[name="description"]').getAttribute('content'),/Claude Code/);
     assert.match(await page.locator('#try .preview-note').innerText(),/No formal download/);
@@ -1070,6 +1070,15 @@ try {
     assert.equal(new URL(live.url()).search,'?trial=synthetic');
     assert.equal(new URL(live.url()).hash,'#how-it-works');
     assert.equal(await live.locator('html').getAttribute('lang'),'en');
+    assert.equal(await live.title(),'Lintel — Claude Code environment and data manager','live locale updates the document title');
+    assert.equal(await live.locator('meta[property="og:title"]').getAttribute('content'),'Lintel — Claude Code environment and data manager');
+    assert.equal(await live.locator('meta[name="twitter:title"]').getAttribute('content'),'Lintel — Claude Code environment and data manager');
+    assert.equal(await live.locator('meta[name="twitter:description"]').getAttribute('content'),await live.locator('meta[name="description"]').getAttribute('content'));
+    assert.equal(await live.locator('meta[property="og:image:alt"]').getAttribute('content'),'Lintel — Claude Code environment and data manager');
+    assert.deepEqual(await live.locator('#site-structured-data').evaluate(node => {
+      const page = JSON.parse(node.textContent)['@graph'][1];
+      return [page.url,page.inLanguage,page.name];
+    }), ['https://lintel.page/en/','en','Lintel — Claude Code environment and data manager']);
     assert.equal(await live.locator('html').getAttribute('data-theme'),'dark');
     assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
     assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'Resume the scenery');
@@ -1090,6 +1099,13 @@ try {
     assert.deepEqual(await live.evaluate(()=>Object.keys(localStorage).filter(key=>!['lintel.site.theme','lintel.site.clawd.best'].includes(key))),[],'locale switching writes no language or other new storage');
     await live.goBack();
     assert.equal(await live.locator('html').getAttribute('lang'),'zh-CN');
+    assert.equal(await live.title(),'Lintel — Claude Code 环境与资料管理器','history restores the Chinese document title');
+    assert.equal(await live.locator('meta[name="twitter:title"]').getAttribute('content'),'Lintel — Claude Code 环境与资料管理器');
+    assert.deepEqual(await live.locator('#site-structured-data').evaluate(node => {
+      const page = JSON.parse(node.textContent)['@graph'][1];
+      return [page.url,page.inLanguage];
+    }), ['https://lintel.page/','zh-CN']);
+    assert.equal(await live.locator('meta[name="twitter:description"]').getAttribute('content'),await live.locator('meta[name="description"]').getAttribute('content'));
     assert.equal(await live.locator('html').getAttribute('data-motion'),'paused');
     assert.equal(await live.locator('#motion-toggle').getAttribute('aria-label'),'让山湖动起来');
     assert.equal(await live.locator('#theme-toggle').getAttribute('aria-label'),'切换到日光');

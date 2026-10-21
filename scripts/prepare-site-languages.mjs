@@ -11,6 +11,9 @@ import {
   SITE_ORIGIN,
   localizedRoute,
   localePath,
+  sitePageMetadata,
+  homeStructuredData,
+  serializeStructuredData,
 } from '../apps/site/site-routes.mjs';
 import { renderGuideMarkdown, escapeHtml } from '../apps/site/site-docs.mjs';
 import { siteGuideHref, siteRouteHref } from '../apps/site/site-language.mjs';
@@ -21,18 +24,52 @@ const guideArticleByKey = new Map(GUIDE_ARTICLES.map(article => [article.key, ar
 const decode = value => value.replace(/&(amp|lt|gt|quot|#39);/g,(_,c)=>({
   amp:'&', lt:'<', gt:'>', quot:'"', '#39':"'",
 }[c]));
-const metadataTitles = Object.freeze({
-  download: Object.freeze({zh:'下载与安装 · Lintel',en:'Download and install · Lintel'}),
-  guide: Object.freeze({zh:'使用指南 · Lintel',en:'Guides · Lintel'}),
-  inside: Object.freeze({zh:'设计与实现 · Lintel',en:'Design and implementation · Lintel'}),
-  releases: Object.freeze({zh:'版本状态 · Lintel',en:'Release status · Lintel'}),
-});
-const metadataDescriptions = Object.freeze({
-  download:Object.freeze({zh:'Lintel 安装信息：核对公开下载记录与平台，或从源码试用 macOS App 与独立 CLI。',en:'Lintel installation: check public download records and platforms, or try the macOS App and standalone CLI from source.'}),
-  guide:Object.freeze({zh:'Lintel 指南：第一次使用、基本概念、排错与六任务操作路径，正文来自维护中的仓库文档。',en:'Lintel guides for first use, concepts, troubleshooting and six practical tasks, projected from maintained repository documents.'}),
-  inside:Object.freeze({zh:'Lintel 的设计与实现：一个 core、分明的执行路径、冻结计划、原任务记录与可独立阅读的工作包。',en:'Lintel design and implementation: one core, distinct execution paths, frozen plans, original tasks and independently readable work packages.'}),
-  releases:Object.freeze({zh:'Lintel 版本状态：区分源码、本地候选、公开字节核对与正式发行。',en:'Lintel version status separating source, local candidates, public-byte verification and formal release.'}),
-});
+const socialImage = `${SITE_ORIGIN}/assets/lintel-social-preview.png`;
+
+function metadataFor(route, language) {
+  const metadata = sitePageMetadata(route, language);
+  return {
+    title: escapeHtml(metadata.title),
+    description: escapeHtml(metadata.description),
+  };
+}
+
+function socialImageAlt(route, language) {
+  return escapeHtml(sitePageMetadata(route, language).imageAlt);
+}
+
+const homeStructuredDataPattern = /<script type="application\/ld\+json" id="site-structured-data">[\s\S]*?<\/script>/;
+function projectHomeStructuredData(html, language) {
+  if (!homeStructuredDataPattern.test(html)) throw new Error('Missing home structured-data projection');
+  const script = `<script type="application/ld+json" id="site-structured-data">\n${serializeStructuredData(homeStructuredData(language))}\n  </script>`;
+  return html.replace(homeStructuredDataPattern, script);
+}
+
+function replaceOrInsertMeta(html, marker, meta) {
+  const existing = new RegExp(`<meta ${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^>]*>`, 'i');
+  if (existing.test(html)) return html.replace(existing, meta);
+  return html.replace('</head>', `  ${meta}\n</head>`);
+}
+
+function applyPageMetadata(html, route, language) {
+  const { title, description } = metadataFor(route, language);
+  const imageAlt = socialImageAlt(route, language);
+  const properties = [
+    ['name="description"', `<meta name="description" content="${description}">`],
+    ['property="og:title"', `<meta property="og:title" content="${title}">`],
+    ['property="og:description"', `<meta property="og:description" content="${description}">`],
+    ['property="og:site_name"', '<meta property="og:site_name" content="Lintel">'],
+    ['property="og:image"', `<meta property="og:image" content="${socialImage}">`],
+    ['property="og:image:alt"', `<meta property="og:image:alt" content="${imageAlt}">`],
+    ['name="twitter:card"', '<meta name="twitter:card" content="summary_large_image">'],
+    ['name="twitter:title"', `<meta name="twitter:title" content="${title}">`],
+    ['name="twitter:description"', `<meta name="twitter:description" content="${description}">`],
+    ['name="twitter:image"', `<meta name="twitter:image" content="${socialImage}">`],
+    ['name="twitter:image:alt"', `<meta name="twitter:image:alt" content="${imageAlt}">`],
+  ];
+  for (const [marker, meta] of properties) html = replaceOrInsertMeta(html, marker, meta);
+  return html.replace(/<title[^>]*>[\s\S]*?<\/title>/, `<title>${title}</title>`);
+}
 
 function phraseFor(language, key) {
   const entry = SITE_COPY[key] || ROUTE_COPY[key];
@@ -59,6 +96,7 @@ export function projectHomeHtml(source) {
     return tag;
   });
   for (const key of Object.keys(SITE_COPY)) if (!used.has(key)) throw new Error(`Unreferenced website phrase: ${key}`);
+  html = projectHomeStructuredData(html, 'en');
   const withoutIntentionalChinese = html.replace(/<!--[\s\S]*?-->/g,'').replace(/<nav class="language-links"[\s\S]*?<\/nav>/,'');
   if (/[\u4e00-\u9fff]/.test(withoutIntentionalChinese)) throw new Error('Unbound Chinese website copy');
   html = html.replace('<html lang="zh-CN"','<html lang="en"');
@@ -83,14 +121,6 @@ function rewriteRouteLinks(html, language) {
 
 function projectRouteHtml(source, language, route = null) {
   let html = source;
-  if (route && metadataTitles[route.key]) {
-    const title = escapeHtml(metadataTitles[route.key][language]);
-    const description = escapeHtml(metadataDescriptions[route.key][language]);
-    html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
-      .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${description}">`)
-      .replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${title}">`)
-      .replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${description}">`);
-  }
   html = html.replace(/<([a-z0-9:-]+)([^>]*\sdata-route-guide-title="([^"]+)"[^>]*)>([^<]*)<\/\1>/g,
     (_,tag,attrs,key) => `<${tag}${attrs}>${escapeHtml(guideArticleByKey.get(key)?.title[language] || '')}</${tag}>`);
   html = html.replace(/<([a-z0-9:-]+)([^>]*\sdata-route-guide-summary="([^"]+)"[^>]*)>([^<]*)<\/\1>/g,
@@ -107,6 +137,7 @@ function projectRouteHtml(source, language, route = null) {
   });
   html = rewriteRouteLinks(html, language);
   if (route) {
+    html = applyPageMetadata(html, route, language);
     html = html.replace('<html lang="zh-CN"', `<html lang="${language === 'en' ? 'en' : 'zh-CN'}"`);
     const zhPath = localePath(route.path,'zh');
     const enPath = localePath(route.path,'en');
@@ -140,14 +171,10 @@ function projectGuideHtml(shell, source, language, article) {
   const current = language === 'en' ? enPath : zhPath;
   const canonical = `${SITE_ORIGIN}${current}`;
   let html = shell
-    .replace('<meta property="og:title" content="使用指南 · Lintel">', `<meta property="og:title" content="${escapeHtml(title)} · Lintel">`)
-    .replace('<meta property="og:description" content="Lintel 指南文章。">', `<meta property="og:description" content="${escapeHtml(summary)}">`)
     .replace('property="og:locale" content="zh_CN"', `property="og:locale" content="${language === 'en' ? 'en_US' : 'zh_CN'}"`)
-    .replace(/<title[^>]*>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)} · Lintel</title>`)
     .replace('data-guide-document="start-here"', `data-guide-document="${escapeHtml(article.doc)}"`)
     .replace(`<a href="${enPath}" lang="en"`, `<a href="${localePath(article.path,'en')}" lang="en"`)
     .replace('<html lang="zh-CN"', `<html lang="${language === 'en' ? 'en' : 'zh-CN'}"`)
-    .replace('<meta name="description" content="Lintel 指南文章。">', `<meta name="description" content="${escapeHtml(summary)}">`)
     .replace('<link rel="canonical" href="https://lintel.page/guide/">', `<link rel="canonical" href="${canonical}">`)
     .replace('<meta property="og:url" content="https://lintel.page/guide/">', `<meta property="og:url" content="${canonical}">`)
     .replace('<link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/">', `<link rel="alternate" hreflang="zh-CN" href="https://lintel.page${zhPath}">`)
@@ -159,7 +186,26 @@ function projectGuideHtml(shell, source, language, article) {
   html = html.replace('<a href="/guide/" data-route-copy="guideCrumb">指南</a>', `<a href="${language === 'en' ? '/en/guide/' : '/guide/'}" data-route-copy="guideCrumb">${language === 'en' ? 'Guides' : '指南'}</a>`);
   html = html.replace('<a href="/guide/" data-route-copy="allGuides">全部指南</a>', `<a href="${language === 'en' ? '/en/guide/' : '/guide/'}" data-route-copy="allGuides">${language === 'en' ? 'All guides' : '全部指南'}</a>`);
   html = html.replace(/<a href="https:\/\/github.com\/IndelibleVivi\/lintel-cc\/blob\/main\/docs\/start-here.md" data-route-copy="repositoryOriginal">[^<]*<span aria-hidden="true">↗<\/span><\/a>/, `<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/${article.doc}${language === 'en' ? '.en' : ''}.md" data-route-copy="repositoryOriginal">${language === 'en' ? 'Repository source' : '仓库原文'} <span aria-hidden="true">↗</span></a>`);
-  return projectRouteHtml(html, language, { path: article.path });
+  return projectRouteHtml(html, language, { key:`guide:${article.key}`, path:article.path, article });
+}
+
+function sitemapUrls() {
+  return SITE_ROUTES.flatMap(route => ['zh', 'en'].map(language => ({
+    route,
+    location: `${SITE_ORIGIN}${localePath(route.path, language)}`,
+  })));
+}
+
+function projectSitemap() {
+  const urls = sitemapUrls().map(({ route, location }) => {
+    const alternates = [
+      ['zh-CN', `${SITE_ORIGIN}${localePath(route.path, 'zh')}`],
+      ['en', `${SITE_ORIGIN}${localePath(route.path, 'en')}`],
+      ['x-default', `${SITE_ORIGIN}${localePath(route.path, 'zh')}`],
+    ].map(([language, href]) => `<xhtml:link rel="alternate" hreflang="${language}" href="${href}"/>`).join('');
+    return `  <url><loc>${location}</loc>${alternates}</url>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
 }
 
 async function routeSources() {
@@ -186,8 +232,27 @@ async function routeSources() {
 
 function validateRoute(html, route, language) {
   const expected = `${SITE_ORIGIN}${localePath(route.path, language)}`;
+  const { title, description } = metadataFor(route, language);
+  const imageAlt = socialImageAlt(route, language);
   if (!html.includes(`rel="canonical" href="${expected}"`)) throw new Error(`Canonical mismatch for ${route.key}/${language}`);
   if (!html.includes(`property="og:url" content="${expected}"`)) throw new Error(`OG URL mismatch for ${route.key}/${language}`);
+  const documentTitle = title;
+  if (!html.includes(`<title>${documentTitle}</title>`)) throw new Error(`Title mismatch for ${route.key}/${language}`);
+  for (const marker of [
+    `<meta name="description" content="${description}">`,
+    `<meta property="og:title" content="${documentTitle}">`,
+    `<meta property="og:description" content="${description}">`,
+    '<meta property="og:site_name" content="Lintel">',
+    `<meta property="og:image" content="${socialImage}">`,
+    `<meta property="og:image:alt" content="${imageAlt}">`,
+    '<meta name="twitter:card" content="summary_large_image">',
+    `<meta name="twitter:title" content="${documentTitle}">`,
+    `<meta name="twitter:description" content="${description}">`,
+    `<meta name="twitter:image" content="${socialImage}">`,
+    `<meta name="twitter:image:alt" content="${imageAlt}">`,
+  ]) {
+    if (!html.includes(marker)) throw new Error(`Incomplete social metadata for ${route.key}/${language}: ${marker}`);
+  }
   for (const [altLanguage, altPath] of [['zh-CN',localePath(route.path,'zh')],['en',localePath(route.path,'en')]]) {
     if (!html.includes(`hreflang="${altLanguage}" href="${SITE_ORIGIN}${altPath}"`)) {
       throw new Error(`hreflang mismatch for ${route.key}/${language}: ${altPath}`);
@@ -217,9 +282,21 @@ async function targetFor(route, language) {
 }
 
 export async function checkSiteLanguages({write = false} = {}) {
-  const homeSource = await readFile(path.join(site,'index.html'),'utf8');
+  const originalHome = await readFile(path.join(site,'index.html'),'utf8');
+  const homeSource = projectHomeStructuredData(originalHome, 'zh');
+  if (homeSource !== originalHome) {
+    if (write) await writeFile(path.join(site,'index.html'),homeSource);
+    else throw new Error('Home structured data is stale; run node scripts/prepare-site-languages.mjs');
+  }
+  const faviconSource = await readFile(path.join(repo,'apps/desktop/src-tauri/icons/128x128.png'));
+  const faviconTarget = path.join(site,'assets/favicon.png');
+  if (write) await writeFile(faviconTarget,faviconSource);
+  else if (!(await readFile(faviconTarget).catch(() => Buffer.alloc(0))).equals(faviconSource)) {
+    throw new Error('Website favicon is stale; run node scripts/prepare-site-languages.mjs');
+  }
   const homeEnglish = projectHomeHtml(homeSource);
   const generated = await routeSources();
+  const sitemap = projectSitemap();
   if (write) await writeFile(path.join(site,'en/index.html'),homeEnglish);
   else {
     const actualHome = await readFile(path.join(site,'en/index.html'),'utf8');
@@ -238,12 +315,18 @@ export async function checkSiteLanguages({write = false} = {}) {
       }
     }
   }
+  if (write) await writeFile(path.join(site, 'sitemap.xml'), sitemap);
+  else {
+    const actualSitemap = await readFile(path.join(site, 'sitemap.xml'), 'utf8');
+    if (actualSitemap !== sitemap) throw new Error('Sitemap is stale; run node scripts/prepare-site-languages.mjs');
+  }
   return {
     languages:['zh-CN','en'],
     phrases:Object.keys(SITE_COPY).length,
     routePhrases:Object.keys(ROUTE_COPY).length,
     routes:SITE_ROUTES.length,
     guides:GUIDE_ARTICLES.length,
+    sitemapUrls:sitemapUrls().length,
   };
 }
 

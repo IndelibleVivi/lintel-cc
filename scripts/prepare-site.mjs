@@ -41,7 +41,7 @@ for(const route of SITE_ROUTES){
   routeFiles.push([zh,zh==='/'?path.join(repo,'apps/site/index.html'):path.join(repo,'apps/site',...zh.split('/').filter(Boolean),'index.html')]);
   routeFiles.push([en,zh==='/'?path.join(repo,'apps/site/en/index.html'):path.join(repo,'apps/site/en',...zh.split('/').filter(Boolean),'index.html')]);
 }
-const names=['styles.css','site.mjs','site-copy.mjs','site-language.mjs','site-routes.mjs','site-docs.mjs','film.mjs','film.vtt','site-world.mjs','workflow-trail.mjs','clawd-game.mjs','clawd-game.css','404.html','_headers','robots.txt','sitemap.xml','assets/favicon.svg','assets/lintel-landscape.png','assets/lintel-landscape-night.png','assets/lintel-keep.png','assets/lintel-crossing.png'];
+const names=['styles.css','site.mjs','site-copy.mjs','site-language.mjs','site-routes.mjs','site-docs.mjs','film.mjs','film.vtt','site-world.mjs','workflow-trail.mjs','clawd-game.mjs','clawd-game.css','404.html','_headers','robots.txt','sitemap.xml','assets/favicon.svg','assets/favicon.png','assets/lintel-landscape.png','assets/lintel-landscape-night.png','assets/lintel-keep.png','assets/lintel-crossing.png'];
 const inputs=[...routeFiles.map(([name,file])=>[name==='/'?'index.html':name==='/en/'?'en/index.html':`${name.slice(1)}index.html`,file]),...names.map(name=>[name,path.join(site,name)])];
 inputs.push(['assets/lintel-social-preview.png',path.join(repo,'assets/preview/lintel-social-preview.png')]);
 for(const name of ['lintel-intro.mp4','lintel-film-poster.jpg'])inputs.push(['media/'+name,path.join(mediaDir,name)]);

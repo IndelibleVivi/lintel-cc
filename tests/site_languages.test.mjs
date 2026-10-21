@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { SITE_COPY, ENGLISH_GUIDES } from '../apps/site/site-copy.mjs';
 import { checkSiteLanguages, projectSiteHtml } from '../scripts/prepare-site-languages.mjs';
 import { applySiteLanguage, siteGuideHref, siteRouteHref, siteLanguageFromPath } from '../apps/site/site-language.mjs';
-import { GUIDE_ARTICLES, SITE_ROUTES, localePath } from '../apps/site/site-routes.mjs';
+import { GUIDE_ARTICLES, SITE_ROUTES, SITE_ORIGIN, SOCIAL_IMAGE_PATH, localePath, homeStructuredData, serializeStructuredData } from '../apps/site/site-routes.mjs';
 import { renderGuideMarkdown } from '../apps/site/site-docs.mjs';
 const source = await readFile(new URL('../apps/site/index.html',import.meta.url),'utf8');
 const english = await readFile(new URL('../apps/site/en/index.html',import.meta.url),'utf8');
@@ -67,6 +67,7 @@ test('actual home language application completes metadata without an undeclared 
   const canonical = new Map(), ogUrl = new Map(), locale = new Map(), alternate = new Map();
   const node = attributes => ({ setAttribute: (name, value) => attributes.set(name, value) });
   const html = { lang: '', dataset: {} };
+  const structuredData = { textContent: '' };
   const root = {
     documentElement: html,
     querySelectorAll: () => [],
@@ -75,6 +76,7 @@ test('actual home language application completes metadata without an undeclared 
       'meta[property="og:url"]': node(ogUrl),
       'meta[property="og:locale"]': node(locale),
       'meta[property="og:locale:alternate"]': node(alternate),
+      '#site-structured-data': structuredData,
     })[selector] ?? null,
   };
   try {
@@ -85,10 +87,40 @@ test('actual home language application completes metadata without an undeclared 
     assert.equal(ogUrl.get('content'), 'https://lintel.page/en/');
     assert.equal(locale.get('content'), 'en_US');
     assert.equal(alternate.get('content'), 'zh_CN');
+    const englishData = JSON.parse(structuredData.textContent);
+    assert.equal(englishData['@graph'][1].url, 'https://lintel.page/en/');
+    assert.equal(englishData['@graph'][1].inLanguage, 'en');
+    assert.equal(englishData['@graph'][1].name, SITE_COPY.c002.en);
+    applySiteLanguage('zh', root);
+    const chineseData = JSON.parse(structuredData.textContent);
+    assert.equal(chineseData['@graph'][1].url, 'https://lintel.page/');
+    assert.equal(chineseData['@graph'][1].description, SITE_COPY.c001.zh);
+    assert.deepEqual(chineseData['@graph'][0], englishData['@graph'][0], 'both locales retain one site identity');
   } finally {
     if (previousLocation === undefined) delete globalThis.location;
     else globalThis.location = previousLocation;
   }
+});
+
+test('home schema projects only actual site and localized page facts with safe script bytes', async () => {
+  for (const [html,language,url] of [[source,'zh',`${SITE_ORIGIN}/`],[english,'en',`${SITE_ORIGIN}/en/`]]) {
+    const scripts = [...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)];
+    assert.equal(scripts.length, 1);
+    const data = JSON.parse(scripts[0][1]);
+    assert.deepEqual(data, homeStructuredData(language));
+    assert.deepEqual(data['@graph'].map(node => node['@type']), ['WebSite','WebPage']);
+    assert.equal(data['@graph'][0].name, 'Lintel');
+    assert.equal(data['@graph'][0].url, `${SITE_ORIGIN}/`);
+    assert.equal(data['@graph'][1].url, url);
+    assert.equal(data['@graph'][1].name, SITE_COPY.c002[language]);
+    assert.equal(data['@graph'][1].description, SITE_COPY.c001[language]);
+    assert.doesNotMatch(scripts[0][1], /aggregateRating|offers|softwareVersion|license|datePublished/);
+  }
+  const unsafe = {name:'</script><script>alert(1)</script>'};
+  assert.doesNotMatch(serializeStructuredData(unsafe), /</);
+  assert.deepEqual(JSON.parse(serializeStructuredData(unsafe)), unsafe);
+  assert.deepEqual(await readFile(new URL('../apps/site/assets/favicon.png',import.meta.url)),
+    await readFile(new URL('../apps/desktop/src-tauri/icons/128x128.png',import.meta.url)), 'favicon reuses the supplied identity export byte for byte');
 });
 
 test('route map has exact locale mirrors, metadata and sitemap coverage', async () => {
@@ -97,6 +129,8 @@ test('route map has exact locale mirrors, metadata and sitemap coverage', async 
   assert.equal(new Set(SITE_ROUTES.map(route=>route.key)).size,SITE_ROUTES.length);
   assert.equal(new Set(SITE_ROUTES.map(route=>route.path)).size,SITE_ROUTES.length);
   const sitemap=await readFile(new URL('../apps/site/sitemap.xml',import.meta.url),'utf8');
+  const titlesByLanguage = new Map([['zh', new Set()], ['en', new Set()]]);
+  const descriptionsByLanguage = new Map([['zh', new Set()], ['en', new Set()]]);
   for(const route of SITE_ROUTES){
     for(const language of ['zh','en']){
       const routePath=localePath(route.path,language);
@@ -122,11 +156,46 @@ test('route map has exact locale mirrors, metadata and sitemap coverage', async 
       const title=/<title[^>]*>([^<]*)<\/title>/.exec(html)?.[1];
       const ogTitle=/<meta property="og:title" content="([^"]*)"/.exec(html)?.[1];
       assert.equal(ogTitle,title,`${routePath} share title matches the page language`);
-      const meta=html.match(/<meta (?:name="description"|property="og:description") content="([^"]*)"/g)||[];
-      assert.equal(meta.length,2,`${routePath} has page and share descriptions`);
-      if(language==='en') for(const content of meta) assert.doesNotMatch(content,/[\u4e00-\u9fff]/,`${routePath} descriptions are English`);
-
+      const description=html.match(/<meta name="description" content="([^"]*)"/)?.[1];
+      const ogDescription=html.match(/<meta property="og:description" content="([^"]*)"/)?.[1];
+      const twitterTitle=html.match(/<meta name="twitter:title" content="([^"]*)"/)?.[1];
+      const twitterDescription=html.match(/<meta name="twitter:description" content="([^"]*)"/)?.[1];
+      assert.equal(description,ogDescription,`${routePath} page and share descriptions agree`);
+      assert.equal(twitterDescription,description,`${routePath} Twitter description agrees`);
+      assert.equal(twitterTitle,title,`${routePath} Twitter title agrees`);
+      assert.ok(html.includes('<meta property="og:site_name" content="Lintel">'),`${routePath} site name`);
+      assert.ok(html.includes(`<meta property="og:image" content="${SITE_ORIGIN}${SOCIAL_IMAGE_PATH}">`),`${routePath} share image`);
+      assert.ok(html.includes(`<meta name="twitter:image" content="${SITE_ORIGIN}${SOCIAL_IMAGE_PATH}">`),`${routePath} Twitter image`);
+      assert.equal((html.match(/<meta property="og:image:alt" content="([^"]+)"[^>]*>/)?.[1] || '').length>0,true,`${routePath} share image alt`);
+      assert.equal((html.match(/<meta name="twitter:image:alt" content="([^"]+)"[^>]*>/)?.[1] || '').length>0,true,`${routePath} Twitter image alt`);
+      const noindex=html.match(/<meta name="robots" content="([^"]*)"/)?.[1];
+      assert.equal(noindex,undefined,`${routePath} is indexable`);
+      if (route.key !== 'home') assert.doesNotMatch(html, /application\/ld\+json/,`${routePath} adds no unsupported schema`);
+      assert.match(html, /<link rel="icon" type="image\/png" sizes="128x128" href="\/assets\/favicon.png">/,`${routePath} has a crawlable raster favicon`);
+      if(language==='en') for(const content of [description,ogDescription,twitterDescription]) assert.doesNotMatch(content,/[\u4e00-\u9fff]/,`${routePath} descriptions are English`);
+      assert.ok(title?.trim(),`${routePath} has a descriptive title`);
+      assert.ok(description?.trim(),`${routePath} has a useful description`);
+      titlesByLanguage.get(language).add(title);
+      descriptionsByLanguage.get(language).add(description);
     }
+  }
+  for (const language of ['zh','en']) {
+    assert.equal(titlesByLanguage.get(language).size,SITE_ROUTES.length,`${language} titles are unique`);
+    assert.equal(descriptionsByLanguage.get(language).size,SITE_ROUTES.length,`${language} descriptions are unique`);
+  }
+  for (const article of GUIDE_ARTICLES) {
+    for (const language of ['zh','en']) {
+      const html=await readFile(new URL(`../apps/site${language==='en'?`/en${article.path}`:article.path}index.html`,import.meta.url),'utf8');
+      assert.equal(html.includes(`<meta name="description" content="${article.summary[language]}">`),true,`${article.doc}/${language} description comes from paired guide summary`);
+    }
+  }
+  const sitemapUrls=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match=>match[1]);
+  assert.equal(sitemapUrls.length,40);
+  assert.equal(new Set(sitemapUrls).size,40);
+  for (const block of [...sitemap.matchAll(/<url>(.*?)<\/url>/g)].map(match=>match[1])) {
+    const location=/<loc>([^<]+)<\/loc>/.exec(block)?.[1];
+    assert.equal((block.match(/<xhtml:link /g)||[]).length,3,`${location} has Chinese, English and default alternates`);
+    for (const language of ['zh-CN','en','x-default']) assert.match(block,new RegExp(`hreflang="${language}"`),`${location} ${language}`);
   }
 });
 

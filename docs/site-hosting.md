@@ -93,6 +93,28 @@ Pages 的 Custom domains 维护 `lintel.page` 关联；Cloudflare 的同名 DNS 
 
 将具体 URL、deployment ID、来源声明、检查结果与当前状态同步到 current-state。HTTP 200 不替代实际播放，平台的 success 也不替代 apex HTTPS 验收。
 
+## 搜索入口与上线核对
+
+搜索元数据随网站源码维护：只修改中文首页、有限 route／guide metadata 与 canonical templates，再运行 `prepare-site-languages.mjs` 生成对应页面和 sitemap，不手改投影页。标题与摘要须准确说明该页内容，保留 Claude Code 环境与资料管理的完整产品范围和 Preview 边界；同一页面的 HTML、社交 metadata 与结构化数据须一致。Google 可能按查询重新选择标题或摘要，源码 metadata 不能证明实际搜索展示；参见 [title links](https://developers.google.com/search/docs/appearance/title-link) 与 [snippets](https://developers.google.com/search/docs/appearance/snippet)。
+
+准备 SEO 更新包时须同时保留现网的发行资料。手动 Preview 下载使用已核对公开字节的 `lintel.app-release-manual-public/1` 记录，通过 `--app-manual` 传入；带签名 updater 的记录仍用 `--app-release`。下例的文件名是占位路径，应替换为既有 canonical 记录，不重建或推测发行事实：
+
+```sh
+node scripts/prepare-site-languages.mjs --check
+LINTEL_SITE_MEDIA_DIR=candidate-packages/site-media \
+  python3 tests/verify.py --checks site-game-test,site-ui --require-passed
+node scripts/prepare-site.mjs \
+  --media-dir candidate-packages/site-media \
+  --app-manual candidate-packages/verified-manual-release.json \
+  --out candidate-packages/site-seo-build
+```
+
+按既有授权先验收 preview，再把同一冻结包更新到 production。Preview 的 `X-Robots-Tag: noindex` 应保留；正式域名可索引页面不能继承它。逐页核对全部 40 个 locale URL 的 HTTP 200、唯一且自指的 HTTPS canonical、准确的 title／description、完整中英 alternate 与 sitemap 对应关系，未知路径仍须真正 404。Sitemap 只列 canonical URL，不把构建日期当作内容的 `lastmod`；参见 [多语言页面](https://developers.google.com/search/docs/specialty/international/localized-versions)与 [sitemap 规范](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)。分享图与 favicon 必须可同源抓取；按前节继续检查 CSP、指南技术标识及无第三方请求。
+
+结构化数据只投影真实可见的站点身份、页面与阅读路径，不填虚构评分、价格、许可或发行日期。使用 [Schema Markup Validator](https://validator.schema.org/) 检查 schema；Google 的 Rich Results Test 不支持 site-name 检查，不能用它的“无适用项目”判断 `WebSite` 无效。站名由 canonical 首页的 `WebSite` 提供，具体规则见 [site names](https://developers.google.com/search/docs/appearance/site-names)与[结构化数据政策](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)。
+
+Search Console 属于独立账号操作，须有当前授权并使用 owner 已验证的 `lintel.page` property；不要为本次源码修改自动创建账号、写 DNS 验证记录或添加追踪脚本。上线后可提交 `https://lintel.page/sitemap.xml`，并用 URL Inspection 核对中英首页及代表性指南的 Google-selected canonical、抓取和索引状态。源码完成、production 读回、提交、搜索引擎实际收录及排名是不同事实，只记录实际观察到的层级。
+
 ## 失败与回退
 
 上传失败或结果不明时先在 project deployment 列表核对原次提交，不盲目重复。DNS／证书尚未 active 时保留正常安全校验，报告具体 pending 状态；不绕过浏览器证书警告。Preview 不改变生产。

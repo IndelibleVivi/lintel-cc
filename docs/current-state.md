@@ -8,6 +8,12 @@
 
 先前 `fcae6cb` 已完成真实 native 首用、归档、退出重开、独立阅读与 CLI 交接；配置恢复和残留清理的完整 native 操作先在 `e822d74` 完成，下面保留各自的 source 范围。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 
+## 官网 SEO 源码（2026-10-21，未部署）
+
+40 个中英静态页面的 title／description、Open Graph／Twitter 字段与分享图说明已统一维护；首页搜索标题明确 Claude Code 环境与资料管理身份，原可见标语与正文保持。首页仅投影真实 `WebSite`／本语言 `WebPage` JSON-LD，语言／history 切换同步；sitemap 的 40 项均由同一路由表生成，并保留中英及 x-default 配对。PNG favicon 逐字节复用既有 App identity export。生成检查覆盖页面、JSON-LD、favicon 与 sitemap 漂移，次级页继续走完整静态 mirrors。
+
+本机 canonical `site-game-test`、`app-release-test` 已通过；更新搜索标题的既有断言后，`site-ui` 完整通过，使用现有真实影片，包含无 JavaScript 阅读、语言／history 元数据、原有实例与交互。源码与本地打包不等于 production 激活。本轮尚未上传 preview／production、提交 Search Console 或验证 Google 实际索引；现网仍是上方 `d4a92dd` 的 0.1.1 下载包。生成与上线程序见[网站源码说明](../apps/site/README.md)及[搜索入口核对](site-hosting.md#搜索入口与上线核对)。
+
 ## 0.1.1 修复与下载验收
 
 0.1.0 的下载／安装副本与原 DMG 字节一致，但只有 `adhoc,linker-signed`、未绑定 Info.plist、没有资源封装；严格校验报 `code has no resources but signature indicates they must be present`。这是包装缺陷，原 tag 与 8 个资产保留，旧 Release 顶部已指向修复版；详细旧字节与发行事实见[候选历史](candidate-history.md#preview-0-1-0-release-history)。

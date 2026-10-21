@@ -1,5 +1,5 @@
 import { SITE_COPY, ENGLISH_GUIDES, RELEASE_COPY, releaseSecurityCopy } from './site-copy.mjs';
-import { SITE_ROUTES } from './site-routes.mjs';
+import { SITE_ROUTES, homeStructuredData, serializeStructuredData } from './site-routes.mjs';
 
 export const siteLanguageFromPath = pathname => /^\/en(?:\/|$)/.test(pathname) ? 'en' : 'zh';
 const routePath = (pathname, language = siteLanguageFromPath(pathname)) => {
@@ -68,6 +68,8 @@ export function applySiteLanguage(language, root = document) {
   root.querySelector('meta[property="og:url"]')?.setAttribute('content', `https://lintel.page${currentPath}`);
   root.querySelector('meta[property="og:locale"]')?.setAttribute('content', language === 'en' ? 'en_US' : 'zh_CN');
   root.querySelector('meta[property="og:locale:alternate"]')?.setAttribute('content', language === 'en' ? 'zh_CN' : 'en_US');
+  const structuredData = root.querySelector('#site-structured-data');
+  if (structuredData) structuredData.textContent = serializeStructuredData(homeStructuredData(language));
   return language;
 }
 
