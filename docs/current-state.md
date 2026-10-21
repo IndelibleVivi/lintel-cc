@@ -4,7 +4,11 @@
 
 独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 仍由原 [v0.1.0 prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供；包名保留原候选身份，Linux 为 experimental。10-20 发行整理版在不改变任何 executable 字节的前提下，为各 CLI 包加入 18 份与已核验 App 相同的第三方声明及校验覆盖；此前未含声明的本地包保留作历史测试候选。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。
 
-[官网](https://lintel.page/) 于 2026-10-21 上线双语 SEO 更新，保留 0.1.1 下载与安装指南。当前 payload 来自 clean `46cf22ed00a54226cda39dd34734b8cc0e382a8c`；[production 777ec268](https://777ec268.lintel-aue.pages.dev/) 与 [preview 5f8353ea](https://5f8353ea.lintel-aue.pages.dev/) 使用同一 67 项有限 ZIP，经现有 Pages project 的 Dashboard Direct Upload 发布。正式域名 40 路均为 HTTP 200：10 页 HTML 原样一致，30 篇指南仅消费两条自有 `email_off` 注释，正文与技术标识保持原字节、无邮箱解码脚本。下载／来源记录、robots／40 项 sitemap、实际脚本、CSS 与媒体均匹配冻结包；未知路径及两条 updater feed 为真正 404。0.1.1 下载记录与既有公开 URL 原字节保留，本轮没有重发 Release 或重新下载 DMG；此前公开下载与 quarantine 验收仍属于 10-20 的证据。390px 中英日夜首页无横向溢出，语言／history 切换同步 metadata 与 JSON-LD；正常缓存回访的首页 29 个请求无第三方 HTTP 请求或加载失败。影片在 preview 与正式域名均实际完整播放到 20.01 秒；正式域名另通过 206 Range、原生 seek、字幕资源加载与可见英文 cue、关闭暂停／归零／焦点返回。没有启用 updater。
+[官网](https://lintel.page/) 于 2026-10-21 上线双语 SEO 与 Search Console 验证标签，保留 0.1.1 下载与安装指南。当前 payload 来自 clean `8f8d7d2113b2e1dcb1789d9effe5e43a6c5fb155`；[production 79f556f9](https://79f556f9.lintel-aue.pages.dev/) 与 [preview f4ee45e3](https://f4ee45e3.lintel-aue.pages.dev/) 使用同一 67 项有限 ZIP，经现有 Pages project 的 Dashboard Direct Upload 发布。它只比同日 `46cf22e` SEO 包在中英首页 `<head>` 各多一行 Google 提供的公开所有权标签；全部 40 页 body 与其余 64 个公开文件逐字节保留。
+
+正式域名 40 路均为 HTTP 200：10 页 HTML 原样一致，30 篇指南仅消费两条自有 `email_off` 注释，正文与技术标识保持原字节、无邮箱解码脚本。首页验证标签、下载／来源记录、robots／40 项 sitemap、实际脚本、CSS 与媒体均匹配冻结包；未知路径及两条 updater feed 为真正 404，视频 Range 返回 206。0.1.1 下载记录与既有公开 URL 原字节保留，本轮没有重发 Release 或重新下载 DMG；此前公开下载与 quarantine 验收仍属于 10-20 的证据，没有启用 updater。
+
+390px 中英日夜、语言／history、首页 29 个请求无第三方 HTTP／加载失败，以及两环境影片完整播放到 20.01 秒、原生 seek、字幕加载／可见 cue、关闭暂停／归零／焦点返回的浏览器证据来自同日 `46cf22e` 首轮发布。本次追加验证标签后，本机 canonical `app-release-test` 与真实媒体 `site-ui` 再次通过，且线上 HTML／资源字节复核通过；不把前一包的手动浏览器观察冒认为新包重测。
 
 先前 `fcae6cb` 已完成真实 native 首用、归档、退出重开、独立阅读与 CLI 交接；配置恢复和残留清理的完整 native 操作先在 `e822d74` 完成，下面保留各自的 source 范围。`878482f`、`bb9fa824` 均为较早候选，见[候选历史](candidate-history.md)。
 
@@ -12,7 +16,20 @@
 
 40 个中英静态页面的 title／description、Open Graph／Twitter 字段与分享图说明已统一维护；首页搜索标题明确 Claude Code 环境与资料管理身份，原可见标语与正文保持。首页仅投影真实 `WebSite`／本语言 `WebPage` JSON-LD，语言／history 切换同步；sitemap 的 40 项均由同一路由表生成，并保留中英及 x-default 配对。PNG favicon 逐字节复用既有 App identity export。生成检查覆盖页面、JSON-LD、favicon 与 sitemap 漂移，次级页继续走完整静态 mirrors。
 
-本机 canonical `site-game-test`、`app-release-test` 已通过；更新搜索标题的既有断言后，`site-ui` 完整通过，使用现有真实影片，包含无 JavaScript 阅读、语言／history 元数据、原有实例与交互。完整 CI gate 通过后，按本轮明确授权依次发布同一冻结包到 preview 与 production，并在正式域名复验全部 40 路 canonical／语言配对、准确标题／摘要、分享 metadata 与首页 JSON-LD；preview 保留 `noindex`，正式域名没有继承它。Search Console 跟进已另获当前授权，正在为 `https://lintel.page/` URL-prefix property 完成所有权验证；验证 meta tag 的源码已准备，本轮追加标签尚未部署，sitemap 尚未提交，Google 实际索引、搜索展示与排名未验证。生成与上线程序见[网站源码说明](../apps/site/README.md)及[搜索入口核对](site-hosting.md#搜索入口与上线核对)。
+本机 canonical `site-game-test`、`app-release-test` 已通过；更新搜索标题的既有断言后，`site-ui` 完整通过，使用现有真实影片，包含无 JavaScript 阅读、语言／history 元数据、原有实例与交互。完整 CI gate 通过后，按当前授权依次发布冻结包到 preview 与 production，并在正式域名复验全部 40 路 canonical／语言配对、准确标题／摘要、分享 metadata 与首页 JSON-LD；preview 保留 `noindex`，正式域名没有继承它。Search Console 接入与 Google 观察见下节；新 SEO 标题在实际搜索中的展示与排名仍未验证。生成与上线程序见[网站源码说明](../apps/site/README.md)及[搜索入口核对](site-hosting.md#搜索入口与上线核对)。
+
+## Google Search Console（2026-10-21）
+
+按本轮明确授权，已在既有账号添加 `https://lintel.page/` URL-prefix property，经 canonical 首页的 HTML meta tag 验证；Google 设置页确认“您是经过验证的所有者”。[sitemap.xml](https://lintel.page/sitemap.xml) 已成功提交，Google 的站点地图报告显示“成功”、已发现 40 个网页。所有权标签须随以后的 payload 保留；本次没有添加 analytics、写 DNS 或修改用户／服务权限。
+
+| 已检查 URL | Google 已存索引报告 | Google 选择的 canonical | Google 实时测试 |
+| --- | --- | --- | --- |
+| `/` | 已收录 | 所检查的网址 | 抓取成功，允许抓取与索引 |
+| `/en/` | 已收录 | 所检查的网址 | 抓取成功，允许抓取与索引 |
+| `/guide/quickstart/` | 已收录 | 所检查的网址 | 抓取成功，允许抓取与索引 |
+| `/en/guide/quickstart/` | 尚未收录；Google 当时无法识别此网址 | 尚未确定 | 抓取成功，允许抓取与索引；声明 canonical 为自身 |
+
+以上只覆盖这四个 URL；sitemap 发现 40 页不等于全部已收录。已存索引报告与实时测试是不同数据，不能据此前三条认定新 SEO 标题已经刷新搜索结果。中文首页的手动“请求编入索引”连续两次未被接受：Google 页面提示无法连接 reCAPTCHA 服务，按提示完整刷新后仍同样返回。本次没有解决 CAPTCHA、改浏览器／网络安全设置或继续对其他 URL 重复提交；该手动入口受阻，所有权与 sitemap 的成功结果独立保留。新 property 的汇总报告仍在处理数据。
 
 ## 0.1.1 修复与下载验收
 
@@ -42,7 +59,7 @@
 
 App／CLI 共用 core、有限 SSH 与原任务查询；v5 的 27 项保护字段、客户端配置／残留／身份控制、精确工作选择、流式加密包、独立阅读、有限启动来源、systemd、browser、IPv4／IPv6 与遥测已在源码接通。六任务合同与完整目标分别由 [product baseline](specs/product-baseline.md)、[SPEC](SPEC.md) 维护，不能把源码支持扩大为所有平台实效。
 
-GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。0.1.1 App source／tag target `ebbe237` 的 [GitHub CI 39399056140](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39399056140) 已完成，14 个 jobs（含 aggregate、两平台 heavy 和 Linux VM）全部 success。当前网站 payload source `46cf22e` 的 [CI 39567599162](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39567599162) 也已 14 个 jobs 全部 success，包含两平台网页／browser UI、heavy work、Linux VM 与最终 aggregate；未把跳过记作通过。没有接入自动部署，以上 production 为本次明确授权的手动激活。
+GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path profiles，`tests/verify.py --checks` 执行并输出 canonical evidence，aggregate 拒绝选中但 skipped 的检查。隐式默认组保持原样；真实 browser startup、native WebKit、Linux runtime 与大包容量为各自独立证据。0.1.1 App source／tag target `ebbe237` 的 [GitHub CI 39399056140](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39399056140) 已完成，14 个 jobs（含 aggregate、两平台 heavy 和 Linux VM）全部 success。SEO source `46cf22e` 的 [CI 39567599162](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39567599162) 也已 14 个 jobs 全部 success。当前验证标签 payload source `8f8d7d2` 的 [CI 39583906342](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39583906342) 已完成；选中的 plan、control、Ubuntu frontend／browser UI 与 aggregate 全部 success，native／heavy／runner／Linux VM 未选中而跳过，不计为通过。没有接入自动部署，以上 production 为本次明确授权的手动激活。
 
 逐轮 source、旧候选资源、CI 和隔离 runtime 证据已移入 [候选历史](candidate-history.md#2026-10-19-归档的阶段证据)，[基线验收](specs/product-baseline-status.md) 保留 A01–A18；具体命令和证据边界见 [验证说明](verification.md)。历史通过不会把本轮未测层标成通过。
 
