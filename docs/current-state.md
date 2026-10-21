@@ -12,7 +12,7 @@
 
 40 个中英静态页面的 title／description、Open Graph／Twitter 字段与分享图说明已统一维护；首页搜索标题明确 Claude Code 环境与资料管理身份，原可见标语与正文保持。首页仅投影真实 `WebSite`／本语言 `WebPage` JSON-LD，语言／history 切换同步；sitemap 的 40 项均由同一路由表生成，并保留中英及 x-default 配对。PNG favicon 逐字节复用既有 App identity export。生成检查覆盖页面、JSON-LD、favicon 与 sitemap 漂移，次级页继续走完整静态 mirrors。
 
-本机 canonical `site-game-test`、`app-release-test` 已通过；更新搜索标题的既有断言后，`site-ui` 完整通过，使用现有真实影片，包含无 JavaScript 阅读、语言／history 元数据、原有实例与交互。完整 CI gate 通过后，按本轮明确授权依次发布同一冻结包到 preview 与 production，并在正式域名复验全部 40 路 canonical／语言配对、准确标题／摘要、分享 metadata 与首页 JSON-LD；preview 保留 `noindex`，正式域名没有继承它。Search Console 尚未操作，Google 实际索引、搜索展示与排名未验证。生成与上线程序见[网站源码说明](../apps/site/README.md)及[搜索入口核对](site-hosting.md#搜索入口与上线核对)。
+本机 canonical `site-game-test`、`app-release-test` 已通过；更新搜索标题的既有断言后，`site-ui` 完整通过，使用现有真实影片，包含无 JavaScript 阅读、语言／history 元数据、原有实例与交互。完整 CI gate 通过后，按本轮明确授权依次发布同一冻结包到 preview 与 production，并在正式域名复验全部 40 路 canonical／语言配对、准确标题／摘要、分享 metadata 与首页 JSON-LD；preview 保留 `noindex`，正式域名没有继承它。Search Console 跟进已另获当前授权，正在为 `https://lintel.page/` URL-prefix property 完成所有权验证；验证 meta tag 的源码已准备，本轮追加标签尚未部署，sitemap 尚未提交，Google 实际索引、搜索展示与排名未验证。生成与上线程序见[网站源码说明](../apps/site/README.md)及[搜索入口核对](site-hosting.md#搜索入口与上线核对)。
 
 ## 0.1.1 修复与下载验收
 

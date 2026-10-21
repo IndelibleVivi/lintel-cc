@@ -113,7 +113,7 @@ node scripts/prepare-site.mjs \
 
 结构化数据只投影真实可见的站点身份、页面与阅读路径，不填虚构评分、价格、许可或发行日期。使用 [Schema Markup Validator](https://validator.schema.org/) 检查 schema；Google 的 Rich Results Test 不支持 site-name 检查，不能用它的“无适用项目”判断 `WebSite` 无效。站名由 canonical 首页的 `WebSite` 提供，具体规则见 [site names](https://developers.google.com/search/docs/appearance/site-names)与[结构化数据政策](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)。
 
-Search Console 属于独立账号操作，须有当前授权并使用 owner 已验证的 `lintel.page` property；不要为本次源码修改自动创建账号、写 DNS 验证记录或添加追踪脚本。上线后可提交 `https://lintel.page/sitemap.xml`，并用 URL Inspection 核对中英首页及代表性指南的 Google-selected canonical、抓取和索引状态。源码完成、production 读回、提交、搜索引擎实际收录及排名是不同事实，只记录实际观察到的层级。
+Search Console 属于独立账号操作，须有当前授权并先检查 owner 的已有 `lintel.page` property；源码修改本身不授权创建账号、写 DNS 验证记录或添加追踪脚本。本次明确授权的接入使用 `https://lintel.page/` URL-prefix property，Google 提供的公开 `google-site-verification` meta tag 保存在中文 canonical 首页 `<head>`，由现有生成器保留到 English 首页；它不发出请求。后续完整 payload 必须保留该标签，不在成功后删除。先在正式域名读回标签原值，再在对应 property 的 HTML 标记方式中点击验证；只有账号侧确认所有权后才提交 `https://lintel.page/sitemap.xml`。用 URL Inspection 核对中英首页及代表性指南的 Google-selected canonical、抓取和索引状态，必要时测试实际网址并请求编入索引；成功提交与实际收录、搜索展示及排名分别记录。源码、production 读回、所有权、提交和索引是不同事实，只记录实际观察到的层级。
 
 ## 失败与回退
 

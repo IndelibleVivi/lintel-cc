@@ -103,9 +103,11 @@ python3 tests/verify.py --checks clawd-app-ui --require-passed
 
 全部 40 个 locale 页面都有各语言唯一的标题与描述、同语言的 Open Graph／Twitter 标题描述、`og:site_name: Lintel`、同源分享图 `https://lintel.page/assets/lintel-social-preview.png` 与图像替代文本。首页稳定的 `c001`／`c002` 配对明确 Claude Code 环境与资料管理的完整身份，保留可见的原标语与 Preview 边界；15 篇指南描述直接取自 `site-routes.mjs` 的配对摘要，不另写泛化占位文案。`sitePageMetadata` 是生成页元数据的组合入口；`homeStructuredData` 只声明真实 `WebSite` 与本语言 `WebPage`，不编造评分、价格、许可或发行事实。现有生成入口维护首页 `site-structured-data` JSON-LD 投影，首页 runtime 语言／history 更新同步其 URL、标题、摘要和语言，保留现有节点。次级页继续使用完整静态 mirrors，不新增 runtime 翻译路径。`sitemap.xml` 由同一路由表生成，40 项均带 `zh-CN`、`en`、`x-default` alternate；`--check` 拒绝页面、JSON-LD、favicon 或 sitemap 漂移。`404.html` 独立声明 `noindex`；分享图由打包入口供应，`robots.txt`／`sitemap.xml` 使用正式域名，`_headers` 维护托管 CSP 与响应 headers。搜索引擎的抓取、收录与展示须在独立授权的上线后核对，程序见[官网托管说明](../../docs/site-hosting.md#搜索入口与上线核对)。
 
+中文首页 `<head>` 中的 `google-site-verification` 是经当前 owner 授权、由 Google 提供的公开所有权证明，不是 analytics 或 runtime 脚本。English 首页由现有语言生成入口保留同一标签；后续更新须保留此证明，账号侧是否已验证、sitemap 是否已提交与实际索引状态分别见 [current-state](../../docs/current-state.md)。
+
 ## 未来 App 下载与更新资料
 
-[`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。当前 v0.1.0 开发者 Preview 使用 manual 记录，公开下载与站点的实际部署证据见 current-state；不生成 updater feed。
+[`prepare-site.mjs`](../../scripts/prepare-site.mjs) 可从已核对公开二进制字节的 `lintel.app-release-public/1` 记录生成首装 DMG 链接、`app-downloads.json` 和 `updates/preview.json`／`stable.json`。版本与 feed 来自同一记录；二进制留在固定 GitHub Releases 仓库，Pages payload 不包含 App archives。无记录时保持源码 Preview 入口。两个已激活通道需同次传入两个记录，feed 使用 no-cache；具体命令、签名区别与先核对字节后激活的顺序由 [App 更新指南](../../docs/app-updates.md) 管理。当前 v0.1.1 开发者 Preview 使用 manual 记录，公开下载与站点的实际部署证据见 current-state；不生成 updater feed。
 
 ## 语言与发行状态的唯一入口
 
