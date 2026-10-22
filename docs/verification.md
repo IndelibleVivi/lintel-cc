@@ -794,3 +794,21 @@ clean `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 已构建本地 unsigned App／
 clean `ddfcd438990bb4b9af4b2720dac6e3af77c0d78c` 的 [GitHub CI 39252988511](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39252988511) 已完成，14 个 jobs（含 aggregate）全部 success；CI 结果与上述真实 native 观察分别成立。
 
 官网现在由 finite route map 生成五类页面、15 篇中英指南，共 40 路静态正文。`site-ui` 在浏览器中检查全部 guide 的 390px 无 JS 布局、同页语言／query／hash、主题历史、原首页游戏／播放器实例和实际同源 20 秒影片。源码／语言／游戏／发行准备的 Node 检查一并通过；本机 loopback 的真实浏览器检查已完成；静态生成与实际浏览器行为分别记录。SVG 旅程图另以 900px、灰度、双语结构与 strict readability 检查；原始 QA、fixture 与内部记录不进入 public Git。准确候选与部署事实由 [current-state](current-state.md)维护。
+
+## 打包与恢复的验证边界
+
+Desktop build/signature 脚本及随包项目许可文件选择 core profile；15 篇 paired 网站指南源选择 site profile，controller test 与 `site-routes.mjs` 比对完整集合。`macos-bundle-signature-test` 在 macOS frontend job 执行，Linux 不选中。后续 push 不再取消同 ref 正在运行的验证；GitHub 仍可能替换 pending run，docs-only aggregate 也不能证明前一产品 revision 或代替准确候选的发行 gate。
+
+原生构建前运行 `npm --prefix apps/desktop run prepare:locked-dependencies`，显式 fetch 三个 locked Cargo graph 并准备 `rust-docs`。`node apps/desktop/scripts/prepare-locked-dependencies.mjs --check` 只检查 Node/npm、Rust/rustup 与 macOS Xcode Command Line Tools，不下载；notices 收集仍 locked/offline。本轮没有完成从空缓存开始的完整 native build 独立验收。
+
+修改前端后，先 build 再运行 built-App UI check；验证 registry 保持 canonical 顺序，不按 `--checks` 参数顺序执行。core 回归覆盖 journal 损坏；`i18n-ui` 覆盖错误记录提示、健康 receipt 同时可见及语言切换。Runtime fault fixtures 只用 synthetic 进程、替代 resolver 与临时 roots，不证明 clean-Mac 信任、真实 Claude 认证或生产激活。
+
+### 2026-10-23 源码修复验收
+
+Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`native-host-rust-test`、`runner-build`、`journey-client-control`、`js-engine-test`、`i18n-test`、`i18n-coverage-test`、`app-release-test`、`macos-bundle-signature-test`、`rust-notices-test`、`desktop-typecheck`、built-App `i18n-ui` 和 `site-ui` 已通过。`cli-candidate` 也已通过，含实际 supplied binary smoke；该次保留工具 stdout，没有独立 JSON evidence。Desktop Rust 的两项既有 ignored 保留为未执行；没有据此声称所有独立 checks 或所有平台通过。最后收紧 job 标题／时间／steps 类型后，损坏记录、live journal 原 ID 查询的定向回归与 runner build 再次通过。同目录多原件隔离测试先复现路径复用，再以每项独立 locator 修复，覆盖残留和标识备份。
+
+故障证据包括：继承及 `setsid` 逃逸的 stdout 写端不再阻止适配器返回；阻塞 resolver 不拖住 runtime drop，满额重复请求不排队；24 MiB 的三种字节内容经实际残留 producer／reader／restorer 完整往返；两个隔离后失败原件分别保留定位，最终 parent sync 失败不记完成；完整 App installer 在三种 registration publication 阶段重开并使用原批准恢复，外部同字节新 inode 与同 inode 改文均保留为冲突。App 中英记录页在 900／1120px 显示坏记录 ID/code 及健康任务；网站 15 篇 paired 指南在 390px、无 JS 下保持整页不溢出，code/table 在本地滚动。
+
+首轮运行有两项环境失败：SSH fixture 的测试用命令替换不支持含空格的临时目录，updater fixture 拒绝经 symlink 启动的测试 executable。分别使用普通临时目录及真实 `CARGO_TARGET_DIR` 后，完整相关检查通过。网站无 JS 测试改为先设手机 viewport、再等待 document/styles load，保留原溢出断言。原失败不改写为通过。
+
+真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。

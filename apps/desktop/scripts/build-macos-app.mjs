@@ -155,7 +155,7 @@ export async function buildArguments(extraArgs = [], {env = process.env, dryRun 
   const output = parsed.target
     ? path.join(root, parsed.target, parsed.profile, 'bundle/macos/Lintel.app')
     : path.join(root, parsed.profile, 'bundle/macos/Lintel.app');
-  return {args: ['build', ...parsed.tauri], fallback, requireDeveloperId: parsed.requireDeveloperId, output: {target: parsed.target, profile: parsed.profile, app: output}};
+  return {args: ['build', ...parsed.tauri], fallback, requireDeveloperId: parsed.requireDeveloperId || env.LINTEL_REQUIRE_FORMAL_SIGNING === '1', output: {target: parsed.target, profile: parsed.profile, app: output}};
 }
 
 export async function buildMacosApp(extraArgs = [], {

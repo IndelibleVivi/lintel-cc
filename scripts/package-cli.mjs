@@ -531,10 +531,11 @@ async function buildArchives({ outDir, identity, version, revision, cli, runners
     // The CLI resolves its remote runners at `dirname(current_exe)/remote-runners`,
     // so the executable lives at bin/lintel and the bundles at bin/remote-runners.
     const entries = [{ archive: 'bin/lintel', bytes: cli[targetId].bytes }];
-    for (const file of [...runners.files, ...notices]) {
+    const projectTerms = await Promise.all(['LICENSE', 'LICENSE-DOCUMENTATION', 'LICENSING.md'].map(async name => ({archive: `project-licenses/${name}`, bytes: await readFile(new URL(`../${name}`, import.meta.url))})));
+    for (const file of [...runners.files, ...notices, ...projectTerms]) {
       const destination = path.join(stage, file.archive);
       await mkdir(path.dirname(destination), { recursive: true });
-      await writeFile(destination, file.bytes, { mode: file.archive.startsWith('third-party-notices/') ? 0o644 : 0o700 });
+      await writeFile(destination, file.bytes, { mode: (file.archive.startsWith('third-party-notices/') || file.archive.startsWith('project-licenses/')) ? 0o644 : 0o700 });
       entries.push({ archive: file.archive, bytes: file.bytes });
     }
     await writeFile(path.join(stage, 'bin', 'lintel'), cli[targetId].bytes, { mode: 0o755 });

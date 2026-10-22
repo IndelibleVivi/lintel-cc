@@ -12,11 +12,13 @@
 | 已由自己或可信提供方构建的 macOS App | 打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见[当前状态](current-state.md) |
 | Linux，或只需要 CLI | [Agent CLI](agents.md)负责安装；[CLI 完整试用](quickstart.md)提供全程合成示例 |
 
-[0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 已提供 Apple Silicon App 与三平台 CLI 的手动下载，先阅读 Release 内的 INSTALL 与校验和。App 产品字节来自已验收的 clean `fcae6cb`；没有 Developer ID 签名、公证或 updater feed，干净 Mac 首装未验证。系统阻止时停止，继续下方源码试用。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
+当前手动下载：[App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)、[CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)。App v0.1.0 因封装签名缺陷已被替代。没有 Developer ID 签名、公证或 updater feed；干净 Mac 首装仍未验证。
+
+先阅读 Release 内的 INSTALL 与校验和。系统阻止时停止，继续下方源码试用。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
 
 ## 合成界面试用
 
-准备 Git、Rust stable 与兼容仓库依赖的 Node.js／npm：
+准备 Git、Rust stable 与 Node.js >=22.12.0／npm >=10：
 
 ```sh
 git clone https://github.com/IndelibleVivi/lintel-cc.git
@@ -54,6 +56,7 @@ npm run dev:synthetic
 
 ```sh
 mkdir -p src-tauri/runner-bundles
+npm run prepare:locked-dependencies
 npm run desktop:build
 ```
 

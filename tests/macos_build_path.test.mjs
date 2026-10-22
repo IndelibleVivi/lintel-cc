@@ -149,3 +149,28 @@ test('preview output is new and never overwritten', async () => {
   await assert.rejects(() => ensureNewDirectory(path.join(directory, 'occupied')), /must not already exist/);
   assert.equal(await import('node:fs/promises').then(({readFile}) => readFile(path.join(directory, 'occupied'), 'utf8')), 'keep\n');
 });
+
+test('formal signing environment reaches the final signature gate', async () => {
+  await assert.rejects(() => buildMacosApp(['--config', '{"bundle":{"macOS":{"signingIdentity":"Developer ID Application: Test"}}}'], {
+    guard: false, env: {LINTEL_REQUIRE_FORMAL_SIGNING: '1'},
+    execute: () => ({status: 0}), verify: async () => ({signature: 'ad-hoc'}),
+  }), /requires a Developer ID signature/);
+});
+
+
+test('locked dependency bootstrap rejects missing prerequisites before downloads', async () => {
+  const {checkPrerequisites,commands}=await import('../apps/desktop/scripts/prepare-locked-dependencies.mjs');
+  const calls=[];
+  const run=(tool,args)=>{calls.push([tool,args]);return {status:0,stdout:tool==='npm'?'10.9.0':'available'};};
+  assert.throws(()=>checkPrerequisites({version:'22.11.0',run}),/Node.js/);
+  assert.equal(calls.length,0);
+  checkPrerequisites({version:'22.12.0',platform:'darwin',run});
+  assert.ok(calls.some(([tool])=>tool==='xcode-select'));
+  assert.throws(()=>checkPrerequisites({version:'24.0.0',platform:'darwin',run:()=>({status:1})}),/npm is unavailable/);
+  assert.throws(()=>checkPrerequisites({version:'24.0.0',platform:'linux',run:()=>({status:0,stdout:'9.0.0'})}),/npm >=10/);
+  assert.deepEqual(commands.filter(([tool])=>tool==='cargo').map(([,args])=>args),[
+    ['fetch','--locked','--manifest-path','Cargo.toml'],
+    ['fetch','--locked','--manifest-path','apps/desktop/src-tauri/Cargo.toml'],
+    ['fetch','--locked','--manifest-path','extensions/browser/native-host/Cargo.toml'],
+  ]);
+});

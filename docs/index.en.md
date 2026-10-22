@@ -31,6 +31,6 @@ For goals, see the [SPEC (Chinese)](SPEC.md) and [product baseline (Chinese)](sp
 
 Chinese is the canonical product-documentation edition. Paired English pages maintain the same commands, defaults and operational boundaries. Some engineering specifications and acceptance records remain Chinese-only, as labelled above.
 
-This is **0.1.0 Preview**: check the local release-preparation candidate, source capabilities, public downloads and active update channel separately. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual downloads, without Developer ID signing, notarization or an updater feed.
+Current manual downloads: [App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), [CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.
 
 Page language and direction remain stable. For waiting, partial or `needs_reconciliation` results, keep the original ID and use [Troubleshooting](troubleshooting.en.md) rather than deleting Lintel state or a work package to re-read it.

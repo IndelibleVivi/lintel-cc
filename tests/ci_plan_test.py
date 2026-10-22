@@ -50,7 +50,7 @@ class FakeCompleted:
 class ClassificationTests(unittest.TestCase):
     def test_docs_paths(self):
         for path in ("docs/verification.md", "README.md", "README.en.md", "AGENTS.md",
-                     "LICENSE", "notes.md", "CHANGELOG.md"):
+                     "notes.md", "CHANGELOG.md"):
             self.assertEqual(ci_plan.classify_path(path), ci_plan.AREA_DOCS, path)
 
     def test_site_paths(self):
@@ -59,6 +59,19 @@ class ClassificationTests(unittest.TestCase):
                      "scripts/prepare-site-languages.mjs", "tests/site_languages.test.mjs",
                      "scripts/prepare-preview-art.mjs"):
             self.assertEqual(ci_plan.classify_path(path), ci_plan.AREA_SITE, path)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is required to read the website source contract")
+    def test_guide_sources_and_distributed_terms_select_consumers(self):
+        source = "import {GUIDE_ARTICLES} from './apps/site/site-routes.mjs'; console.log(JSON.stringify(GUIDE_ARTICLES.flatMap(({doc})=>[`docs/${doc}.md`,`docs/${doc}.en.md`])));"
+        docs = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", source], cwd=ROOT))
+        selected = {pattern for area, pattern in ci_plan._PATH_RULES if area == ci_plan.AREA_SITE and pattern.startswith("docs/")}
+        self.assertEqual(selected, set(docs), "website source changes must update CI input coverage")
+        for path in docs:
+            self.assertEqual(ci_plan.classify_path(path), ci_plan.AREA_SITE)
+        for path in ("apps/desktop/scripts/build-macos-app.mjs", "apps/desktop/scripts/verify-macos-bundle.mjs", "LICENSE", "LICENSE-DOCUMENTATION", "LICENSING.md"):
+            self.assertEqual(ci_plan.classify_path(path), ci_plan.AREA_CORE)
+        self.assertIn("macos-bundle-signature-test", ci_plan.checks_for_platform(ci_plan.FRONTEND_CHECKS, ci_plan.MACOS))
+        self.assertNotIn("macos-bundle-signature-test", ci_plan.checks_for_platform(ci_plan.FRONTEND_CHECKS, ci_plan.LINUX))
 
     def test_app_ui_vs_core_native(self):
         self.assertEqual(ci_plan.classify_path("apps/desktop/src/App.tsx"), ci_plan.AREA_APP_UI)
@@ -368,7 +381,7 @@ class CanonicalEvidenceModelTests(unittest.TestCase):
     def test_canonical_files_per_job(self):
         self.assertEqual(
             ci_plan.canonical_evidence("frontend", ci_plan.LINUX, ci_plan.FRONTEND_CHECKS),
-            [(f"frontend-{ci_plan.LINUX}.json", ci_plan.FRONTEND_CHECKS)])
+            [(f"frontend-{ci_plan.LINUX}.json", ci_plan.checks_for_platform(ci_plan.FRONTEND_CHECKS, ci_plan.LINUX))])
         runner_macos = ci_plan.canonical_evidence("runner", ci_plan.MACOS, ci_plan.RUNNER_CHECKS)
         self.assertEqual(runner_macos, [(f"cli-candidate-{ci_plan.MACOS}.json", ("cli-candidate",))])
         runner_linux = ci_plan.canonical_evidence("runner", ci_plan.LINUX, ci_plan.RUNNER_CHECKS)

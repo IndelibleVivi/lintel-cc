@@ -263,6 +263,13 @@ class PackageJourney:
             payload = (root / entry["path"]).read_bytes()
             assert len(payload) == entry["bytes"], (entry, "size")
             assert sha256_bytes(payload) == entry["sha256"], (entry, "digest")
+        listed = {entry["path"] for entry in manifest["files"]}
+        sums = (root / "SHA256SUMS").read_text()
+        for name in ("LICENSE", "LICENSE-DOCUMENTATION", "LICENSING.md"):
+            relative = "project-licenses/" + name
+            assert relative in listed, relative
+            assert relative in sums, relative
+            assert (root / relative).read_bytes() == (Path(__file__).resolve().parents[1] / name).read_bytes(), relative
         return manifest
 
     @staticmethod
@@ -473,7 +480,9 @@ sys.exit(subprocess.call([{real_tar!r},*options,*sys.argv[1:]]))
                 assert set(names) == {"bin/lintel", "candidate.json", "SHA256SUMS", "README.txt",
                                       "bin/remote-runners/manifest.json",
                                       "bin/remote-runners/x86_64-unknown-linux-musl/lintel",
-                                      "bin/remote-runners/aarch64-unknown-linux-musl/lintel"}, names
+                                      "bin/remote-runners/aarch64-unknown-linux-musl/lintel",
+                                      "project-licenses/LICENSE", "project-licenses/LICENSE-DOCUMENTATION",
+                                      "project-licenses/LICENSING.md"}, names
                 assert len(names) == len(set(names))
 
 

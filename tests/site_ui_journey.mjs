@@ -263,9 +263,12 @@ try {
       assert.equal(await page.locator('.guide-body script').count(),0,`${article.key}: source markup escaped`);
       assert.equal(await page.locator('.guide-body[data-guide-document]').count(),1,`${article.key}: exactly one guide body`);
       for (const language of ['zh','en']) {
-        await page.goto(base+localePath(article.path,language),{waitUntil:'domcontentloaded'});
+        // Navigate at the target viewport and wait for the no-JS document's
+        // styles/resources; do not sample an in-flight desktop-to-phone resize.
         await page.setViewportSize({width:390,height:844});
-        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${article.key}/${language}: no-JS article fits 390px; code and tables scroll locally`);
+        await page.goto(base+localePath(article.path,language),{waitUntil:'load'});
+        const geometry = await page.evaluate(()=>({page:document.documentElement.scrollWidth,width:innerWidth}));
+        assert.equal(geometry.page>geometry.width,false,`${article.key}/${language}: no-JS article fits 390px; code and tables scroll locally`);
       }
       await page.setViewportSize({width:1280,height:900});
     }

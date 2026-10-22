@@ -73,6 +73,7 @@ _CI_EXACT = frozenset({
 _OWNER_DIR_RULES: Tuple[Tuple[str, str], ...] = (
     # Native App crate is core/desktop-rust evidence, not pure frontend UI.
     (AREA_CORE, "apps/desktop/src-tauri/**"),
+    (AREA_CORE, "apps/desktop/scripts/**"),
     (AREA_APP_UI, "apps/desktop/**"),
     (AREA_SITE, "apps/site/**"),
     (AREA_SITE, "assets/preview/**"),
@@ -112,8 +113,40 @@ _PATH_RULES: Tuple[Tuple[str, str], ...] = (
     (AREA_DOCS, "AGENTS.md"),
     (AREA_DOCS, "README.md"),
     (AREA_DOCS, "README.en.md"),
+    (AREA_SITE, "docs/start-here.md"),
+    (AREA_SITE, "docs/start-here.en.md"),
+    (AREA_SITE, "docs/quickstart.md"),
+    (AREA_SITE, "docs/quickstart.en.md"),
+    (AREA_SITE, "docs/concepts.md"),
+    (AREA_SITE, "docs/concepts.en.md"),
+    (AREA_SITE, "docs/troubleshooting.md"),
+    (AREA_SITE, "docs/troubleshooting.en.md"),
+    (AREA_SITE, "docs/operator-guide.md"),
+    (AREA_SITE, "docs/operator-guide.en.md"),
+    (AREA_SITE, "docs/agents.md"),
+    (AREA_SITE, "docs/agents.en.md"),
+    (AREA_SITE, "docs/browser.md"),
+    (AREA_SITE, "docs/browser.en.md"),
+    (AREA_SITE, "docs/remote.md"),
+    (AREA_SITE, "docs/remote.en.md"),
+    (AREA_SITE, "docs/desktop.md"),
+    (AREA_SITE, "docs/desktop.en.md"),
+    (AREA_SITE, "docs/network.md"),
+    (AREA_SITE, "docs/network.en.md"),
+    (AREA_SITE, "docs/services.md"),
+    (AREA_SITE, "docs/services.en.md"),
+    (AREA_SITE, "docs/telemetry.md"),
+    (AREA_SITE, "docs/telemetry.en.md"),
+    (AREA_SITE, "docs/app-updates.md"),
+    (AREA_SITE, "docs/app-updates.en.md"),
+    (AREA_SITE, "docs/core.md"),
+    (AREA_SITE, "docs/core.en.md"),
+    (AREA_SITE, "docs/architecture.md"),
+    (AREA_SITE, "docs/architecture.en.md"),
     (AREA_DOCS, "docs/**"),
-    (AREA_DOCS, "LICENSE"),
+    (AREA_CORE, "LICENSE"),
+    (AREA_CORE, "LICENSE-DOCUMENTATION"),
+    (AREA_CORE, "LICENSING.md"),
     (AREA_DOCS, "LICENSE.*"),
     # Top-level-only Markdown: a `*.md` at the repository root. Owner-dir rules
     # above already claimed product-internal Markdown, so this cannot reach into
@@ -176,6 +209,7 @@ FRONTEND_CHECKS: Tuple[str, ...] = (
     "js-engine-test", "site-game-test", "home-greetings-test", "i18n-test",
     "i18n-coverage-test", "recipe-test", "app-release-test", "rust-notices-test",
     "python-ssh-test", "linux-vm-control-test", "desktop-typecheck", "desktop-build",
+    "macos-bundle-signature-test",
 )
 NATIVE_CHECKS: Tuple[str, ...] = (
     "cargo-workspace-test", "desktop-rust-test", "native-host-rust-test", "runner-build",
@@ -203,7 +237,6 @@ VM_CHECKS: Tuple[str, ...] = ("linux-vm-runtime",)
 EXCLUDED_FROM_CI: Dict[str, str] = {
     "work-scale": "release-capacity runtime evidence (four 256 MiB members, >=16 GiB temp free); explicitly local/manual, not routine CI",
     "desktop-tauri-bundle": "native macOS Tauri bundle + real WebKit build; needs macOS/Xcode and stays out of the synthetic Linux-first matrix",
-    "macos-bundle-signature-test": "macOS codesign/clang synthetic bundle proof; not available on Linux and not a native App launch",
 }
 
 LINUX = "ubuntu-24.04"
@@ -738,6 +771,7 @@ PLATFORM_SYSTEM: Dict[str, str] = {MACOS: "Darwin", LINUX: "Linux"}
 # Checks that only run on one platform. Everything else runs on every platform a
 # job is scheduled for.
 PLATFORM_ONLY_CHECKS: Dict[str, Tuple[str, ...]] = {
+    "macos-bundle-signature-test": (MACOS,),
     "linux-ssh-runtime": (LINUX,),
     "linux-vm-runtime": (LINUX,),
 }

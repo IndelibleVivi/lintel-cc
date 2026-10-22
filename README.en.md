@@ -102,4 +102,6 @@ Choose checks relevant to the change using the [verification guide (Chinese)](do
 
 Report issues through [GitHub Issues](https://github.com/IndelibleVivi/lintel-cc/issues), including version/source, target, steps and actual result. Use synthetic examples and omit credentials or unredacted work material.
 
-Lintel is not affiliated with Anthropic. Clawd and third-party dependencies retain their respective rights. A public reuse license for original project material is still to be selected; source publication and a formal release are tracked separately.
+Lintel is not affiliated with Anthropic. Clawd and third-party dependencies retain their respective rights. Source publication and a formal release are tracked separately.
+
+Licensing: this is a source-available Preview, not OSI open source. Original functional code uses [SUL-1.0](LICENSE); original documentation and independent original diagrams use [CC BY-NC-SA 4.0](LICENSE-DOCUMENTATION). Brand, Clawd and unverified assets are excluded; third parties retain their terms. See [scope and transition](LICENSING.md).

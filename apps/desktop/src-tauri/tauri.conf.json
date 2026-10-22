@@ -46,7 +46,10 @@
       "third-party-notices/": "third-party-notices/",
       "runner-bundles/": "remote-runners/",
       "browser-host-bundle/": "browser-host/",
-      "browser-extension-bundle/": "browser-extensions/"
+      "browser-extension-bundle/": "browser-extensions/",
+      "../../../LICENSE": "project-licenses/LICENSE",
+      "../../../LICENSE-DOCUMENTATION": "project-licenses/LICENSE-DOCUMENTATION",
+      "../../../LICENSING.md": "project-licenses/LICENSING.md"
     }
   }
 }

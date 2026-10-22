@@ -12,5 +12,6 @@
   },
   "devDependencies": {
     "playwright": "1.62.1"
-  }
+  },
+  "license": "SUL-1.0"
 }

@@ -395,6 +395,9 @@ install 的 prepare_runner → install_runner → query_install 与 App 共用�
 
 ### 可移植候选包的生成与校验
 
+从采用当前许可的源码打出的新候选还包含独立的 `project-licenses/`（`LICENSE`、`LICENSE-DOCUMENTATION`、`LICENSING.md`），进入 candidate 清单与校验；它不替代第三方 notices。许可范围见[项目授权](../LICENSING.md)。已经公开的旧候选不因源码修复而被重新打包或自动改授许可。
+
+
 `scripts/package-cli.mjs` 把**明确提供的** canonical 构建产物打成候选归档：一个 macOS arm64 Mach-O、两个静态 Linux musl ELF（x86_64 与 aarch64），以及 CLI 自己解析的 canonical `remote-runners` 目录。打包器**不编译、不下载、不签名**，只核对格式与字节；缺少、架构错误、带动态加载器或与 canonical runner 字节不一致的 Linux 输入会以具体错误拒绝。两个 Linux CLI 输入必须与该架构的 canonical runner 逐字节相同，旧输入／混合输入不能被标成同一个 candidate。分发准备必须用 `--notices` 指向与所供二进制构建 toolchain 对应的完整声明目录（见 [发行说明](app-updates.md#本地未签名-dmg-与第三方说明)）。打包器只保留 inventory 指定的有限 license 文件与声明正文，加入 `third-party-notices/`、candidate 文件清单及 `SHA256SUMS`。未传此选项仍兼容既有合成测试，但会标记 `notices_included:false`，只用于本地试验；声明集合是依赖超集，不是 exact linked SBOM。
 
 归档是扁平的运行时布局：`bin/lintel`、`bin/remote-runners/manifest.json`、`bin/remote-runners/<triple>/lintel`（两个 Linux runner）、`candidate.json`、`SHA256SUMS`、`README.txt`；CLI 在 `dirname(executable)/remote-runners` 找 runner，所以是 `bin/remote-runners`，不是归档根。

@@ -23,13 +23,13 @@ on:
 permissions:
   contents: read
 
-# Cancel a superseded push/PR run on the same ref, but never cancel an
-# independent scheduled or manually dispatched acceptance run. Scheduled and
-# manual runs get their own group keyed by run id, so they never queue behind or
-# replace one another; only push/PR runs cancel (per ref).
+# Do not cancel running product verification when a later push changes docs.
+# Scheduled and manual acceptance runs have independent groups keyed by run id.
+# GitHub may replace an older pending run; exact candidate evidence is still a
+# separate release gate, never inferred from the latest lightweight aggregate.
 concurrency:
   group: verify-${{ github.ref }}-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('acceptance-{0}', github.run_id) || 'change' }}
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   plan:

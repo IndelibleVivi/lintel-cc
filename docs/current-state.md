@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-10-23：未发布的可靠性与交付修复
+
+当前源码新增下列修复；公开 App 仍为下文的 0.1.1，独立 CLI 仍为原 0.1.0 候选。本轮没有发布新 Release、激活 updater 或更新官网部署。
+
+| 范围 | 当前源码事实 |
+| --- | --- |
+| CLI / DNS 等待 | CLI 使用 nonblocking bounded stdout；系统 DNS 由最多 32 个 slot 的独立 owner 管理，取消后的迟到结果不连接；不承诺能终止 OS DNS 或逃逸进程 |
+| 浏览器恢复 | 隔离释放可协调完全匹配的旧 owner；App host 安装 intent 和 manifest publication journal 绑定原批准、完整 staging 及文件身份，原批准可继续中断；外部变更保留 |
+| 残留／标识保全 | 保持 `lintel.residue/1` 原编码，共享有限预算、删除前生产 reader 校验、路径资格及逐原件隔离定位；同步不确定不记完成 |
+| 任务与诊断 | 损坏 job 返回结构化错误且不重写，列表保留健康记录并报告缺口；App 记录页显示 ID/code；I/O 增加安全的有限原因分类。列表尚无分页，完整组件健康检查尚未交付 |
+| 首用／构建／CI | App/CLI 当前指引分开维护；显式 locked dependency/rust-docs 准备并检查前置工具；打包脚本、网站指南输入与 macOS signature fixture 接入对应 CI；日常 push 不取消上一轮验证。完整冷缓存 native 构建尚未独立验收 |
+| 分发与许可 | tar inspector 检查传递／循环 symlink，正式签名环境约束到达最终 gate；新 App/CLI 候选携带独立项目许可。原创功能代码 SUL-1.0、原创文档／独立图示 CC BY-NC-SA 4.0，范围／排除见[授权边界](../LICENSING.md)；项目为 source-available Preview |
+
+定向证据包括实际 Rust 逃逸 pipe／阻塞 resolver 回归、24 MiB 混合字节的生产残留归档→reader→恢复、同目录多原件各自隔离定位、完整 App installer 重新打开后的三阶段恢复，以及 built App 中英记录错误提示和健康 receipt 同时显示。公开旧版 CLI → 当前不同 binary 的原 job／plan、旧加密包精确正文、选中字段恢复及实际 kill 后原 ID 不重放已通过。它们均使用 synthetic roots／adapter，不是个人认证、正式浏览器或 clean-Mac 验收。最终 canonical 检查范围见[验证说明](verification.md#2026-10-23-源码修复验收)。
+
+仍需独立建设／验收：准确候选 SHA 与实际产物的完整发行 gate、正式 RC 的跨平台升级／回退及 clean-Mac 信任／首装；长期 journal 归档／去重保留与分页容量；组件退场、完整健康／恢复中心、私密安全报告渠道和可复现演示。代理强约束、更多浏览器与完整长期 SPEC 继续按原边界维护；不将这些建议当作本轮已交付功能。
+
+
 2026-10-20 · **[Lintel 0.1.1 开发者 Preview 已发布](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)**，修复 0.1.0 DMG 的 App bundle 签名封装。App／文档编译 revision 与 tag target 均为 clean `ebbe237cd236a2b299281e070b4758a9e9e522b2`。DMG 13,123,475 bytes，SHA-256 `867ea626ceb5101006e15c071da9627db38a555212208a4fffd577a5f5faf6d3`。Release 于 `2026-10-20T09:39:22Z` 公开，4 个上传资产均已核对公开字节；manual 记录为 `public_bytes_verified`／`publication_verified:true`。Chrome 从公开 Release 下载的副本保留 quarantine，只读挂载后的 App 通过严格签名校验。完整 ad-hoc 签名不提供 Developer ID 或公证，也没有 updater feed；干净 Mac 首装与用户信任确认仍独立。字节一致不构成源码认证。
 
 独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，macOS arm64、Linux x86_64／aarch64 三包及两份 static musl runner 仍由原 [v0.1.0 prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供；包名保留原候选身份，Linux 为 experimental。10-20 发行整理版在不改变任何 executable 字节的前提下，为各 CLI 包加入 18 份与已核验 App 相同的第三方声明及校验覆盖；此前未含声明的本地包保留作历史测试候选。两份 Linux runner 在 10-19 用 X9 上的隔离 cargo-zigbuild 0.23.4／Zig 0.16.0 重建；App 内 runner、browser host、16 个扩展文件均与 manifest 的大小／摘要一致。实际 macOS CLI 交付包已解出，在新 HOME／state 逐字节读取三份原文且没有来源 job；这不证明其他架构 runtime。
@@ -79,7 +97,7 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 
 统一验证 owner 是 `python3 tests/verify.py`；UI／browser startup／Linux runtime 为独立 selections。dirty 开发 App 的 docs revision 为 unknown；干净候选的 Lintel 文档资源指向自己的源码 revision，main 入口标为最新开发说明；独立 Infra Field Guide 使用自己的 main，标为独立指南最新版。不会开放任意 URL 或 shell。
 
-仓库已公开；项目原创材料的公开复用许可证仍未选定，第三方权利独立。源码可见不构成通用复用许可。
+仓库已公开；当前源码的原创功能代码适用 SUL-1.0，原创文档／独立原创图示适用 CC BY-NC-SA 4.0；品牌、Clawd 与未核实素材排除，第三方保留原条款。此前发行包不自动改授许可，具体范围和生效边界见 [LICENSING](../LICENSING.md)。
 
 ## 完整目标仍缺少
 

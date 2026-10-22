@@ -14,7 +14,8 @@
     "build:desktop-resources": "npm run prepare:browser-host && npm run prepare:browser-extension && npm run build && npm run prepare:third-party-notices",
     "tauri": "tauri",
     "desktop:build": "node scripts/build-macos-app.mjs",
-    "desktop:build:macos-preview": "node scripts/build-macos-app.mjs --bundles app,dmg --ci"
+    "desktop:build:macos-preview": "node scripts/build-macos-app.mjs --bundles app,dmg --ci",
+    "prepare:locked-dependencies": "node scripts/prepare-locked-dependencies.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",
@@ -29,5 +30,10 @@
     "@vitejs/plugin-react": "^6.1.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
-  }
+  },
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "license": "SUL-1.0"
 }

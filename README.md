@@ -102,4 +102,6 @@ python3 tests/verify.py --list
 
 反馈请提交到 [Issues](https://github.com/IndelibleVivi/lintel-cc/issues)，说明版本或来源、目标、步骤与实际结果；使用合成示例，不附凭据或未脱敏工作资料。
 
-Lintel 与 Anthropic 无官方关联，Clawd 形象及第三方依赖保留各自权利。项目原创材料的公开复用许可尚待选定；源码公开与正式发行分别记录。
+Lintel 与 Anthropic 无官方关联，Clawd 形象及第三方依赖保留各自权利。源码公开与正式发行分别记录。
+
+许可：本项目为 source-available Preview，并非 OSI open source。原创功能代码适用 [SUL-1.0](LICENSE)，原创文档／独立原创图示适用 [CC BY-NC-SA 4.0](LICENSE-DOCUMENTATION)。品牌、Clawd 与未核实素材排除；第三方保留原条款。范围和生效边界见 [LICENSING](LICENSING.md)。

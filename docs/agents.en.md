@@ -365,6 +365,9 @@ migration_path_conflict means actual case/Unicode/path equivalence; approved emp
 
 ### Portable package creation and verification
 
+New candidates built from the licensed source include a separate `project-licenses/` directory containing `LICENSE`, `LICENSE-DOCUMENTATION` and `LICENSING.md`, covered by the candidate file list and checksums. It does not replace third-party notices. See [licensing scope](../LICENSING.md); previously published candidates are not repackaged or automatically relicensed by a source change.
+
+
 package-cli.mjs packages **explicitly supplied canonical outputs**: arm64 macOS Mach-O, x86_64/aarch64 static Linux musl ELF and canonical remote-runners. No compile/download/signing; missing/wrong-arch/dynamic/mismatched Linux refuses. Linux CLI inputs must byte-match canonical runner, no mixed candidate. Redistribution preparation supplies `--notices` with the complete notice directory matching the binaries’ build toolchains; see [distribution preparation](app-updates.en.md#local-unsigned-dmg-and-third-party-notices). The finite inventory-listed licenses and notice texts are retained under `third-party-notices/` and covered by candidate file metadata and `SHA256SUMS`. Existing synthetic callers may omit the option; those packages explicitly record `notices_included:false` and are for local testing only. The notice collection is a dependency superset, not an exact linked SBOM.
 
 Flat runtime: bin/lintel, bin/remote-runners/manifest.json, bin/remote-runners/<triple>/lintel (both), candidate.json/SHA256SUMS/README.txt. Lookup is dirname(executable)/remote-runners, not archive root. Verify/archive same-read manifest bytes to avoid resource rebuild mixing.

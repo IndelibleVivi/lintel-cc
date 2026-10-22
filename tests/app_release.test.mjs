@@ -162,3 +162,30 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  for(const route of ['/updates/*','/app-downloads.json'])assert.deepEqual(rules.get(route),['Cache-Control: no-cache'],'Feed/download metadata must have one explicit cache rule');
  assert.equal(JSON.stringify(build).includes(dir),false);assert.notEqual(pack('metadata').status,0,'Must not overwrite existing output');
 });
+
+test('archive symlink graph rejects transitive escapes and cycles, accepts framework links', async () => {
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-link-graph-'));
+ for(const [kind,pattern] of [['escape',/escapes bundle/],['cycle',/cycle/],['valid',/identity\/version/]]) {
+  const file=path.join(dir,kind+'.tar.gz');
+  const made=spawnSync('python3',['-c',`import tarfile,sys
+with tarfile.open(sys.argv[1],'w:gz') as t:
+ links = {'escape':[('Lintel.app/a','.'),('Lintel.app/b','a/../outside')], 'cycle':[('Lintel.app/a','b'),('Lintel.app/b','a')], 'valid':[('Lintel.app/Contents/Frameworks/F.framework/Versions/Current','A'),('Lintel.app/Contents/Frameworks/F.framework/F','Versions/Current/F')]}[sys.argv[2]]
+ for name,target in links:
+  e=tarfile.TarInfo(name);e.type=tarfile.SYMTYPE;e.linkname=target;t.addfile(e)
+`,file,kind],{encoding:'utf8'});
+  assert.equal(made.status,0);
+  const result=spawnSync('python3',[path.join(repo,'scripts/inspect-app-archive.py'),file,'0.2.0','darwin-aarch64'],{encoding:'utf8'});
+  assert.notEqual(result.status,0);assert.match(result.stderr,pattern);
+ }
+});
+
+test('project terms ship separately from dependency notices', async () => {
+ const config=JSON.parse(await readFile(path.join(repo,'apps/desktop/src-tauri/tauri.conf.json'),'utf8'));
+ for(const name of ['LICENSE','LICENSE-DOCUMENTATION','LICENSING.md']) {
+  assert.equal(config.bundle.resources['../../../'+name],'project-licenses/'+name);
+  assert.ok((await readFile(path.join(repo,name))).length>1000);
+ }
+ const packager=await readFile(path.join(repo,'scripts/package-cli.mjs'),'utf8');
+ assert.match(packager,/project-licenses/);
+ assert.match(await readFile(path.join(repo,'LICENSING.md'),'utf8'),/Excluded from these grants/);
+});

@@ -46,9 +46,10 @@
 <p>Begin with one small task: <strong>select two synthetic files, create an encrypted work package and open it again.</strong> This shows targets, previews and results without configuring your own Claude installation or browser.</p>
 <h2 id="choose-an-entry-point">Choose an entry point</h2>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">What you have</th><th class="align-left">How to start</th></tr></thead><tbody><tr><td class="align-left">Source code, and you want to explore the UI</td><td class="align-left">Follow the synthetic interface trial below</td></tr><tr><td class="align-left">A macOS app built by you or a trusted provider</td><td class="align-left">Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current status (Chinese)</a></td></tr><tr><td class="align-left">Linux, or a CLI-only workflow</td><td class="align-left">Use <a href="/en/guide/agents/">Agent CLI</a> for installation and the <a href="/en/guide/quickstart/">complete CLI trial</a> for a synthetic example</td></tr></tbody></table></div>
-<p>The <a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">0.1.0 developer Preview</a> provides manual downloads for the Apple Silicon App and three-platform CLI. Read the Release INSTALL and checksums first. The App retains accepted clean <code>fcae6cb</code> product bytes; no Developer ID signing, notarization or updater feed is provided, and clean-Mac installation remains unverified. Stop if the system blocks installation and continue with the source trial below. Plain <code>npm run dev</code> starts only the frontend and does not provide the execution channel below.</p>
+<p>Current manual downloads: <a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1">App v0.1.1</a>, <a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">CLI v0.1.0</a>. App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.</p>
+<p>Read the Release&#39;s INSTALL and checksums first. If macOS blocks the app, stop and use the source trial below. Ordinary <code>npm run dev</code> starts only the frontend, without the native execution channel used by this trial.</p>
 <h2 id="synthetic-interface-trial">Synthetic interface trial</h2>
-<p>Prepare Git, Rust stable and Node.js/npm compatible with the repository dependencies:</p>
+<p>Prepare Git, Rust stable and Node.js &gt;=22.12.0 and npm &gt;=10:</p>
 <pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
 cargo build -p lintel-runner --locked
@@ -67,6 +68,7 @@ npm run dev:synthetic</code></pre>
 <h2 id="build-the-native-macos-app">Build the native macOS app</h2>
 <p>On macOS, prepare Rust, Node.js/npm and Xcode Command Line Tools. The build also needs <code>rust-docs</code> for the current Rust toolchain and locked dependencies to generate third-party notices. After <code>npm ci</code>, run inside <code>apps/desktop</code>:</p>
 <pre class="guide-code" data-language="sh"><code>mkdir -p src-tauri/runner-bundles
+npm run prepare:locked-dependencies
 npm run desktop:build</code></pre>
 <p>An empty <code>runner-bundles</code> directory permits a local app build without bundled Linux runners; the remote installer reports missing resources. To include them, follow <a href="/en/guide/remote/">Remote</a> to prepare both static Linux runners first.</p>
 <p>The app is produced at:</p>

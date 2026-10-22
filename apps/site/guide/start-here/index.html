@@ -46,9 +46,10 @@
 <p>第一次先完成一件小事：<strong>选择两份合成资料，生成加密工作包，再把它打开。</strong> 你会看见 Lintel 如何展示目标、预览变更和记录结果；不用先配置自己的 Claude 或浏览器。</p>
 <h2 id="选择入口">选择入口</h2>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">你手里有什么</th><th class="align-left">使用方式</th></tr></thead><tbody><tr><td class="align-left">源码，想先看界面</td><td class="align-left">按下面的“合成界面试用”启动</td></tr><tr><td class="align-left">已由自己或可信提供方构建的 macOS App</td><td class="align-left">打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a></td></tr><tr><td class="align-left">Linux，或只需要 CLI</td><td class="align-left"><a href="/guide/agents/">Agent CLI</a>负责安装；<a href="/guide/quickstart/">CLI 完整试用</a>提供全程合成示例</td></tr></tbody></table></div>
-<p><a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">0.1.0 开发者 Preview</a> 已提供 Apple Silicon App 与三平台 CLI 的手动下载，先阅读 Release 内的 INSTALL 与校验和。App 产品字节来自已验收的 clean <code>fcae6cb</code>；没有 Developer ID 签名、公证或 updater feed，干净 Mac 首装未验证。系统阻止时停止，继续下方源码试用。普通 <code>npm run dev</code> 只启动前端，没有下面这条本机执行通道。</p>
+<p>当前手动下载：<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1">App v0.1.1</a>、<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">CLI v0.1.0</a>。App v0.1.0 因封装签名缺陷已被替代。没有 Developer ID 签名、公证或 updater feed；干净 Mac 首装仍未验证。</p>
+<p>先阅读 Release 内的 INSTALL 与校验和。系统阻止时停止，继续下方源码试用。普通 <code>npm run dev</code> 只启动前端，没有下面这条本机执行通道。</p>
 <h2 id="合成界面试用">合成界面试用</h2>
-<p>准备 Git、Rust stable 与兼容仓库依赖的 Node.js／npm：</p>
+<p>准备 Git、Rust stable 与 Node.js &gt;=22.12.0／npm &gt;=10：</p>
 <pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
 cargo build -p lintel-runner --locked
@@ -67,6 +68,7 @@ npm run dev:synthetic</code></pre>
 <h2 id="构建原生-macos-app">构建原生 macOS App</h2>
 <p>在 macOS 上准备 Rust、Node.js／npm 与 Xcode Command Line Tools。当前构建还需要当前 Rust toolchain 的 <code>rust-docs</code> 和锁定依赖，以生成第三方许可正文。先按上文完成 <code>npm ci</code>，然后在 <code>apps/desktop</code> 目录运行：</p>
 <pre class="guide-code" data-language="sh"><code>mkdir -p src-tauri/runner-bundles
+npm run prepare:locked-dependencies
 npm run desktop:build</code></pre>
 <p>空 <code>runner-bundles</code> 允许不附带 Linux runner 的本地 App 构建；远端安装入口会说明资源缺失。需要该能力时，先按<a href="/guide/remote/#准备-app-内置资源">远程资源准备</a>准备两种静态 Linux runner，再构建。</p>
 <p>产物位于：</p>

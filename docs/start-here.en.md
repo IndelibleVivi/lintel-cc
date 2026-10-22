@@ -12,11 +12,13 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 | A macOS app built by you or a trusted provider | Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against [current status (Chinese)](current-state.md) |
 | Linux, or a CLI-only workflow | Use [Agent CLI](agents.en.md) for installation and the [complete CLI trial](quickstart.en.md) for a synthetic example |
 
-The [0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual downloads for the Apple Silicon App and three-platform CLI. Read the Release INSTALL and checksums first. The App retains accepted clean `fcae6cb` product bytes; no Developer ID signing, notarization or updater feed is provided, and clean-Mac installation remains unverified. Stop if the system blocks installation and continue with the source trial below. Plain `npm run dev` starts only the frontend and does not provide the execution channel below.
+Current manual downloads: [App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), [CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.
+
+Read the Release's INSTALL and checksums first. If macOS blocks the app, stop and use the source trial below. Ordinary `npm run dev` starts only the frontend, without the native execution channel used by this trial.
 
 ## Synthetic interface trial
 
-Prepare Git, Rust stable and Node.js/npm compatible with the repository dependencies:
+Prepare Git, Rust stable and Node.js >=22.12.0 and npm >=10:
 
 ```sh
 git clone https://github.com/IndelibleVivi/lintel-cc.git
@@ -54,6 +56,7 @@ On macOS, prepare Rust, Node.js/npm and Xcode Command Line Tools. The build also
 
 ```sh
 mkdir -p src-tauri/runner-bundles
+npm run prepare:locked-dependencies
 npm run desktop:build
 ```
 

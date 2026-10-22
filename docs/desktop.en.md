@@ -115,6 +115,8 @@ Browser pairing/local channels stay on the desktop host, never move with SSH. En
 
 ## Help and developer information
 
+New source candidates carry `project-licenses/` independently in App resources; see [licensing scope](../LICENSING.md). Dependency notices remain separate. Before a native source build, `npm run prepare:locked-dependencies` explicitly prepares locked dependency graphs and `rust-docs`, after checking Node/npm, Rust/rustup and macOS Xcode Command Line Tools. Notice collection remains strictly offline. A complete cold-cache native build, downloaded first installation and signing trust require separate acceptance.
+
 Offline sidebar help has six goals, goal/preview/approval/original-query steps, reader/CLI handoff and fixed Faye GitHub/Lintel/ [Infra Field Guide](https://github.com/IndelibleVivi/infra-field-guide) VPS 101/SSH troubleshooting links. The independent project provides source/usage/current acceptance. Frontend/native share `contracts/documentation-resources.json`; `resources.rs` opens only finite resource-ID HTTPS links. Clean builds pin only Lintel docs to the same revision; dirty/unknown builds label latest development docs. Independent guides retain their own main/latest-guide label. No arbitrary URLs or attached configuration/errors/credentials. Web preview uses ordinary links; App uses system browser. Failures preserve copyable links.
 
 ## Remote runners

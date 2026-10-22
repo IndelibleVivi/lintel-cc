@@ -11,6 +11,7 @@ def inspect(file, version, platform):
     files, total, info, executable = 0, 0, None, None
     expected_cpu = {"darwin-aarch64": 0x0100000C, "darwin-x86_64": 0x01000007}[platform]
     seen = {}
+    links = {}
     with tarfile.open(file, "r|gz") as archive:
         for entry in archive:
             files += 1
@@ -26,6 +27,7 @@ def inspect(file, version, platform):
             if not (entry.isfile() or entry.isdir() or entry.issym()):
                 raise ValueError("Unsupported App archive entry type")
             if entry.issym():
+                links[normalized] = entry.linkname
                 target = PurePosixPath(entry.linkname)
                 if target.is_absolute():
                     raise ValueError("Absolute App symlink")
@@ -56,6 +58,28 @@ def inspect(file, version, platform):
         for parent in PurePosixPath(name).parents:
             if seen.get(str(parent)) in ("symlink", "file"):
                 raise ValueError("App entry descends through a symlink or file")
+    # Resolve every link component against the complete archive graph. Lexical
+    # containment alone misses chained links followed by parent traversals.
+    for name, target in links.items():
+        pending = list(PurePosixPath(name).parent.parts) + list(PurePosixPath(target).parts)
+        resolved, expansions = [], 0
+        while pending:
+            part = pending.pop(0)
+            if part == ".":
+                continue
+            if part == "..":
+                if len(resolved) <= 1:
+                    raise ValueError("App symlink escapes bundle")
+                resolved.pop()
+                continue
+            resolved.append(part)
+            key = "/".join(resolved)
+            if key in links:
+                expansions += 1
+                if expansions > 40:
+                    raise ValueError("App symlink cycle or excessive chain")
+                resolved.pop()
+                pending = list(PurePosixPath(links[key]).parts) + pending
     if not info or info.get("CFBundleIdentifier") != "app.lintel.desktop" or info.get("CFBundleShortVersionString") != version or info.get("CFBundleExecutable") != "lintel-desktop" or not executable:
         raise ValueError("App bundle identity/version differs from release record")
     return {"files": files, "plain_bytes": total, "version": version, "platform": platform, "scope": "format-and-declared-identity-only"}
