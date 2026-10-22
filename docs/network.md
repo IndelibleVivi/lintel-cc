@@ -18,6 +18,8 @@ macOS 操作准确的当前 SCNetworkSet／service UUID／接口，不按 Wi-Fi 
 
 Linux 的 `network inspect/probe` 在所选 runner 执行，不用 Mac 的通道代替远端。只接受远端 loopback HTTP 通道；`network serve` 仍由独立前台进程持有。Linux 整机 IPv6 变更不支持，不尝试 sudo 或改变管理连接；namespace／systemd 工作负载强约束仍是独立 SPEC 目标。`LINTEL_TEST_HOME` 和开发 fixture 禁止接触真实宿主网络，本 Leaf 的系统配置验收只使用 cfg(test) adapter 与 synthetic invoke。真实 macOS 授权、系统写入／恢复、VPN 切换、公众回显互通与 Linux native runtime 保持未验证。
 
+系统域名解析由进程内有限 owner 管理，最多同时 32 个系统 resolver 调用；满额明确返回 DNS 失败，不排队增长。探测超时或取消后，迟到解析只归还地址，不能继续连接；同步调用也不再因销毁 Tokio runtime 等待阻塞 DNS。系统调用本身不能被强制取消，仍会占用一个 slot 到返回，因此这不是系统 DNS 必然可用的保证。
+
 ## 启动和停用
 
 每个环境启动一个独立实例，并将该环境的受控启动入口指向输出的 loopback 地址。配置例子全部为 synthetic 值：

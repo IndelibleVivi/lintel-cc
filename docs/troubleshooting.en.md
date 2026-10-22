@@ -6,6 +6,7 @@ Keep the host, configuration path, original task/request ID and error code first
 
 | What you see | Next action | Explanation |
 | --- | --- | --- |
+| Records reports unreadable entries, or `invalid_job_record` | Preserve the damaged original and ID; query readable tasks separately and report the error code | Do not delete jobs/plans to retry; healthy records remain visible; pagination is not delivered |
 | A web page displays the UI but cannot operate locally | Use `npm run dev:synthetic` for the source trial, or the native app for real environments | Plain frontend development and the website have no real execution channel |
 | The app works, but the shell cannot find `lintel` | Select the standalone CLI's absolute path; inspect `version --json` and `context --json` | Installing the app does not modify PATH; see [Agent CLI](agents.en.md) |
 | `accepted` or `ok:true`, with no clear outcome | Query the original job and inspect status, steps and coverage | Reception, request handling and task completion are distinct |

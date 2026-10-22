@@ -10,6 +10,9 @@ export const en: Catalog = {
   'language.select': 'Interface language',
   'language.hint': 'Follow system tracks your macOS preferred languages; choosing 简体中文 or English pins the interface language.',
 
+  'history.incompleteRecords': 'Some original task records cannot be read. Readable records remain below; damaged originals are preserved. Query the original ID without resubmitting the operation.',
+  'history.invalidRecordId': 'Record filename is not a valid task ID',
+
   'nav.environments': 'Environments',
   'nav.policy': 'Protection plan',
   'nav.work': 'Preserve work',

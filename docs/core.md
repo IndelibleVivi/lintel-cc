@@ -4,6 +4,8 @@
 
 `crates/core` 是本地环境清单、计划、文件操作、任务 journal 与字段恢复的唯一实现。GUI 和 `apps/runner` 通过同一个 `handle_request` 调用它。完整目标仍由 [SPEC](SPEC.md) 定义，本页只描述当前实现。
 
+任务读取由 `jobs.rs` 校验原 ID、有限状态及恢复所需字段；不完整记录返回 `invalid_job_record`，不重写原件。`jobs` 保留可读 receipts，并附 `records_complete` 和逐项 `{job_id,code}` 的 `record_errors`；App 记录页显示这些缺口。列表仍返回完整历史，分页与传输容量验收尚未交付。底层 I/O 保留 `io_error`，另附有限 `reason`（如 `permission_denied`、`storage_full`、`read_only_filesystem`），不附原始 OS 错误或路径。CLI 适配器的 20 秒期限覆盖 nonblocking stdout 读取，64 KiB 上限不变；逃逸后代保留 pipe 不再使 reader join 无限等待，超时后仍按原 ID 核对。
+
 ## 宿主共享 IPv4 / IPv6
 
 `telemetry_catalog` 在 runtime paths/state 初始化前返回编译期嵌入的 [确切目标目录](../contracts/telemetry-destinations.json)，只接受 command 字段；named CLI 与有限 SSH 同用 operations 的静态字段合同。它不产生计划或任务，也不做网络请求。core policy 记录非必要流量总开关的更新／feature flag 附带影响；实际受控测试由 egress 的原 Proxy owner 完成。[遥测指南](telemetry.md) 定义观察边界。App 自身更新由独立 native `app_updates.rs` 管理，不进入 Claude 文件 mutation plan；原更新 intent 保存在 App data，详情见 [App 更新](app-updates.md)。
@@ -143,7 +145,9 @@ flowchart TD
 
 `config_inspect`／`config_read`／`plan_config_edit`／`plan_config_apply`／`config_restore_inspect`／`plan_config_restore`（`config_control.rs`）编辑目标环境明确选中的用户可写配置文件。`source_scope` 把文件归到 `user`／`project`／`project_local`／`project_mcp`／`explicit_user_config`，managed 与身份文件只读、拒绝写入。`plan_config_edit` 需要严格 JSON `document` 与读取时的 `expected_digest`，把差异算成逐字段 diff；`public_change` 对未识别键或凭据值（`masked_setting`）只报 `masked: true` 且 `before`／`after` 为 `null`，即显式高级编辑才可能读到原文，普通输出只显示遮蔽。执行写前先把当前配置以 age 加密备份为 `lintel.config/1`（`config_archive_path`），发布后逐字节读回；`plan_config_restore` 只处理原任务改过的字段、要求现值仍等于原写入值（否则 `restore_conflict`），保留无关后续编辑；`plan_config_apply` 只复制已识别的普通配置、拒绝跨环境复制身份与接收端凭据。`plan_client_workflow` 把配置修改、残留清理与标识重置合成为一份 `client_workflow` 计划，一次批准、一个原 job；同一文件不能属于两个步骤（`overlapping_actions`），每步各自完成或跳过，中断后只查询原 ID。
 
-`plan_cleanup` 的 `clear_residue` recipe 与独立 `plan_identity_reset` 各自精确处理所选原件：`clear_residue` 需要非空 `residue_paths`，可选先写独立 `lintel.residue/1` 加密备份再删除，逐文件复查身份，单文件失败不阻塞其余；`identity_reset` 只移除已核实的 `userID`（可选显式 `identity_backup_paths`），先加密保全再移除，其他键逐值保留，**不注销、不清凭据**。`residue_archive_inspect`／`plan_residue_restore` 是这两个备份的有限读／恢复入口：`lintel.residue/1` 独立于工作包，只按包内记录的原路径选择恢复、已有文件不覆盖（`restore_conflict`），不是工作 import。
+`plan_cleanup` 的 `clear_residue` recipe 与独立 `plan_identity_reset` 各自精确处理所选原件：`clear_residue` 需要非空 `residue_paths`，可选先写独立 `lintel.residue/1` 加密备份再删除，逐文件复查身份，单文件失败不阻塞其余；`identity_reset` 只移除已核实的 `userID`（可选显式 `identity_backup_paths`），先加密保全再移除，其他键逐值保留，**不注销、不清凭据**。当前生产与 reader 共用每文件 8 MiB、合计 32 MiB、最多 2000 项的准入；标识备份的 `client_state`（最多 2 MiB）也计入总量和条目数。编码与密文预算从这些 raw/metadata 上限有限推导，保留原 JSON 数字数组与 `lintel.residue/1` 格式。控制字符路径在预览前拒绝，Unicode 与空格保留。任何移除前，已发布的包必须通过生产 reader 的环境、路径、字节数与摘要核对。隔离前逐项持久保存 `quarantine_path`／`source_identity`；未完成时继续保留 `held_path`、阶段与保留事实。父目录同步不确定仍是失败，不能从文件缺失推断完成。
+
+`residue_archive_inspect`／`plan_residue_restore` 是这两个备份的有限读／恢复入口：`lintel.residue/1` 独立于工作包，只按包内记录的原路径选择恢复、已有文件不覆盖（`restore_conflict`），不是工作 import。
 
 ## 有限清理与认证
 

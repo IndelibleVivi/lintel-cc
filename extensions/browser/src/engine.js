@@ -240,8 +240,14 @@ export class Engine {
   releaseIsolation(id) {return this.serial(async()=>{
     const r=await this.get(`operation:${id}`);
     if (!r?.isolationRuleIds || r.phase==='running') fail('no_releasable_isolation');
-    if (r.isolationReleasedAt) return r;
     const owner=await this.get('cleanupIsolation');
+    if (r.isolationReleasedAt) {
+      // The receipt can precede owner removal if storage fails or the worker stops.
+      // Never touch rules here: their IDs may already belong to a newer isolation.
+      if (owner?.operationId===id && JSON.stringify(owner.rules?.map(rule=>rule.id))===JSON.stringify(r.isolationRuleIds))
+        await this.api.storage.local.remove('cleanupIsolation');
+      return r;
+    }
     if (owner?.operationId!==id) fail('isolation_owner_conflict','此回执不拥有当前隔离，未移除任何规则。');
     await this.api.declarativeNetRequest.updateDynamicRules({removeRuleIds:r.isolationRuleIds});
     r.isolationReleasedAt=Date.now();await this.set(`operation:${id}`,r);

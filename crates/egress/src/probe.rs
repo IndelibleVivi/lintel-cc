@@ -681,7 +681,8 @@ fn finite_message(status: Status) -> String {
 
 /// Synchronous convenience wrapper for callers that are not async. Uses a
 /// dedicated current-thread runtime, so the probe never requires a caller-owned
-/// tokio runtime and never spawns a background worker.
+/// tokio runtime. System DNS uses the shared finite resolver admission; canceled
+/// resolution never proceeds to a connection.
 pub fn run_blocking(
     request: &ProbeRequest,
     proxy: Option<ProxyChannel>,

@@ -239,3 +239,5 @@ test('a late reconciliation consumes only its own persisted pause generation',as
   await f.api.storage.local.set({pausedRules:newer});release.resolve();await restoring;
   assert.deepEqual(f.db.pausedRules,newer,'stale callback never removes a different record, even with equal rules/deadline');
 });
+
+test('release retry after owner removal failure survives Engine reconstruction without replay',async()=>{const f=fake(),e=new Engine(f.api,chromium),p=await e.preview(clear);await e.commit(p.id);const count=f.calls.length,remove=f.api.storage.local.remove;f.api.storage.local.remove=async()=>{throw new Error('synthetic storage interruption');};await assert.rejects(e.releaseIsolation(p.id),/synthetic storage/);assert(f.db[`operation:${p.id}`].isolationReleasedAt);assert.equal(f.rules.length,0);f.api.storage.local.remove=remove;const restarted=new Engine(f.api,chromium);await restarted.recover();await restarted.releaseIsolation(p.id);assert.equal(f.db.cleanupIsolation,undefined);assert.equal(f.calls.length,count);});

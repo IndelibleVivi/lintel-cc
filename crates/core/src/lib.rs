@@ -9,6 +9,7 @@ mod comparison_control;
 mod components;
 mod config_control;
 mod context;
+mod jobs;
 mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
@@ -47,12 +48,14 @@ use storage::*;
 pub struct Error {
     pub code: String,
     pub message: String,
+    pub reason: Option<&'static str>,
 }
 pub type Result<T> = std::result::Result<T, Error>;
 pub(crate) fn err(code: &str, message: &str) -> Error {
     Error {
         code: code.into(),
         message: message.into(),
+        reason: None,
     }
 }
 fn now() -> String {
@@ -258,7 +261,7 @@ impl Engine {
                         if !path.exists() {
                             return Err(err("job_not_found", "任务尚未持久接收"));
                         }
-                        return load(&path); // Atomic journal snapshots while the actual writer owns the lock.
+                        return self.load_job(&path, &jid); // Atomic journal snapshots while the actual writer owns the lock.
                     }
                     _ => {
                         return Err(err(
@@ -276,7 +279,13 @@ impl Engine {
         })();
         match result {
             Ok(data) => json!({"ok":true,"data":data}),
-            Err(e) => json!({"ok":false,"error":{"code":e.code,"message":e.message}}),
+            Err(e) => {
+                let mut error = json!({"code":e.code,"message":e.message});
+                if let Some(reason) = e.reason {
+                    error["reason"] = json!(reason);
+                }
+                json!({"ok":false,"error":error})
+            }
         }
     }
     fn inventory(&self) -> Result<Vec<Value>> {
@@ -709,17 +718,7 @@ impl Engine {
             "session_read" => self.session_read(r),
             "plan_import" => self.plan_import(r),
             "execute" => self.execute(r),
-            "jobs" => {
-                let mut jobs = vec![];
-                for f in fs::read_dir(self.state.join("jobs"))? {
-                    let p = f?.path();
-                    if p.extension().is_some_and(|v| v == "json") {
-                        jobs.push(load(&p)?);
-                    }
-                }
-                jobs.sort_by(|a, b| b["created_at"].as_str().cmp(&a["created_at"].as_str()));
-                Ok(json!({"jobs":jobs}))
-            }
+            "jobs" => self.list_jobs(),
             "job" => {
                 let key = if r.get("job_id").is_some() {
                     "job_id"
@@ -731,7 +730,7 @@ impl Engine {
                 if !p.exists() {
                     return Err(err("job_not_found", "任务尚未持久接收；没有执行证据"));
                 }
-                let mut j = load(&p)?;
+                let mut j = self.load_job(&p, &jid)?;
                 let settings_reconciled = self.reconcile_settings_write(&mut j);
                 let network_reconciled = self.reconcile_network_job(&mut j);
                 let reconciled = settings_reconciled || network_reconciled;
@@ -1783,6 +1782,86 @@ mod tests {
         engine.request(json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce","keep_remote_control":false}))["data"].clone()
     }
     #[test]
+    fn corrupt_job_query_returns_error_without_rewriting_original() {
+        let (_t, engine, _e, _root) = setup();
+        let jid = id();
+        let path = engine.path("jobs", &jid);
+        let valid = json!({"id":jid,"title":"synthetic","created_at":now(),"status":"executing","warnings":[],"steps":[]});
+        let mut missing_steps = valid.clone();
+        missing_steps.as_object_mut().unwrap().remove("steps");
+        let mut missing_warnings = valid.clone();
+        missing_warnings.as_object_mut().unwrap().remove("warnings");
+        let mut cases = vec![missing_steps, missing_warnings, json!(["not a job"])];
+        for (key, value) in [
+            ("warnings", json!({})),
+            ("status", json!("invented")),
+            ("id", json!(id())),
+            ("title", json!({})),
+            ("created_at", json!({})),
+            ("environment_id", json!({})),
+            (
+                "steps",
+                json!([{"id":"synthetic","status":"completed","label":{}}]),
+            ),
+            (
+                "steps",
+                json!([{"id":"synthetic","status":"completed","message":{}}]),
+            ),
+        ] {
+            let mut record = valid.clone();
+            record[key] = value;
+            cases.push(record);
+        }
+        for record in cases {
+            save(&path, &record).unwrap();
+            let original = fs::read(&path).unwrap();
+            let result = engine.request(json!({"command":"job","job_id":jid}));
+            assert_eq!(result["error"]["code"], "invalid_job_record", "{result}");
+            let listed = engine.request(json!({"command":"jobs"}));
+            assert_eq!(listed["data"]["jobs"], json!([]));
+            assert_eq!(
+                listed["data"]["record_errors"][0]["code"],
+                "invalid_job_record"
+            );
+            assert_eq!(fs::read(&path).unwrap(), original);
+        }
+        save(&path, &valid).unwrap();
+        assert_eq!(
+            engine.request(json!({"command":"job","job_id":jid}))["ok"],
+            true
+        );
+    }
+    #[test]
+    fn corrupt_job_list_retains_healthy_receipts_and_reports_each_bad_id() {
+        let (_t, engine, e, _root) = setup();
+        let p = plan(&engine, &e);
+        let receipt =
+            engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+        assert_eq!(receipt["ok"], true, "{receipt}");
+        let broken = id();
+        let invalid = id();
+        fs::write(engine.path("jobs", &broken), b"{").unwrap();
+        save(
+            &engine.path("jobs", &invalid),
+            &json!({"id":invalid,"status":"executing","warnings":null}),
+        )
+        .unwrap();
+        let response = engine.request(json!({"command":"jobs"}));
+        assert_eq!(response["ok"], true, "{response}");
+        assert_eq!(response["data"]["jobs"].as_array().unwrap().len(), 1);
+        assert_eq!(response["data"]["jobs"][0]["id"], p["id"]);
+        assert_eq!(response["data"]["records_complete"], false);
+        let errors = response["data"]["record_errors"].as_array().unwrap();
+        assert_eq!(errors.len(), 2);
+        assert!(errors
+            .iter()
+            .any(|v| v["job_id"] == broken && v["code"] == "invalid_json"));
+        assert!(errors
+            .iter()
+            .any(|v| v["job_id"] == invalid && v["code"] == "invalid_job_record"));
+        assert_eq!(fs::read(engine.path("jobs", &broken)).unwrap(), b"{");
+    }
+    #[test]
     fn duplicate_json_kept() {
         let (_t, engine, e, root) = setup();
         let raw = r#"{"env":{"DISABLE_TELEMETRY":"0","DISABLE_TELEMETRY":"1"}}"#;
@@ -1990,7 +2069,7 @@ mod tests {
         let p = plan(&engine, &e);
         let jid = string(&p, "id").unwrap();
         let jp = engine.path("jobs", jid);
-        save(&jp, &json!({"id":jid,"status":"executing","warnings":[]})).unwrap();
+        save(&jp, &json!({"id":jid,"title":"synthetic","created_at":now(),"status":"executing","warnings":[],"steps":[]})).unwrap();
         let lock = OpenOptions::new()
             .read(true)
             .write(true)

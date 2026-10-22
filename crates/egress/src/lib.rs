@@ -2,6 +2,7 @@
 pub mod probe;
 pub mod telemetry;
 
+mod resolver;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, SocketAddr},
@@ -775,7 +776,7 @@ async fn connect_ip_family(
         }]
     } else {
         let mut addresses = Vec::new();
-        for address in tokio::net::lookup_host((endpoint.host.as_str(), endpoint.port))
+        for address in resolver::resolve(endpoint.host.clone(), endpoint.port)
             .await
             .map_err(|_| "dns_failed")?
         {

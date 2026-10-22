@@ -18,6 +18,8 @@ Full restoration requires separate preview/approval, including manual addresses,
 
 Linux `network inspect/probe` runs on the selected runner; Mac channels never substitute for remote ones. Only remote loopback HTTP channels are accepted; `network serve` remains owned by an independent foreground process. Host-wide Linux IPv6 changes are unsupported, with no sudo or management-connection changes. Namespace/systemd workload enforcement remains a separate SPEC target. `LINTEL_TEST_HOME` and development fixtures may not touch real host networks. This Leaf's system-configuration acceptance uses only cfg(test) adapters and synthetic invoke. Real macOS authorization/write/restore, VPN changes, public echo interoperability and Linux native runtime remain unverified.
 
+System name resolution has a process-wide owner with at most 32 active system resolver calls. Saturation returns a DNS failure without an expanding queue. After probe timeout or cancellation, a late result cannot start a connection, and synchronous callers do not wait for blocked DNS during Tokio runtime shutdown. An OS resolver call itself cannot be forcibly canceled and keeps its slot until it returns; this does not guarantee DNS availability.
+
 ## Starting and stopping
 
 Start an independent instance per environment and point that environment's controlled launch entry at the returned loopback address. All configuration examples are synthetic:

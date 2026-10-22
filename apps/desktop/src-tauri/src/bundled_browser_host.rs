@@ -45,7 +45,7 @@ fn read(path: &Path) -> Result<Option<Vec<u8>>> {
     let mut options = fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
-    options.custom_flags(libc::O_NOFOLLOW);
+    options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     let mut file = match options.open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -76,6 +76,21 @@ fn load(path: &Path) -> Result<Value> {
         None => Ok(Value::Null),
     }
 }
+fn object_identity(path: &Path) -> Result<Value> {
+    let m = fs::symlink_metadata(path).map_err(|e| format!("storage_error:{e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        Ok(
+            json!({"dev":m.dev(),"ino":m.ino(),"birth":m.created().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|t| t.as_nanos().to_string())}),
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = m;
+        Err("platform_unsupported:publication identity".into())
+    }
+}
 fn private_dir(path: &Path) -> Result<()> {
     if path
         .symlink_metadata()
@@ -98,10 +113,17 @@ fn save(path: &Path, value: &Value) -> Result<()> {
     let mut file = options
         .open(&temp)
         .map_err(|e| format!("storage_error:{e}"))?;
+    let _temp_guard = lintel_browser_host::installation::OwnedStaging::new(&temp)?;
     file.write_all(&serde_json::to_vec_pretty(value).unwrap())
         .map_err(|e| format!("storage_error:{e}"))?;
     file.sync_all().map_err(|e| format!("storage_error:{e}"))?;
     fs::rename(temp, path).map_err(|e| format!("storage_error:{e}"))?;
+    fs::File::open(path.parent().unwrap())
+        .and_then(|f| f.sync_all())
+        .map_err(|e| format!("storage_error:{e}"))?;
+    if load(path)? != *value {
+        return Err("storage_error:publication readback".into());
+    }
     Ok(())
 }
 
@@ -296,6 +318,11 @@ impl Installer {
         let browser = string(approved, "browser")?;
         let extension = string(approved, "extension_id")?;
         let bundle = self.bundle()?;
+        let intent_path = self
+            .install_root()
+            .join(format!("{browser}-install-intent.json"));
+        let intent = load(&intent_path)?;
+        let recovering = intent["approved_plan"] == *approved;
         let current = self.plan_with(browser, extension, &bundle)?;
         let receipt = load(&self.receipt_path(browser))?;
         // Exact successful replay is query-only, without reauthorizing or writing.
@@ -304,10 +331,10 @@ impl Installer {
         {
             return Ok(json!({"status":"already-registered","plan":current,"pairing":"required"}));
         }
-        if approved != &current {
+        if !recovering && approved != &current {
             return Err("stale_plan:资源或当前登记已变化；请重新生成并审核 preview".into());
         }
-        if current["install_action"] == "blocked" {
+        if !recovering && current["install_action"] == "blocked" {
             return Err("manifest_conflict:现有登记或 host 不属于此 bundled installer；保留原登记，请先人工核对".into());
         }
         // Serialize this installer's approvals, then recheck under the lock.
@@ -327,30 +354,97 @@ impl Installer {
         if fresh != current {
             return Err("stale_plan:安装条件在批准后发生变化；请重新生成 preview".into());
         }
+        let current = if recovering {
+            let mut expected = approved.clone();
+            let host_path = Path::new(approved["host_path"].as_str().unwrap());
+            if !current["installed_host"].is_null()
+                && approved["installed_host"].is_null()
+                && object_identity(host_path)? != intent["host_identity"]
+            {
+                return Err("host_conflict:目标不属于原安装 intent".into());
+            }
+            let pending_manifest = Path::new(approved["manifest_path"].as_str().unwrap())
+                .with_extension("lintel-publication-intent.json")
+                .exists();
+            if !pending_manifest && current["existing_manifest"] != approved["existing_manifest"] {
+                let manifest_path = Path::new(approved["manifest_path"].as_str().unwrap());
+                if object_identity(manifest_path)? != intent["manifest_identity"] {
+                    return Err("manifest_conflict:登记不属于原安装 intent".into());
+                }
+            }
+            if current["host_path"] != approved["host_path"]
+                || current["sha256"] != approved["sha256"]
+                || current["manifest"] != approved["manifest"]
+            {
+                return Err("stale_plan:安装资源已变化".into());
+            }
+            if !current["installed_host"].is_null()
+                && (current["installed_host"]["sha256"] != approved["sha256"]
+                    || current["installed_host"]["mode"] != 0o700)
+            {
+                return Err("host_conflict:恢复对象已变化".into());
+            }
+            if !pending_manifest
+                && current["existing_manifest"] != approved["existing_manifest"]
+                && current["existing_manifest"] != approved["manifest"]
+            {
+                return Err("manifest_conflict:恢复登记已变化".into());
+            }
+            expected["installed_host"] = current["installed_host"].clone();
+            if !pending_manifest {
+                expected["existing_manifest"] = current["existing_manifest"].clone();
+            }
+            expected
+        } else {
+            current
+        };
+        let mut intent = if recovering {
+            intent
+        } else {
+            json!({"approved_plan":approved})
+        };
+        save(&intent_path, &intent)?;
         let host = Path::new(current["host_path"].as_str().unwrap());
         private_dir(host.parent().unwrap())?;
         if current["installed_host"].is_null() {
+            let staging =
+                host.with_extension(format!("{}.install-staging", lintel_browser_host::random()));
             let mut options = fs::OpenOptions::new();
             options.write(true).create_new(true);
             #[cfg(unix)]
             options.mode(0o700);
             let mut file = options
-                .open(host)
+                .open(&staging)
                 .map_err(|e| format!("host_conflict:{e}"))?;
+            let _staging_guard = lintel_browser_host::installation::OwnedStaging::new(&staging)?;
             file.write_all(&fresh_bundle.bytes)
                 .map_err(|e| format!("storage_error:{e}"))?;
             #[cfg(unix)]
             file.set_permissions(fs::Permissions::from_mode(0o700))
                 .map_err(|e| format!("storage_error:{e}"))?;
             file.sync_all().map_err(|e| format!("storage_error:{e}"))?;
+            if read(&staging)?.as_deref() != Some(fresh_bundle.bytes.as_slice()) {
+                return Err("host_conflict:staging readback".into());
+            }
+            intent["host_identity"] = object_identity(&staging)?;
+            save(&intent_path, &intent)?;
+            fs::hard_link(&staging, host).map_err(|e| format!("host_conflict:{e}"))?;
+            fs::remove_file(staging).map_err(|e| format!("storage_error:{e}"))?;
+            fs::File::open(host.parent().unwrap())
+                .and_then(|f| f.sync_all())
+                .map_err(|e| format!("storage_error:{e}"))?;
         }
-        let outcome = lintel_browser_host::installation::install_reviewed(
+        let outcome = lintel_browser_host::installation::install_reviewed_tracked(
             browser,
             extension,
             host,
             &self.home,
             &self.platform,
             &current["existing_manifest"],
+            &mut |staged, _target| {
+                intent["manifest_identity"] = object_identity(staged)?;
+                save(&intent_path, &intent)
+            },
         )?;
         private_dir(&root.join("registrations"))?;
         save(
@@ -415,6 +509,110 @@ mod tests {
         }
         fn db(&self, plan: &Value) -> Value {
             load(&Path::new(plan["state_path"].as_str().unwrap()).join("bridge.json")).unwrap()
+        }
+    }
+    #[test]
+    fn recovery_rejects_identical_external_host_inode() {
+        let f = Fixture::new("macos");
+        let p = f.plan();
+        f.installer.install(&p).unwrap();
+        fs::remove_file(f.installer.receipt_path("chrome")).unwrap();
+        let host = Path::new(p["host_path"].as_str().unwrap());
+        let external = host.with_extension("external");
+        fs::copy(host, &external).unwrap();
+        fs::rename(&external, host).unwrap();
+        assert!(f
+            .installer
+            .install(&p)
+            .unwrap_err()
+            .starts_with("host_conflict:"));
+    }
+
+    #[test]
+    fn recovery_rejects_changed_registration() {
+        let f = Fixture::new("macos");
+        let p = f.plan();
+        f.installer.install(&p).unwrap();
+        fs::remove_file(f.installer.receipt_path("chrome")).unwrap();
+        fs::write(p["manifest_path"].as_str().unwrap(), b"{}").unwrap();
+        assert!(f
+            .installer
+            .install(&p)
+            .unwrap_err()
+            .starts_with("manifest_conflict:"));
+    }
+
+    #[test]
+    fn interrupted_receipt_publication_recovers_original_approval() {
+        let f = Fixture::new("macos");
+        let p = f.plan();
+        f.installer.install(&p).unwrap();
+        fs::remove_file(f.installer.receipt_path("chrome")).unwrap();
+        let recovered = f.installer.install(&p).unwrap();
+        assert_eq!(recovered["plan"]["status"], "already-registered");
+        assert_eq!(
+            load(&f.installer.receipt_path("chrome")).unwrap()["approved_plan"],
+            p
+        );
+    }
+
+    #[test]
+    fn original_approval_recovers_each_manifest_publication_phase_after_reopen() {
+        for phase in 0..3 {
+            let f = Fixture::new("macos");
+            let old = f.plan();
+            f.installer.install(&old).unwrap();
+            f.bundle(b"synthetic dedicated host v2", "0.2.0");
+            let approved = f.plan();
+            let target = Path::new(approved["manifest_path"].as_str().unwrap());
+            let staged = target.with_extension("synthetic.tmp");
+            let backup = staged.with_extension("previous-registration");
+            save(&staged, &approved["manifest"]).unwrap();
+            let native_identity = |path: &Path| {
+                let mut v = object_identity(path).unwrap();
+                v["size"] = json!(fs::metadata(path).unwrap().len());
+                v
+            };
+            let journal = target.with_extension("lintel-publication-intent.json");
+            save(&journal,&json!({"target":target,"staged":staged,"backup":backup,"previous":approved["existing_manifest"],"next":approved["manifest"],"previous_identity":native_identity(target),"next_identity":native_identity(&staged)})).unwrap();
+            let mut intent = json!({"approved_plan":approved,"manifest_identity":object_identity(&staged).unwrap()});
+            if phase > 0 {
+                let host = Path::new(approved["host_path"].as_str().unwrap());
+                private_dir(host.parent().unwrap()).unwrap();
+                fs::write(host, b"synthetic dedicated host v2").unwrap();
+                fs::set_permissions(host, fs::Permissions::from_mode(0o700)).unwrap();
+                intent["host_identity"] = object_identity(host).unwrap();
+                fs::rename(target, &backup).unwrap();
+            }
+            if phase > 1 {
+                fs::hard_link(&staged, target).unwrap();
+            }
+            save(
+                &f.installer
+                    .install_root()
+                    .join("chrome-install-intent.json"),
+                &intent,
+            )
+            .unwrap();
+            let reopened = Installer {
+                home: f.installer.home.clone(),
+                resources: f.installer.resources.clone(),
+                platform: "macos".into(),
+                architecture: "aarch64".into(),
+            };
+            let result = reopened.install(&approved).unwrap();
+            assert_eq!(
+                result["plan"]["status"], "already-registered",
+                "phase {phase}: {result}"
+            );
+            assert_eq!(load(target).unwrap(), approved["manifest"]);
+            assert!(!journal.exists());
+            assert!(!staged.exists());
+            assert!(!backup.exists());
+            assert_eq!(
+                fs::read(old["host_path"].as_str().unwrap()).unwrap(),
+                b"synthetic dedicated host v1"
+            );
         }
     }
     #[test]

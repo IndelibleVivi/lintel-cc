@@ -13,7 +13,8 @@ fn hostile_residue_admission_stops_before_cipher_or_byte_array_allocation() {
     let fx = fixture();
     let oversized = fx.engine.state.join("archives/oversized.age");
     let file = fs::File::create(&oversized).unwrap();
-    file.set_len(MAX_CIPHER_BYTES + 1).unwrap();
+    file.set_len(cipher_bound(RESIDUE_MAX_FILES, RESIDUE_TOTAL_LIMIT) + 1)
+        .unwrap();
     assert_eq!(
         read_cipher(&oversized).unwrap_err().code,
         "residue_archive_limit"
@@ -22,12 +23,12 @@ fn hostile_residue_admission_stops_before_cipher_or_byte_array_allocation() {
     let valid = json!({"schema":RESIDUE_SCHEMA,"files":[item.clone()]});
     assert!(serde_json::from_value::<DecodedPackage>(valid.clone()).is_ok());
     let mut too_many = valid.clone();
-    too_many["files"] = json!(vec![item; MAX_FILES + 1]);
+    too_many["files"] = json!(vec![item; RESIDUE_MAX_FILES + 1]);
     assert!(serde_json::from_value::<DecodedPackage>(too_many).is_err());
     // The finite decoder, unlike a generic Value array, refuses a ninth MiB
     // while reading the byte sequence. No archive or file publication occurs.
-    let data = "0,".repeat(FILE_LIMIT_BYTES as usize) + "0";
-    let text=format!("{{\"schema\":\"{}\",\"files\":[{{\"path\":\"/synthetic/original\",\"bytes\":{},\"digest\":\"{}\",\"data\":[{}]}}]}}",RESIDUE_SCHEMA,FILE_LIMIT_BYTES+1,digest(b""),data);
+    let data = "0,".repeat(RESIDUE_FILE_LIMIT as usize) + "0";
+    let text=format!("{{\"schema\":\"{}\",\"files\":[{{\"path\":\"/synthetic/original\",\"bytes\":{},\"digest\":\"{}\",\"data\":[{}]}}]}}",RESIDUE_SCHEMA,RESIDUE_FILE_LIMIT+1,digest(b""),data);
     assert!(serde_json::from_str::<DecodedPackage>(&text).is_err());
     assert!(serde_json::from_str::<DecodedPackage>(
         "{\"schema\":\"lintel.residue/1\",\"schema\":\"lintel.work/1\",\"files\":[]}"
@@ -218,6 +219,37 @@ fn residue_inspect_returns_a_body_free_manifest() {
             .code,
         "residue_archive_schema"
     );
+}
+
+#[test]
+fn legacy_numeric_byte_array_packages_remain_readable() {
+    let fx = fixture();
+    let original = fx.root.join("debug/legacy.log");
+    fs::create_dir_all(original.parent().unwrap()).unwrap();
+    // This is the historical wire shape used by earlier producers. Current
+    // producers still emit it, so legacy fixtures need no format migration.
+    let package = json!({
+        "schema": RESIDUE_SCHEMA,
+        "environment_id": fx.environment_id["id"],
+        "files": [{
+            "path": original,
+            "role": "residue",
+            "bytes": 3,
+            "digest": digest(b"old"),
+            "data": [111, 108, 100]
+        }]
+    });
+    let archive = fx.engine.state.join("archives").join("legacy.age");
+    fs::write(&archive, seal(&package, PASS).unwrap()).unwrap();
+    let report = fx
+        .engine
+        .residue_archive_inspect(&json!({
+            "archive_path": archive,
+            "archive_passphrase": PASS,
+        }))
+        .unwrap();
+    assert_eq!(report["file_count"], 1);
+    assert_eq!(report["files"][0]["digest"], digest(b"old"));
 }
 
 #[test]

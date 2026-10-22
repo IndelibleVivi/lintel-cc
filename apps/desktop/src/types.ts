@@ -269,7 +269,7 @@ export interface Api {
   archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };
   archive_read: { request: { job_id?: string; archive_path?: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };
   plan_import: { request: { environment_id: string; job_id?: string; archive_path?: string; categories: string[]; activate?:{instructions:boolean}; archive_passphrase: string }; response: Plan };
-  jobs: { request: {}; response: { jobs: Receipt[] } };
+  jobs: { request: {}; response: { jobs: Receipt[]; records_complete?: boolean; record_errors?: {job_id:string|null;code:string}[] } };
   job: { request: { job_id: string }; response: Receipt };
   drift: { request: { environment_id: string;lightweight?:boolean }; response: Drift };
   accept_drift: { request: { environment_id: string;lightweight?:boolean }; response: unknown };

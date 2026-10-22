@@ -4,6 +4,8 @@
 
 状态：0.1.0 开发候选。Chrome/Edge 的 MV3 包和 Firefox 独立 event-page 适配可构建；正式浏览器安装、商店发布和完整三浏览器验收尚未完成。本文对应 [完整目标](SPEC.md#9-模块-c浏览器能力必须真实可操作) 与 [B01–B15 验收](ACCEPTANCE.md#c-浏览器实测)，不是完成整版目标的声明。
 
+当前源码支持按原批准继续中断的 App 内置 host 安装：副作用前保存安装 intent，完整 staging 后条件发布，并以文件身份和内容复核已发布对象。登记升级的临时原件及 publication journal 由同一 installer 恢复；外部替换或修改保留并报告冲突。文件系统不能提供 birth time 时，新的 publication 明确拒绝，不能弱化身份检查。不要手工删除 intent、登记或原件来重试。该能力不证明真实浏览器安装或配对完成。隔离解除 marker 已持久化而 owner 删除失败时，重试只清理完全匹配的旧 owner，不重跑浏览数据删除或解除新任务的隔离。
+
 ## 使用入口与实际范围
 
 扩展 popup 可以独立预览并确认站点清理、WebRTC、Chromium 站点权限、站点阻断规则及 Chromium 站点代理。桌面应用通过同一 native host 提交操作；用户还需在目标扩展内查看范围并确认。网页没有消息入口，扩展没有 content script、debugger、远程代码或默认全站 host 权限。

@@ -333,6 +333,31 @@ fn clear_residue_skips_a_replaced_original_and_completes_the_others() {
 }
 
 #[test]
+fn residue_paths_with_controls_are_refused_before_any_archive_or_delete() {
+    let fx = fixture();
+    let target = fx.root.join("debug/bad\ttab.log");
+    write(&target, b"synthetic control path");
+    let plan = fx.engine.plan_clear_residue(&json!({
+        "environment_id": fx.environment_id["id"],
+        "writers_confirmed_stopped": true,
+        "residue_paths": [target.to_string_lossy()],
+        "archive_before_clear": true,
+    }));
+    assert_eq!(plan.unwrap_err().code, "invalid_path");
+    assert!(target.exists());
+    assert_eq!(
+        fs::read_dir(fx.engine.state.join("plans")).unwrap().count(),
+        0
+    );
+    assert_eq!(
+        fs::read_dir(fx.engine.state.join("archives"))
+            .unwrap()
+            .count(),
+        0
+    );
+}
+
+#[test]
 fn clear_residue_skips_an_already_absent_original_without_error() {
     let fx = fixture();
     seed(&fx);
@@ -345,6 +370,177 @@ fn clear_residue_skips_an_already_absent_original_without_error() {
     assert_eq!(receipt["residue_clear"]["removed"], 1);
     assert_eq!(receipt["residue_clear"]["skipped"], 1);
     assert!(!other.exists());
+}
+
+#[test]
+fn production_residue_archive_reader_restores_unicode_and_spaces() {
+    let fx = fixture();
+    let target = fx.root.join("debug/残留 备份.log");
+    write(&target, b"synthetic unicode residue");
+    let plan = clear_plan(&fx, &[&target], true);
+    let receipt = run_clear(&fx, &plan, PASS);
+    assert_eq!(receipt["status"], "completed", "{receipt}");
+    assert!(!target.exists());
+    let archive = PathBuf::from(receipt["residue_archive_path"].as_str().unwrap());
+    let report = fx
+        .engine
+        .residue_archive_inspect(&json!({
+            "archive_path": archive,
+            "archive_passphrase": PASS,
+        }))
+        .unwrap();
+    assert_eq!(report["file_count"], 1);
+    assert_eq!(
+        report["files"][0]["path"],
+        target.to_string_lossy().as_ref()
+    );
+    let restore = fx
+        .engine
+        .plan_residue_restore(&json!({
+            "environment_id": fx.environment_id["id"],
+            "archive_path": archive,
+            "archive_passphrase": PASS,
+            "selected_paths": [target.to_string_lossy()],
+        }))
+        .unwrap();
+    let id = restore["id"].as_str().unwrap();
+    let saved = frozen(&fx.engine, &restore);
+    let env = fx
+        .engine
+        .env(&json!({"environment_id": saved["environment_id"]}))
+        .unwrap();
+    let r = json!({"archive_passphrase": PASS});
+    fx.engine.check_residue_restore(&saved, &r).unwrap();
+    let journal = fx.engine.state.join("jobs").join(format!("{id}.json"));
+    let mut restored = json!({"id":id,"plan_id":id,"status":"executing","steps":[],"warnings":[]});
+    save(&journal, &restored).unwrap();
+    fx.engine
+        .execute_residue_restore(&env, &saved, &r, &mut restored, &journal)
+        .unwrap();
+    assert_eq!(restored["status"], "completed", "{restored}");
+    assert_eq!(fs::read(&target).unwrap(), b"synthetic unicode residue");
+}
+
+#[test]
+fn identity_paths_with_controls_are_refused_before_planning() {
+    let fx = fixture();
+    seed(&fx);
+    let invalid = fx.root.join("debug/bad\nname");
+    write(&invalid, b"synthetic");
+    let error = fx
+        .engine
+        .plan_identity_reset(&json!({
+            "environment_id": fx.environment_id["id"],
+            "writers_confirmed_stopped": true,
+            "identity_backup_paths": [invalid.to_string_lossy()],
+        }))
+        .unwrap_err();
+    assert_eq!(error.code, "invalid_backup_paths");
+    assert!(invalid.exists());
+    assert!(fs::read_dir(fx.engine.state.join("plans")).unwrap().count() == 0);
+}
+
+#[test]
+fn identity_total_includes_client_state_and_reader_entries() {
+    let fx = fixture();
+    seed(&fx);
+    fs::write(
+        fx.root.join(".claude.json"),
+        format!(
+            "{{\"userID\":\"{USER_ID}\",\"padding\":\"{}\"}}",
+            "x".repeat(1024 * 1024)
+        ),
+    )
+    .unwrap();
+    let backup = fx.root.join(".claude.json.backup");
+    let file = fs::File::create(&backup).unwrap();
+    file.set_len(RESIDUE_TOTAL_LIMIT).unwrap();
+    let error = fx
+        .engine
+        .plan_identity_reset(&json!({
+            "environment_id": fx.environment_id["id"],
+            "writers_confirmed_stopped": true,
+            "identity_backup_paths": [backup],
+        }))
+        .unwrap_err();
+    assert_eq!(error.code, "archive_limit");
+    assert!(backup.exists());
+    assert!(load(&fx.root.join(".claude.json")).unwrap()["userID"].is_string());
+}
+
+#[test]
+fn failed_post_rename_quarantine_records_each_item_and_keeps_objects() {
+    for sibling in ["debug/two.log", "shell-snapshots/two.log"] {
+        let fx = fixture();
+        let first = fx.root.join("debug/one.log");
+        let second = fx.root.join(sibling);
+        write(&first, b"one");
+        write(&second, b"two");
+        let plan = clear_plan(&fx, &[&first, &second], false);
+        cleanup::arm_post_rename_failure();
+        cleanup::arm_post_rename_failure();
+        let receipt = run_clear(&fx, &plan, PASS);
+        assert_eq!(receipt["status"], "partially_completed", "{receipt}");
+        assert!(!first.exists() && !second.exists());
+        let failures = receipt["residue_clear"]["failed"].as_array().unwrap();
+        assert_eq!(failures.len(), 2);
+        for (failure, source) in failures.iter().zip([&first, &second]) {
+            let held = PathBuf::from(failure["quarantine_path"].as_str().unwrap());
+            assert!(held.starts_with(source.parent().unwrap()));
+            assert_eq!(held.file_name().unwrap(), "state");
+            assert!(held.exists(), "quarantined file not retained: {failure}");
+            assert_eq!(failure["retained"], true);
+            assert_eq!(failure["stage"]["stage"], "post_rename_sync");
+        }
+        let steps = receipt["steps"].as_array().unwrap();
+        let held_steps: Vec<&Value> = steps
+            .iter()
+            .filter(|step| step["held_path"].is_string())
+            .collect();
+        assert_eq!(held_steps.len(), 2);
+        assert_ne!(
+            held_steps[0]["quarantine_path"],
+            held_steps[1]["quarantine_path"]
+        );
+        assert_eq!(
+            fs::read(held_steps[0]["held_path"].as_str().unwrap()).unwrap(),
+            b"one"
+        );
+        assert_eq!(
+            fs::read(held_steps[1]["held_path"].as_str().unwrap()).unwrap(),
+            b"two"
+        );
+    }
+}
+
+#[test]
+fn identity_quarantine_failures_in_one_parent_keep_distinct_originals() {
+    let fx = fixture();
+    seed(&fx);
+    let first = fx.root.join("identity-one.backup");
+    let second = fx.root.join("identity-two.backup");
+    write(&first, b"one");
+    write(&second, b"two");
+    let plan = identity_plan(&fx, &[&first, &second]);
+    cleanup::arm_post_rename_failure();
+    cleanup::arm_post_rename_failure();
+    let receipt = run_identity(&fx, &plan, PASS);
+    let failures = receipt["identity_reset"]["backup_failures"]
+        .as_array()
+        .unwrap();
+    assert_eq!(failures.len(), 2, "{receipt}");
+    assert!(!first.exists() && !second.exists());
+    let held: Vec<PathBuf> = failures
+        .iter()
+        .map(|failure| {
+            assert_eq!(failure["retained"], true);
+            assert_eq!(failure["stage"]["stage"], "post_rename_sync");
+            PathBuf::from(failure["quarantine_path"].as_str().unwrap())
+        })
+        .collect();
+    assert_ne!(held[0], held[1]);
+    assert_eq!(fs::read(&held[0]).unwrap(), b"one");
+    assert_eq!(fs::read(&held[1]).unwrap(), b"two");
 }
 
 // ---- identity reset --------------------------------------------------------
@@ -597,4 +793,94 @@ fn identity_reset_receipt_reports_the_observed_state() {
             & 0o777,
         0o640
     );
+}
+
+#[test]
+fn final_parent_sync_uncertainty_stays_failed_in_residue_receipt() {
+    let fx = fixture();
+    let path = fx.root.join("debug/final-sync.log");
+    write(&path, b"original");
+    let plan = clear_plan(&fx, &[&path], false);
+    cleanup::arm_final_parent_failure();
+    let receipt = run_clear(&fx, &plan, PASS);
+    assert_eq!(receipt["status"], "partially_completed", "{receipt}");
+    assert_eq!(receipt["residue_clear"]["removed"], 0);
+    assert_eq!(
+        receipt["residue_clear"]["failed"][0]["stage"]["stage"],
+        "final_parent_sync"
+    );
+}
+
+#[test]
+fn large_legacy_array_package_survives_production_readback_and_restore() {
+    let fx = fixture();
+    let originals: Vec<PathBuf> = (0..3)
+        .map(|i| fx.root.join(format!("debug/capacity-{i}.log")))
+        .collect();
+    let values = [0u8, 120, 255];
+    for (path, value) in originals.iter().zip(values) {
+        write(path, &vec![value; RESIDUE_FILE_LIMIT as usize]);
+    }
+    let selected: Vec<&Path> = originals.iter().map(PathBuf::as_path).collect();
+    let preview = clear_plan(&fx, &selected, true);
+    let receipt = run_clear(&fx, &preview, PASS);
+    assert_eq!(receipt["status"], "completed", "{receipt}");
+    let archive = PathBuf::from(receipt["residue_archive_path"].as_str().unwrap());
+    // Mixed low/high numbers encode beyond the former 64 MiB cipher readback.
+    assert!(fs::metadata(&archive).unwrap().len() > 64 * 1024 * 1024);
+    let inspected = fx
+        .engine
+        .residue_archive_inspect(&json!({"archive_path":archive,"archive_passphrase":PASS}))
+        .unwrap();
+    assert_eq!(inspected["file_count"], 3);
+    let restore=fx.engine.plan_residue_restore(&json!({"environment_id":fx.environment_id["id"],"archive_path":archive,"archive_passphrase":PASS,"selected_paths":originals})).unwrap();
+    let saved = frozen(&fx.engine, &restore);
+    let id = restore["id"].as_str().unwrap();
+    let env = fx
+        .engine
+        .env(&json!({"environment_id":saved["environment_id"]}))
+        .unwrap();
+    let journal = fx.engine.state.join("jobs").join(format!("{id}.json"));
+    let mut restored = json!({"id":id,"plan_id":id,"status":"executing","steps":[],"warnings":[]});
+    save(&journal, &restored).unwrap();
+    fx.engine
+        .execute_residue_restore(
+            &env,
+            &saved,
+            &json!({"archive_passphrase":PASS}),
+            &mut restored,
+            &journal,
+        )
+        .unwrap();
+    assert_eq!(restored["status"], "completed", "{restored}");
+    for (path, value) in originals.iter().zip(values) {
+        assert!(fs::read(path).unwrap().iter().all(|byte| *byte == value));
+        assert_eq!(fs::metadata(path).unwrap().len(), RESIDUE_FILE_LIMIT);
+    }
+    assert!(
+        residue_cipher_bound(RESIDUE_MAX_FILES, RESIDUE_TOTAL_LIMIT)
+            > residue_encoded_bound(RESIDUE_MAX_FILES, RESIDUE_TOTAL_LIMIT)
+    );
+}
+
+#[test]
+fn identity_total_counts_client_state_once_across_multiple_backups() {
+    let fx = fixture();
+    write(
+        &fx.root.join(".claude.json"),
+        &serde_json::to_vec(
+            &json!({"userID":USER_ID,"padding":"x".repeat(IDENTITY_BYTES as usize-100)}),
+        )
+        .unwrap(),
+    );
+    let backups: Vec<PathBuf> = (0..4)
+        .map(|n| fx.root.join(format!("identity-backup-{n}.json")))
+        .collect();
+    for path in &backups {
+        write(path, &vec![b'x'; 7 * 1024 * 1024]);
+    }
+    let selected: Vec<&Path> = backups.iter().map(PathBuf::as_path).collect();
+    let preview = identity_plan(&fx, &selected);
+    assert_eq!(preview["outcome"], "identity_reset");
+    assert!(backups.iter().all(|p| p.exists()));
 }

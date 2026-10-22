@@ -12,6 +12,9 @@ export const zhCN: Catalog = {
   'language.select': '界面语言',
   'language.hint': '跟随系统时使用 macOS 首选语言；选择简体中文或 English 会固定界面语言。',
 
+  'history.incompleteRecords': '部分原任务记录无法读取，下面仍显示可读记录。损坏原件保留；按原 ID 核对，不重新提交操作。',
+  'history.invalidRecordId': '记录文件名不是有效任务 ID',
+
   'nav.environments': '环境',
   'nav.policy': '保护方案',
   'nav.work': '工作保全',

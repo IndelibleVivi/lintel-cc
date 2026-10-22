@@ -11,7 +11,15 @@
 //! same wire shape the shared work codec writes. It is decoded here in memory
 //! under strict limits and full per-entry validation; decoded bytes are never
 //! persisted, logged or returned in a manifest.
-use crate::{err, now, storage::*, string, Engine, Result};
+use crate::{
+    client_data::{
+        residue_cipher_bound, residue_encoded_bound, residue_path_supported, RESIDUE_FILE_LIMIT,
+        RESIDUE_MAX_FILES, RESIDUE_PATH_BYTES, RESIDUE_ROLE_BYTES, RESIDUE_TOTAL_LIMIT,
+    },
+    err, now,
+    storage::*,
+    string, Engine, Result,
+};
 use serde::{
     de::{self, SeqAccess, Visitor},
     Deserialize, Deserializer,
@@ -29,37 +37,34 @@ use std::{
 pub(crate) const RESIDUE_RESTORE_KIND: &str = "residue_restore";
 /// The only package schema this module accepts.
 pub(crate) const RESIDUE_SCHEMA: &str = "lintel.residue/1";
-/// Ciphertext bound: the JSON byte-array envelope plus age framing, generously
-/// bounded so a hostile file cannot make the reader allocate without limit.
-const MAX_CIPHER_BYTES: u64 = 256 * 1024 * 1024;
-/// Plaintext bound for one decoded package.
-const MAX_PLAIN_BYTES: u64 = 192 * 1024 * 1024;
-/// Per-entry plaintext bound, mirroring the writer's admission.
-const FILE_LIMIT_BYTES: u64 = 8 * 1024 * 1024;
-/// Aggregate plaintext bound across all entries.
-const TOTAL_LIMIT_BYTES: u64 = 32 * 1024 * 1024;
-/// File-count bound for one package.
-const MAX_FILES: usize = 2000;
 /// Bound on untrusted passphrase work, so a hostile header cannot burn CPU.
 const MAX_SCRYPT_LOG_N: u8 = 20;
 
-/// The private, decoded residue package. `files` hold the exact recorded bytes
-/// in memory; nothing is written to disk by a read.
-struct ResiduePackage {
-    cipher_digest: String,
-    environment_id: Option<String>,
-    files: Vec<ResidueEntry>,
+fn plaintext_bound(entries: usize, raw_bytes: u64) -> u64 {
+    residue_encoded_bound(entries, raw_bytes)
 }
 
-struct ResidueEntry {
+fn cipher_bound(entries: usize, raw_bytes: u64) -> u64 {
+    residue_cipher_bound(entries, raw_bytes)
+}
+
+/// The private, decoded residue package. `files` hold the exact recorded bytes
+/// in memory; nothing is written to disk by a read.
+pub(crate) struct ResiduePackage {
+    cipher_digest: String,
+    pub(crate) environment_id: Option<String>,
+    pub(crate) files: Vec<ResidueEntry>,
+}
+
+pub(crate) struct ResidueEntry {
     /// The absolute original location recorded when the backup was written.
-    path: PathBuf,
+    pub(crate) path: PathBuf,
     /// The role marker written by the producer (`client_state`,
     /// `identity_backup`, ...); free-form but bounded by the read.
-    role: String,
-    bytes: u64,
-    digest: String,
-    data: Vec<u8>,
+    pub(crate) role: String,
+    pub(crate) bytes: u64,
+    pub(crate) digest: String,
+    pub(crate) data: Vec<u8>,
 }
 
 #[derive(Deserialize)]
@@ -101,7 +106,7 @@ fn bounded_data<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Vec<u8>,
         ) -> std::result::Result<Self::Value, A::Error> {
             let mut bytes = Vec::new();
             while let Some(byte) = seq.next_element::<u8>()? {
-                if bytes.len() as u64 >= FILE_LIMIT_BYTES {
+                if bytes.len() as u64 >= RESIDUE_FILE_LIMIT {
                     return Err(de::Error::custom("residue file limit"));
                 }
                 bytes.push(byte);
@@ -128,10 +133,10 @@ fn bounded_entries<'de, D: Deserializer<'de>>(
             let mut total = 0u64;
             while let Some(entry) = seq.next_element::<DecodedEntry>()? {
                 total = total.saturating_add(entry.data.len() as u64);
-                if entries.len() >= MAX_FILES
-                    || total > TOTAL_LIMIT_BYTES
-                    || entry.path.len() > 4096
-                    || entry.role.len() > 128
+                if entries.len() >= RESIDUE_MAX_FILES
+                    || total > RESIDUE_TOTAL_LIMIT
+                    || entry.path.len() > RESIDUE_PATH_BYTES
+                    || entry.role.len() > RESIDUE_ROLE_BYTES
                     || entry.digest.len() != 64
                 {
                     return Err(de::Error::custom("residue metadata or content limit"));
@@ -152,7 +157,7 @@ fn bounded_entries<'de, D: Deserializer<'de>>(
 /// validated (absolute path with no parent hops, non-duplicate, byte count,
 /// digest). Any disagreement is a specific error and no partial package is
 /// returned.
-fn open_residue_package(path: &Path, pass: &str) -> Result<ResiduePackage> {
+pub(crate) fn open_residue_package(path: &Path, pass: &str) -> Result<ResiduePackage> {
     let (cipher, identity) = read_cipher(path)?;
     let cipher_digest = identity["digest"].as_str().unwrap().to_owned();
     let decryptor = age::Decryptor::new(cipher.as_slice())
@@ -172,12 +177,13 @@ fn open_residue_package(path: &Path, pass: &str) -> Result<ResiduePackage> {
                 err("residue_archive_locked", "口令不正确，或残留备份无法解密")
             }
         })?;
+    let maximum_plain = plaintext_bound(RESIDUE_MAX_FILES, RESIDUE_TOTAL_LIMIT);
     let mut plain = Vec::new();
     reader
-        .take(MAX_PLAIN_BYTES + 1)
+        .take(maximum_plain + 1)
         .read_to_end(&mut plain)
         .map_err(|_| err("invalid_residue_archive", "残留备份解密或完整性校验失败"))?;
-    if plain.len() as u64 > MAX_PLAIN_BYTES {
+    if plain.len() as u64 > maximum_plain {
         return Err(err("residue_archive_limit", "残留备份展开后超过容量上限"));
     }
     drop(cipher);
@@ -202,30 +208,19 @@ fn open_residue_package(path: &Path, pass: &str) -> Result<ResiduePackage> {
     let mut files = vec![];
     for entry in raw_files {
         let raw_path = entry.path.as_str();
-        if raw_path.is_empty() || raw_path.chars().any(char::is_control) {
+        if !residue_path_supported(raw_path) {
             return Err(err("invalid_residue_archive", "残留备份条目路径无效"));
         }
         let path = PathBuf::from(raw_path);
-        // Exact original locations: absolute, no parent-directory hops, and no
-        // symlink anywhere in the recorded path.
-        if !path.is_absolute() {
-            return Err(err("invalid_residue_archive", "残留备份只接受绝对原始路径"));
-        }
-        if path
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
-        {
-            return Err(err("invalid_residue_archive", "残留备份路径含父目录跳转"));
-        }
         if !seen.insert(path.clone()) {
             return Err(err("invalid_residue_archive", "残留备份含重复路径"));
         }
         let bytes = entry.bytes;
-        if bytes > FILE_LIMIT_BYTES {
+        if bytes > RESIDUE_FILE_LIMIT {
             return Err(err("residue_archive_limit", "残留备份单文件超过容量上限"));
         }
         total = total.saturating_add(bytes);
-        if total > TOTAL_LIMIT_BYTES {
+        if total > RESIDUE_TOTAL_LIMIT {
             return Err(err("residue_archive_limit", "残留备份合计超过容量上限"));
         }
         let data = entry.data;
@@ -317,7 +312,8 @@ fn read_cipher(path: &Path) -> Result<(Vec<u8>, Value)> {
             "归档必须是当前用户独占的普通文件",
         ));
     }
-    if before.len() > MAX_CIPHER_BYTES {
+    let maximum_cipher = cipher_bound(RESIDUE_MAX_FILES, RESIDUE_TOTAL_LIMIT);
+    if before.len() > maximum_cipher {
         return Err(err("residue_archive_limit", "归档密文超过容量上限"));
     }
     let mut file = fs::OpenOptions::new()
@@ -329,9 +325,9 @@ fn read_cipher(path: &Path) -> Result<(Vec<u8>, Value)> {
     }
     let mut bytes = vec![];
     (&mut file)
-        .take(MAX_CIPHER_BYTES + 1)
+        .take(maximum_cipher + 1)
         .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_CIPHER_BYTES
+    if bytes.len() as u64 > maximum_cipher
         || identity(&file.metadata()?) != identity(&before)
         || identity(&fs::symlink_metadata(path)?) != identity(&before)
     {
@@ -584,7 +580,8 @@ impl Engine {
                 .unwrap_or(0o600);
             match atomic_new(destination, &entry.data, mode) {
                 Ok(()) => {
-                    let readback = read(destination, FILE_LIMIT_BYTES).map(|bytes| digest(&bytes));
+                    let readback =
+                        read(destination, RESIDUE_FILE_LIMIT).map(|bytes| digest(&bytes));
                     if matches!(readback, Ok(ref value) if value == &entry.digest) {
                         restored += 1;
                         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"restore","label":raw,"status":"completed","message":"已写回原路径并读回校验一致。"});

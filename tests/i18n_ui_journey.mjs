@@ -39,7 +39,7 @@ try{
     if(command==='app_set_language'){menuCalls.push(args.language);return null;}
     if(command==='request'){const c=args.payload;coreCalls.push(c.command);
       if(c.command==='discover')return {ok:true,data:{environments:[environment],capabilities}};
-      if(c.command==='jobs')return {ok:true,data:{jobs:[receipt]}};
+      if(c.command==='jobs')return {ok:true,data:{jobs:[receipt],records_complete:false,record_errors:[{job_id:'22222222-2222-4222-8222-222222222222',code:'invalid_json'}]}};
       if(c.command==='inspect')return {ok:true,data:{environment,settings:[],assets:[],warnings:[]}};
       if(c.command==='plan_policy'){planCount++;return {ok:true,data:plan};}
       if(c.command==='job')return {ok:true,data:receipt};
@@ -263,6 +263,26 @@ try{
   await help.getByText('Know exactly what changed',{exact:true}).waitFor();
   await page.keyboard.press('Escape');
   report.checks.push('task help, settings capabilities and help dialog render English from additive metadata/catalog');
+
+  // Damaged journal entries remain distinct from readable receipts in both locales.
+  await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();
+  await page.getByText(en['history.incompleteRecords'],{exact:true}).waitFor();
+  await page.getByText('22222222-2222-4222-8222-222222222222',{exact:true}).waitFor();
+  assert.equal(await page.locator('.job-row').count(),1);
+  assert.ok((await page.locator('.job-row').innerText()).includes(receipt.id));
+  await page.locator(switchSel).selectOption('zh-CN');
+  await page.getByText(zhCN['history.incompleteRecords'],{exact:true}).waitFor();
+  assert.equal(await page.locator('.job-row').count(),1);
+  await page.locator(switchSel).selectOption('en');
+  await page.getByText(en['history.incompleteRecords'],{exact:true}).waitFor();
+  await page.screenshot({path:path.join(output,'journal-errors-en-1120.png')});
+  await page.setViewportSize({width:900,height:640});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'record errors fit 900px beside healthy receipts');
+  await page.screenshot({path:path.join(output,'journal-errors-en-900.png')});
+  report.checks.push('damaged journal ID/code remains visible beside a healthy receipt across language switches; no operation is resubmitted');
+  await page.locator('.sidebar nav').getByRole('button',{name:en['nav.environments'],exact:true}).click();
+  await page.locator(switchSel).selectOption('system');
+  await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
 
   // (8) 900px layout + accessible html lang; no horizontal overflow.
   await page.setViewportSize({width:900,height:640});

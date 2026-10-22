@@ -6,6 +6,7 @@
 
 | 看到的情况 | 下一步 | 说明 |
 | --- | --- | --- |
+| 记录列表显示部分记录无法读取，或返回 `invalid_job_record` | 保留坏原件与原 ID，分别查询可读任务；提供错误 code | 不删除 jobs／plans 来重试；列表仍显示正常记录，分页尚未交付 |
 | 网页只能展示，无法操作本机 | 源码试用改用 `npm run dev:synthetic`；真实环境使用原生 App | 普通前端与官网没有真实执行通道 |
 | App 能用，但终端找不到 `lintel` | 选择独立 CLI 的完整路径，核对 `version --json`、`context --json` | App 安装不自动修改 PATH；见 [Agent CLI](agents.md) |
 | 返回 `accepted` 或 `ok:true`，但结果不明确 | 用原 ID 查看 job，检查 status、steps、coverage | 请求接收、请求处理成功、任务完成分别表达 |

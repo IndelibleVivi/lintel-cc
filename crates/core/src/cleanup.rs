@@ -15,7 +15,11 @@ fn auth_status_digest(public: &Value, raw: &Value, nonce: &str) -> String {
     digest(&serde_json::to_vec(&json!([nonce, public["logged_in"], raw])).unwrap())
 }
 
-pub(crate) fn bounded(mut command: Command) -> Result<(i32, Vec<u8>)> {
+pub(crate) fn bounded(command: Command) -> Result<(i32, Vec<u8>)> {
+    bounded_with_timeout(command, Duration::from_secs(20))
+}
+
+fn bounded_with_timeout(mut command: Command, deadline: Duration) -> Result<(i32, Vec<u8>)> {
     use std::os::unix::process::CommandExt;
     command
         .stdin(Stdio::null())
@@ -25,44 +29,68 @@ pub(crate) fn bounded(mut command: Command) -> Result<(i32, Vec<u8>)> {
     let mut child = command
         .spawn()
         .map_err(|_| err("adapter_start_failed", "无法启动已登记的 Claude 命令"))?;
-    let stdout = child.stdout.take().unwrap();
-    let (tx, rx) = std::sync::mpsc::channel();
-    let reader = std::thread::spawn(move || {
-        let mut data = vec![];
-        let result = stdout.take(64 * 1024 + 1).read_to_end(&mut data);
-        let _ = tx.send((result, data));
-    });
+    use std::os::fd::AsRawFd;
+    let mut stdout = child.stdout.take().unwrap();
+    let flags = unsafe { libc::fcntl(stdout.as_raw_fd(), libc::F_GETFL) };
+    if flags < 0
+        || unsafe { libc::fcntl(stdout.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
+    {
+        unsafe {
+            libc::kill(-(child.id() as i32), libc::SIGKILL);
+        }
+        let _ = child.wait();
+        return Err(std::io::Error::last_os_error().into());
+    }
     let started = Instant::now();
     let mut status = None;
-    let mut output = None;
+    let mut bytes = Vec::new();
+    let mut eof = false;
     loop {
+        let mut chunk = [0u8; 4096];
+        match stdout.read(&mut chunk) {
+            Ok(0) => eof = true,
+            Ok(n) => bytes.extend_from_slice(&chunk[..n]),
+            Err(e)
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => {
+                unsafe {
+                    libc::kill(-(child.id() as i32), libc::SIGKILL);
+                }
+                let _ = child.wait();
+                return Err(e.into());
+            }
+        }
         if status.is_none() {
-            status = child.try_wait()?;
+            match child.try_wait() {
+                Ok(value) => status = value,
+                Err(e) => {
+                    unsafe {
+                        libc::kill(-(child.id() as i32), libc::SIGKILL);
+                    }
+                    let _ = child.wait();
+                    return Err(e.into());
+                }
+            }
         }
-        if output.is_none() {
-            output = rx.try_recv().ok();
-        }
-        if status.is_some() && output.is_some() {
-            break;
-        }
-        if started.elapsed() > Duration::from_secs(20) {
+        if bytes.len() > 64 * 1024 || started.elapsed() > deadline {
             unsafe {
                 libc::kill(-(child.id() as i32), libc::SIGKILL);
             }
             let _ = child.wait();
-            let _ = reader.join();
-            return Err(err(
-                "adapter_timeout",
-                "Claude 命令超时；执行结果需核对，不自动重跑",
-            ));
+            return Err(if bytes.len() > 64 * 1024 {
+                err("adapter_output_limit", "命令返回超出适配器上限")
+            } else {
+                err(
+                    "adapter_timeout",
+                    "Claude 命令超时；执行结果需核对，不自动重跑",
+                )
+            });
         }
-        std::thread::sleep(Duration::from_millis(25));
-    }
-    let _ = reader.join();
-    let (result, bytes) = output.unwrap();
-    result?;
-    if bytes.len() > 64 * 1024 {
-        return Err(err("adapter_output_limit", "命令返回超出适配器上限"));
+        if status.is_some() && eof {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
     Ok((status.unwrap().code().unwrap_or(-1), bytes))
 }
@@ -568,7 +596,54 @@ pub(crate) fn bounded_snapshot(path: &Path, limit: u64) -> Result<Value> {
 // Bind removal to the object moved out of the client path, not whatever later
 // occupies that path. A replaced file is restored without overwriting new state.
 pub(crate) fn quarantine_remove(path: &Path, expected: &Value, directory: &Path) -> Result<()> {
-    quarantine_remove_bounded(path, expected, directory, 8 * 1024 * 1024)
+    let outcome = quarantine_remove_bounded(path, expected, directory, 8 * 1024 * 1024)?;
+    if !outcome.observed.is_null() {
+        return Err(err(
+            outcome.observed["code"].as_str().unwrap_or("io_error"),
+            outcome.observed["message"]
+                .as_str()
+                .unwrap_or("隔离删除未完成；按原任务核对"),
+        ));
+    }
+    Ok(())
+}
+
+/// The outcome of one quarantine attempt. A verified removal is complete. A
+/// conflict leaves the exact moved object at `held`; callers persist that
+/// locator before treating the failure as reconciled.
+pub(crate) struct Quarantined {
+    pub(crate) held: PathBuf,
+    pub(crate) retained: bool,
+    pub(crate) observed: Value,
+}
+
+#[cfg(test)]
+thread_local! {
+    static FINAL_PARENT_FAILURE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static POST_RENAME_FAILURE: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn arm_final_parent_failure() {
+    FINAL_PARENT_FAILURE.with(|armed| armed.set(true));
+}
+
+#[cfg(test)]
+pub(crate) fn arm_post_rename_failure() {
+    POST_RENAME_FAILURE.with(|armed| armed.set(armed.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+fn take_post_rename_failure() -> bool {
+    POST_RENAME_FAILURE.with(|armed| {
+        let remaining = armed.get();
+        if remaining == 0 {
+            false
+        } else {
+            armed.set(remaining - 1);
+            true
+        }
+    })
 }
 
 /// The same quarantine removal with a caller-chosen read limit for the
@@ -579,13 +654,33 @@ pub(crate) fn quarantine_remove_bounded(
     expected: &Value,
     directory: &Path,
     limit: u64,
-) -> Result<()> {
+) -> Result<Quarantined> {
     use std::os::unix::fs::DirBuilderExt;
     fs::DirBuilder::new().mode(0o700).create(directory)?;
     let held = directory.join("state");
     fs::rename(path, &held)?;
-    fs::File::open(directory)?.sync_all()?;
-    fs::File::open(path.parent().unwrap())?.sync_all()?;
+    #[cfg(test)]
+    if take_post_rename_failure() {
+        return Ok(Quarantined {
+            held,
+            retained: true,
+            observed: json!({"stage":"post_rename_sync","code":"io_error","message":"synthetic post-rename sync failure"}),
+        });
+    }
+    if let Err(error) = fs::File::open(directory).and_then(|file| file.sync_all()) {
+        return Ok(Quarantined {
+            held,
+            retained: true,
+            observed: json!({"stage":"quarantine_sync","code":"io_error","message":crate::Error::from(error).message}),
+        });
+    }
+    if let Err(error) = fs::File::open(path.parent().unwrap()).and_then(|file| file.sync_all()) {
+        return Ok(Quarantined {
+            held,
+            retained: true,
+            observed: json!({"stage":"source_parent_sync","code":"io_error","message":crate::Error::from(error).message}),
+        });
+    }
     let observed = bounded_snapshot(&held, limit);
     if !matches!(&observed, Ok(actual) if actual == expected) {
         // hard_link is no-replace. If a writer created another file meanwhile,
@@ -595,13 +690,145 @@ pub(crate) fn quarantine_remove_bounded(
             fs::remove_dir(directory)?;
             fs::File::open(path.parent().unwrap())?.sync_all()?;
         }
-        return Err(err(
-            "cleanup_conflict",
-            "目标在清理窗口内改变；新状态未删除。若原位置已被占用，文件保留在回执的隔离目录中。",
-        ));
+        let retained = held.exists();
+        return Ok(Quarantined {
+            held,
+            retained,
+            observed: json!({"stage":"verification","code":"cleanup_conflict","message":"目标在清理窗口内改变；新状态未删除。"}),
+        });
     }
-    fs::remove_file(&held)?;
-    fs::remove_dir(directory)?;
-    fs::File::open(path.parent().unwrap())?.sync_all()?;
-    Ok(())
+    remove_quarantined(path, &held, directory)
+}
+
+fn remove_quarantined(path: &Path, held: &Path, directory: &Path) -> Result<Quarantined> {
+    match fs::remove_file(held) {
+        Ok(()) => {}
+        Err(error) => {
+            return Ok(Quarantined {
+                held: held.to_path_buf(),
+                retained: true,
+                observed: json!({"stage":"remove_held","code":"io_error","message":crate::Error::from(error).message}),
+            })
+        }
+    }
+    if let Err(error) = fs::remove_dir(directory) {
+        return Ok(Quarantined {
+            held: held.to_path_buf(),
+            retained: false,
+            observed: json!({"stage":"remove_quarantine","code":"io_error","message":crate::Error::from(error).message}),
+        });
+    }
+    #[cfg(test)]
+    if FINAL_PARENT_FAILURE.with(|armed| armed.replace(false)) {
+        return Ok(Quarantined {
+            held: held.to_path_buf(),
+            retained: false,
+            observed: json!({"stage":"final_parent_sync","code":"io_error","message":"synthetic final parent sync failure"}),
+        });
+    }
+    if let Err(error) = fs::File::open(path.parent().unwrap()).and_then(|file| file.sync_all()) {
+        return Ok(Quarantined {
+            held: held.to_path_buf(),
+            retained: false,
+            observed: json!({"stage":"final_parent_sync","code":"io_error","message":crate::Error::from(error).message}),
+        });
+    }
+    Ok(Quarantined {
+        held: held.to_path_buf(),
+        retained: false,
+        observed: Value::Null,
+    })
+}
+
+#[cfg(test)]
+mod bounded_tests {
+    use super::*;
+    #[test]
+    fn bounded_output_and_exit() {
+        let mut c = Command::new("/bin/sh");
+        c.args(["-c", "printf hello; exit 7"]);
+        let (code, bytes) = bounded(c).unwrap();
+        assert_eq!(code, 7);
+        assert_eq!(bytes, b"hello");
+        let mut c = Command::new("/bin/sh");
+        c.args([
+            "-c",
+            "while :; do printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'; done",
+        ]);
+        assert!(bounded(c).unwrap_err().code == "adapter_output_limit");
+    }
+    #[test]
+    fn escaped_writer_cannot_hold_reader_or_operation() {
+        for parent_waits in [false, true] {
+            for _ in 0..3 {
+                let mut c = Command::new("python3");
+                c.args(["-c", if parent_waits {
+                    "import os,time; p=os.fork(); (os.setsid(),time.sleep(.3),os._exit(0)) if p==0 else time.sleep(2)"
+                } else {
+                    "import os,time; p=os.fork(); (os.setsid(),time.sleep(.3),os._exit(0)) if p==0 else os._exit(0)"
+                }]);
+                let started = Instant::now();
+                assert_eq!(
+                    bounded_with_timeout(c, Duration::from_millis(80))
+                        .unwrap_err()
+                        .code,
+                    "adapter_timeout"
+                );
+                assert!(started.elapsed() < Duration::from_millis(250));
+            }
+        }
+        let mut c = Command::new("/bin/sh");
+        c.args(["-c", "cat; printf usable"]);
+        assert_eq!(bounded(c).unwrap().1, b"usable");
+    }
+    #[test]
+    fn inherited_pipe_and_running_parent_obey_deadline() {
+        for script in ["sleep 2 & exit 0", "sleep 2 & wait"] {
+            for _ in 0..3 {
+                let mut c = Command::new("/bin/sh");
+                c.args(["-c", script]);
+                let start = Instant::now();
+                assert!(
+                    bounded_with_timeout(c, Duration::from_millis(40))
+                        .unwrap_err()
+                        .code
+                        == "adapter_timeout"
+                );
+                assert!(start.elapsed() < Duration::from_secs(1));
+            }
+        }
+        let mut c = Command::new("/bin/sh");
+        c.args(["-c", "printf usable"]);
+        assert_eq!(bounded(c).unwrap().1, b"usable");
+    }
+}
+
+#[cfg(test)]
+mod quarantine_outcome_tests {
+    use super::*;
+    #[test]
+    fn legacy_cleanup_does_not_swallow_a_retained_quarantine() {
+        let t = tempfile::tempdir().unwrap();
+        let base = t.path().canonicalize().unwrap();
+        let path = base.join("synthetic.json");
+        fs::write(&path, b"original").unwrap();
+        let expected = bounded_snapshot(&path, 1024).unwrap();
+        arm_post_rename_failure();
+        assert!(quarantine_remove(&path, &expected, &base.join("hold")).is_err());
+        assert_eq!(fs::read(base.join("hold/state")).unwrap(), b"original");
+    }
+    #[test]
+    fn removed_bytes_with_failed_parent_sync_are_not_completion() {
+        let t = tempfile::tempdir().unwrap();
+        let base = t.path().canonicalize().unwrap();
+        let path = base.join("synthetic.json");
+        fs::write(&path, b"original").unwrap();
+        let expected = bounded_snapshot(&path, 1024).unwrap();
+        FINAL_PARENT_FAILURE.with(|armed| armed.set(true));
+        let outcome =
+            quarantine_remove_bounded(&path, &expected, &base.join("hold"), 1024).unwrap();
+        assert!(!outcome.retained);
+        assert!(!path.exists());
+        assert_eq!(outcome.observed["stage"], "final_parent_sync");
+    }
 }

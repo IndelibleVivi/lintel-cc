@@ -51,6 +51,7 @@
 <p>macOS 操作准确的当前 SCNetworkSet／service UUID／接口，不按 Wi-Fi 等显示名猜测。预览冻结完整 IPv6 protocol 配置、协议 enabled、服务自身 enabled、服务身份及前测；关闭禁用该协议，仅链路本地选 LinkLocal。批准后只修改该服务 IPv6，保留 IPv4、DNS、系统代理与其他服务，在系统授权下写入、提交／应用、独立读回，再自动沿用冻结端点和路径复测。它是<strong>宿主共享设置</strong>，影响使用服务的所有应用，不随 Claude 环境切换或 App 退出撤销；IPv6-only／VPN 可能失连。有效前测要求同 revision／端点／通道实例／deadline 且不超过五分钟，否则重新前测；批准前若前测过期或网络变化，原计划拒绝新任务，须重新预览。</p>
 <p>完整配置恢复另行预览批准，包含手动地址、前缀与 router；后续外部修改、服务／接口变化拒绝覆盖。App 原通道停止后，可在新恢复预览中把该路径明确列为未测试。原任务 ID 持久保存，响应丢失或中断只查询原任务，不重写或重新复测；intent 或相同可读值不能单独证明完成。读回未确认时保留不确定性，不能据此自动恢复；配置已读回而后测中断或未完成时，任务标为 <code>partially_completed</code> 并保留已确认的恢复入口；后测取得有限失败结果则如实列出每格原因。后测失败独立显示，不回滚已确认配置，也不变成“零泄漏”。</p>
 <p>Linux 的 <code>network inspect/probe</code> 在所选 runner 执行，不用 Mac 的通道代替远端。只接受远端 loopback HTTP 通道；<code>network serve</code> 仍由独立前台进程持有。Linux 整机 IPv6 变更不支持，不尝试 sudo 或改变管理连接；namespace／systemd 工作负载强约束仍是独立 SPEC 目标。<code>LINTEL_TEST_HOME</code> 和开发 fixture 禁止接触真实宿主网络，本 Leaf 的系统配置验收只使用 cfg(test) adapter 与 synthetic invoke。真实 macOS 授权、系统写入／恢复、VPN 切换、公众回显互通与 Linux native runtime 保持未验证。</p>
+<p>系统域名解析由进程内有限 owner 管理，最多同时 32 个系统 resolver 调用；满额明确返回 DNS 失败，不排队增长。探测超时或取消后，迟到解析只归还地址，不能继续连接；同步调用也不再因销毁 Tokio runtime 等待阻塞 DNS。系统调用本身不能被强制取消，仍会占用一个 slot 到返回，因此这不是系统 DNS 必然可用的保证。</p>
 <h2 id="启动和停用">启动和停用</h2>
 <p>每个环境启动一个独立实例，并将该环境的受控启动入口指向输出的 loopback 地址。配置例子全部为 synthetic 值：</p>
 <pre class="guide-code" data-language="sh"><code>lintel network serve --config crates/egress/examples/policy.synthetic.json

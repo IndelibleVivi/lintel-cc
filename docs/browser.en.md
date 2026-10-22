@@ -4,6 +4,8 @@
 
 Status: 0.1.0 development candidate. Chrome/Edge MV3 packages and the independent Firefox event-page adapter can be built; formal browser installation, store publication and full three-browser acceptance are incomplete. This document corresponds to the [full target (Chinese)](SPEC.md#9-模块-c浏览器能力必须真实可操作) and [B01–B15 acceptance (Chinese)](ACCEPTANCE.md#c-浏览器实测), without claiming delivery of the complete target.
 
+Current source supports continuing an interrupted App bundled-host installation with the original approval: intent precedes effects, complete staging precedes conditional publication, and recovery verifies file identity and content. The same installer consumes registration-upgrade backups and publication journals; external replacements or edits are retained as conflicts. New publication explicitly refuses filesystems without birth-time evidence rather than weakening identity checks. Do not delete intents, registrations or originals to retry. This does not prove real browser installation or pairing. If the isolation-release marker persisted but owner removal failed, retry removes only the exactly matching old owner without repeating browser-data deletion or releasing a newer operation.
+
 ## Entry points and actual scope
 
 The extension popup independently previews/confirms site clear, WebRTC, Chromium site permissions, site-blocking rules and Chromium site proxy. The App submits through the same native host; users still review and confirm in the target extension. Web pages have no message entry. The extension has no content script, debugger, remote code or default all-site host permission.

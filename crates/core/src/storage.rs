@@ -493,12 +493,51 @@ impl<'de> Visitor<'de> for UniqueVisitor {
     }
 }
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
-        err("io_error", "文件操作未完成；检查访问权限与可用空间")
+    fn from(error: std::io::Error) -> Self {
+        use std::io::ErrorKind;
+        let (reason, message) = match error.kind() {
+            ErrorKind::NotFound => ("not_found", "文件操作未完成：对象不存在；保留原任务核对"),
+            ErrorKind::PermissionDenied => ("permission_denied", "文件操作未完成：访问权限不足"),
+            ErrorKind::AlreadyExists => ("already_exists", "文件操作未完成：目标已存在；没有覆盖"),
+            ErrorKind::StorageFull => ("storage_full", "文件操作未完成：可用空间不足"),
+            ErrorKind::ReadOnlyFilesystem => {
+                ("read_only_filesystem", "文件操作未完成：文件系统只读")
+            }
+            ErrorKind::TimedOut => ("timed_out", "文件操作未完成：等待超时；按原任务核对"),
+            ErrorKind::Interrupted => ("interrupted", "文件操作未完成：系统调用被中断"),
+            _ => ("other", "文件操作未完成；检查访问权限与可用空间"),
+        };
+        let mut result = err("io_error", message);
+        // Keep the stable error code and publish only a finite cause. The raw
+        // OS message can contain paths or other private context.
+        result.reason = Some(reason);
+        result
     }
 }
 impl From<serde_json::Error> for Error {
     fn from(_: serde_json::Error) -> Self {
         err("invalid_json", "无法处理该 JSON 数据")
+    }
+}
+
+#[cfg(test)]
+mod io_diagnostic_tests {
+    use super::*;
+    #[test]
+    fn io_causes_are_finite_without_raw_os_context() {
+        for (kind, expected) in [
+            (std::io::ErrorKind::NotFound, "not_found"),
+            (std::io::ErrorKind::PermissionDenied, "permission_denied"),
+            (std::io::ErrorKind::StorageFull, "storage_full"),
+            (
+                std::io::ErrorKind::ReadOnlyFilesystem,
+                "read_only_filesystem",
+            ),
+        ] {
+            let result: Error = std::io::Error::new(kind, "/private/SYNTHETIC_SECRET").into();
+            assert_eq!(result.code, "io_error");
+            assert_eq!(result.reason, Some(expected));
+            assert!(!result.message.contains("SYNTHETIC_SECRET"));
+        }
     }
 }

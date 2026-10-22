@@ -37,24 +37,41 @@ pub(crate) const RESIDUE_SCHEMA: &str = "lintel.residue/1";
 /// through the in-memory age/JSON codec ([`crate::archive::seal`]), whose JSON
 /// byte-array encoding is roughly four bytes per plaintext byte, so this bound
 /// keeps that single warm-path package bounded.
-const RESIDUE_FILE_LIMIT: u64 = 8 * 1024 * 1024;
+pub(crate) const RESIDUE_FILE_LIMIT: u64 = 8 * 1024 * 1024;
 /// Aggregate admission for one residue plan's preserved content.
-const RESIDUE_TOTAL_LIMIT: u64 = 32 * 1024 * 1024;
+pub(crate) const RESIDUE_TOTAL_LIMIT: u64 = 32 * 1024 * 1024;
 /// File-count admission for one residue plan.
-const RESIDUE_MAX_FILES: usize = 2000;
+pub(crate) const RESIDUE_MAX_FILES: usize = 2000;
+/// One recorded absolute path, including Unicode and ordinary spaces.
+pub(crate) const RESIDUE_PATH_BYTES: usize = 4096;
+/// Bounded role string carried by an identity entry.
+pub(crate) const RESIDUE_ROLE_BYTES: usize = 128;
+/// Fixed worst-case room for one entry's JSON keys, numbers, separators and
+/// escaped path beyond its byte array. The raw array itself is budgeted at four
+/// characters per byte, so this allowance covers only bounded metadata.
+pub(crate) const RESIDUE_ENTRY_METADATA_BYTES: u64 = 16 * 1024;
 /// Identity material bound: the same discipline `residue.rs` uses, so an
 /// oversized client-state file is refused rather than partially rewritten.
 const IDENTITY_BYTES: u64 = 2 * 1024 * 1024;
-/// Bound for one explicitly selected identity backup file.
-const IDENTITY_BACKUP_BYTES: u64 = 8 * 1024 * 1024;
-/// Aggregate bound for the identity backups in one plan.
-const IDENTITY_BACKUP_TOTAL: u64 = 32 * 1024 * 1024;
+
+/// The sole path admissibility rule shared by the residue producer and the
+/// independent package reader. Paths remain ordinary UTF-8 strings, including
+/// spaces and Unicode, but cannot carry controls or escape their parent.
+pub(crate) fn residue_path_supported(raw: &str) -> bool {
+    !raw.is_empty()
+        && raw.len() <= RESIDUE_PATH_BYTES
+        && !raw.chars().any(char::is_control)
+        && Path::new(raw).is_absolute()
+        && !Path::new(raw)
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+}
 
 /// One frozen residue original: the absolute path plus the identity/content
 /// facts that bind a later removal to this exact object.
 fn freeze_residue_original(path: &Path) -> Result<Value> {
     guard(path)?;
-    if !path.is_absolute() {
+    if !path.to_str().is_some_and(residue_path_supported) {
         return Err(err("invalid_path", "residue_paths 需要绝对路径"));
     }
     let meta = fs::symlink_metadata(path)
@@ -184,6 +201,96 @@ fn residue_package(environment_id: &str, files: &[Value]) -> Value {
         "files": files,
         "notes": "本地残留备份：只包含预览中明确选择的原件字节，可独立解密查看；与 lintel.work/1 工作包不通用，不会被自动迁入任何环境。",
     })
+}
+
+/// JSON byte-array encoding has a finite worst case: every raw byte may become
+/// three digits plus one separator. Metadata is bounded per entry, and age adds
+/// a fixed framing/header allowance. The reader derives its admission from this
+/// same rule, so the legacy `Vec<u8>` wire shape never needs a migration.
+pub(crate) fn residue_encoded_bound(entries: usize, raw_bytes: u64) -> u64 {
+    raw_bytes
+        .saturating_mul(4)
+        .saturating_add((entries as u64).saturating_mul(RESIDUE_ENTRY_METADATA_BYTES))
+}
+
+pub(crate) fn residue_cipher_bound(entries: usize, raw_bytes: u64) -> u64 {
+    let plain = residue_encoded_bound(entries, raw_bytes);
+    plain
+        .saturating_add(plain / (64 * 1024) * 64)
+        .saturating_add(64 * 1024)
+}
+
+fn admit_residue_package(files: &[Value]) -> Result<(usize, u64)> {
+    if files.len() > RESIDUE_MAX_FILES {
+        return Err(err("residue_archive_limit", "残留备份条目超过上限"));
+    }
+    let mut total = 0u64;
+    for file in files {
+        let raw = string(file, "path")?;
+        if !residue_path_supported(raw) {
+            return Err(err("invalid_residue_path", "残留备份路径不受支持"));
+        }
+        let bytes = file["bytes"]
+            .as_u64()
+            .ok_or_else(|| err("invalid_residue_archive", "残留条目缺少字节数"))?;
+        if bytes > RESIDUE_FILE_LIMIT {
+            return Err(err("residue_archive_limit", "残留备份单文件超过容量上限"));
+        }
+        total = total.saturating_add(bytes);
+        if total > RESIDUE_TOTAL_LIMIT {
+            return Err(err("residue_archive_limit", "残留备份合计超过容量上限"));
+        }
+    }
+    Ok((files.len(), total))
+}
+
+/// Verify the published package through the same production reader that the
+/// restore path uses. Ciphertext equality alone does not prove the schema,
+/// path contract, byte counts, digests or environment binding are readable.
+fn verify_residue_package(
+    path: &Path,
+    pass: &str,
+    environment_id: &str,
+    files: &[Value],
+) -> Result<()> {
+    let package = crate::residue_archive::open_residue_package(path, pass)?;
+    if package.environment_id.as_deref() != Some(environment_id)
+        || package.files.len() != files.len()
+    {
+        return Err(err(
+            "archive_semantic_readback_failed",
+            "残留备份 reader 回读的环境或条目数量不一致",
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for expected in files {
+        let path = string(expected, "path")?;
+        let actual = package
+            .files
+            .iter()
+            .find(|actual| actual.path.to_str() == Some(path))
+            .ok_or_else(|| {
+                err(
+                    "archive_semantic_readback_failed",
+                    "残留备份 reader 回读缺少生产条目",
+                )
+            })?;
+        let role = expected["role"].as_str().unwrap_or("");
+        let bytes = expected["bytes"].as_u64().unwrap_or(u64::MAX);
+        let expected_digest = string(expected, "digest")?;
+        if !seen.insert(path)
+            || actual.role != role
+            || actual.bytes != bytes
+            || actual.digest != expected_digest
+            || digest(&actual.data) != expected_digest
+        {
+            return Err(err(
+                "archive_semantic_readback_failed",
+                "残留备份 reader 回读的条目与生产写入不一致",
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Publish complete sealed bytes at `dest` through the shared no-replace
@@ -331,12 +438,7 @@ impl Engine {
             if !seen.insert(path.to_path_buf()) {
                 return Err(err("invalid_residue_paths", "residue_paths 含重复路径"));
             }
-            if !path.is_absolute()
-                || path
-                    .components()
-                    .any(|c| matches!(c, std::path::Component::ParentDir))
-                || raw.chars().any(char::is_control)
-            {
+            if !residue_path_supported(raw) {
                 return Err(err("invalid_path", "需要准确的绝对原件路径"));
             }
             guard(path)?;
@@ -383,7 +485,7 @@ impl Engine {
                 ));
             }
             let frozen = freeze_residue_original(path)?;
-            total += frozen["bytes"].as_u64().unwrap_or(0);
+            total = total.saturating_add(frozen["bytes"].as_u64().unwrap_or(0));
             if total > RESIDUE_TOTAL_LIMIT {
                 return Err(err(
                     "archive_limit",
@@ -526,7 +628,14 @@ impl Engine {
                 }));
                 preserved.insert(PathBuf::from(string(file, "path")?));
             }
+            let (entries, raw_bytes) = admit_residue_package(&staged)?;
+            if raw_bytes > RESIDUE_TOTAL_LIMIT {
+                return Err(err("archive_limit", "残留备份超过合计容量上限"));
+            }
             let bytes = archive::seal(&residue_package(string(e, "id")?, &staged), pass)?;
+            if bytes.len() as u64 > residue_cipher_bound(entries, raw_bytes) {
+                return Err(err("archive_limit", "残留备份密文超过统一预算"));
+            }
             let dest = self
                 .state
                 .join("archives")
@@ -536,9 +645,11 @@ impl Engine {
             j["residue_backup"] = json!({"preserved": staged.len(), "skipped_absent": skipped_absent, "conflicts": conflicts.len()});
             save(journal, j)?;
             publish_sealed(&dest, &bytes)?;
-            if read(&dest, 64 * 1024 * 1024)? != bytes {
+            let readback = read(&dest, residue_cipher_bound(entries, raw_bytes))?;
+            if readback != bytes {
                 return Err(err("archive_readback_failed", "残留备份未能读回，未清理"));
             }
+            verify_residue_package(&dest, pass, string(e, "id")?, &staged)?;
             *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"residue_backup","label":"独立加密残留备份","status":"completed","message":"残留备份已写入并读回；schema 为 lintel.residue/1，独立于工作包与身份。"});
             save(journal, j)?;
         }
@@ -579,12 +690,20 @@ impl Engine {
                 }
             }
             j["steps"].as_array_mut().unwrap().push(json!({"id":"clear","label":file["path"],"status":"executing","message":"仅移除预览冻结的原件；使用隔离重命名，不覆盖新状态。"}));
-            save(journal, j)?;
+            let quarantine_step = j["steps"].as_array().unwrap().len() - 1;
             let quarantine = path
                 .parent()
                 .ok_or_else(|| err("invalid_path", "残留原件缺少父目录"))?
-                .join(format!(".lintel-quarantine-{}-residue", string(j, "id")?));
+                .join(format!(
+                    ".lintel-quarantine-{}-residue-{quarantine_step}",
+                    string(j, "id")?
+                ));
+            j["steps"][quarantine_step]["quarantine_path"] = json!(quarantine);
+            j["steps"][quarantine_step]["source_identity"] = file["identity"].clone();
+            j["steps"][quarantine_step]["stage"] = json!("planned");
             j["quarantine_path"] = json!(quarantine);
+            save(journal, j)?;
+            j["steps"][quarantine_step]["stage"] = json!("renaming");
             save(journal, j)?;
             match cleanup::quarantine_remove_bounded(
                 path,
@@ -592,19 +711,38 @@ impl Engine {
                 &quarantine,
                 RESIDUE_FILE_LIMIT,
             ) {
-                Ok(()) if !path.exists() => {
+                Ok(outcome)
+                    if !path.exists() && !outcome.retained && outcome.observed.is_null() =>
+                {
                     removed += 1;
-                    *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"clear","label":file["path"],"status":"completed","message":"原件已移除；备份（如启用）保留在任务记录中。"});
+                    j["steps"][quarantine_step]["status"] = json!("completed");
+                    j["steps"][quarantine_step]["message"] =
+                        json!("原件已移除；备份（如启用）保留在任务记录中。");
                 }
-                Ok(()) => {
-                    failures.push(json!({"path":file["path"],"reason":"state_reappeared"}));
-                    *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"clear","label":file["path"],"status":"failed","message":"移除后检测到同路径内容重新出现；请核对写入来源。"});
+                Ok(outcome) => {
+                    failures.push(json!({
+                        "path":file["path"],
+                        "quarantine_path":outcome.held,
+                        "retained":outcome.retained,
+                        "stage":outcome.observed,
+                    }));
+                    j["steps"][quarantine_step]["status"] = json!("failed");
+                    j["steps"][quarantine_step]["held_path"] = json!(outcome.held);
+                    j["steps"][quarantine_step]["retained"] = json!(outcome.retained);
+                    j["steps"][quarantine_step]["stage"] = outcome.observed;
+                    j["steps"][quarantine_step]["message"] =
+                        json!("隔离或同步未完成；准确保留位置已记录，不自动重启或重试。");
                 }
                 Err(error) => {
-                    failures.push(
-                        json!({"path":file["path"],"code":error.code,"message":error.message}),
-                    );
-                    *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"clear","label":file["path"],"status":"failed","message":error.message});
+                    failures.push(json!({
+                        "path":file["path"],
+                        "quarantine_path":quarantine,
+                        "stage":"not_confirmed",
+                        "code":error.code,
+                        "message":error.message,
+                    }));
+                    j["steps"][quarantine_step]["status"] = json!("failed");
+                    j["steps"][quarantine_step]["stage"] = json!("not_confirmed");
                 }
             }
             save(journal, j)?;
@@ -682,8 +820,14 @@ impl Engine {
         let _ = user_id;
         // Freeze the exact object and bytes; the raw value itself never enters
         // the plan, only the fact that this field is present and removable.
-        let snapshot = snapshot(&path)?;
         let meta = fs::metadata(&path)?;
+        if meta.len() > IDENTITY_BYTES {
+            return Err(err(
+                "file_limit",
+                "client_state 超过身份读取上限，未生成重置计划",
+            ));
+        }
+        let snapshot = snapshot(&path)?;
         let retained: Vec<String> = doc
             .as_object()
             .map(|map| {
@@ -698,8 +842,14 @@ impl Engine {
             .unwrap_or_default();
         let mut backups = vec![];
         if let Some(list) = r["identity_backup_paths"].as_array() {
+            if list.len().saturating_add(1) > RESIDUE_MAX_FILES {
+                return Err(err(
+                    "archive_limit",
+                    "身份归档条目包括 client_state 合计最多 2000 项",
+                ));
+            }
             let mut seen = std::collections::HashSet::new();
-            let mut total = 0u64;
+            let mut total = meta.len();
             for raw in list {
                 let raw = raw.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
                     err(
@@ -709,6 +859,9 @@ impl Engine {
                 })?;
                 let backup = Path::new(raw);
                 guard(backup)?;
+                if !residue_path_supported(raw) {
+                    return Err(err("invalid_backup_paths", "身份备份路径不受支持"));
+                }
                 if backup == path
                     || backup == root.join(".credentials.json")
                     || backup == root.join("settings.json")
@@ -719,7 +872,7 @@ impl Engine {
                         "身份备份选择不能包含原状态、登录凭据、设置或 Lintel 状态",
                     ));
                 }
-                if !backup.is_absolute() || !seen.insert(backup.to_path_buf()) {
+                if !seen.insert(backup.to_path_buf()) {
                     return Err(err(
                         "invalid_backup_paths",
                         "identity_backup_paths 需要唯一的绝对路径",
@@ -736,21 +889,21 @@ impl Engine {
                         "所选身份备份的所有者或硬链接状态不受支持",
                     ));
                 }
-                if backup_meta.len() > IDENTITY_BACKUP_BYTES {
-                    return Err(err("file_limit", "所选身份备份超过单文件容量上限（8 MiB）"));
-                }
-                total += backup_meta.len();
-                if total > IDENTITY_BACKUP_TOTAL {
+                total = total.saturating_add(backup_meta.len());
+                if total > RESIDUE_TOTAL_LIMIT {
                     return Err(err(
                         "archive_limit",
-                        "所选身份备份合计超过容量上限（32 MiB）；未写入任何备份",
+                        "身份归档合计超过 32 MiB；未写入任何备份",
                     ));
+                }
+                if backup_meta.len() > RESIDUE_FILE_LIMIT {
+                    return Err(err("file_limit", "所选身份备份超过单文件容量上限（8 MiB）"));
                 }
                 backups.push(json!({
                     "path": backup,
                     "bytes": backup_meta.len(),
-                    "digest": digest_file_bounded(backup, IDENTITY_BACKUP_BYTES)?,
-                    "snapshot": cleanup::bounded_snapshot(backup, IDENTITY_BACKUP_BYTES)?,
+                    "digest": digest_file_bounded(backup, RESIDUE_FILE_LIMIT)?,
+                    "snapshot": cleanup::bounded_snapshot(backup, RESIDUE_FILE_LIMIT)?,
                     "identity": {"device":backup_meta.dev(),"inode":backup_meta.ino(),
                         "owner":backup_meta.uid(),"mode":backup_meta.mode(),
                         "mtime":backup_meta.mtime(),"mtime_nsec":backup_meta.mtime_nsec(),
@@ -872,7 +1025,11 @@ impl Engine {
                 "data": read_residue_original(backup)?,
             }));
         }
+        let (entries, raw_bytes) = admit_residue_package(&staged)?;
         let bytes = archive::seal(&residue_package(string(e, "id")?, &staged), pass)?;
+        if bytes.len() as u64 > residue_cipher_bound(entries, raw_bytes) {
+            return Err(err("archive_limit", "标识备份密文超过统一预算"));
+        }
         let dest = self
             .state
             .join("archives")
@@ -881,12 +1038,13 @@ impl Engine {
         j["identity_archive_path"] = json!(dest);
         save(journal, j)?;
         publish_sealed(&dest, &bytes)?;
-        if read(&dest, 64 * 1024 * 1024)? != bytes {
+        if read(&dest, residue_cipher_bound(entries, raw_bytes))? != bytes {
             return Err(err(
                 "archive_readback_failed",
                 "标识备份未能读回；未做任何移除",
             ));
         }
+        verify_residue_package(&dest, pass, string(e, "id")?, &staged)?;
         *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"identity_backup","label":"独立加密标识备份","status":"completed","message":"标识备份已写入并读回，可独立解密；不写入任何工作包。"});
         save(journal, j)?;
         // Step 2: recheck again after preservation, immediately before the
@@ -965,28 +1123,63 @@ impl Engine {
                     continue;
                 }
             }
+            let quarantine_step = j["steps"].as_array().unwrap().len();
             let quarantine = backup_path
                 .parent()
                 .ok_or_else(|| err("invalid_path", "身份备份缺少父目录"))?
-                .join(format!(".lintel-quarantine-{}-identity", string(j, "id")?));
+                .join(format!(
+                    ".lintel-quarantine-{}-identity-{quarantine_step}",
+                    string(j, "id")?
+                ));
+            j["steps"].as_array_mut().unwrap().push(json!({
+                "id":"remove_backup",
+                "label":backup["path"],
+                "status":"executing",
+                "message":"仅移除已保全的身份备份原件。"
+            }));
+            j["steps"][quarantine_step]["quarantine_path"] = json!(quarantine);
+            j["steps"][quarantine_step]["source_identity"] = backup["identity"].clone();
+            j["steps"][quarantine_step]["stage"] = json!("renaming");
             j["quarantine_path"] = json!(quarantine);
             save(journal, j)?;
             match cleanup::quarantine_remove_bounded(
                 &backup_path,
                 &backup["snapshot"],
                 &quarantine,
-                IDENTITY_BACKUP_BYTES,
+                RESIDUE_FILE_LIMIT,
             ) {
-                Ok(()) if !backup_path.exists() => {
+                Ok(outcome)
+                    if !backup_path.exists() && !outcome.retained && outcome.observed.is_null() =>
+                {
                     removed_backups += 1;
-                    j["steps"].as_array_mut().unwrap().push(json!({"id":"remove_backup","label":backup["path"],"status":"completed","message":"已保全的身份备份原件已移除。"}));
+                    j["steps"][quarantine_step]["status"] = json!("completed");
+                    j["steps"][quarantine_step]["message"] = json!("已保全的身份备份原件已移除。");
                 }
-                Ok(()) => {
-                    backup_failures
-                        .push(json!({"path":backup["path"],"reason":"state_reappeared"}));
+                Ok(outcome) => {
+                    backup_failures.push(json!({
+                        "path":backup["path"],
+                        "quarantine_path":outcome.held,
+                        "retained":outcome.retained,
+                        "stage":outcome.observed,
+                    }));
+                    j["steps"][quarantine_step]["status"] = json!("failed");
+                    j["steps"][quarantine_step]["held_path"] = json!(outcome.held);
+                    j["steps"][quarantine_step]["retained"] = json!(outcome.retained);
+                    j["steps"][quarantine_step]["stage"] = outcome.observed;
+                    j["steps"][quarantine_step]["message"] =
+                        json!("隔离或同步未完成；准确保留位置已记录，不自动重启或重试。");
                 }
-                Err(error) => backup_failures
-                    .push(json!({"path":backup["path"],"code":error.code,"message":error.message})),
+                Err(error) => {
+                    backup_failures.push(json!({
+                        "path":backup["path"],
+                        "quarantine_path":quarantine,
+                        "stage":"not_confirmed",
+                        "code":error.code,
+                        "message":error.message,
+                    }));
+                    j["steps"][quarantine_step]["status"] = json!("failed");
+                    j["steps"][quarantine_step]["stage"] = json!("not_confirmed");
+                }
             }
             save(journal, j)?;
         }
