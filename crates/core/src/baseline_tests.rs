@@ -68,7 +68,7 @@ fn generic_execute_rejects_launch_resume_and_unknown_before_acceptance() {
         assert!(!marker.exists());
     }
     // Existing original receipts remain query-only even for an obsolete kind.
-    let receipt = json!({"id":unknown["id"],"plan_id":unknown["id"],"status":"completed","steps":[],"warnings":[]});
+    let receipt = json!({"id":unknown["id"],"plan_id":unknown["id"],"title":unknown["title"],"created_at":now(),"status":"completed","steps":[],"warnings":[]});
     save(
         &engine.path("jobs", unknown["id"].as_str().unwrap()),
         &receipt,

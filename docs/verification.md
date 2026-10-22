@@ -815,4 +815,6 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 
 首轮远端 [9ff86a8 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39831726994) 发现两处集成错误：取消策略测试仍期待旧 expression，Linux frontend 实际执行未过滤的 macOS signature check。前者改为断言 `false` 的新合同，后者改为上述按平台执行清单；不降低 `--require-passed` 或把 skip 当 pass。同轮 npm 公告提示 Vite 8.3.2 的已知问题，开发依赖与 lock 更新到同系列 8.3.5，保留 Node/npm 约束；上游修复边界见 [Vite advisory](https://github.com/vitejs/vite/security/advisories/GHSA-rq7h-c2jc-7f22)。这不改变已发布 App 的字节。
 
+同轮 workspace 的四个手工 journal fixture 还缺少真实 producer 已有的 `title`／`created_at`，在新的读时校验下失败；仅补齐 fixture 基础字段，原恢复／原 ID 不重放断言保持，四项定向回归再次通过。没有为测试放宽损坏记录的生产校验。
+
 真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。

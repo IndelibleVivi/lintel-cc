@@ -2018,7 +2018,7 @@ mod tests {
         let environment = engine.register("synthetic", &root, false).unwrap();
         let job_id = crate::id();
         let journal = engine.path("jobs", &job_id);
-        let mut receipt = json!({"id":job_id,"status":"executing","warnings":[],"steps":[]});
+        let mut receipt = json!({"id":job_id,"title":"synthetic migration","created_at":crate::now(),"status":"executing","warnings":[],"steps":[]});
         // Registration will fail after the fresh directory has been created.
         // Only this synthetic inventory is changed.
         save(&engine.state.join("inventory.json"), &json!({})).unwrap();
@@ -2561,7 +2561,7 @@ mod tests {
         // Model the durable state the real `execute` path persists before the
         // archive step so a recovery query exercises the reconciliation branch.
         let mut receipt = json!({"id":preview["id"],"plan_id":preview["id"],
-            "status":"executing","warnings":[],"steps":[]});
+            "title":plan["title"],"created_at":crate::now(),"status":"executing","warnings":[],"steps":[]});
         // The rename succeeds and the archive lands, but the parent-directory
         // flush fails. The write must not report success, the durable step must
         // not become "completed", and nothing re-publishes on its own.
@@ -2784,7 +2784,7 @@ mod tests {
         let engine = Engine::new(home.clone(), state.clone()).unwrap();
         let job_id = uuid::Uuid::new_v4().to_string();
         let journal = engine.path("jobs", &job_id);
-        let mut receipt = json!({"id":job_id,"status":"executing","steps":[],"warnings":[]});
+        let mut receipt = json!({"id":job_id,"title":"synthetic migration probe","created_at":crate::now(),"status":"executing","steps":[],"warnings":[]});
         let scratch =
             record_migration_probe(&state.join("environments"), &mut receipt, &journal).unwrap();
         assert!(!scratch.exists(), "intent must precede directory creation");
