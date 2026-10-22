@@ -819,6 +819,8 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 
 同轮 workspace 的四个手工 journal fixture 还缺少真实 producer 已有的 `title`／`created_at`，在新的读时校验下失败；仅补齐 fixture 基础字段，原恢复／原 ID 不重放断言保持，四项定向回归再次通过。没有为测试放宽损坏记录的生产校验。
 
-准确 `98819e7` 的 [CI 39833641553](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39833641553) 其余 12 组成功，含 macOS native、两平台 frontend／heavy／browser UI／CLI 与 Linux VM。Ubuntu native 在两次 attempt 中均停于 Azure Ubuntu 镜像下载 WebKit，15 分钟超时发生在任何产品检查之前；aggregate 正确拒绝，没有 Ubuntu native evidence。这是上述临时 runner mirror 调整的直接依据；真实下载及完整新 head 验证结果须独立记录。
+准确 `98819e7` 的 [CI 39833641553](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39833641553) 其余 12 组成功，含 macOS native、两平台 frontend／heavy／browser UI／CLI 与 Linux VM。Ubuntu native 在两次 attempt 中均停于 Azure Ubuntu 镜像下载 WebKit，15 分钟超时发生在任何产品检查之前；aggregate 正确拒绝，没有 Ubuntu native evidence。这是上述临时 runner mirror 调整的直接依据。
+
+调整后的准确 clean `4de7e54122f2e8dd350058c3944e9e9e5a5fbdeb` 在 [CI 39839654207](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39839654207) 执行 full profile，14 个 jobs 全部 success。Ubuntu native 先完成官方依赖安装，再实际通过全部 16 项 native 检查；两平台 native／frontend／heavy／browser UI／CLI、独立 Linux OpenSSH 与 Linux VM evidence 全部通过。已下载并检查 12 份 canonical reports：各自记录同一 clean head，所有选中 checks 均为 passed；aggregate 也确认全部选中 job／check 通过。后续仅补充本记录的 docs revision 不是另一轮产品构建／发行证据，现有 ignored 与 native／认证／发行边界保持。
 
 真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。

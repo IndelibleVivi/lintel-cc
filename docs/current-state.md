@@ -15,6 +15,8 @@
 
 定向证据包括实际 Rust 逃逸 pipe／阻塞 resolver 回归、24 MiB 混合字节的生产残留归档→reader→恢复、同目录多原件各自隔离定位、完整 App installer 重新打开后的三阶段恢复，以及 built App 中英记录错误提示和健康 receipt 同时显示。公开旧版 CLI → 当前不同 binary 的原 job／plan、旧加密包精确正文、选中字段恢复及实际 kill 后原 ID 不重放已通过。它们均使用 synthetic roots／adapter，不是个人认证、正式浏览器或 clean-Mac 验收。最终 canonical 检查范围见[验证说明](verification.md#2026-10-23-源码修复验收)。
 
+准确源码 `4de7e54122f2e8dd350058c3944e9e9e5a5fbdeb` 的 [CI 39839654207](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39839654207) 已完成 full profile，14 个 jobs（含 aggregate、两平台 native／frontend／heavy／browser UI／CLI 与 Linux VM）全部 success。下载的 12 份 canonical evidence 均为该 clean revision，所有选中 checks 为 passed；Ubuntu native 的官方依赖下载和后续 16 项检查均实际通过。本段是源码验证记录，后续仅维护证据文字的 revision 不改变该产品证据身份，也不形成新 App／CLI 发行或官网部署。
+
 仍需独立建设／验收：准确候选 SHA 与实际产物的完整发行 gate、正式 RC 的跨平台升级／回退及 clean-Mac 信任／首装；长期 journal 归档／去重保留与分页容量；组件退场、完整健康／恢复中心、私密安全报告渠道和可复现演示。代理强约束、更多浏览器与完整长期 SPEC 继续按原边界维护；不将这些建议当作本轮已交付功能。
 
 
