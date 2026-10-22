@@ -799,6 +799,8 @@ clean `ddfcd438990bb4b9af4b2720dac6e3af77c0d78c` 的 [GitHub CI 39252988511](htt
 
 Desktop build/signature 脚本及随包项目许可文件选择 core profile；15 篇 paired 网站指南源选择 site profile，controller test 与 `site-routes.mjs` 比对完整集合。`macos-bundle-signature-test` 在 macOS frontend job 执行，Linux 不选中。后续 push 不再取消同 ref 正在运行的验证；GitHub 仍可能替换 pending run，docs-only aggregate 也不能证明前一产品 revision 或代替准确候选的发行 gate。
 
+Frontend 的实际执行清单由 planner 输出 `frontend_checks_by_platform`，workflow 按 matrix 平台读取，与 aggregate 的过滤规则一致；旧的未过滤 frontend 输出已移除。回归覆盖 planner 输出、workflow 转接及消费表达式，避免仅检查证据模型而漏掉实际接线。带 PyYAML 的 controller 76 项与 `verify.py --self-test` 全部通过，没有将 YAML 分支 skip 计为验收。
+
 原生构建前运行 `npm --prefix apps/desktop run prepare:locked-dependencies`，显式 fetch 三个 locked Cargo graph 并准备 `rust-docs`。`node apps/desktop/scripts/prepare-locked-dependencies.mjs --check` 只检查 Node/npm、Rust/rustup 与 macOS Xcode Command Line Tools，不下载；notices 收集仍 locked/offline。本轮没有完成从空缓存开始的完整 native build 独立验收。
 
 修改前端后，先 build 再运行 built-App UI check；验证 registry 保持 canonical 顺序，不按 `--checks` 参数顺序执行。core 回归覆盖 journal 损坏；`i18n-ui` 覆盖错误记录提示、健康 receipt 同时可见及语言切换。Runtime fault fixtures 只用 synthetic 进程、替代 resolver 与临时 roots，不证明 clean-Mac 信任、真实 Claude 认证或生产激活。
@@ -810,5 +812,7 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 故障证据包括：继承及 `setsid` 逃逸的 stdout 写端不再阻止适配器返回；阻塞 resolver 不拖住 runtime drop，满额重复请求不排队；24 MiB 的三种字节内容经实际残留 producer／reader／restorer 完整往返；两个隔离后失败原件分别保留定位，最终 parent sync 失败不记完成；完整 App installer 在三种 registration publication 阶段重开并使用原批准恢复，外部同字节新 inode 与同 inode 改文均保留为冲突。App 中英记录页在 900／1120px 显示坏记录 ID/code 及健康任务；网站 15 篇 paired 指南在 390px、无 JS 下保持整页不溢出，code/table 在本地滚动。
 
 首轮运行有两项环境失败：SSH fixture 的测试用命令替换不支持含空格的临时目录，updater fixture 拒绝经 symlink 启动的测试 executable。分别使用普通临时目录及真实 `CARGO_TARGET_DIR` 后，完整相关检查通过。网站无 JS 测试改为先设手机 viewport、再等待 document/styles load，保留原溢出断言。原失败不改写为通过。
+
+首轮远端 [9ff86a8 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39831726994) 发现两处集成错误：取消策略测试仍期待旧 expression，Linux frontend 实际执行未过滤的 macOS signature check。前者改为断言 `false` 的新合同，后者改为上述按平台执行清单；不降低 `--require-passed` 或把 skip 当 pass。同轮 npm 公告提示 Vite 8.3.2 的已知问题，开发依赖与 lock 更新到同系列 8.3.5，保留 Node/npm 约束；上游修复边界见 [Vite advisory](https://github.com/vitejs/vite/security/advisories/GHSA-rq7h-c2jc-7f22)。这不改变已发布 App 的字节。
 
 真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。

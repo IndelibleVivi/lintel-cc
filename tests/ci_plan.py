@@ -563,7 +563,13 @@ class Plan:
         }
         for job in self.jobs:
             key = job.id.replace("-", "_")
-            outputs[key + "_checks"] = ",".join(job.checks)
+            if job.id == "frontend":
+                outputs["frontend_checks_by_platform"] = json.dumps({
+                    platform: ",".join(checks_for_platform(job.checks, platform))
+                    for platform in job.platforms
+                }, separators=(",", ":"))
+            else:
+                outputs[key + "_checks"] = ",".join(job.checks)
             outputs[key + "_enabled"] = "true" if job.runs() else "false"
         return outputs
 

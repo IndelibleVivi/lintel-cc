@@ -10,7 +10,7 @@
 | 浏览器恢复 | 隔离释放可协调完全匹配的旧 owner；App host 安装 intent 和 manifest publication journal 绑定原批准、完整 staging 及文件身份，原批准可继续中断；外部变更保留 |
 | 残留／标识保全 | 保持 `lintel.residue/1` 原编码，共享有限预算、删除前生产 reader 校验、路径资格及逐原件隔离定位；同步不确定不记完成 |
 | 任务与诊断 | 损坏 job 返回结构化错误且不重写，列表保留健康记录并报告缺口；App 记录页显示 ID/code；I/O 增加安全的有限原因分类。列表尚无分页，完整组件健康检查尚未交付 |
-| 首用／构建／CI | App/CLI 当前指引分开维护；显式 locked dependency/rust-docs 准备并检查前置工具；打包脚本、网站指南输入与 macOS signature fixture 接入对应 CI；日常 push 不取消上一轮验证。完整冷缓存 native 构建尚未独立验收 |
+| 首用／构建／CI | App/CLI 当前指引分开维护；显式 locked dependency/rust-docs 准备并检查前置工具；打包脚本、网站指南输入与 macOS signature fixture 接入对应 CI，frontend 执行与证据同用按平台过滤的清单；日常 push 不取消上一轮验证。Vite 开发依赖更新到 8.3.5 安全补丁。完整冷缓存 native 构建尚未独立验收 |
 | 分发与许可 | tar inspector 检查传递／循环 symlink，正式签名环境约束到达最终 gate；新 App/CLI 候选携带独立项目许可。原创功能代码 SUL-1.0、原创文档／独立图示 CC BY-NC-SA 4.0，范围／排除见[授权边界](../LICENSING.md)；项目为 source-available Preview |
 
 定向证据包括实际 Rust 逃逸 pipe／阻塞 resolver 回归、24 MiB 混合字节的生产残留归档→reader→恢复、同目录多原件各自隔离定位、完整 App installer 重新打开后的三阶段恢复，以及 built App 中英记录错误提示和健康 receipt 同时显示。公开旧版 CLI → 当前不同 binary 的原 job／plan、旧加密包精确正文、选中字段恢复及实际 kill 后原 ID 不重放已通过。它们均使用 synthetic roots／adapter，不是个人认证、正式浏览器或 clean-Mac 验收。最终 canonical 检查范围见[验证说明](verification.md#2026-10-23-源码修复验收)。

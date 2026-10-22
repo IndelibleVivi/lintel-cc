@@ -669,6 +669,20 @@ class WorkflowContractTests(unittest.TestCase):
     def _triggers(self):
         return self.doc.get(True) or self.doc.get("on")
 
+    def test_frontend_planner_output_is_consumed_per_platform(self):
+        plan = ci_plan.build_plan("push", base=None, head=None, changed_paths=["apps/desktop/scripts/build-macos-app.mjs"])
+        outputs = plan.to_github_outputs()
+        selected = json.loads(outputs["frontend_checks_by_platform"])
+        self.assertNotIn("macos-bundle-signature-test", selected[ci_plan.LINUX].split(","))
+        self.assertIn("macos-bundle-signature-test", selected[ci_plan.MACOS].split(","))
+        self.assertNotIn("frontend_checks", outputs)
+        self.assertEqual(set(selected), set(plan.job("frontend").platforms))
+        forwarded = self.doc["jobs"]["plan"]["outputs"]["frontend_checks_by_platform"]
+        self.assertIn("steps.compute.outputs.frontend_checks_by_platform", forwarded)
+        frontend = self.doc["jobs"]["frontend"]
+        runs = "\n".join(step.get("run", "") for step in frontend["steps"])
+        self.assertIn("fromJSON(needs.plan.outputs.frontend_checks_by_platform)[matrix.os]", runs)
+
     def test_triggers_and_permissions(self):
         triggers = self._triggers()
         for name in ("push", "pull_request", "schedule", "workflow_dispatch"):
@@ -679,8 +693,9 @@ class WorkflowContractTests(unittest.TestCase):
         concurrency = self.doc["concurrency"]
         self.assertIn("github.run_id", concurrency["group"])
         self.assertIn("cancel-in-progress", concurrency)
-        # Never cancel scheduled/manual acceptance runs.
-        self.assertIn("github.event_name == 'push'", concurrency["cancel-in-progress"])
+        # Keep unfinished product evidence alive across later docs-only pushes;
+        # scheduled/manual acceptance runs also retain their own run scope.
+        self.assertIs(concurrency["cancel-in-progress"], False)
 
     def test_evidence_dir_is_outside_the_repo(self):
         self.assertNotIn("EVIDENCE_DIR", self.doc.get("env", {}))
