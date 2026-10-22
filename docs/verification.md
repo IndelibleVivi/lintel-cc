@@ -799,7 +799,9 @@ clean `ddfcd438990bb4b9af4b2720dac6e3af77c0d78c` 的 [GitHub CI 39252988511](htt
 
 Desktop build/signature 脚本及随包项目许可文件选择 core profile；15 篇 paired 网站指南源选择 site profile，controller test 与 `site-routes.mjs` 比对完整集合。`macos-bundle-signature-test` 在 macOS frontend job 执行，Linux 不选中。后续 push 不再取消同 ref 正在运行的验证；GitHub 仍可能替换 pending run，docs-only aggregate 也不能证明前一产品 revision 或代替准确候选的发行 gate。
 
-Frontend 的实际执行清单由 planner 输出 `frontend_checks_by_platform`，workflow 按 matrix 平台读取，与 aggregate 的过滤规则一致；旧的未过滤 frontend 输出已移除。回归覆盖 planner 输出、workflow 转接及消费表达式，避免仅检查证据模型而漏掉实际接线。带 PyYAML 的 controller 76 项与 `verify.py --self-test` 全部通过，没有将 YAML 分支 skip 计为验收。
+Frontend 的实际执行清单由 planner 输出 `frontend_checks_by_platform`，workflow 按 matrix 平台读取，与 aggregate 的过滤规则一致；旧的未过滤 frontend 输出已移除。回归覆盖 planner 输出、workflow 转接及消费表达式，避免仅检查证据模型而漏掉实际接线。带 PyYAML 的 controller 77 项与 `verify.py --self-test` 全部通过，没有将 YAML 分支 skip 计为验收。
+
+Ubuntu native job 沿用 [GitHub 官方 runner 的 mirror file 机制](https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh)，在这个临时 runner 上优先 Canonical HTTPS archive，保留官方 security／Azure 回退。仅在三个官方 URL／原 priority 及 `ubuntu.sources` 的 mirror 引用完全匹配时重排；不改 suites、components 或 Signed-By。临时 fixture 执行实际 workflow transform，核对正常重排、未知 mirror／source 拒绝且原文件保留。六个 Tauri 开发依赖、APT 签名校验、30 秒网络 timeout、两次 retry 和 15 分钟 step 时限保持。
 
 原生构建前运行 `npm --prefix apps/desktop run prepare:locked-dependencies`，显式 fetch 三个 locked Cargo graph 并准备 `rust-docs`。`node apps/desktop/scripts/prepare-locked-dependencies.mjs --check` 只检查 Node/npm、Rust/rustup 与 macOS Xcode Command Line Tools，不下载；notices 收集仍 locked/offline。本轮没有完成从空缓存开始的完整 native build 独立验收。
 
@@ -816,5 +818,7 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 首轮远端 [9ff86a8 CI](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39831726994) 发现两处集成错误：取消策略测试仍期待旧 expression，Linux frontend 实际执行未过滤的 macOS signature check。前者改为断言 `false` 的新合同，后者改为上述按平台执行清单；不降低 `--require-passed` 或把 skip 当 pass。同轮 npm 公告提示 Vite 8.3.2 的已知问题，开发依赖与 lock 更新到同系列 8.3.5，保留 Node/npm 约束；上游修复边界见 [Vite advisory](https://github.com/vitejs/vite/security/advisories/GHSA-rq7h-c2jc-7f22)。这不改变已发布 App 的字节。
 
 同轮 workspace 的四个手工 journal fixture 还缺少真实 producer 已有的 `title`／`created_at`，在新的读时校验下失败；仅补齐 fixture 基础字段，原恢复／原 ID 不重放断言保持，四项定向回归再次通过。没有为测试放宽损坏记录的生产校验。
+
+准确 `98819e7` 的 [CI 39833641553](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39833641553) 其余 12 组成功，含 macOS native、两平台 frontend／heavy／browser UI／CLI 与 Linux VM。Ubuntu native 在两次 attempt 中均停于 Azure Ubuntu 镜像下载 WebKit，15 分钟超时发生在任何产品检查之前；aggregate 正确拒绝，没有 Ubuntu native evidence。这是上述临时 runner mirror 调整的直接依据；真实下载及完整新 head 验证结果须独立记录。
 
 真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。

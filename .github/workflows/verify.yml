@@ -189,6 +189,26 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 15
         run: |
+          # Keep the official runner mirror mechanism; prefer Canonical HTTPS.
+          sudo python3 - /etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources <<'PY_MIRRORS'
+          import pathlib, sys
+          mirrors, sources = map(pathlib.Path, sys.argv[1:])
+          expected = {
+              "http://azure.archive.ubuntu.com/ubuntu/": "priority:1",
+              "https://archive.ubuntu.com/ubuntu/": "priority:2",
+              "https://security.ubuntu.com/ubuntu/": "priority:3",
+          }
+          rows = [line.split() for line in mirrors.read_text().splitlines() if line.strip()]
+          if len(rows) != 3 or any(len(row) != 2 for row in rows) or dict(rows) != expected:
+              raise SystemExit("Unknown official runner apt mirror structure; refusing rewrite")
+          text = sources.read_text()
+          uris = [line.split(":", 1)[1].split() for line in text.splitlines() if line.startswith("URIs:")]
+          if not uris or any(values != ["mirror+file:/etc/apt/apt-mirrors.txt"] for values in uris):
+              raise SystemExit("Ubuntu sources do not exclusively consume the official mirror file")
+          mirrors.write_text("https://archive.ubuntu.com/ubuntu/\tpriority:1\n"
+                             "https://security.ubuntu.com/ubuntu/\tpriority:2\n"
+                             "http://azure.archive.ubuntu.com/ubuntu/\tpriority:3\n")
+          PY_MIRRORS
           sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 --error-on=any update
           sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 install -y \
             libwebkit2gtk-4.1-dev \

@@ -683,6 +683,33 @@ class WorkflowContractTests(unittest.TestCase):
         runs = "\n".join(step.get("run", "") for step in frontend["steps"])
         self.assertIn("fromJSON(needs.plan.outputs.frontend_checks_by_platform)[matrix.os]", runs)
 
+    def test_native_mirror_transform_on_temporary_fixtures(self):
+        step = next(s for s in self.doc["jobs"]["native"]["steps"]
+                    if s.get("name") == "Linux system packages (Tauri desktop-rust-test)")
+        code = step["run"].split("<<'PY_MIRRORS'\n", 1)[1].split("\nPY_MIRRORS", 1)[0]
+        original = ("http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n"
+                    "https://archive.ubuntu.com/ubuntu/\tpriority:2\n"
+                    "https://security.ubuntu.com/ubuntu/\tpriority:3\n")
+        source = "Types: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt\nSuites: noble noble-updates\nComponents: main universe\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n"
+        with tempfile.TemporaryDirectory() as directory:
+            mirrors, sources = Path(directory) / "mirrors", Path(directory) / "sources"
+            for invalid in (None, "mirror", "source"):
+                before = original if invalid != "mirror" else original.replace("azure.archive.ubuntu.com", "unexpected.invalid")
+                source_before = source if invalid != "source" else source.replace("mirror+file:/etc/apt/apt-mirrors.txt", "https://unexpected.invalid/")
+                mirrors.write_text(before)
+                sources.write_text(source_before)
+                result = subprocess.run([sys.executable, "-c", code, str(mirrors), str(sources)], capture_output=True, text=True)
+                self.assertEqual(sources.read_text(), source_before)
+                if invalid:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(mirrors.read_text(), before)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(mirrors.read_text().splitlines(), [
+                        "https://archive.ubuntu.com/ubuntu/\tpriority:1",
+                        "https://security.ubuntu.com/ubuntu/\tpriority:2",
+                        "http://azure.archive.ubuntu.com/ubuntu/\tpriority:3"])
+
     def test_triggers_and_permissions(self):
         triggers = self._triggers()
         for name in ("push", "pull_request", "schedule", "workflow_dispatch"):
