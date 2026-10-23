@@ -132,7 +132,7 @@ CHECKS: List[Check] = [
     _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
            *(NODE or "node", "--test", "tests/app_release.test.mjs", "tests/macos_build_path.test.mjs"), tools=("node", "python3")),
     _check("candidate-gate-test", "local candidate build receipts, exact full CI evidence and final package bytes", "python",
-           PYTHON, "tests/candidate_gate_test.py", tools=("python3",), explicit_only=True),
+           PYTHON, "tests/candidate_gate_test.py", tools=("python3", "npm"), explicit_only=True),
     _check("macos-bundle-signature-test", "linker-only rejection plus complete Info.plist/resource seal and tamper rejection on a synthetic macOS App", "independent",
            PYTHON, "tests/macos_bundle_signature_test.py", tools=("node", "python3", "clang"),
            independent=True,

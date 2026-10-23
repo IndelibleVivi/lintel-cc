@@ -314,12 +314,17 @@ def build(repo, revision, output, app=False):
     env["ZIG_LOCAL_CACHE_DIR"] = str(output / "zig-cache-local")
     env["XDG_CACHE_HOME"] = str(output / "cache")
     env["NPM_CONFIG_CACHE"] = str(output / "npm-cache")
-    env["NPM_CONFIG_USERCONFIG"] = os.devnull
-    env["NPM_CONFIG_GLOBALCONFIG"] = os.devnull
+    # npm rejects one pathname loaded as both user and global config (including
+    # /dev/null). Separate empty files also exclude operator credentials/config.
+    for scope in ("USER", "GLOBAL"):
+        config = output / ("npmrc-" + scope.lower())
+        config.write_text("")
+        env["NPM_CONFIG_" + scope + "CONFIG"] = str(config)
     commands = []
     def execute(command, cwd=source):
         commands.append({"argv": [str(a).replace(str(source), "<source>").replace(str(output), "<output>") for a in command], "cwd": str(cwd.relative_to(source))})
         run(command, cwd, env)
+    execute(["npm", "config", "get", "cache"], source / "apps/desktop")
     for manifest in ("Cargo.toml", "apps/desktop/src-tauri/Cargo.toml", "extensions/browser/native-host/Cargo.toml"):
         execute(["cargo", "fetch", "--locked", "--manifest-path", manifest])
     # All three binaries and both remote runners originate in this fresh target.

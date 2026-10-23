@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -245,6 +246,15 @@ class CandidateGateTests(unittest.TestCase):
             elif command[0] == "npm":
                 self.assertEqual(cwd, source / "apps/desktop")
                 self.assertTrue((cwd / "package.json").is_file())
+                self.assertNotEqual(env["NPM_CONFIG_USERCONFIG"], env["NPM_CONFIG_GLOBALCONFIG"])
+                for scope in ("USER", "GLOBAL"):
+                    self.assertEqual(Path(env["NPM_CONFIG_" + scope + "CONFIG"]).read_text(), "")
+                if command[:4] == ["npm", "config", "get", "cache"]:
+                    # Exercise npm's actual config loader, without network,
+                    # dependency installation or the operator's config files.
+                    actual = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True)
+                    self.assertEqual(actual.returncode, 0, actual.stderr)
+                    self.assertEqual(actual.stdout.strip(), env["NPM_CONFIG_CACHE"])
             if command[:2] in (["cargo", "build"], ["cargo", "zigbuild"]):
                 triples = [command[index+1] for index, value in enumerate(command) if value == "--target"]
                 self.assertEqual(triples, [gate.TARGETS["macos-arm64"]] if command[1] == "build" else [gate.TARGETS["linux-x86_64"], gate.TARGETS["linux-aarch64"]])

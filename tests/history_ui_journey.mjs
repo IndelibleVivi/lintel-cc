@@ -1,11 +1,11 @@
 // Built App + finite synthetic invoke, no native WebKit or real SSH.
 import assert from 'node:assert/strict';
 import {spawn,spawnSync} from 'node:child_process';
-import {mkdtemp,writeFile,mkdir} from 'node:fs/promises';
+import {mkdtemp,writeFile,mkdir,realpath} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {fileURLToPath,pathToFileURL} from 'node:url';import {stripVTControlCharacters} from 'node:util';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),desktop=path.join(root,'apps/desktop');
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE||path.join(root,'extensions/browser/node_modules/playwright/index.mjs')).href);
-const output=await mkdtemp(path.join(os.tmpdir(),'lintel-history-ui-'));
+const output=await realpath(await mkdtemp(path.join(os.tmpdir(),'lintel-history-ui-')));
 const report={runtime:'built App + real synthetic core, injected errors/late-host transport; no native WebKit/SSH',checks:[],passed:false};
 const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/vite.js'),'preview','--host','127.0.0.1','--port','0','--strictPort'],{cwd:desktop,stdio:['ignore','pipe','pipe']});let browser;
 const env={id:'00000000-0000-4000-8000-000000000001',name:'SYNTHETIC_DISCOVERY',root:'/synthetic/claude',status:'active',executable:null};
