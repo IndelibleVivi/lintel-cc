@@ -160,7 +160,7 @@ python3 scripts/prepare-candidate.py verify \
   --ci-evidence ../lintel-ci/evidence \
   --out ../lintel-candidate-verified.json</code></pre>
 <p><code>build</code> 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。<code>verify</code> 重新读取实际 tar member bytes，不信任包内自报 checksum；核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout）。它不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。</p>
-<p>这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。本轮未完成真实冷原生构建、新 DMG、干净 Mac 或 Release 验收；上述流程存在不表示已经运行。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 <code>main</code> 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。</p>
+<p>这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。<code>c7680f0</code> 已实际完成 fresh clone／fresh target 的三平台 CLI（macOS arm64、Linux x86_64／arm64 musl）及 macOS App／DMG 构建，依赖下载缓存复用，并非全空缓存构建。最终候选的完整 source SHA、matrix 与 full CI 状态由<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>按准确 SHA 记录。后续 proof-only 文档提交不改变已构建候选的 source revision。App 安装、干净 Mac 信任与 Release 验收仍未完成。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 <code>main</code> 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。</p>
       </article>
       <!--/email_off-->
       <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/app-updates.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>

@@ -11,16 +11,28 @@
 | 残留／标识保全 | 保持 `lintel.residue/1` 原编码，共享有限预算、删除前生产 reader 校验、路径资格及逐原件隔离定位；同步不确定不记完成 |
 | 任务与诊断 | App／named CLI 改用 256 KiB 有界摘要与分段详情，环境发现独立；cursor 绑定元数据快照／筛选／搜索，坏记录与超大单项明确说明。原 journal／去重记录不删，旧 full RPC 兼容；I/O reason 在 accepted 前后、落盘与重开查询一致。Bridge 错形 JSON 返回 invalid_state 并保留原字节，32 MiB 读写准入一致 |
 | 首用／构建／CI | App/CLI 当前指引分开维护；显式 locked dependency/rust-docs 准备并检查前置工具；打包脚本、网站指南输入与 macOS signature fixture 接入对应 CI，frontend 执行与证据同用按平台过滤的清单；日常 push 不取消上一轮验证。Ubuntu native 临时 runner 优先官方 Canonical HTTPS mirror，保留依赖与严格 gate。Vite 开发依赖更新到 8.3.5 安全补丁。完整冷缓存 native 构建尚未独立验收 |
-| 本地候选 gate | 新 `prepare-candidate.py` 固定 clean SHA、fresh source／target、三平台 CLI 与可选 App／DMG，并核对最终包字节、组件／许可与同 SHA canonical full CI。当前只完成 source 与合成回归，实际新候选／冷构建未验收；本地 receipt／CI JSON 来源未独立认证 |
+| 本地候选 gate | 新 `prepare-candidate.py` 固定 clean SHA、fresh source／target、三平台 CLI 与可选 App／DMG，并核对最终包字节、组件／许可与同 SHA canonical full CI。`c7680f0` 已完成 fresh clone／fresh target 的三平台 CLI 与 App／DMG 实跑；依赖下载缓存复用。准确 source SHA 与 full CI 状态见下表；本地 receipt／CI JSON 来源未独立认证 |
 | 分发与许可 | tar inspector 检查传递／循环 symlink，正式签名环境约束到达最终 gate；新 App/CLI 候选携带独立项目许可。原创功能代码 SUL-1.0、原创文档／独立图示 CC BY-NC-SA 4.0，范围／排除见[授权边界](../LICENSING.md)；项目为 source-available Preview |
 
 本轮定向证据包含：App host 三发布阶段丢弃前端对象后从公开 IPC 重开恢复；真实 framed native-host 与生产 background／popup 的 lost ACK→reset→重配对→重开组合；逃逸进程 readiness 与实际 operation lock 释放；32 个真实阻塞 resolver owner 加 100 次饱和拒绝及迟到结果无连接；完整 Engine 残留 rename／sync 故障重开；accepted 前后有限 I/O reason 与 bridge 错形保留。旧轮的 24 MiB 生产残留归档→reader→恢复、逐原件隔离定位证据继续按其 source 范围保留。公开旧版 CLI → 当前不同 binary 的原 job／plan、旧加密包精确正文、选中字段恢复及实际 kill 后原 ID 不重放已通过。它们均使用 synthetic roots／adapter，不是个人认证、正式浏览器或 clean-Mac 验收。本轮检查范围见[验证说明](verification.md#2026-10-24-恢复与有界历史接续)；旧轮证据见同页 10-23 节。
+
+候选验收记录（full CI 与最终 gate 尚待齐备）：
+
+| 层次 | 准确范围与状态 |
+| --- | --- |
+| 产品源码 | `c7680f0656d27b5d043543df30cfae6fe5eda8a9`（本轮产品 source 已 push）；后续 proof-only docs revision 独立，不替换候选的 source SHA |
+| 本地构建 matrix | `c7680f0` fresh source clone／fresh target：macOS arm64、Linux x86_64／arm64 musl 三份 CLI 与 macOS App／DMG 构建成功；复用依赖下载，不声称全空缓存 |
+| 最终包 | 三份 CLI tar 与 macOS App／DMG 已生成；final gate 尚待同 SHA full CI evidence，不将构建完成写作 CI 验收完成 |
+| 最终 full CI | `39997130322` 的 workflow_dispatch full profile 正在运行，尚未确认结果；必须核对同一候选源码的完整 canonical evidence |
+| 实际 CLI 迁移 | 公开 v0.1.0 tar → `c7680f0` 实际 tar CLI probe 已通过：原 jobs／plans、完整旧加密正文、选中字段恢复保留后续无关编辑；旧 accepted worker 实际 kill 后，原 ID 查询与 execute 不重放。旧 binary 能读新 completed restore 只是有限 downgrade 观察 |
+| gate 边界 | 只证明本地一致性；`origin_authenticated`、`build_origin_authenticated`、`ci_origin_authenticated`、`release_authorized` 均为 `false`，不证明签名或来源真实性 |
+| 分发／运行 | 未发布新 Release、未安装新 App、未激活 updater、未部署官网；公开 App 0.1.1／CLI 0.1.0 及旧网站状态不变 |
 
 上一轮准确源码 `4de7e54122f2e8dd350058c3944e9e9e5a5fbdeb` 的 [CI 39839654207](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39839654207) 已完成 full profile，14 个 jobs（含 aggregate、两平台 native／frontend／heavy／browser UI／CLI 与 Linux VM）全部 success。下载的 12 份 canonical evidence 均为该 clean revision，所有选中 checks 为 passed；Ubuntu native 的官方依赖下载和后续 16 项检查均实际通过。本段仅是上一轮源码验证记录，不能覆盖本轮新改动，也不形成新 App／CLI 发行或官网部署。
 
 有界历史的独立 debug 观察：10k 项首页约 225 ms，100k 项约 5.54 s，响应均约 15 KiB；100k 测试进程（含 fixture 建立）的最大 RSS 约 110 MiB。保留元数据扫描上限与显式加载状态，没有据此宣称恒定时间或无限容量。
 
-仍需独立建设／验收：实际新候选的完整构建／产物 gate、正式 RC 跨平台升级／回退及 clean-Mac 信任／首装；物理 journal 归档先满足旧版去重／downgrade 兼容政策。Browser host 仍保留 1000 操作上限，满额可查原 ID，尚无安全归档／清理入口。完整健康／恢复中心、Client Footprint 的来源解释→精确修改→中断核对→快照→恢复旅程，以及外发／权限来源解释保留为下一产品建设；受管强隔离与可恢复退场独立试点，不阻塞当前维护修复。私密安全报告渠道与可复现演示仍未交付；完整 SPEC 不因此缩减。
+仍需独立建设／验收：最终准确 SHA 的产物 gate 与 full CI 收口、正式 RC 跨平台升级／回退、其他架构实际 runtime 及 clean-Mac 信任／首装；物理 journal 归档先满足旧版去重／downgrade 兼容政策。Browser host 仍保留 1000 操作上限，满额可查原 ID，尚无安全归档／清理入口。完整健康／恢复中心、Client Footprint 的来源解释→精确修改→中断核对→快照→恢复旅程，以及外发／权限来源解释保留为下一产品建设；受管强隔离与可恢复退场独立试点，不阻塞当前维护修复。私密安全报告渠道与可复现演示仍未交付；完整 SPEC 不因此缩减。
 
 
 2026-10-20 · **[Lintel 0.1.1 开发者 Preview 已发布](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)**，修复 0.1.0 DMG 的 App bundle 签名封装。App／文档编译 revision 与 tag target 均为 clean `ebbe237cd236a2b299281e070b4758a9e9e522b2`。DMG 13,123,475 bytes，SHA-256 `867ea626ceb5101006e15c071da9627db38a555212208a4fffd577a5f5faf6d3`。Release 于 `2026-10-20T09:39:22Z` 公开，4 个上传资产均已核对公开字节；manual 记录为 `public_bytes_verified`／`publication_verified:true`。Chrome 从公开 Release 下载的副本保留 quarantine，只读挂载后的 App 通过严格签名校验。完整 ad-hoc 签名不提供 Developer ID 或公证，也没有 updater feed；干净 Mac 首装与用户信任确认仍独立。字节一致不构成源码认证。

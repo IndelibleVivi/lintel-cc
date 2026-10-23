@@ -10,7 +10,7 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 
 **0.1.1 开发者 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1) 手动下载 Apple Silicon macOS App，先阅读双语 INSTALL 与 SHA256SUMS。本版修复 0.1.0 的 App bundle 资源签名封装；四个公开资产已下载核对，新 DMG 内的 App 也通过严格签名校验。App 使用完整 ad-hoc 签名，**没有 Developer ID、Apple 公证或 updater feed**；首次打开可能需要在“系统设置 → 隐私与安全性”为这一 App 选择“仍要打开”。旧 DMG 与 tag 保留供历史核对，CLI 继续使用下方原候选下载。准确来源、安装步骤与验收范围见 [App 安装说明](docs/app-updates.md) 和[当前状态](docs/current-state.md)。
 
-当前 `main` 的本轮可靠性与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。源码检查通过不代表已生成新候选、完成原生冷构建、核对新 DMG、通过干净 Mac 安装或创建 Release。
+当前 `main` 的六项可靠性修复与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。`c7680f0` 已完成 fresh clone／fresh target 的三平台 CLI 与 macOS App／DMG 本地构建（复用依赖下载缓存）。候选源码与 full CI 的准确状态见[当前状态](docs/current-state.md)；构建不代表已安装 App、通过干净 Mac 信任验收或创建 Release。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 

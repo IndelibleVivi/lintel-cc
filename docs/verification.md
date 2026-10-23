@@ -837,10 +837,16 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 
 进程测试先以 readiness 确认逃逸 child 持有 stdout，分别覆盖 parent 已退出／仍存活，再观察 deadline 和真实 operation lock 可再次取得。DNS 测试占满 32 个实际阻塞 owner，100 次后续请求不增加队列／resolver，取消与 runtime drop 能返回，晚到结果没有 TCP 连接。残留测试从完整 Engine 注入 rename／两类 parent sync 失败，重开原 ID 反复查询／execute 不重放、不将不确定状态记完成。三类 I/O reason 同时覆盖 accepted 前后、持久 journal 与重开，旧无 reason 记录仍可读。
 
-有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归只证明固定调用与拒绝行为；实际 cold native build、真实新 DMG、clean-Mac、RC 升级／回退与独立来源认证仍未验证。
+有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归证明固定调用与拒绝行为；随后 `c7680f0656d27b5d043543df30cfae6fe5eda8a9` 已完成真实 fresh clone／fresh target 三平台 CLI 与 App／DMG 构建，复用依赖下载，并非全空缓存。最终 `c7680f0656d27b5d043543df30cfae6fe5eda8a9` matrix 已构建完成，`39997130322` full CI 正在验收；最终 canonical evidence 的检查数量待 CI 完成后核对。clean-Mac、完整 RC 跨平台升级／回退、其他架构实际 runtime 与独立来源认证仍未验证。
 
 独立 metadata 规模观察：10,000 项首页约 225 ms／15,043 bytes；100,000 项首页约 5.54 s／15,044 bytes（macOS arm64、外置 SSD、debug core、limit 50）。后者的 `time -l` 最大 RSS 为 115,130,368 bytes，涵盖该测试进程的 fixture 创建与查询，不能当作单次 RPC 的独立峰值。两项均显式选择 ignored benchmark，未加入默认 CI；100k 是当前 scan 上限的观察，不承诺更高容量或恒定响应时间。
 
 Bridge 写入预算回归先复现“事务可写出超过 32 MiB、后续读取拒绝”的错误，再共享读写准入；超限事务保留原字节，原查询继续可用。Native-host 19 项单元测试通过。完整候选实跑另发现 npm 双载同一路径配置与 App/CLI runner 清单差异；采用独立空 npmrc 和有限三文件 CLI runner 投影，保留原 packager 合同。macOS 的外置 TMPDIR 挂载点实际被拒绝，同一冻结镜像改用系统临时挂载点后只读核对与 detach 均通过；大镜像副本仍由调用方 TMPDIR 容纳。以上实跑中的失败与独立 App probe 不计为完整候选 matrix 成功。
 
 网站 no-JS 布局检查也固定了冷 stylesheet 的读取边界：真实 browser guide 在 DOMContentLoaded 时可尚无 `link.sheet`，延迟 CSS 的实验观察到自然表格宽 2601px；load 后在 1280／390px 均与 viewport 一致。检查等待 load、要求 stylesheet 已加载，再执行原 no-overflow 断言，并故意将该页 CSS 延迟到 DOMContentLoaded 之后。独立 `site-ui` 通过；未修改网站样式或缓存 URL。
+
+候选 source 与证明提交分开：本轮最终产品源码为 `c7680f0656d27b5d043543df30cfae6fe5eda8a9`；后续只更新证据／文档的 commit 不被称为该候选的 source revision。公开 v0.1.0 → `c7680f0656d27b5d043543df30cfae6fe5eda8a9` actual tar CLI probe 已通过，保留原 jobs／plans、完整旧加密正文与选中字段恢复的后续无关编辑；实际 kill 旧 accepted worker 后，原 ID query／execute 不重放。旧 binary 读取新 completed restore 仅为有限 downgrade 观察，不构成完整回退或 RC。
+
+六项可靠性修复与 B1 有界分页已完成；未新增物理 journal archive／capacity policy。健康／恢复中心、Client Footprint 完整旅程、egress 来源解释与受管强隔离仍是后续独立建设。新 gate 的本地一致性结果不认证 build／CI 来源，不授予发布；未安装新 App、未发 Release、未激活 updater、未部署网站。
+
+Clawd 的真实 CDP touch-cancel 检查保留原高度与不重复跳跃断言。原测试在部分 hold 后跨进程发送 cancel，注入 300 ms driver 延迟时观察到 cancel 到达前已蓄满；测试改为固定 simulation step 并在已绘制的部分 hold 后暂存后续 RAF，真实 CDP cancel 到达后恢复。修复后同一延迟下通过，产品 game 代码未改；不从缺少 trace 的旧 CI 反推那次确切延迟。
