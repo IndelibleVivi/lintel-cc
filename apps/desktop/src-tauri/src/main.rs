@@ -62,7 +62,7 @@ async fn browser_request(app: tauri::AppHandle, payload: serde_json::Value) -> s
         return envelope(Err("unsupported_browser_operation:Desktop 安装只接受 App 内置 host 的 frozen preview；手工路径 installer 由独立 CLI 提供".into()));
     }
     let bundle = match op {
-        Some("bundled_host_plan" | "install_bundled_host") => {
+        Some("bundled_host_plan" | "bundled_host_pending" | "install_bundled_host") => {
             Some(("browser-host-bundle", "browser-host", false))
         }
         Some(

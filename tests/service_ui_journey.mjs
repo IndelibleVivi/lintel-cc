@@ -21,6 +21,8 @@ function invoke(command,args){
   let data;
   switch(p.command){
     case 'discover':data={environments:[environment],capabilities:[]};break;
+    case 'jobs_page':data={jobs:receipts.map(r=>({...r,updated_at_ns:'1760000000000000000'})),record_errors:[],digest:'a'.repeat(64),next_offset:null,scan_complete:true};break;
+    case 'job_detail_page': data={job_id:p.job_id,section:p.section,items:[receipts.find(r=>r.id===p.job_id)],digest:'a'.repeat(64),next_offset:null};break;
     case 'jobs':data={jobs:receipts};break;
     case 'inspect':data={environment,settings:[],assets:[],warnings:[]};break;
     case 'cleanup_inspect':data={environment_id:environment.id,files:[],writers:quiesced?[]:[{pid:123,name:'claude',scope:'not_attributed'}],shared_profile_present:false,official_logout_available:false,coverage:'Synthetic files only'};break;

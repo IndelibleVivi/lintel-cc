@@ -10,6 +10,8 @@ Lintel provides a macOS app and a standalone CLI for reviewing configuration and
 
 **The 0.1.1 developer Preview is published.** Download the Apple Silicon macOS App manually from the [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), and read the paired INSTALL notes and SHA256SUMS first. This release repairs the App resource-sealing defect in 0.1.0. All four public assets were downloaded and checked, and the App inside the new DMG passed strict signature verification. It has a complete ad-hoc signature, **no Developer ID, Apple notarization or updater feed**; first launch may require a per-App Open Anyway confirmation under System Settings → Privacy & Security. The old DMG/tag remain for historical verification; the CLI retains the original candidate downloads below. See [App installation](docs/app-updates.en.md) and [current status (Chinese)](docs/current-state.md) for exact source and acceptance scope.
 
+The current reliability and bounded-history changes on `main` are unreleased. The public App remains 0.1.1 and the independent CLI remains 0.1.0. Source checks do not establish a new candidate, a native cold build, a verified new DMG, clean-Mac installation or a Release.
+
 [First use](docs/start-here.en.md) · [Choose a task](docs/operator-guide.en.md) · [Use with an agent](docs/agents.en.md) · [Architecture](docs/architecture.en.md)
 
 ![The real Lintel macOS app: synthetic environment, English interface](assets/preview/screenshots/native-home.en.jpg)

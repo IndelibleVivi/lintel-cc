@@ -39,6 +39,7 @@ try {
     switch (payload.command) {
       case 'discover': data = { environments: [environment], capabilities: [] }; break;
       case 'jobs': data = { jobs: [] }; break;
+      case 'jobs_page': data = {jobs:[],record_errors:[],records_complete:true,digest:'a'.repeat(64),next_offset:null,scan_complete:true}; break;
       case 'inspect': data = { settings: [], assets: [], warnings: [] }; break;
       case 'context': data = context; break;
       case 'archive_inspect': {

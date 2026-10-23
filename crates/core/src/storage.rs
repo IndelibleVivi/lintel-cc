@@ -261,6 +261,10 @@ fn write_atomic(
     record: impl FnOnce(&Path) -> Result<()>,
 ) -> Result<()> {
     guard(path)?;
+    #[cfg(test)]
+    if let Some(errno) = io_fault::take(path) {
+        return Err(std::io::Error::from_raw_os_error(errno).into());
+    }
     let parent = path
         .parent()
         .ok_or_else(|| err("invalid_path", "缺少父目录"))?;
@@ -539,5 +543,29 @@ mod io_diagnostic_tests {
             assert_eq!(result.reason, Some(expected));
             assert!(!result.message.contains("SYNTHETIC_SECRET"));
         }
+    }
+}
+
+/// Exact-path, one-shot synthetic publication failure. No production endpoint.
+#[cfg(test)]
+pub(crate) mod io_fault {
+    use std::{
+        cell::RefCell,
+        path::{Path, PathBuf},
+    };
+    thread_local! { static FAULT: RefCell<Option<(PathBuf,i32)>> = const { RefCell::new(None) }; }
+    pub(crate) fn arm(path: PathBuf, errno: i32) {
+        assert!(path.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        FAULT.with(|f| *f.borrow_mut() = Some((path, errno)));
+    }
+    pub(crate) fn take(path: &Path) -> Option<i32> {
+        FAULT.with(|f| {
+            let mut fault = f.borrow_mut();
+            if fault.as_ref().is_some_and(|(target, _)| target == path) {
+                fault.take().map(|(_, errno)| errno)
+            } else {
+                None
+            }
+        })
     }
 }

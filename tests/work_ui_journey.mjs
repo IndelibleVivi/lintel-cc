@@ -134,7 +134,7 @@ try{
   report.checks.push('Paged metadata → old-runner refusal → project/session/file controls → exclude 9MiB → exact archive and preserve; frozen approved paths/bytes, unselected changes excluded; Day/Night and action dock; ignored selection rejected');
   const targetHome=path.join(fixture,'target-home');await mkdir(targetHome);context={...context,HOME:targetHome,LINTEL_TEST_HOME:targetHome,LINTEL_STATE_DIR:path.join(fixture,'target-state')};
   const portable=path.join(targetHome,'portable.age');await copyFile(carried,portable);const destination=await data({command:'create_environment',name:'Synthetic destination'});
-  await page.reload();await page.getByRole('button',{name:'会话与资料',exact:true}).click();assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
+  await page.reload();await page.locator('.sidebar nav').getByRole('button',{name:'会话与资料',exact:true}).click();assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
   await reader.getByLabel('加密包完整路径',{exact:true}).fill(portable);await reader.getByLabel('归档口令',{exact:true}).fill('wrong-passphrase');await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('alert').waitFor();
   await reader.getByLabel('归档口令',{exact:true}).fill(password);await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('heading',{name:'准备到另一个配置环境',exact:true}).waitFor();await reader.getByLabel('会话资料',{exact:true}).uncheck();await reader.getByRole('button',{name:'预览迁入计划',exact:true}).click();
   const mapping=dialog.getByRole('region',{name:'最终迁入清单',exact:true});await mapping.waitFor();
@@ -180,7 +180,7 @@ try{
   for(const [theme,button] of [['night','深色 Night'],['day','浅色 Day']]){
     await page.reload();await page.getByRole('button',{name:button,exact:true}).click();
     await page.locator('.sidebar').getByRole('button',{name:'记录与恢复',exact:true}).click();
-    await page.getByRole('button',{name:/待处理/}).click();assert.equal(await page.locator('.job-row').count(),1);
+    await page.getByLabel('全部环境',{exact:true}).selectOption('attention');await page.locator('.job-row').filter({hasText:modeled.title}).waitFor();assert.equal(await page.locator('.job-row').count(),1);
     await page.locator('.job-row').filter({hasText:modeled.title}).getByRole('button',{name:'查看结果',exact:true}).click();
     await dialog.getByText('路径检查临时目录',{exact:true}).scrollIntoViewIfNeeded();
     await dialog.getByText(probe,{exact:true}).waitFor();

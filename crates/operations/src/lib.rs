@@ -292,6 +292,9 @@ fn is_reference_instructions(relative: &Path) -> bool {
 }
 fn property(name: &str) -> Value {
     match name {
+        "query" => json!({"type":"string","maxLength":256}),
+        "filter" => choice(&["all","attention","archives","network"]),
+        "section" => choice(&["header","receipt","steps","warnings","coverage","task_result","result_coverage","next_actions","next_steps","error"]),
         "approval" => plan_hash_schema(),
         "environment_id"
         | "plan_id"
@@ -447,6 +450,8 @@ pub fn valid_service_unit(unit: &str) -> bool {
 fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
     Some(match command {
         "discover" | "jobs" | "export_support" | "telemetry_catalog" => (&[], &[]),
+        "jobs_page" => (&[], &["offset", "limit", "expected_digest", "filter", "environment_id", "query"]),
+        "job_detail_page" => (&["job_id"], &["section", "offset", "limit", "expected_digest"]),
         "network_inspect" => (&[], &[]),
         "network_probe" => (
             &["ipv4_url", "ipv6_url"],
@@ -614,6 +619,8 @@ pub const COMMANDS: &[&str] = &[
     "plan_show",
     "execute",
     "jobs",
+    "jobs_page",
+    "job_detail_page",
     "job",
     "drift",
     "accept_drift",
@@ -657,6 +664,14 @@ pub fn schema(command: &str) -> Option<Value> {
     }
     if command == "plan_residue_restore" {
         properties.insert("selected_paths".into(), property("residue_paths"));
+    }
+    if command == "jobs_page" {
+        let mut environment=property("environment_id");
+        environment["description"]=json!("目标环境记录与此主机共享网络记录；其他环境及无关 host-only 记录不匹配");
+        properties.insert("environment_id".into(),environment);
+    }
+    if matches!(command, "jobs_page" | "job_detail_page") {
+        properties.insert("limit".into(), json!({"type":"integer","minimum":1,"maximum":100}));
     }
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
@@ -876,7 +891,7 @@ pub fn validate(request: &Value) -> Result<(), String> {
             }
         }
     }
-    if matches!(command, "work_inventory" | "residue_inventory")
+    if matches!(command, "work_inventory" | "residue_inventory" | "jobs_page" | "job_detail_page")
         && request["offset"].as_u64().is_some_and(|offset| {
             offset > 9007199254740991 || (offset > 0 && request.get("expected_digest").is_none())
         })
@@ -1002,6 +1017,7 @@ pub fn describe(command: &str) -> Option<Value> {
         "inspect_components" => "read_finite_component_sources_and_original_records",
         "work_preflight" => "read_selected_work_metadata_only",
         "work_inventory" => "read_selected_work_metadata_inventory",
+        "jobs_page" | "job_detail_page" => "read_bounded_journal_views",
         "residue_inventory" => "read_known_local_location_metadata_only",
         "identity_inspect" => "read_documented_identity_presence_or_explicit_private_userID",
         "snapshot_save" => "read_settings_startup_residue_and_identity_for_a_local_snapshot",
@@ -1034,6 +1050,7 @@ pub fn describe(command: &str) -> Option<Value> {
             "update_inventory"
         }
         "job" | "jobs" => "read_journal_may_reconcile_interrupted_job",
+        "jobs_page" | "job_detail_page" => "read_journal_without_reconciliation_or_record_writes",
         "launch_query" | "launches" => "read_launch_records_only",
         "inspect_components" => "read_original_records_without_reconciliation",
         "work_preflight" => "readonly_metadata_scan_no_state_written",
@@ -1821,5 +1838,17 @@ mod tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod history_contract_tests {
+    use super::*;
+    #[test]
+    fn bounded_history_requests_are_strict_and_readonly() {
+        let id="00000000-0000-4000-8000-000000000001";
+        for request in [json!({"command":"jobs_page"}),json!({"command":"jobs_page","filter":"archives","offset":100,"limit":100,"expected_digest":"a".repeat(64)}),json!({"command":"job_detail_page","job_id":id,"section":"steps"})] {validate(&request).unwrap();}
+        for request in [json!({"command":"jobs_page","limit":101}),json!({"command":"jobs_page","filter":"secret"}),json!({"command":"job_detail_page","job_id":id,"section":"private_extra"}),json!({"command":"job_detail_page","job_id":id,"approval":"a".repeat(64)})] {assert!(validate(&request).is_err(),"{request}");}
+        assert!(describe("jobs_page").unwrap().to_string().contains("read_journal_without_reconciliation_or_record_writes"));
     }
 }

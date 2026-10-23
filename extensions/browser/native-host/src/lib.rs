@@ -119,15 +119,28 @@ where
     }
     let mut db = if db_path.exists() {
         let mut bytes = Vec::new();
-        fs::File::open(&db_path)
-            .map_err(|e| e.to_string())?
-            .take(32 * 1024 * 1024)
+        let mut input = OpenOptions::new();
+        input.read(true);
+        #[cfg(unix)]
+        input.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+        let input = input
+            .open(&db_path)
+            .map_err(|e| format!("invalid_state:{e}"))?;
+        if !input.metadata().map_err(|e| e.to_string())?.is_file() {
+            return Err("invalid_state:expected regular file".into());
+        }
+        input
+            .take(32 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
+        if bytes.len() > 32 * 1024 * 1024 {
+            return Err("invalid_state:state exceeds limit".into());
+        }
         serde_json::from_slice(&bytes).map_err(|e| format!("invalid_state:{e}"))?
     } else {
         json!({"pairings":{},"instances":{},"operations":{},"allowed_extensions":[]})
     };
+    validate_state(&db)?;
     // Persist conflicts as well as successful commands.
     let result = f(&mut db);
     let tmp = path.join(format!("bridge-{}.tmp", random()));
@@ -145,6 +158,65 @@ where
         .map_err(|e| e.to_string())?;
     FileExt::unlock(&lock).map_err(|e| e.to_string())?;
     result
+}
+fn validate_state(db: &Value) -> Result<()> {
+    let root = db.as_object().ok_or("invalid_state:expected object")?;
+    for name in ["pairings", "instances", "operations"] {
+        let records = root
+            .get(name)
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("invalid_state:{name} must be object"))?;
+        if records.len() > 10000 {
+            return Err(format!("invalid_state:{name} too large"));
+        }
+        for (key, record) in records {
+            let fields = record
+                .as_object()
+                .ok_or_else(|| format!("invalid_state:{name} entry must be object"))?;
+            if key.len() > 1024 || fields.len() > 64 {
+                return Err("invalid_state:record limit".into());
+            }
+            for field in [
+                "status",
+                "code",
+                "instance_id",
+                "token",
+                "label",
+                "browser",
+                "extension_id",
+                "connection",
+                "proposal_cursor",
+                "phase",
+                "id",
+            ] {
+                if fields.get(field).is_some_and(|v| !v.is_string()) {
+                    return Err(format!("invalid_state:{field} must be string"));
+                }
+            }
+            for field in ["expires_at", "failed_attempts", "last_seen"] {
+                if fields.get(field).is_some_and(|v| v.as_u64().is_none()) {
+                    return Err(format!("invalid_state:{field} must be unsigned integer"));
+                }
+            }
+            for field in ["paired", "conflict"] {
+                if fields.get(field).is_some_and(|v| !v.is_boolean()) {
+                    return Err(format!("invalid_state:{field} must be boolean"));
+                }
+            }
+        }
+    }
+    let allowed = root
+        .get("allowed_extensions")
+        .and_then(Value::as_array)
+        .ok_or("invalid_state:allowed_extensions must be array")?;
+    if allowed.len() > 1000
+        || allowed
+            .iter()
+            .any(|v| v.as_str().is_none_or(|s| s.len() > 1024))
+    {
+        return Err("invalid_state:invalid allowed_extensions".into());
+    }
+    Ok(())
 }
 fn action_fields(kind: &str) -> Result<&'static [&'static str]> {
     Ok(match kind {
@@ -375,7 +447,7 @@ fn control_inner(db: &mut Value, r: &Value) -> Result<Value> {
             }
             if db["operations"].as_object().unwrap().len() >= 1000 {
                 return Err(
-                    "journal_capacity:Export and archive receipts before accepting more operations"
+                    "journal_capacity:1000 retained operations reached; query original IDs remains available, but no safe archive or cleanup action is implemented"
                         .into(),
                 );
             }
@@ -600,6 +672,23 @@ pub fn native_at(path: &Path, request: Value, extension: &str, connection: &str)
                 p["extension_id"] = json!(extension);
                 Ok(json!({"paired":false,"pending":true,"challenge":challenge,"code":code}))
             }
+            "operation_query" => {
+                fields(
+                    &request,
+                    &["op", "request_id", "instance_id", "token", "operation_id"],
+                )?;
+                auth(db, &request, extension, connection)?;
+                let key = format!(
+                    "{}:{}",
+                    id(&request, "instance_id")?,
+                    id(&request, "operation_id")?
+                );
+                let operation = db["operations"]
+                    .get(&key)
+                    .filter(|v| v.is_object())
+                    .ok_or("unknown_operation")?;
+                Ok(operation.clone())
+            }
             "poll" => {
                 fields(&request, &["op", "request_id", "instance_id", "token"])?;
                 auth(db, &request, extension, connection)?;
@@ -730,6 +819,67 @@ pub fn write_frame<W: Write>(w: &mut W, v: &Value) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn authenticated_operation_query_is_exact_and_does_not_submit() {
+        let p = path();
+        let (ext, token) = setup(&p);
+        let submit = json!({"op":"submit","instance_id":"instance-one","operation_id":"query-one","action":{"kind":"webrtc","setting":"disable_non_proxied_udp"}});
+        let record = control_at(&p, submit)["data"].clone();
+        let query = json!({"op":"operation_query","request_id":"query-request","instance_id":"instance-one","token":token,"operation_id":"query-one"});
+        assert_eq!(native_at(&p, query.clone(), &ext, "one")["data"], record);
+        let mut unknown = query.clone();
+        unknown["operation_id"] = json!("unknown-operation");
+        assert_eq!(
+            native_at(&p, unknown, &ext, "one")["error"]["code"],
+            "unknown_operation"
+        );
+        let mut wrong = query.clone();
+        wrong["token"] = json!("wrong-token");
+        assert_eq!(
+            native_at(&p, wrong, &ext, "one")["error"]["code"],
+            "not_paired"
+        );
+        let mut shape = query;
+        shape["extra"] = json!(true);
+        assert_eq!(
+            native_at(&p, shape, &ext, "one")["error"]["code"],
+            "unknown_field"
+        );
+        transaction(&p, |db| {
+            assert_eq!(db["operations"].as_object().unwrap().len(), 1);
+            assert_eq!(db["operations"]["instance-one:query-one"], record);
+            Ok(Value::Null)
+        })
+        .unwrap();
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn malformed_state_shapes_are_errors_and_preserve_original_bytes() {
+        let p = std::env::temp_dir().join(format!("lintel-state-shape-{}", random()));
+        fs::create_dir_all(&p).unwrap();
+        let normal = json!({"pairings":{},"instances":{},"operations":{},"allowed_extensions":[]});
+        let mut bad = normal.clone();
+        bad["instances"] = json!([]);
+        let mut entry = normal.clone();
+        entry["instances"] = json!({"legacy":null});
+        let mut field = normal.clone();
+        field["pairings"] = json!({"legacy":{"expires_at":"tomorrow"}});
+        for value in [json!([]), Value::Null, json!({}), bad, entry, field] {
+            let bytes = serde_json::to_vec(&value).unwrap();
+            fs::write(p.join("bridge.json"), &bytes).unwrap();
+            assert!(authorize_extension(&p, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                .unwrap_err()
+                .starts_with("invalid_state:"));
+            assert_eq!(
+                control_at(&p, json!({"op":"instances"}))["error"]["code"],
+                "invalid_state"
+            );
+            assert_eq!(fs::read(p.join("bridge.json")).unwrap(), bytes);
+        }
+        fs::write(p.join("bridge.json"), serde_json::to_vec(&normal).unwrap()).unwrap();
+        authorize_extension(&p, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap();
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
     fn catalog_identifiers_and_installation_match_runtime_contracts() {
         let catalog = operation_catalog();
         let operations = catalog["operations"].as_array().unwrap();
@@ -792,6 +942,30 @@ mod tests {
             true
         );
         (ext.into(), token)
+    }
+    #[test]
+    fn capacity_keeps_original_queries_and_duplicate_submission_available() {
+        let p = path();
+        setup(&p);
+        let action = json!({"kind":"webrtc","setting":"default"});
+        let original = transaction(&p, |db| {
+            for n in 0..1000 {
+                let id = format!("operation-{n:04}");
+                db["operations"][format!("instance-one:{id}")] = json!({
+                    "instance_id":"instance-one","id":id,"action":action,
+                    "phase":"completed","created_at":1
+                });
+            }
+            Ok(db["operations"].clone())
+        }).unwrap();
+        let request = json!({"op":"submit","instance_id":"instance-one","operation_id":"operation-0000","action":action});
+        assert_eq!(control_at(&p, request)["data"]["phase"], "completed");
+        assert_eq!(control_at(&p, json!({"op":"query","instance_id":"instance-one","operation_id":"operation-0000"}))["data"]["phase"], "completed");
+        let denied = control_at(&p, json!({"op":"submit","instance_id":"instance-one","operation_id":"operation-1000","action":action}));
+        assert_eq!(denied["error"]["code"], "journal_capacity");
+        let after: Value = serde_json::from_slice(&fs::read(p.join("bridge.json")).unwrap()).unwrap();
+        assert_eq!(after["operations"], original);
+        fs::remove_dir_all(p).unwrap();
     }
     #[test]
     fn pairing_and_duplicate_live_instance_conflict() {

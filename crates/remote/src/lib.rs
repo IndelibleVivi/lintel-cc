@@ -429,7 +429,7 @@ fn diagnose(
         "deadline" => ("response", "远程请求超时，已超过控制端等待时限。", &["SSH 连接或远端处理尚未完成；检查网络及 runner 状态。"]),
         _ => ("response", "远程响应中断，结果尚未确认。", &["检查网络及 runner 状态。"]),
     };
-    let query = payload["command"] == "job";
+    let query = payload["command"] == "job" || payload["command"] == "job_detail_page";
     let install = payload["command"] == "install_runner";
     let mutating = submit
         || matches!(
@@ -930,6 +930,8 @@ const REQUEST_COMMANDS: &[&str] = &[
     "plan_show",
     "job",
     "jobs",
+    "jobs_page",
+    "job_detail_page",
     "service_inspect",
     "plan_service_quiesce",
     "plan_service_resume",
@@ -1198,7 +1200,7 @@ impl Controller {
             // Removing a display entry cannot erase or strand a durable task.
             let task_id = match op {
                 "reconnect" => payload["plan_id"].as_str(),
-                "request" if payload["request"]["command"] == "job" => payload["request"]["job_id"]
+                "request" if (payload["request"]["command"] == "job" || payload["request"]["command"] == "job_detail_page") => payload["request"]["job_id"]
                     .as_str()
                     .or_else(|| payload["request"]["plan_id"].as_str()),
                 _ => None,
@@ -1278,7 +1280,7 @@ impl Controller {
                     self.pin_launch_binding(alias, &response, bound.as_ref())?;
                     return Ok(response);
                 }
-                if payload["request"]["command"] == "job" {
+                if payload["request"]["command"] == "job" || payload["request"]["command"] == "job_detail_page" {
                     let id = payload["request"]["job_id"]
                         .as_str()
                         .or_else(|| payload["request"]["plan_id"].as_str())
@@ -1290,7 +1292,13 @@ impl Controller {
                         .join(format!("{id}.json"));
                     if path.exists() {
                         let (path, _held) = self.record(alias, id)?;
-                        return self.query(alias, &path, self.checked_record(&path, id)?);
+                        let record = self.checked_record(&path, id)?;
+                        if payload["request"]["command"] == "job_detail_page" {
+                            let mut request = payload["request"].clone();
+                            request["job_id"] = record["lookup_id"].clone();
+                            return self.runner_call(alias, &request, false, record.get("runner_digest"));
+                        }
+                        return self.query(alias, &path, record);
                     }
                     // A read-only lookup may name an unsubmitted plan. Keep its
                     // submission slot unused; only execute/reconnect create intent.
@@ -2568,5 +2576,29 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert_eq!(entries[0]["alias"], "synthetic-host");
         assert_eq!(entries[0]["runner_digest"], sha);
         let _ = temp;
+    }
+}
+
+#[cfg(test)]
+mod bounded_history_transport_tests {
+    use super::*;
+    #[test]
+    fn detail_uses_original_binding_without_updating_or_creating_task() {
+        let (temp,controller)=super::tests::fixture(r#"cat >/dev/null; printf '%s\n' '{"ok":true,"data":{"job_id":"00000000-0000-4000-8000-000000000002","section":"header","items":[],"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","next_offset":null}}'"#);
+        let id="00000000-0000-4000-8000-000000000002";
+        let (path,held)=controller.record("synthetic-host",id).unwrap();
+        let record=json!({"plan_id":id,"lookup_id":id,"status":"needs_reconciliation","runner_digest":"a".repeat(64)});
+        save(&path,&record).unwrap();drop(held);
+        let before=fs::read(&path).unwrap();
+        let response=controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job_detail_page","job_id":id,"section":"header"}})).unwrap();
+        assert_eq!(response["data"]["job_id"],id);assert_eq!(fs::read(&path).unwrap(),before);
+        assert!(fs::read_to_string(temp.path().join("args")).unwrap().contains(&"a".repeat(64)));
+    }
+    #[test]
+    fn old_runner_rejection_does_not_fallback_or_create_intent() {
+        let (_temp,controller)=super::tests::fixture(r#"cat >/dev/null; printf '%s\n' '{"ok":false,"error":{"code":"unsupported_command","message":"old synthetic runner"}}'"#);
+        let response=controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"jobs_page"}})).unwrap();
+        assert_eq!(response["error"]["code"],"unsupported_command");
+        let tasks=controller.state.join("tasks/synthetic-host");assert!(!tasks.exists());
     }
 }

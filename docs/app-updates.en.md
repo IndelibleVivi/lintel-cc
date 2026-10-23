@@ -190,3 +190,24 @@ A feed failure leaves the current App in place. Signature/version mismatches ref
 Browser extension/native host and remote runner installation are outside automatic App updates. A new App may carry new resources, but they still require their own frozen preview, explicit approval and original-installation reconciliation. Older remote tasks keep their frozen runner.
 
 Protocol/API references: [Tauri updater](https://v2.tauri.app/plugin/updater/). Runtime behavior follows the pinned `tauri-plugin-updater`, the current CLI's `signer sign --app-version`, and repository checks. Source acceptance criteria are in the [telemetry and updates Leaf (Chinese)](specs/telemetry-updates.md).
+
+## Unified candidate build and consistency gate (unreleased)
+
+`scripts/prepare-candidate.py` requires Python 3.11+ (standard-library `tomllib`) and provides local `build` and `verify` modes. Commit and check the exact clean 40-character SHA first. The output directory must be absent and outside the source checkout. The matrix entry currently requires native macOS arm64, all three Rust targets, Node, cargo-zigbuild, Zig 0.16.0 and complete rust-docs notices for the active toolchain. Both Linux targets reuse the existing cargo zigbuild path; the Zig version must match the reviewed native-runtime notices. Preflight rejects missing prerequisites before creating output and installs no toolchains. Replace the sample paths and SHA with actual selected inputs:
+
+```sh
+python3 scripts/prepare-candidate.py build \
+  --revision REPLACE_WITH_EXACT_CLEAN_40_HEX_SHA \
+  --out ../lintel-candidate-build
+# Add --app to that build command when preparing a macOS App/DMG.
+python3 scripts/prepare-candidate.py verify \
+  --receipt ../lintel-candidate-build/build-receipt.json \
+  --ci-plan ../lintel-ci/plan.json \
+  --ci-results ../lintel-ci/results.json \
+  --ci-evidence ../lintel-ci/evidence \
+  --out ../lintel-candidate-verified.json
+```
+
+`build` uses a fresh isolated source clone and fresh target, runs fixed locked builds for all three CLI platforms and their components, and records inputs and final archives. `verify` rereads actual tar member bytes instead of trusting package-declared checksums. It checks the complete platform matrix, components, versions, exact SHA and consistency with the canonical full CI plan/results/evidence, including clean checkouts. Relabeling a reduced plan as full is rejected. App-enabled builds also compare the App and resources in the actual DMG.
+
+These remain local consistency observations: build receipts and CI JSON have no independently authenticated origin and are not trusted CI identity proofs. This work has not completed a real native cold build, new DMG, clean-Mac or Release acceptance; documenting the command does not establish that it ran. The public App 0.1.1 and CLI 0.1.0 remain the previous release lines; current `main` is unreleased. Build, verification, native installation acceptance, signing/notarization, Release, downloads and feed activation remain separate steps, neither authorized nor performed automatically by this script.

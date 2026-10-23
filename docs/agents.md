@@ -440,3 +440,17 @@ candidate 的身份是 `<version>-candidate-<revision 前 12 位>`，因此裸 `
 源码构建的 debug 入口是 `cargo build -p lintel-runner` 后的 `target/debug/lintel`。独立 Native Messaging 可执行文件另行从 `extensions/browser/native-host` 安装；在 Mac 上 `lintel browser control` 的安装预览仍需准确 `host_path`，不会假定 GUI 或 PATH 已提供它。扩展开发包从 canonical extension source 准备，步骤与平台限制见 [browser.md](browser.md)。
 
 远端 runner 的静态资源与 App 使用同一 [生成流程](remote.md#准备-app-内置资源)。仅从明确核对的 canonical bundles 调用 `lintel remote control --bundles /absolute/runner-bundles`，或配置 `LINTEL_RUNNER_BUNDLES`；默认查当前 executable 旁的 `remote-runners`。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。
+
+### 有界任务记录（当前未发布源码）
+
+`lintel jobs` 与 `lintel work archive list` 使用 `jobs_page`，`lintel job detail ID` 使用 `job_detail_page`。列表默认最多 50 条、显式 `--limit` 为 1–100；继续页使用返回的 `next_offset` 与同一 `digest`（`--expected-digest`）。详情按 section 读取，不把全回执塞进摘要列表；`detail_item_too_large` 明确保留原 ID 与原文件。记录变化时重新读取首页，不能拼接两个快照。`scan_complete`、`records_complete`、`record_errors` 分别说明扫描与坏记录缺口；空页不必然代表扫描结束。
+
+```sh
+lintel jobs --filter attention --limit 50
+lintel jobs --filter attention --offset 50 --expected-digest REPLACE_WITH_RETURNED_DIGEST --limit 50
+lintel job detail REPLACE_WITH_ORIGINAL_JOB_ID --section warnings --limit 50
+```
+
+上例 offset 仅为示意，实际必须使用上一响应的 `next_offset`；过滤条件也须保持一致。`discover` 只负责环境发现，App 不再依靠它加载全量历史。旧 runner 明确返回不支持时不退回全量 `jobs`／`discover`；原 `job show`／`job wait`、恢复、服务与网络恢复仍沿原任务 ID，分页不清理记录。旧协议入口仍保留兼容，但不是大历史的自动 fallback。
+
+统一候选必须通过两个本地模式与 full CI 一致性检查；准确命令、Python 3.11 前提及未认证来源限制见 [App 更新与候选 gate](app-updates.md)。

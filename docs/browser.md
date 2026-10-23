@@ -4,6 +4,8 @@
 
 状态：0.1.0 开发候选。Chrome/Edge 的 MV3 包和 Firefox 独立 event-page 适配可构建；正式浏览器安装、商店发布和完整三浏览器验收尚未完成。本文对应 [完整目标](SPEC.md#9-模块-c浏览器能力必须真实可操作) 与 [B01–B15 验收](ACCEPTANCE.md#c-浏览器实测)，不是完成整版目标的声明。
 
+下述未决 host 安装发现、popup 隔离释放恢复和旧回执身份核对属于当前源码增强，尚未随新的公开 App／扩展发行。准确源码、候选与已发布版本分别见[当前状态](current-state.md)。
+
 当前源码支持按原批准继续中断的 App 内置 host 安装：副作用前保存安装 intent，完整 staging 后条件发布，并以文件身份和内容复核已发布对象。登记升级的临时原件及 publication journal 由同一 installer 恢复；外部替换或修改保留并报告冲突。文件系统不能提供 birth time 时，新的 publication 明确拒绝，不能弱化身份检查。不要手工删除 intent、登记或原件来重试。该能力不证明真实浏览器安装或配对完成。隔离解除 marker 已持久化而 owner 删除失败时，重试只清理完全匹配的旧 owner，不重跑浏览数据删除或解除新任务的隔离。
 
 ## 使用入口与实际范围
@@ -41,6 +43,8 @@ macOS App 已带 Chromium / Firefox 伴随扩展，不要求桌面用户安装 N
 1. “预览扩展目录”：只读核对版本、大小、文件清单和目标目录；批准后才准备文件。Chrome / Edge 共用当前用户 `~/Library/Application Support/Lintel/browser-extensions/chromium/`，Firefox 使用同级 `firefox/`。准备完成后可在 Finder 打开，或复制目录／manifest 路径。
 2. 在目标 profile 加载扩展。Chrome 打开 `chrome://extensions`，Edge 打开 `edge://extensions`，启用开发者模式，选择“Load unpacked / 加载已解压的扩展”和已准备的目录。Firefox 打开 `about:debugging#/runtime/this-firefox`，选择“Load Temporary Add-on”和目录里的 `manifest.json`。随后将管理页中的准确扩展 ID 填到 App 第二步，预览并另行批准本地连接。
 3. 生成配对请求，复制 App 显示的 12 位配对短码，在目标扩展输入并提交请求；核对两端短码，再在 App 批准这份 profile。目录准备、本地连接注册、profile 配对、最近轮询在线是四个不同事实。
+
+本地连接安装／升级中断后，重开 App 会查询尚未完成的原批准并显示“继续原安装”。核对原范围后继续；新的预览或批准不能覆盖这份未决 intent。原资源已变化、当前注册被外部修改或 intent 损坏时，显示具体错误并保留原状态；不要删除 intent 或改用新计划掩盖不确定性。已经完成且 receipt 匹配的历史 intent 不会阻挡下一次正常升级。这与下述扩展目录准备的恢复预览是两个独立安装流程。
 
 准备只复制 App 内置文件，不写浏览器 profile、偏好、扩展加载登记、native manifest 或 allowlist。目录保持稳定，移动 App 不影响浏览器加载路径；原有受管文件可预览后批准更新，随后要在浏览器重新加载。非受管目录、被改动的文件或 ownership 冲突会拒绝覆盖；批准前重新核对整份计划。上次准备中断时，新的预览会列出待完成的受管目录切换；重新批准后才继续，不把备份或暂存目录当成已完成。未完成切换期间 App 资源版本改变会阻止恢复；需先核对原版本资源和目录变化，保留现有状态，不自动改用新版本继续。已准备的相同版本可重复核对，无须重写。
 
@@ -121,6 +125,8 @@ App 发起的 clear 在第一次批准后仍是 `awaiting-browser-restart`。完
 
 Native ACK 只在 Engine 串行锁内更新最新记录的元数据；准备阶段的旧 ACK 不确认已经变化的最终结果，也不清除 `finishedBy`／`restoredBy`。DNR 恢复比较按 rule ID 排序后的集合，浏览器返回数组顺序不同不会制造恢复冲突。
 
+隔离规则已解除、但原 owner 记录清理失败时，重开 popup 仍可点击“完成隔离释放恢复”。它只协调匹配的原 owner，不再次删除浏览数据，也不移除后来任务的规则。身份重置与 commit／回执投递串行；旧 journal 保留原 instance，不能借新配对身份执行或补送。没有 instance 字段的旧记录，只有在 host 确认同一 ID、instance 和 action 后才绑定；无法确认时保留并说明未知归属。单条回执投递失败不会将已成功轮询的新配对整体判为失效。
+
 ## Native bridge 接口
 
 CLI 的静态 browser catalog/schema 与 host validator 共用 ID 长度和身份常量：instance/operation/challenge/receipt ID 为 8–80 个 ASCII 字母、数字、`-` 或 `_`；安装时 Chrome/Edge 只接受 32 个 `a`–`p` 的 extension ID，Firefox 只接受 `lintel@lintel.local`。纯 manifest helper 支持 `chromium` 名称，固定路径注册 installer 不支持该名称；不能从 helper 的支持推导一个安装入口。
@@ -139,6 +145,7 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 | `{"op":"install_bundled_extension","approved_plan":{...}}` | **仅桌面**：批准并复查完整计划，返回 `{status,plan,loading:"required",pairing:"required"}`；status 为 installed / updated / already-installed。只准备固定目录；发生中断不能返回成功，需新的恢复预览与批准 |
 | `{"op":"reveal_bundled_extension","browser":"chrome"}` | **仅桌面**：核对受管且完整的固定扩展目录后在 Finder 打开，返回 `{status:"revealed",browser,package,extension_path}`；不接受 path 或 URL；没有已完成的受管目录时拒绝 |
 | `{"op":"bundled_host_plan","browser":"chrome","extension_id":"EXTENSION_ID"}` | **仅桌面**：只读 `{schema,browser,extension_id,version,sha256,bytes,host_path,manifest_path,manifest,state_path,effect,platform,architecture,existing_manifest,existing_registration,existing_host,installed_host,status,install_action}`。status 为 ready / already-registered / conflict；install_action 为 install / upgrade / none / blocked |
+| `{"op":"bundled_host_pending","browser":"chrome"}` | **仅桌面**：返回未完成的原完整批准计划；没有未决安装时为 null。查询不接受新 extension ID，不替换或批准计划 |
 | `{"op":"install_bundled_host","approved_plan":{...}}` | **仅桌面**：完整 frozen plan 批准与复查，返回 `{status,plan,pairing:"required"}`。status 为 registered / updated / already-registered；相同已成功批准只查询，不再次写入或授权；blocked 拒绝 |
 | `{"op":"installation_plan","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{browser,extension_id,manifest_path,manifest,state_path,effect}`；只预览当前用户固定路径 |
 | `{"op":"install_native_host","browser":"chrome","extension_id":"EXTENSION_ID","host_path":"/absolute/path/to/lintel-browser-host"}` | `{status,plan,pairing:"required"}`；用户批准后安装。browser 也可为 edge/firefox；以上两个手工路径操作仅供独立 CLI local control，桌面返回 unsupported_browser_operation，扩展管道不开放 |
@@ -190,9 +197,12 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 - `pair_request` 附加 `{code,label}`：短码挑战与扩展实例绑定，返回 `{paired:false,pending:true,challenge,code}`；不能自行批准。`browser` 字段由 host 根据 argv 校验过的调用方扩展 ID 派生（`lintel@lintel.local` → firefox，32 位 Chromium ID → chromium），请求里自报的 browser 一律忽略。短码连续 5 次错误尝试会把所有存活中的待配对短码作废，需要重新生成。
 - `poll`：返回 `{paired:true,proposals:[...]}`；绑定当前 native connection lease。
+- `operation_query` 附加 `{operation_id}`：仅在当前已认证 instance 下查询原操作，不创建或提交。用于核对旧 journal 的 ID／action 归属，不允许借其他 instance 的身份读取或补送。
 - `receipt` 附加 `{receipt:{id,phase,result?,error?,completedAt?}}`：只报告结果；不会请求执行。
 
 回复 envelope 加同一 `request_id`。桥接目录权限 0700，状态与 lock 0600；独占文件锁、写临时文件、fsync、rename、目录 fsync。默认 macOS 为用户 Application Support 下 `Lintel/browser-bridge`，Linux 为用户 `.local/state/lintel/browser-bridge`。合成环境可用 `LINTEL_BROWSER_STATE` 指定临时根；这是进程配置，不接受来自扩展的路径。无网络 listener。
+
+已有 `bridge.json` 先接受有界结构检查。语法合法但字段错形的 JSON 返回 `invalid_state` 并保留原字节，不会因读取而覆盖损坏文件；这不表示所有语义冲突都可自动修复。
 
 两个同时在线的 native 连接若持同一实例凭据，host 持久标记 `duplicate_instance_conflict`，两个都停止接受操作。扩展提供“生成新身份重新配对”。浏览器没有可信的普通 profile 身份证明，**离线复制后从不同时连接的克隆仍无法被证明区分**；这部分 B02 不算完成。不能把连接冲突检测描述为任意 profile 克隆完整检测。
 

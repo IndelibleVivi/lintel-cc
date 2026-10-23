@@ -13,7 +13,7 @@ const desktop=path.join(repo,'apps/desktop');
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE || path.join(repo,'extensions/browser/node_modules/playwright/index.mjs')).href);
 const environments=[{id:randomUUID(),name:'Synthetic writing A',host:'local',surface:'claude-code',root:'/synthetic/a',executable:null,ownership:'registered',status:'discovered'},{id:randomUUID(),name:'Synthetic writing B',host:'local',surface:'claude-code',root:'/synthetic/b',executable:null,ownership:'registered',status:'discovered'}];
 const originalConfig={set_id:'synthetic-set',service_uuid:'synthetic-service',enabled:true,configuration:{ConfigMethod:'Manual',Addresses:['2001:db8::10'],PrefixLength:[64],Router:'2001:db8::1'}};
-let config=structuredClone(originalConfig),revision='synthetic-revision-1',nonce=0,conflict=false,loseAck=true,empty=false;
+let config=structuredClone(originalConfig),revision='synthetic-revision-1',nonce=0,conflict=false,loseAck=true,empty=false,pagedHistory=false;
 const channels=new Map(),plans=new Map(),probes=new Map(),receipts=[],calls=[];
 const alias='synthetic-linux';
 const ok=data=>({ok:true,data});
@@ -33,7 +33,9 @@ function makePlan(p,restore=false){
 async function core(p,remote=false){
  switch(p.command){
   case 'discover':return {environments:empty?[]:environments.map(e=>remote?{...e,host:alias}:e),capabilities:[]};
-  case 'jobs':return {jobs:remote?[]:receipts};
+  case 'jobs_page':if(pagedHistory&&p.filter==='network'&&!p.offset)return {jobs:[],record_errors:[],digest:'a'.repeat(64),next_offset:50,scan_complete:false};return {jobs:(remote?[]:receipts).map(r=>({...r,updated_at_ns:'1760000000000000000'})),record_errors:[],digest:'a'.repeat(64),next_offset:null,scan_complete:true};
+    case 'job_detail_page': return {job_id:p.job_id,section:p.section,items:[receipts.find(r=>r.id===p.job_id)],digest:'a'.repeat(64),next_offset:null};
+    case 'jobs':return {jobs:remote?[]:receipts};
   case 'inspect':return {environment:environments.find(e=>e.id===p.environment_id),settings:[],assets:[],warnings:[]};
   case 'drift':return {status:'unchanged',changes:[]};
   case 'network_inspect':return {schema:'lintel.network/1',platform:remote?'linux':'macos',execution_host:remote?'synthetic-linux-node':'synthetic-mac-node',network_revision:revision,network_revision_complete:true,interfaces:[{interface:'utun4',flags:1,up:true,ipv4_addresses:[],ipv6_addresses:['fe80::4']}],services:[{service_id:'synthetic-set:synthetic-service',name:remote?'Synthetic eth0':'Synthetic Wi-Fi',interface:remote?'eth0':'en0',mode:config.enabled?'manual':'off',enabled:true,ipv4_addresses:['192.0.2.10'],ipv6_addresses:config.enabled?['2001:db8::10']:[]}],limitations:[remote?'Synthetic Linux readonly; no system mutation':'Synthetic configuration and invoke; no real host change']};
@@ -125,8 +127,8 @@ try{
  const artifacts=process.env.LINTEL_NETWORK_UI_ARTIFACTS;if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'network-day-receipt.png')});}
  conflict=true;await dialog.getByRole('button',{name:'预览恢复',exact:true}).click();await dialog.getByText(/Synthetic external IPv6 edit/).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,1);
  report.checks.push('lost ACK queries original job once; verified configuration plus failed IPv6 probe; external restore conflict preserves later edits');
- await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();await page.getByLabel('当前环境',{exact:true}).selectOption(environments[1].id);await panel.getByText('关闭',{exact:true}).waitFor();
- await panel.getByText('共享网络的修改与恢复记录',{exact:true}).click();await panel.getByRole('button',{name:'查看结果与恢复',exact:true}).click();
+ pagedHistory=true;await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();await page.getByLabel('当前环境',{exact:true}).selectOption(environments[1].id);await panel.getByText('关闭',{exact:true}).waitFor();
+ await panel.getByText('共享网络的修改与恢复记录',{exact:true}).click();await panel.getByRole('button',{name:'读取下一页',exact:true}).click();await panel.getByRole('button',{name:'查看结果与恢复',exact:true}).waitFor();await panel.getByText('无可用路由',{exact:true}).first().waitFor();assert.equal(await panel.getByText('无可用路由',{exact:true}).count(),2,'first matching network receipt on a later page restores its observed probe');pagedHistory=false;await panel.getByRole('button',{name:'查看结果与恢复',exact:true}).click();
  conflict=false;await dialog.getByRole('button',{name:'预览恢复',exact:true}).click();await dialog.getByRole('heading',{name:'恢复原 IPv6 配置',exact:true}).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,1);
  await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();await dialog.getByRole('heading',{name:'执行结果',exact:true}).waitFor();assert.equal(calls.filter(c=>c.command==='execute').length,2);assert.deepEqual(config,originalConfig);
  report.checks.push('shared service survives environment selection; original history remains available; restoration has separate approval and complete manual target');

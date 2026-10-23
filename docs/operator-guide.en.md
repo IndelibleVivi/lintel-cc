@@ -126,6 +126,8 @@ Chrome/Edge share stable files but each profile loads/pairs separately. Firefox 
 
 Completion means paired plus recent 20-second polls. Paired can be offline; authorization and connectivity differ from prepared files/registered component. On failure verify actual load/exact ID; regenerate expired codes. Duplicate conflict: extension generates new identity/re-pairs. Owned extension/host updates need preview/approval/browser reload. Outside/edited/inconsistent resources refuse; interrupted preparation has separate recovery approval. Installer only Chrome/Edge/Firefox, never inferred AdsPower/other Chromium support.
 
+In the current source, reopening the App browser installer performs a read-only unfinished-install query, shows the original approved plan and offers Continue original installation; query failures remain visible. A new preview cannot overwrite an unresolved intent under the install lock. Recovery rechecks the original executable/manifest identity and resources; external registrations or changed resources remain conflicts, and equal content does not establish ownership. Completed historical intents do not block a later upgrade. Extension results awaiting native ACK remain bound to their original instance and operation; pairing again does not send old results under a new identity. Legacy records acquire ownership only after authenticated lookup confirms the same instance, ID and exact action; unknown records remain retained without automatic resubmission.
+
 ### 2.2 Choose a needed action
 
 Select paired/online/nonconflicting profile. Send to browser preview submits only; extension opens desktop proposals, reviews actual impact, confirms scope, grants permissions/executes once.
@@ -141,6 +143,8 @@ Select paired/online/nonconflicting profile. Send to browser preview submits onl
 | Clear site data | Selected sites/types | Preparation/full restart/second approval; irreversible |
 
 Default claude.ai, optional console.anthropic.com, no email/Google/Apple/SSO. Browser readback is not device-wide IP hiding or full DNS/WebRTC/program coverage.
+
+If isolation rules were removed but deleting their old owner record failed, reopening the extension popup still offers Complete isolation release recovery for the original owner. It only finishes cleanup of that matching record: it does not repeat site-data deletion or rule removal, and leaves a new owner untouched. Malformed persisted native bridge JSON returns structured `invalid_state` and retains the original bytes; corrupted state is not an empty registration.
 
 ### 2.3 Site clear: two approvals around a full restart
 
@@ -294,6 +298,8 @@ Hold prevents starts with actual state/cgroup readback, persistent until separat
 ### 6.1 Manual drift checks
 
 Environment details → Changes since last check → Check changes compares managed baseline. Reapply policy re-previews/approves; Accept current updates baseline without rewrites. No differences means inspected scope only, not whole machine/browser/network. Background drift/menu-bar/automatic rules are not enabled; recheck after upgrades/entry switches/external edits.
+
+`HistoryPanel.tsx` loads `jobs_page` summaries and `job_detail_page` sections on demand in Records and recovery; changing a record or section does not load all history. Continuation pages bind the original `digest`; follow `next_offset` to load more. Scan completion and incompleteness from invalid records are separate; an oversized detail item reports a limitation and retains the original record. Environment discovery through `discover` is independent of the history list. An older runner without these endpoints explicitly reports bounded history as unsupported, with no full `jobs`/`discover` fallback. Details, archive reading and restoration retain the owning host and original task ID; pagination never deletes, rewrites or replays tasks.
 
 ### 6.2 Restore by original task
 

@@ -2,6 +2,7 @@
 // actual core and Native Messaging host processes for pairing values/approval.
 // Never reads or registers a personal browser profile.
 import assert from 'node:assert/strict';
+import {extensionRecoveryJourney} from './browser_extension_recovery.mjs';
 import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import os from 'node:os';
@@ -85,7 +86,9 @@ try{
   await dialog.getByText('连接一个新的 profile',{exact:true}).click();await dialog.getByRole('button',{name:'生成配对请求',exact:true}).click();
   await page.locator('.pairing-code strong').filter({hasText:pair.code}).waitFor();await page.locator('.pairing-code').scrollIntoViewIfNeeded();
   assert.equal(await dialog.evaluate(element=>element.scrollWidth>element.clientWidth),false);assert.deepEqual(errors,[]);
-  report.checks.push('fresh code replacement, keyboard Enter, Day/Night layout');report.passed=true;
+  report.checks.push('fresh code replacement, keyboard Enter, Day/Night layout');
+  await extensionRecoveryJourney({repo,browser,host,env,control,extensionId,report});
+  report.passed=true;
   console.log('PASS: rendered App copy/real native pairing/explicit approval journey');
 }catch(error){report.error=error.message;report.retainedFixture=base;throw error;}finally{
   await browser?.close();

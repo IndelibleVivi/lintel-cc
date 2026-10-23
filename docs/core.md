@@ -4,7 +4,7 @@
 
 `crates/core` 是本地环境清单、计划、文件操作、任务 journal 与字段恢复的唯一实现。GUI 和 `apps/runner` 通过同一个 `handle_request` 调用它。完整目标仍由 [SPEC](SPEC.md) 定义，本页只描述当前实现。
 
-任务读取由 `jobs.rs` 校验原 ID、有限状态及恢复所需字段；不完整记录返回 `invalid_job_record`，不重写原件。`jobs` 保留可读 receipts，并附 `records_complete` 和逐项 `{job_id,code}` 的 `record_errors`；App 记录页显示这些缺口。列表仍返回完整历史，分页与传输容量验收尚未交付。底层 I/O 保留 `io_error`，另附有限 `reason`（如 `permission_denied`、`storage_full`、`read_only_filesystem`），不附原始 OS 错误或路径。CLI 适配器的 20 秒期限覆盖 nonblocking stdout 读取，64 KiB 上限不变；逃逸后代保留 pipe 不再使 reader join 无限等待，超时后仍按原 ID 核对。
+任务读取由 `jobs.rs` 校验原 ID、有限状态及恢复所需字段；不完整记录返回 `invalid_job_record`，不重写原件。旧 `jobs` 保留完整 receipts 兼容；App／named CLI 的记录入口改用只读 `jobs_page` 摘要与 `job_detail_page` 分段详情，每次响应连同 envelope 限于 256 KiB。列表按最近修改时间／ID 排序，最多扫描 100000 项文件元数据，不写索引或清理原 journal；每页最多扫描 100 个候选。后续页绑定原 digest 与筛选条件，记录变化返回 `stale_history`。`scan_complete` 与 `records_complete` 分别表示扫描结束与本页坏记录缺口，空页可能仍有 `next_offset`；`record_errors` 逐项给出有限 ID/code。超预算的单条详情明确返回 `detail_item_too_large`，完整小回执仍可打开原结果与恢复操作。环境发现独立，不受历史读取失败牵连。底层 I/O 保留 `io_error`，另附有限 `reason`（如 `permission_denied`、`storage_full`、`read_only_filesystem`），不附原始 OS 错误或路径。CLI 适配器的 20 秒期限覆盖 nonblocking stdout 读取，64 KiB 上限不变；逃逸后代保留 pipe 不再使 reader join 无限等待，超时后仍按原 ID 核对。
 
 ## 宿主共享 IPv4 / IPv6
 
@@ -79,7 +79,7 @@
 
 ## 并发与恢复边界
 
-一个本地 core operation lock 串行化 Lintel 的 mutation。锁文件位于 state 目录下，只互斥**同一 state 目录**的 core 进程；两个指向同一配置根、却使用不同 state 目录的实例不会被这把锁串行化，此时仍靠计划快照与执行前复查兜底，不要把多 state 部署当作已互斥。执行期间 `jobs` / `job` 可以读取已原子落盘的 journal；锁被实际 writer 持有时，不将运行中任务标成中断。没有 writer 时查询非终态任务会转为 `needs_reconciliation`。receipt ID 等于 plan ID，重复 execute 返回原记录，不重做动作。
+一个本地 core operation lock 串行化 Lintel 的 mutation。锁文件位于 state 目录下，只互斥**同一 state 目录**的 core 进程；两个指向同一配置根、却使用不同 state 目录的实例不会被这把锁串行化，此时仍靠计划快照与执行前复查兜底，不要把多 state 部署当作已互斥。执行期间 `jobs` / `job` 及新的 `jobs_page` / `job_detail_page` 可以读取已原子落盘的 journal；新的分页接口始终只读，不做中断核对或更新记录。锁被实际 writer 持有时，不将运行中任务标成中断。没有 writer 时旧 `job` 查询非终态任务会转为 `needs_reconciliation`。receipt ID 等于 plan ID，重复 execute 返回原记录，不重做动作。
 
 任务先持久接收，再记录执行、验证、结果。`lintel request` 在前台执行；`lintel submit` 仅接受 execute，通过 stdin 交给 worker，在 accepted journal 已落盘后返回 ACK。Linux PID 1 systemd／当前 euid 0 使用 system transient service；非 root 必须已有 `Linger=yes` 和可用的当前 UID user bus 才使用 user transient service。原调用环境经同机私有 stdin pipe 继承，工作目录保持一致，认证来源／proxy 复查不能因 manager 切换丢失；环境值不写入 unit 配置、命令参数、回执或磁盘。worker 在接受前核验实际 cgroup 属于所选 unit，`Restart=no`，没有自动重发或 manager 启动失败后的第二次 fallback。其他主机保留 `setsid` 并明确记录续跑限制；这是 macOS、无 systemd 和未满足 user manager 条件的现行兼容路径。`execution` 的 mode、manager、unit、continuation、limitation 与 `reboot_survival: false` 来自 runner 内部，在 ACK 前持久写入，调用者请求里的同名字段不能伪造。旧回执没有该字段时保持原事实，不补造托管结论。断线后查询原 ID；恢复另行预览和批准。真实 PAM logout／重启证据与生产 VPS 限制见 [当前状态](current-state.md)。
 

@@ -249,7 +249,7 @@ impl Engine {
                 .open(lock_path)?;
             if lock.try_lock_exclusive().is_err() {
                 match r["command"].as_str() {
-                    Some("jobs") => return self.dispatch(&r),
+                    Some("jobs" | "jobs_page" | "job_detail_page") => return self.dispatch(&r),
                     Some("job") => {
                         let key = if r.get("job_id").is_some() {
                             "job_id"
@@ -719,6 +719,8 @@ impl Engine {
             "plan_import" => self.plan_import(r),
             "execute" => self.execute(r),
             "jobs" => self.list_jobs(),
+            "jobs_page" => self.jobs_page(r),
+            "job_detail_page" => self.job_detail_page(r),
             "job" => {
                 let key = if r.get("job_id").is_some() {
                     "job_id"
@@ -1174,6 +1176,9 @@ impl Engine {
                 })
                 .map(|step| step["id"].clone());
             j["error"] = json!({"code":failure.code,"message":failure.message,"phase":phase,"step_id":step_id,"uncertain_side_effects":uncertain,"recovery":"查询此任务的原始记录（同一 ID），查看已完成步骤与产物；不要重复提交，已完成步骤不会自动重做。"});
+            if let Some(reason) = failure.reason {
+                j["error"]["reason"] = json!(reason);
+            }
             j["warnings"]
                 .as_array_mut()
                 .unwrap()
@@ -1780,6 +1785,35 @@ mod tests {
     }
     fn plan(engine: &Engine, e: &Value) -> Value {
         engine.request(json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce","keep_remote_control":false}))["data"].clone()
+    }
+    #[test]
+    fn finite_io_reason_survives_acceptance_and_reopen() {
+        for (errno, reason) in [(libc::ENOSPC, "storage_full"), (libc::EACCES, "permission_denied"), (libc::EROFS, "read_only_filesystem")] {
+            for accepted in [false, true] {
+                let (_temp, engine, e, root) = setup();
+                let p = plan(&engine, &e);
+                let journal = engine.path("jobs", p["id"].as_str().unwrap());
+                storage::io_fault::arm(if accepted { root.join("settings.json") } else { journal.clone() }, errno);
+                let response = engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+                let error = if accepted { &response["data"]["error"] } else { &response["error"] };
+                assert_eq!(error["code"], "io_error", "{response}");
+                assert_eq!(error["reason"], reason, "{response}");
+                assert!(!error.to_string().contains(root.to_str().unwrap()));
+                if accepted {
+                    let persisted = load(&journal).unwrap();
+                    assert_eq!(persisted["error"], *error);
+                    let reopened = Engine::new(engine.home.clone(), engine.state.clone()).unwrap();
+                    let query = reopened.request(json!({"command":"job","job_id":p["id"]}));
+                    assert_eq!(query["data"]["error"], *error, "{query}");
+                    let replay = reopened.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+                    assert_eq!(replay["data"]["error"], *error);
+                    let mut legacy = persisted;
+                    legacy["error"].as_object_mut().unwrap().remove("reason");
+                    save(&journal, &legacy).unwrap();
+                    assert_eq!(reopened.request(json!({"command":"job","job_id":p["id"]}))["ok"], true);
+                } else { assert!(!journal.exists()); }
+            }
+        }
     }
     #[test]
     fn corrupt_job_query_returns_error_without_rewriting_original() {

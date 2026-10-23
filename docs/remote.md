@@ -147,17 +147,19 @@ Tauri command 接受 `remote_request({ payload })`，返回单层 Envelope：`{o
 | `execute` | `alias`, `plan_id`, `approval`，可选 `archive_passphrase` | 一次 `lintel submit`，返回 durable Receipt；重复调用只查原 job |
 | `reconnect` | `alias`, `plan_id` | 通过保存的 lookup ID 查询原 Receipt；已移除主机的已有任务也可查询，从不提交执行 |
 
-连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / query_install / launch_query 对已移除 alias 仅开放本地仍有持久记录的原任务、安装或启动，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
+连接、安装预览、上传、普通请求和 execute 要求 alias 已登记；reconnect / request.job / request.job_detail_page / query_install / launch_query 对已移除 alias 仅开放本地仍有持久记录的原任务、安装或启动，request 的其他操作仍需登记。移除登记不会删除这些记录。普通请求有严格字段 allowlist：
 
 - `discover`、`inspect`、`inspect_components`、`work_preflight`、`work_inventory`、`register`、`create_environment`；
 - `network_inspect`、`network_probe`、`plan_network_ipv6`、`plan_network_restore`；IPv4／IPv6 probe 在该 runner 执行，loopback 地址属于远端，不映射本机 App 通道。Linux 系统变更明确 unsupported，观察和显式测试可用；
 - `plan_policy`、`plan_reset`、`plan_archive`、`plan_preserve`、`plan_cleanup`、`plan_restore`、`plan_import`、`plan_launch`、`plan_resume`；
 - `cleanup_inspect`、`auth_probe`、`archive_inspect`、`archive_read`、`session_read`、`service_inspect`、`plan_service_quiesce`、`plan_service_resume`；
-- `jobs`、`job`、`drift`、`accept_drift`、`reactivate_environment`、`export_support`。
+- `jobs`、`job`、`jobs_page`、`job_detail_page`、`drift`、`accept_drift`、`reactivate_environment`、`export_support`。
 
 字段与 core 协议一致；未知字段或任意 shell / generic file 命令被拒绝。`execute` 不能从普通 `request` 绕过持久意图记录。归档正文只在明确阅读请求中经响应返回，不写入普通任务或诊断；口令只进入本次 stdin，不进入 SSH argv 或控制端记录。启动由有限 Terminal owner、服务暂停/恢复由 core service owner 独立核验；此 bridge 不提供任意命令、通用安装或强约束网络组件操作。
 
 关联组件、容量预检和分页原件清单是目标主机上的有限只读入口；精确 `selected_paths` 沿用共享 work schema，经 stdin 完整传递，正式计划冻结所选原件，执行仍经独立 submit。无效路径、类别不符或后续页缺少原摘要在 SSH 前拒绝；旧 runner 不支持时明确报错，不能静默扩大为整类。
+
+记录摘要和分段详情使用 `jobs_page`／`job_detail_page`，256 KiB 页预算小于既有 2 MiB SSH 响应上限。详情按已有 task 的原 `lookup_id` 与冻结 runner 查询，不改本地 task、不创建提交 intent；已移除 alias 仅能读取持有的原 task。旧 runner 不支持时明确报错，不回退到全量 `jobs`，不扩容 SSH 或重发操作。大单条详情的限制与重新读取规则见 [core](core.md)。
 
 ## 连接错误与本机诊断
 

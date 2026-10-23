@@ -445,7 +445,10 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     fn fixture() -> (tempfile::TempDir, Controller) {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = tempfile::Builder::new()
+            .prefix("lintel runner fixture ")
+            .tempdir()
+            .unwrap();
         let root = fs::canonicalize(temp.path()).unwrap();
         let home = root.join("home");
         fs::create_dir(&home).unwrap();
@@ -484,7 +487,7 @@ export HOME='{home}'
 export PATH='{tools}':/usr/bin:/bin:/usr/sbin:/sbin
 for arg do last="$arg"; done
 printf '%s\n' "$last" >> '{root}/commands'
-last=$(printf '%s' "$last" | sed 's|/etc/machine-id|{root}/machine-id|g')
+last=$(printf '%s' "$last" | sed 's|/etc/machine-id|"{root}/machine-id"|g')
 if [ -f '{root}/lose-ack' ]; then
  case "$last" in *uploaded*) rm '{root}/lose-ack'; eval "$last" >/dev/null; exit 0;; esac
 fi

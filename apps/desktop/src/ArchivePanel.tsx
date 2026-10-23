@@ -4,8 +4,8 @@ import { request, RequestError } from './api';
 import { ResourceLink } from './Resources';
 import LaunchPanel from './LaunchPanel';
 import RequestFailure, { asError } from './RequestFailure';
-import type { ArchiveManifest, Environment, Plan, Receipt, SessionPage, SessionRecord, InputReference } from './types';
-import { Icon, Notice, formatBytes, hasConfirmedWorkArchive } from './ui';
+import type { ArchiveManifest, Environment, Plan, JobSummary, JobsPage, SessionPage, SessionRecord, InputReference } from './types';
+import { Icon, Notice, formatBytes } from './ui';
 import { useI18n } from './i18n-provider';
 import { present } from './i18n-presentation';
 type Selection={path:string;digest:string;packageDigest:string;record:SessionRecord;key:string};
@@ -38,12 +38,23 @@ export function selectedContext(items:Selection[],t:(k:string,a?:Record<string,s
   const role=(kind:string)=>roleKeys[kind]?t(roleKeys[kind]):kind;
   return [t('archive.draft.title'),t('archive.draft.note'),'','## '+t('archive.draft.goalHeading'),t('archive.draft.goalBody'),'','## '+t('archive.draft.decisionsHeading'),t('archive.draft.decisionsBody'),'','## '+t('archive.draft.filesHeading'),t('archive.draft.filesBody'),'','## '+t('archive.draft.statusHeading'),t('archive.draft.statusBody'),'','## '+t('archive.draft.nextHeading'),t('archive.draft.nextBody'),'','## '+t('archive.draft.verifyHeading'),t('archive.draft.verifyBody'),'','## '+t('archive.draft.sourcesHeading'),...items.filter(item=>!opaqueRecord(item.record)).flatMap(item=>[`\n### ${role(item.record.kind)} · ${item.path} · ${recordLocation(item.record,t)}`,t('archive.draft.sourceLine',{packageDigest:item.packageDigest,digest:item.digest}),recordText(item.record)])].join('\n');
 }
-export default function ArchivePanel({send=request,jobs,environments,initialJob,selectedId,hostAlias=null,onImport}:{send?:typeof request;jobs:Receipt[];environments:Environment[];initialJob?:string;selectedId:string;hostAlias?:string|null;onImport:(environment:Environment,plan:Plan,passphrase:string)=>void}) {
+export default function ArchivePanel({send=request,environments,initialJob,selectedId,hostAlias=null,onImport}:{send?:typeof request;environments:Environment[];initialJob?:string;selectedId:string;hostAlias?:string|null;onImport:(environment:Environment,plan:Plan,passphrase:string)=>void}) {
   const { t, formatDateTime, locale } = useI18n();
   const role=(kind:string)=>roleKeys[kind]?t(roleKeys[kind]):kind;
   const loc=(record:SessionRecord)=>recordLocation(record,t);
-  const archives=jobs.filter(hasConfirmedWorkArchive);
-  const [source,setSource]=useState<'job'|'file'>(archives.length?'job':'file');
+  const [archives,setArchives]=useState<JobSummary[]>([]);
+  const [archivePage,setArchivePage]=useState<JobsPage|null>(null);
+  const [archiveListError,setArchiveListError]=useState<Error|null>(null);
+  const [archiveListPending,setArchiveListPending]=useState(false);
+  const listGeneration=useRef(0);
+  async function loadArchives(more=false){const token=++listGeneration.current;setArchiveListPending(true);setArchiveListError(null);try{
+    const result=await send('jobs_page',{filter:'archives',...(more&&archivePage?.next_offset!=null?{offset:archivePage.next_offset,expected_digest:archivePage.digest}:{})});
+    if(token!==listGeneration.current)return;
+    setArchives(previous=>more?[...previous,...result.jobs]:result.jobs);setArchivePage(result);
+  }catch(e){if(token===listGeneration.current)setArchiveListError(asError(e))}finally{if(token===listGeneration.current)setArchiveListPending(false)}}
+  useEffect(()=>{void loadArchives();return()=>{listGeneration.current++}},[send]);
+  const sourceTouched=useRef(false);
+  const [source,setSource]=useState<'job'|'file'>(initialJob?'job':'file');
   const [jobId,setJobId]=useState(initialJob ?? archives[0]?.id ?? '');const [archivePath,setArchivePath]=useState('');
   const [targetId,setTargetId]=useState(selectedId);const [passphrase,setPassphrase]=useState('');
   const [manifest,setManifest]=useState<ArchiveManifest|null>(null);const [categories,setCategories]=useState(['instructions','memory','sessions']);
@@ -54,7 +65,7 @@ export default function ArchivePanel({send=request,jobs,environments,initialJob,
   const [pendingRead,setPendingRead]=useState<{path:string;at:number}|null>(null);
   const alive=useRef(true);const actionLock=useRef(false);const reader=useRef<HTMLDivElement>(null);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
-  useEffect(()=>{if(!jobId && archives.length)setJobId(archives[0].id)},[jobId,archives[0]?.id]);
+  useEffect(()=>{if(!jobId && archives.length)setJobId(archives[0].id);if(archives.length&&!sourceTouched.current)setSource('job')},[jobId,archives[0]?.id]);
   const sourceFields=source==='job'?{job_id:jobId}:{archive_path:archivePath.trim()};
   const validSource=source==='job'?!!jobId:archivePath.trim().startsWith('/');
   const target=environments.find(e=>e.id===targetId);
@@ -75,9 +86,14 @@ export default function ArchivePanel({send=request,jobs,environments,initialJob,
   const records=page?.content_kind==='messages'?(page.records ?? []):[];
   return <div className="archive-panel session-workspace"><div className="source-banner"><Icon name="terminal" size={16}/><strong>{hostAlias?`SSH · ${hostAlias}`:t('app.localLabel')} · {t('archive.bannerTitle')}</strong><span>{t('archive.bannerNote')}</span></div>
     {error && <RequestFailure error={error} context={t('archive.context')}/>}
-    <section className="source-open"><div className="segmented archive-source" aria-label={t('archive.sourceAria')}><button disabled={!!busy || !archives.length} aria-pressed={source==='job'} onClick={()=>{setSource('job');clear()}}>{t('archive.sourceJob')}</button><button disabled={!!busy} aria-pressed={source==='file'} onClick={()=>{setSource('file');clear()}}>{t('archive.sourceFile')}</button></div>
-    {source==='job'?<label className="field">{t('app.archiveTitle')}<select disabled={!!busy} value={jobId} onChange={e=>{setJobId(e.target.value);clear()}}>{archives.map(job=><option key={job.id} value={job.id}>{present(job.title,locale)} · {formatDateTime(job.created_at)}</option>)}</select></label>:<label className="field">{t('archive.pathLabel')}<input aria-label={t('archive.pathLabel')} disabled={!!busy} value={archivePath} onChange={e=>{setArchivePath(e.target.value);clear()}} placeholder="/path/to/work-package.age" spellCheck={false}/><span className="small-print">{t('archive.pathNote',{host:hostAlias ?? t('app.localLabel')})}</span></label>}
-    {!archives.length && <p>{t('archive.noArchives')}</p>}
+    <section className="source-open"><div className="segmented archive-source" aria-label={t('archive.sourceAria')}><button disabled={!!busy || (!archives.length&&!initialJob)} aria-pressed={source==='job'} onClick={()=>{sourceTouched.current=true;setSource('job');clear()}}>{t('archive.sourceJob')}</button><button disabled={!!busy} aria-pressed={source==='file'} onClick={()=>{sourceTouched.current=true;setSource('file');clear()}}>{t('archive.sourceFile')}</button></div>
+    {source==='job'?<label className="field">{t('app.archiveTitle')}<select disabled={!!busy} value={jobId} onChange={e=>{setJobId(e.target.value);clear()}}>{jobId&&!archives.some(j=>j.id===jobId)&&<option value={jobId}>{jobId}</option>}{archives.map(job=><option key={job.id} value={job.id}>{present(job.title,locale)} · {formatDateTime(job.created_at)}</option>)}</select></label>:<label className="field">{t('archive.pathLabel')}<input aria-label={t('archive.pathLabel')} disabled={!!busy} value={archivePath} onChange={e=>{sourceTouched.current=true;setArchivePath(e.target.value);clear()}} placeholder="/path/to/work-package.age" spellCheck={false}/><span className="small-print">{t('archive.pathNote',{host:hostAlias ?? t('app.localLabel')})}</span></label>}
+    {archiveListError&&<RequestFailure error={archiveListError}/>}
+    {archiveListPending&&<p role="status">{t('history.boundedLoading')}</p>}
+    <p>{t(archivePage?.scan_complete?'history.boundedEnd':'history.boundedPartial')}</p>
+    <button disabled={archiveListPending} onClick={()=>void loadArchives()}>{t('app.refresh')}</button>
+    {archivePage?.next_offset!=null&&<button disabled={archiveListPending} onClick={()=>void loadArchives(true)}>{t('history.boundedMore')}</button>}
+    {archivePage?.record_errors.map((e,i)=><p key={i}>{e.job_id} · {e.code}</p>)}
     <form className="archive-unlock" onSubmit={e=>{e.preventDefault();void run('unlock',async()=>{const m=await send('archive_inspect',{...sourceFields,archive_passphrase:passphrase});if(alive.current){clear(false);setManifest(m)}})}}><label className="field">{t('app.archivePassphrase')}<input type="password" disabled={!!busy} value={passphrase} onChange={e=>{clear(false);setPassphrase(e.target.value)}} autoComplete="off" placeholder={t('archive.passphrasePlaceholder')}/></label><button disabled={!!busy || !passphrase || !validSource}>{busy==='unlock'?t('archive.unlocking'):t('archive.unlock')}</button>{manifest && <button type="button" disabled={!!busy} onClick={()=>clear()}>{t('archive.lock')}</button>}</form><p className="small-print">{t('archive.passphraseNote')}</p></section>
     {manifest && <><div className="archive-count"><strong>{t('archive.fileCount',{count:manifest.files.length})}</strong><span>{t('archive.fileCountNote',{bytes:formatBytes(manifest.files.reduce((n,f)=>n+f.bytes,0))})}</span></div><div className="reader-mobile-tabs" role="group" aria-label={t('archive.readerPaneAria')}><button aria-pressed={mobilePane==='index'} onClick={()=>setMobilePane('index')}>{t('archive.tabIndex')}</button><button disabled={!page} aria-pressed={mobilePane==='reader'} onClick={()=>setMobilePane('reader')}>{t('archive.tabRead')}</button><button aria-pressed={mobilePane==='context'} onClick={()=>setMobilePane('context')}>{t('archive.tabContext',{count:selections.length})}</button></div>
     <div className={`session-layout pane-${mobilePane}`}><aside className="session-index"><h3>{t('archive.indexTitle')}</h3><div className="archive-files">{manifest.files.map(file=><button key={file.path} className={activePath===file.path?'selected-file':''} disabled={!!busy} onClick={()=>void read(file.path)}><Icon name="terminal" size={14}/><code>{file.path}</code><span>{formatBytes(file.bytes)}</span></button>)}</div></aside>

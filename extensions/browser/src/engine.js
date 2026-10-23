@@ -16,15 +16,16 @@ export class Engine {
   serial(fn) {const run=this.tail.then(fn,fn);this.tail=run.catch(()=>{});return run;}
   async get(key) {return (await this.api.storage.local.get(key))[key];}
   async set(key,value) {await this.api.storage.local.set({[key]:value});}
-  async preview(input,source='local',operationId=crypto.randomUUID()) {
+  async preview(input,source='local',operationId=crypto.randomUUID(),nativeInstanceId) {
     const action=normalizeAction(input,this.config);
     if (!/^[A-Za-z0-9_-]{8,80}$/.test(operationId)) fail('invalid_operation_id');
     const existing=await this.get(`operation:${operationId}`);
     if (existing) {
+      if (nativeInstanceId && existing.nativeInstanceId!==nativeInstanceId) fail('operation_identity_conflict');
       if (!equal(existing.action,action)) fail('operation_id_conflict');
       return existing;
     }
-    const record={id:operationId,action,source,phase:'preview',createdAt:Date.now(),expiresAt:Date.now()+PREVIEW_TTL,preview:describe(action,this.config),permissions:requiredPermissions(action,this.config)};
+    const record={id:operationId,action,source,...(nativeInstanceId?{nativeInstanceId}:{}),phase:'preview',createdAt:Date.now(),expiresAt:Date.now()+PREVIEW_TTL,preview:describe(action,this.config),permissions:requiredPermissions(action,this.config)};
     if (action.kind === 'clear') {
       record.preview.writerHandling=action.cookieStoreId ? '容器删除不注销共享 Service Worker；浏览器重启后仍仅保证所选 store 的 API 确认，无法验证后台本地回写停止。' : action.types.includes('serviceWorkers') ? '关闭目标 frame 并注销 Service Worker；重启浏览器后再次确认删除，隔离保留到单独解除。' : '未选择 serviceWorkers，无法可靠停止后台本地写入；执行前须选择该类别。';
       if (!action.cookieStoreId && !action.types.includes('serviceWorkers')) fail('service_worker_quiescence_required',record.preview.writerHandling);
@@ -43,6 +44,14 @@ export class Engine {
     await this.set(`operation:${operationId}`,record);
     return record;
   }
+  bindNativeIdentity(id,instanceId,observed) {return this.serial(async()=>{
+    const r=await this.get(`operation:${id}`);
+    if(!r)return;
+    if(r.source!=='app'||observed.id!==id||observed.instance_id!==instanceId||!equal(r.action,normalizeAction(observed.action,this.config))) fail('operation_identity_conflict');
+    if(r.nativeInstanceId&&r.nativeInstanceId!==instanceId)fail('operation_identity_conflict');
+    r.nativeInstanceId=instanceId;delete r.nativeIdentityLimitation;await this.set(`operation:${id}`,r);return r;
+  });}
+  noteUnboundIdentity(id) {return this.serial(async()=>{const r=await this.get(`operation:${id}`);if(r&&!r.nativeInstanceId){r.nativeIdentityLimitation='旧回执的原实例归属尚未由桌面确认；已保留记录，未借当前身份发送或执行。';await this.set(`operation:${id}`,r);}});}
   // `onRunning` runs after preflight succeeds and the durable `running` journal
   // boundary is crossed, but before any browser mutation. Callers use it to
   // report `running` to the host only once the op can no longer be rejected
@@ -59,7 +68,10 @@ export class Engine {
       await this.set(key,expired);
       return expired;
     }
-    if (r.source === 'app' && !(await this.get('pairing'))?.paired) fail('pairing_required');
+    if (r.source === 'app') {
+      if (!(await this.get('pairing'))?.paired) fail('pairing_required');
+      if (r.nativeInstanceId && r.nativeInstanceId!==(await this.get('identity'))?.instanceId) fail('operation_identity_conflict');
+    }
     if (!await this.api.permissions.contains(r.permissions)) fail('permissions_missing');
     const running={...r,phase:'running',startedAt:Date.now()};
     await this.set(key,running); // durable boundary BEFORE any browser mutation
@@ -337,6 +349,7 @@ export class Engine {
     return {browser:this.config.browser,synthetic:this.config.fixture,pairing:all.pairing || {paired:false},bridge:all.bridge || {connected:false},
       instanceId:all.identity?.instanceId,webrtc,permissions:await this.api.permissions.getAll(),
       receipts:Object.entries(all).filter(([k])=>k.startsWith('operation:')).map(([,v])=>v).sort((a,b)=>b.createdAt-a.createdAt),
+      cleanupIsolation:all.cleanupIsolation?{operationId:all.cleanupIsolation.operationId}:undefined,
       pausedRules:all.pausedRules,ruleConflict:all.ruleConflict,
       capabilities:{siteData:true,cacheStorage:this.config.browser!=='firefox',siteHttpCache:this.config.browser!=='firefox',containerStore:this.config.browser==='firefox',sitePermissions:this.config.browser!=='firefox',scopedProxy:this.config.browser!=='firefox'}};
   }

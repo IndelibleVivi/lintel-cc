@@ -1,3 +1,6 @@
+export type JobSummary = {id:string;title:string;title_truncated:boolean;created_at:string;updated_at_ns:string;environment_id:string|null;status:string;host_shared_network:boolean;has_work_archive:boolean;restorable:boolean;service_restorable:boolean};
+export type JobsPage = {jobs:JobSummary[];record_errors:{job_id:string|null;code:string}[];records_complete:boolean;digest:string;next_offset:number|null;scan_complete:boolean;scanned:number;total_candidates:number;order:'updated_desc_id'};
+export type JobDetailPage = {job_id:string;section:string;items:unknown[];digest:string;next_offset:number|null;total_items:number;complete:boolean};
 import type { NetworkChange, NetworkInspection, NetworkPlan, NetworkProbe, ProbeOptions } from './networkTypes';
 export interface Environment {
   id: string; name: string; host: string; surface: string; root: string;
@@ -269,6 +272,8 @@ export interface Api {
   archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };
   archive_read: { request: { job_id?: string; archive_path?: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };
   plan_import: { request: { environment_id: string; job_id?: string; archive_path?: string; categories: string[]; activate?:{instructions:boolean}; archive_passphrase: string }; response: Plan };
+  jobs_page: {request:{offset?:number;limit?:number;expected_digest?:string;filter?:'all'|'attention'|'archives'|'network';environment_id?:string;query?:string};response:JobsPage};
+  job_detail_page: {request:{job_id:string;section?:'header'|'receipt'|'steps'|'warnings'|'coverage'|'task_result'|'result_coverage'|'next_actions'|'next_steps'|'error';offset?:number;limit?:number;expected_digest?:string};response:JobDetailPage};
   jobs: { request: {}; response: { jobs: Receipt[]; records_complete?: boolean; record_errors?: {job_id:string|null;code:string}[] } };
   job: { request: { job_id: string }; response: Receipt };
   drift: { request: { environment_id: string;lightweight?:boolean }; response: Drift };

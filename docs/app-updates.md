@@ -190,3 +190,24 @@ feed 故障保留当前 App；签名或版本不匹配拒绝安装。误发候�
 浏览器 extension/native host、远端 runner 不在 App updater 的自动安装边界。新 App 可能带新资源，但必须继续各自的 frozen preview、明确批准与原安装核对；旧远端任务仍使用自己冻结的 runner。
 
 协议与 API 依据 [Tauri updater](https://v2.tauri.app/plugin/updater/)；运行行为以锁定的 `tauri-plugin-updater`、当前 CLI 的 `signer sign --app-version` 和本仓库检查为准。源码验收标准见 [遥测与更新 Leaf](specs/telemetry-updates.md)。
+
+## 统一候选构建与一致性 gate（未发布）
+
+`scripts/prepare-candidate.py` 需要 Python 3.11+（标准库 `tomllib`），提供 `build` 与 `verify` 两个本地模式。先提交并核对准确的 clean 40 位 SHA；输出目录必须尚不存在且位于源码 checkout 外。当前 matrix 入口只接受 native macOS arm64；Rust 三个 targets、Node、cargo-zigbuild、Zig 0.16.0 与当前 toolchain 的完整 rust-docs 声明须预先可用。Linux 两目标复用既有 cargo zigbuild 路径，Zig 版本须与受审 native-runtime 声明匹配；脚本在创建输出前检查并拒绝缺项，不安装工具链。示例路径和 SHA 均须替换为实际选定值：
+
+```sh
+python3 scripts/prepare-candidate.py build \
+  --revision REPLACE_WITH_EXACT_CLEAN_40_HEX_SHA \
+  --out ../lintel-candidate-build
+# 需要 macOS App/DMG 时，在上述 build 命令加 --app。
+python3 scripts/prepare-candidate.py verify \
+  --receipt ../lintel-candidate-build/build-receipt.json \
+  --ci-plan ../lintel-ci/plan.json \
+  --ci-results ../lintel-ci/results.json \
+  --ci-evidence ../lintel-ci/evidence \
+  --out ../lintel-candidate-verified.json
+```
+
+`build` 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。`verify` 重新读取实际 tar member bytes，不信任包内自报 checksum；核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout）。它不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。
+
+这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。本轮未完成真实冷原生构建、新 DMG、干净 Mac 或 Release 验收；上述流程存在不表示已经运行。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 `main` 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。

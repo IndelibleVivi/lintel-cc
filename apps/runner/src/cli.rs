@@ -422,7 +422,8 @@ const GROUP_HELP: &[(&str, &str)] = &[
     ("data", "data clear|identity-reset|workflow plan\n  data archive inspect | data restore plan：JSON stdin 提供 job_id/archive_path 之一、archive_passphrase；restore 还需 environment_id 与 selected_paths。残留备份独立于工作包，只恢复缺失的准确原路径，不覆盖现有文件。"),
     ("policy", "policy plan --environment ID --preset reduce|preserve|custom [--keep-remote-control]\n  预览精确的 user settings 字段写入；执行需要 approve 阶段。"),
     ("work", "work inventory --environment ID --categories instructions,memory,sessions [--offset N] [--expected-digest HEX]\n  work preflight --environment ID --categories ... [--path RELATIVE_PATH ...]\n  work archive plan|list|inspect|read | preserve plan | import plan | session read\n  inventory 返回有界只读原件元数据清单（分页/摘要绑定同一次扫描）；preflight 只读元数据容量预检。archive/preserve plan 可用可重复 --path 精确选择所选类别内的原件，排除未选的大会话而不截断。session read 需要 --job ID 或 --archive-path PATH 之一、--path PATH，以及 stdin 的 {\"archive_passphrase\":\"...\"}。"),
-    ("job", "job show ID | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
+    ("jobs", "jobs [--filter all|attention|archives] [--offset N --expected-digest HASH] [--limit 1..100]\n  有界摘要页，按最近更新排序。next_offset 非空表示仍有候选；后续页必须带原 digest。"),
+    ("job", "job show ID | job detail ID [--section header|steps|warnings|coverage|task_result|error --offset N --expected-digest HASH] | job wait ID --timeout 30s | job submit --plan ID --approval HASH\n  show/wait 只查询原任务；submit 批准原计划；wait 超时不会重新提交。"),
     ("restore", "restore plan --job ID\n  为仍属于本工具的字段准备独立恢复预览。"),
     ("remote", "remote hosts | aliases | inspect ALIAS | request ALIAS | submit ALIAS | job ALIAS PLAN_ID | launch ALIAS ENVIRONMENT_ID | control\n  remote launch request|resume ALIAS REQUEST_ID APPROVAL；remote launch query ALIAS REQUEST_ID | remote launch list ALIAS。有限 OpenSSH controller；execute 只走 submit，恢复只查询原任务。"),
     ("launch", "launch ENVIRONMENT_ID\n  launch request REQUEST_ID APPROVAL | launch resume REQUEST_ID APPROVAL\n  launch query REQUEST_ID | launch list\n  真实 TTY 直接交互、无 prompt；旧入口以 root 为 cwd，新请求冻结独立 cwd。resume 的口令在该 TTY 无回显输入；请求以不可变 request ID 解析，重复只查询。"),
@@ -530,7 +531,8 @@ pub fn run(args: &[String]) -> Value {
             }
             named(word(1), &[], json!({}), true)
         }
-        "discover" | "jobs" => named(word(0), &args[1..], json!({}), false),
+        "discover" => named(word(0), &args[1..], json!({}), false),
+        "jobs" => named("jobs_page", &args[1..], json!({}), false),
         "inspect" => {
             if word(1).is_empty() {
                 error("invalid_argument", "需要 environment ID")
@@ -596,6 +598,7 @@ pub fn run(args: &[String]) -> Value {
         "policy" if word(1) == "plan" => named("plan_policy", &args[2..], json!({}), false),
         "restore" if word(1) == "plan" => named("plan_restore", &args[2..], json!({}), false),
         "job" => match word(1) {
+            "detail" if !word(2).is_empty() => named("job_detail_page", &args[3..], json!({"job_id":word(2)}), false),
             "submit" => named("execute", &args[2..], json!({}), true),
             "show" if !word(2).is_empty() => {
                 named("job", &args[3..], json!({"plan_id":word(2)}), false)
@@ -619,7 +622,7 @@ pub fn run(args: &[String]) -> Value {
         "work" => {
             let (command, start, input) = match (word(1), word(2), word(3)) {
                 ("archive", "plan", _) => ("plan_archive", 3, false),
-                ("archive", "list", _) => ("jobs", 3, false),
+                ("archive", "list", _) => ("jobs_page", 3, false),
                 ("archive", "inspect", _) => ("archive_inspect", 3, true),
                 ("archive", "read", _) => ("archive_read", 3, true),
                 ("preflight", _, _) => ("work_preflight", 2, false),
@@ -634,12 +637,7 @@ pub fn run(args: &[String]) -> Value {
                     )
                 }
             };
-            let mut response = named(command, &args[start..], json!({}), input);
-            if word(2) == "list" && response["ok"] == true {
-                if let Some(jobs) = response["data"]["jobs"].as_array_mut() {
-                    jobs.retain(|j| j["archive_path"].is_string());
-                }
-            }
+            let response = named(command, &args[start..], if command == "jobs_page" {json!({"filter":"archives"})} else {json!({})}, input);
             response
         }
         "remote" => remote(args),

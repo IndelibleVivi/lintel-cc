@@ -241,3 +241,80 @@ test('a late reconciliation consumes only its own persisted pause generation',as
 });
 
 test('release retry after owner removal failure survives Engine reconstruction without replay',async()=>{const f=fake(),e=new Engine(f.api,chromium),p=await e.preview(clear);await e.commit(p.id);const count=f.calls.length,remove=f.api.storage.local.remove;f.api.storage.local.remove=async()=>{throw new Error('synthetic storage interruption');};await assert.rejects(e.releaseIsolation(p.id),/synthetic storage/);assert(f.db[`operation:${p.id}`].isolationReleasedAt);assert.equal(f.rules.length,0);f.api.storage.local.remove=remove;const restarted=new Engine(f.api,chromium);await restarted.recover();await restarted.releaseIsolation(p.id);assert.equal(f.db.cleanupIsolation,undefined);assert.equal(f.calls.length,count);});
+
+// Run the actual worker and popup against disposable in-memory browser/DOM APIs.
+async function worker(f,respond){
+  const event=()=>({addListener(fn){this.fn=fn;}});
+  f.api.runtime={id:'synthetic-extension',getURL:p=>`extension://synthetic/${p}`,onMessage:event(),onStartup:event(),connectNative(){
+    const p={onMessage:event(),onDisconnect:event(),disconnect(){p.onDisconnect.fn?.();},postMessage(msg){Promise.resolve().then(()=>respond(msg)).then(data=>{if(data.proposals)data={...data,proposals:data.proposals.map(r=>({instance_id:msg.instance_id,...r}))};return data;}).then(data=>p.onMessage.fn({request_id:msg.request_id,ok:true,data}),error=>p.onMessage.fn({request_id:msg.request_id,ok:false,error:{code:error.code||'unknown_operation',message:error.message}}));}};return p;
+  }};
+  f.api.permissions.onRemoved=event();f.api.alarms.onAlarm=event();
+  const prior=globalThis.browser,interval=globalThis.setInterval;globalThis.browser=f.api;globalThis.setInterval=fn=>{f.tick=fn;return 0;};
+  try{await import(`../src/background.js?fixture=${crypto.randomUUID()}`);}finally{globalThis.browser=prior;globalThis.setInterval=interval;}
+  const send=message=>new Promise(resolve=>f.api.runtime.onMessage.fn(message,{id:f.api.runtime.id,url:f.api.runtime.getURL('popup.html')},resolve));
+  f.api.runtime.sendMessage=send;await send({type:'status'});return send;
+}
+async function popup(f){
+  class Node{constructor(){this.children=[];this.value='';}append(...n){this.children.push(...n);}replaceChildren(...n){this.children=n;}querySelectorAll(){return [];}scrollIntoView(){}}
+  const nodes=new Map(),doc={getElementById(id){if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);},createElement:()=>new Node(),createTextNode:text=>({textContent:text})};
+  const prior=globalThis.browser,document=globalThis.document;globalThis.browser=f.api;globalThis.document=doc;
+  try{await import(`../src/popup.js?fixture=${crypto.randomUUID()}`);}finally{globalThis.browser=prior;globalThis.document=document;}
+  // Popup callbacks retain the production `$` closure but resolve global document.
+  return {nodes,async click(node){const old=globalThis.document;globalThis.document=doc;try{await node.onclick();}finally{globalThis.document=old;}}};
+}
+test('worker and reopened popup expose exact pending isolation release without replay or stealing newer ownership',async()=>{
+  const f=fake(),e=new Engine(f.api,chromium),p=await e.preview(clear);await e.commit(p.id);
+  const count=f.calls.length,remove=f.api.storage.local.remove;f.api.storage.local.remove=async()=>{throw Error('synthetic removal interruption');};await assert.rejects(e.releaseIsolation(p.id));
+  f.api.storage.local.remove=remove;await worker(f,async()=>({proposals:[]}));
+  let ui=await popup(f);assert(ui.nodes.get('receipts').children.flatMap(n=>n.children).some(n=>n.textContent==='完成隔离释放恢复'));
+  // Close popup and worker; recover from durable storage alone.
+  const send=await worker(f,async()=>({proposals:[]}));ui=await popup(f);
+  const recovery=ui.nodes.get('receipts').children.flatMap(n=>n.children).find(n=>n.textContent==='完成隔离释放恢复');await ui.click(recovery);
+  assert.equal(f.db.cleanupIsolation,undefined);assert.equal(f.calls.length,count);
+  const next=(await send({type:'preview',action:clear})).data;await send({type:'commit',id:next.id});
+  const rules=structuredClone(f.rules);await send({type:'releaseIsolation',id:p.id});
+  assert.deepEqual(f.rules,rules);assert.equal(f.db.cleanupIsolation.operationId,next.id);assert.equal(f.calls.length,count+2);
+});
+test('lost ACK journals keep original identity through reset, reopen, new pairing, preview and commit',async()=>{
+  const f=fake();f.db.identity={instanceId:'original-instance',token:'synthetic-token'};
+  let proposals=[],requests=[],rejectReceipts=true;
+  const transport=async msg=>{requests.push(msg);if(msg.op==='poll')return {proposals};if(msg.op==='pair_request')return {code:'TEST'};if(msg.op==='receipt'&&msg.receipt.phase!=='running'&&rejectReceipts)throw Error('synthetic lost ACK / unknown_operation');return {};};
+  let send=await worker(f,transport);proposals=[{id:'old-app-operation',action:{kind:'webrtc',setting:'disable_non_proxied_udp'}}];await send({type:'refreshPairing'});
+  proposals=[];assert.equal((await send({type:'commit',id:'old-app-operation'})).data.phase,'completed');
+  assert.equal((await send({type:'refreshPairing'})).data.pairing.paired,true,'one receipt failure does not invalidate a successful poll');
+  const reset=send({type:'resetIdentity'}),refresh=send({type:'refreshPairing'});const newId=(await reset).data.instanceId;await refresh;
+  assert.notEqual(newId,'original-instance');assert.equal(f.db['operation:old-app-operation'].nativeInstanceId,'original-instance');assert(!f.db['operation:old-app-operation'].nativeAcknowledged);
+  send=await worker(f,transport);await send({type:'pair',code:'TEST'});rejectReceipts=false;proposals=[{id:'new-app-operation',action:{kind:'webrtc',setting:'disable_non_proxied_udp'}}];await send({type:'refreshPairing'});proposals=[];
+  assert.equal((await send({type:'commit',id:'new-app-operation'})).data.phase,'completed');
+  assert.equal(f.db.pairing.paired,true);assert.equal(f.db['operation:new-app-operation'].nativeInstanceId,newId);
+  assert(requests.filter(r=>r.receipt?.id==='old-app-operation').every(r=>r.instance_id==='original-instance'),'old receipt never borrows new identity');
+  assert.equal(f.db['operation:old-app-operation'].id,'old-app-operation');
+});
+
+test('legacy journals bind only to an authoritative exact instance/action query; unknown history stays visible and unsent',async()=>{
+  const f=fake();f.db.identity={instanceId:'legacy-current',token:'synthetic'};
+  const action={kind:'webrtc',setting:'disable_non_proxied_udp'};
+  for(const id of ['legacy-valid','legacy-unknown','legacy-mismatch'])f.db[`operation:${id}`]={id,source:'app',action,phase:'completed',createdAt:1};
+  const requests=[];const send=await worker(f,async msg=>{requests.push(msg);if(msg.op==='poll')return {proposals:[]};if(msg.op==='operation_query'){if(msg.operation_id==='legacy-unknown')throw Error('unknown_operation');return {id:msg.operation_id,instance_id:msg.instance_id,action:msg.operation_id==='legacy-mismatch'?{kind:'clearProfileCache'}:action};}return {};});
+  await send({type:'refreshPairing'});
+  assert.equal(f.db['operation:legacy-valid'].nativeInstanceId,'legacy-current');assert.equal(f.db['operation:legacy-valid'].nativeAcknowledged,true);
+  for(const id of ['legacy-unknown','legacy-mismatch']){assert.equal(f.db[`operation:${id}`].nativeInstanceId,undefined);assert(f.db[`operation:${id}`].nativeIdentityLimitation);assert(!requests.some(r=>r.receipt?.id===id));}
+  const ui=await popup(f);assert(ui.nodes.get('receipts').children.some(n=>JSON.stringify(n.children).includes('旧回执的原实例归属')));
+});
+test('identity reset waits for an in-flight approved App commit and its receipt delivery',async()=>{
+  const f=fake(),running=deferred(),release=deferred();let proposals=[{id:'inflight-app-operation',action:{kind:'webrtc',setting:'disable_non_proxied_udp'}}];const requests=[];
+  const send=await worker(f,async msg=>{requests.push(msg);if(msg.op==='poll')return {proposals};if(msg.receipt?.phase==='running'){running.resolve();await release.promise;}return {};});
+  await send({type:'refreshPairing'});proposals=[];const original=f.db.identity.instanceId;
+  const commit=send({type:'commit',id:'inflight-app-operation'});await running.promise;let resetDone=false;
+  const reset=send({type:'resetIdentity'}).then(r=>{resetDone=true;return r;});await Promise.resolve();assert.equal(resetDone,false);assert.equal(f.db.identity.instanceId,original);
+  release.resolve();assert.equal((await commit).data.phase,'completed');await reset;
+  assert.notEqual(f.db.identity.instanceId,original);assert(requests.filter(r=>r.receipt).every(r=>r.instance_id===original));assert.equal(f.db['operation:inflight-app-operation'].nativeInstanceId,original);
+});
+
+test('scheduled heartbeat ticks coalesce behind a slow native poll and do not starve reset',async()=>{
+  const f=fake(),entered=deferred(),release=deferred();let polls=0;
+  const send=await worker(f,async msg=>{if(msg.op==='poll'){polls++;if(polls===1){entered.resolve();await release.promise;}return {proposals:[]};}return {};});
+  f.api.alarms.onAlarm.fn({name:'bridge-status'});await entered.promise;
+  for(let i=0;i<20;i++){f.tick();f.api.alarms.onAlarm.fn({name:'bridge-status'});}
+  const reset=send({type:'resetIdentity'});release.resolve();assert((await reset).ok);await send({type:'status'});assert.equal(polls,1,'ticks while a scheduled poll is active must not add queued native requests');
+});

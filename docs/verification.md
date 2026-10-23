@@ -65,6 +65,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared connected silhouette, tap/hold-release jumps, normal/high reachable stars, collision/cancellation, four obstacle families, generated pacing and 320px visible-input clearance/landing at 30/60/144fps, no dependencies) |
 | `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
 | `app-release-test` | js | strict SemVer, actual disposable Ed25519 artifact/comment/version verification, synthetic App identity/architecture, macOS build/signing argument priority and output selection, and finite website metadata packaging |
+| `candidate-gate-test` | python, explicit-only | finite synthetic exact-SHA/full-CI/final-archive rejection fixtures and fixed build orchestration; no native candidate build |
 | `macos-bundle-signature-test` | independent | synthetic macOS App with a linker-only signature, a bundle-level ad-hoc signature, and resource/Info.plist tamper; Darwin/Xcode only |
 | `rust-notices-test` | js, explicit-only | locked Cargo graph selection, exact-version upstream evidence and missing/invalid notice rejection; no network or production licence changes |
 | `linux-vm-control-test` | python | `python3 -m unittest discover -s tests/fixtures/linux_vm -v` (launcher, barrier and finite probe tests; no VM) |
@@ -369,6 +370,8 @@ a prerequisite is unavailable they report `skipped` with a reason, never a pass.
 | `linux-ssh-runtime` | Real Linux x86_64, OpenSSH sshd/client, static musl runner and shared Rust controller; temporary loopback keys/config/HOME/state, inert Claude. No real VPS or account actions. |
 | `browser-smoke` | Built desktop frontend, Rust and Playwright Chromium, with a real restart that emits `runtime.onStartup`. Two-phase browser clear cannot be accepted from extension-worker restarts or synthetic generations. |
 | `browser-pairing-ui` | Built desktop frontend, Playwright Chromium and Rust. Renders the App, copies its actual short code and submits a framed request to the real native host; invoke and clipboard are synthetic. This does not prove native WebKit/OS clipboard or a non-developer installation. |
+| `history-ui` | Built App, isolated Chromium and real temporary-root core. Independent discovery/history failures, filtered empty pages, digest-bound paging, oversized details, original-ID restore preview, single-archive opening and late old-host response isolation; invoke/SSH modeled, not native WebKit. |
+| `browser-host-recovery-ui` | Built App, isolated Chromium and real synthetic core with browser-host IPC fixture. Reopened pending approval discovery, original approved continuation and visible query failure; no real registration or native WebKit. |
 | `remote-task-ui` | Built desktop frontend and Playwright Chromium. ACK loss, App reload, local→A/B→A full receipt routing through refresh, Agent packet/query command and startup preview, late-response isolation and separately approved restoration; invoke/SSH/registry are synthetic. Set `LINTEL_REMOTE_TASK_UI_REPORT` for the report and optional `LINTEL_REMOTE_TASK_UI_ARTIFACTS` for external screenshots. |
 | `baseline-ui` | Built frontend + real synthetic core; once-per-date greeting across StrictMode and App reload, task/target isolation, source-bound reader, explicit context, finite startup sources with sanitized declarations/auth unknown, old-runner approval refusal, clipboard failure, original request query followed by a fresh preview only for confirmed unattempted plans, and finite Agent metadata. Static CLI/clipboard/launch-error transport is modeled; not native WebKit or authenticated Claude. |
 | `work-ui` | Built desktop frontend, Playwright Chromium and runner. Real core in independent synthetic homes; archive-only/preserve/portable import, metadata paging, exact project/session/file selection excluding the actual runner file limit + 1 sparse bytes, frozen approval/bytes, old-runner refusal, wrong password, keyboard and Day/Night; synthetic invoke, not native WebKit. |
@@ -824,3 +827,16 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 调整后的准确 clean `4de7e54122f2e8dd350058c3944e9e9e5a5fbdeb` 在 [CI 39839654207](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39839654207) 执行 full profile，14 个 jobs 全部 success。Ubuntu native 先完成官方依赖安装，再实际通过全部 16 项 native 检查；两平台 native／frontend／heavy／browser UI／CLI、独立 Linux OpenSSH 与 Linux VM evidence 全部通过。已下载并检查 12 份 canonical reports：各自记录同一 clean head，所有选中 checks 均为 passed；aggregate 也确认全部选中 job／check 通过。后续仅补充本记录的 docs revision 不是另一轮产品构建／发行证据，现有 ignored 与 native／认证／发行边界保持。
 
 真实跨版本试验使用 [v0.1.0 公开 macOS arm64 CLI](https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz)，归档与公开 `SHA256SUMS` 对应项一致；当前版本为实际不同的本轮源码 debug binary。旧版创建的 completed job／frozen plan 在当前版本保留原 ID/hash，旧工作包正文精确读回；当前 selected-field restore 读取旧配置任务并保留后来无关编辑。旧版 submit 在真实 synthetic accept barrier 停住后 kill worker，当前连续原 ID 查询和原 plan execute 均为 `needs_reconciliation`，settings 未改变。没有通过改 receipt 或 sidecar 伪造版本／中断。此证据只覆盖 macOS 上述路径；不代表正式 RC、其他平台升级、downgrade、clean-Mac 安装或真实认证。
+
+
+### 2026-10-24 恢复与有界历史接续
+
+本轮 source 延续 10-23 修复，公开 App／CLI 与官网版本未变。新增 explicit-only `candidate-gate-test` 及 independent `history-ui`、`browser-host-recovery-ui`，接入既有 frontend／browser CI owner，隐式默认组不变。统一 controller self-test 已通过。
+
+定向回归使用 synthetic roots：host 安装三阶段重开后通过公开 pending/install IPC 找回原批准；popup 的原 owner 释放收尾不重删浏览资料；真实 native-host framed stdio 与生产 Engine/background 组合覆盖 lost ACK、reset、新配对、worker/popup 重开和 exact legacy operation query。Bridge 错形 JSON 保留原字节；1000 项满额后原 ID 查询／重复提交仍返回原记录，新 ID 明确拒绝，不提供虚构的归档入口。
+
+进程测试先以 readiness 确认逃逸 child 持有 stdout，分别覆盖 parent 已退出／仍存活，再观察 deadline 和真实 operation lock 可再次取得。DNS 测试占满 32 个实际阻塞 owner，100 次后续请求不增加队列／resolver，取消与 runtime drop 能返回，晚到结果没有 TCP 连接。残留测试从完整 Engine 注入 rename／两类 parent sync 失败，重开原 ID 反复查询／execute 不重放、不将不确定状态记完成。三类 I/O reason 同时覆盖 accepted 前后、持久 journal 与重开，旧无 reason 记录仍可读。
+
+有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归只证明固定调用与拒绝行为；实际 cold native build、真实新 DMG、clean-Mac、RC 升级／回退与独立来源认证仍未验证。
+
+独立 metadata 规模观察：10,000 项首页约 225 ms／15,043 bytes；100,000 项首页约 5.54 s／15,044 bytes（macOS arm64、外置 SSD、debug core、limit 50）。后者的 `time -l` 最大 RSS 为 115,130,368 bytes，涵盖该测试进程的 fixture 创建与查询，不能当作单次 RPC 的独立峰值。两项均显式选择 ignored benchmark，未加入默认 CI；100k 是当前 scan 上限的观察，不承诺更高容量或恒定响应时间。

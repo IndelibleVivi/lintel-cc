@@ -207,7 +207,7 @@ SELFTEST_CHECKS: Tuple[str, ...] = ("__verify_self_test__", "__ci_plan_test__")
 
 FRONTEND_CHECKS: Tuple[str, ...] = (
     "js-engine-test", "site-game-test", "home-greetings-test", "i18n-test",
-    "i18n-coverage-test", "recipe-test", "app-release-test", "rust-notices-test",
+    "i18n-coverage-test", "recipe-test", "app-release-test", "candidate-gate-test", "rust-notices-test",
     "python-ssh-test", "linux-vm-control-test", "desktop-typecheck", "desktop-build",
     "macos-bundle-signature-test",
 )
@@ -227,6 +227,7 @@ APP_UI_CHECKS: Tuple[str, ...] = (
     "browser-smoke", "browser-pairing-ui", "service-ui", "remote-task-ui", "work-ui",
     "components-ui", "baseline-ui", "archive-wait-ui", "drift-ui", "network-ui",
     "telemetry-ui", "app-update-ui", "clawd-app-ui", "i18n-ui", "client-control-ui",
+    "history-ui", "browser-host-recovery-ui",
 )
 SITE_UI_CHECKS: Tuple[str, ...] = ("site-ui",)
 RUNNER_CHECKS: Tuple[str, ...] = ("linux-ssh-runtime", "cli-candidate")

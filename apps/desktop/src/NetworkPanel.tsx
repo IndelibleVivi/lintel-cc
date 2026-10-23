@@ -67,7 +67,7 @@ function RuleReadback({ rules }: { rules: Rule[] }) {
 }
 // The key owns the whole request lifetime, so even start/stop replies from the
 // previous environment cannot update the newly selected environment's panel.
-type Props = { environmentId: string; executable: boolean; onLaunch:(proxyUrl:string)=>void; hostAlias:string|null; receipts:Receipt[]; disabled:boolean; onPlan:(plan:Plan)=>void;onReceipt:(receipt:Receipt)=>void; settings?:Inspection['settings']; onPrivacySettings?:()=>void };
+type Props = { environmentId: string; executable: boolean; onLaunch:(proxyUrl:string)=>void; hostAlias:string|null; historyRevision?:number; disabled:boolean; onPlan:(plan:Plan)=>void;onReceipt:(receipt:Receipt)=>void; settings?:Inspection['settings']; onPrivacySettings?:()=>void };
 export default function NetworkPanel(props: Props) {
   const { t } = useI18n();
   return (props.hostAlias || !props.environmentId) ? <><IpNetworkPanel key={`${props.hostAlias}:${props.environmentId}`} {...props} proxyUrl={null} proxyBinding={null}/><Notice>{t('netPanel.readonlyNotice')}</Notice><TelemetryPanel key={`telemetry:${props.hostAlias}:${props.environmentId}`} hostAlias={props.hostAlias} selected={[]} onChange={()=>{}} disabled settings={props.settings} onPrivacySettings={props.onPrivacySettings}/></> : <EnvironmentNetworkPanel key={props.environmentId} {...props}/>;

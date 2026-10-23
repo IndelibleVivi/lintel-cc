@@ -1,18 +1,18 @@
 import { present } from './i18n-presentation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { requester, transport } from './api';
-import type { Plan, Receipt } from './types';
+import type { Plan, Receipt, JobSummary, JobsPage } from './types';
 import type { NetworkInspection, NetworkProbe, ProbeOptions } from './networkTypes';
 import NetworkResults, { useIpv6Mode } from './NetworkResults';
 import { useI18n } from './i18n-provider';
 import { Notice } from './ui';
 
 type Props = {
-  hostAlias: string | null; proxyUrl: string | null; proxyBinding: string | null; receipts: Receipt[]; disabled: boolean;
+  hostAlias: string | null; proxyUrl: string | null; proxyBinding: string | null; historyRevision?:number; disabled: boolean;
   onPlan: (plan: Plan) => void; onReceipt: (receipt: Receipt) => void;
 };
 
-export default function IpNetworkPanel({ hostAlias, proxyUrl, proxyBinding, receipts, disabled, onPlan, onReceipt }: Props) {
+export default function IpNetworkPanel({ hostAlias, proxyUrl, proxyBinding, historyRevision, disabled, onPlan, onReceipt }: Props) {
   const { t, locale } = useI18n();
   const ipv6Mode = useIpv6Mode();
   const send = useMemo(() => requester(hostAlias), [hostAlias]);
@@ -29,8 +29,19 @@ export default function IpNetworkPanel({ hostAlias, proxyUrl, proxyBinding, rece
   const host = hostAlias ?? t('app.localLabel');
   const selectedProxy = hostAlias ? remoteProxy.trim() || null : proxyUrl;
   const options: ProbeOptions = { ipv4_url: ipv4Url.trim(), ipv6_url: ipv6Url.trim(), ...(selectedProxy ? { proxy_url: selectedProxy } : {}), timeout_seconds: 10 };
-  const networkReceipts = receipts.filter(receipt => receipt.network_change);
-  const latest = networkReceipts[0];
+  const [networkReceipts,setNetworkReceipts]=useState<JobSummary[]>([]);
+  const [historyPage,setHistoryPage]=useState<JobsPage|null>(null);
+  const [historyFailure,setHistoryFailure]=useState('');
+  const [latest,setLatest]=useState<Receipt|null>(null);
+  const historyGeneration=useRef(0);
+  async function loadHistory(more=false){const token=++historyGeneration.current;try{
+    const result=await send('jobs_page',{filter:'network',...(more&&historyPage?.next_offset!=null?{offset:historyPage.next_offset,expected_digest:historyPage.digest}:{})});
+    if(token!==historyGeneration.current)return;
+    setNetworkReceipts(previous=>more?[...previous,...result.jobs]:result.jobs);setHistoryPage(result);setHistoryFailure('');if(!more)setLatest(null);
+    if(result.jobs.length&&(!more||!latest)){const details=await send('job_detail_page',{job_id:result.jobs[0].id,section:'receipt'});if(token===historyGeneration.current)setLatest(details.items[0] as Receipt)}
+  }catch(e){if(token===historyGeneration.current)setHistoryFailure(e instanceof Error?e.message:String(e))}}
+  useEffect(()=>{void loadHistory();return()=>{historyGeneration.current++}},[send,historyRevision]);
+  async function openHistory(id:string){await act('history',async()=>{const result=await send('job_detail_page',{job_id:id,section:'receipt'});if(mounted.current)onReceipt(result.items[0] as Receipt)})}
   const additionalInterfaces = inspection?.interfaces?.filter(item => !inspection.services.some(service => service.interface === item.interface)) ?? [];
   const locked = disabled || !!busy || !inspection;
   const current = !!probe && !probe.stale && !!inspection && inspection.network_revision_complete !== false && !observeError && probe.network_revision === inspection.network_revision
@@ -88,6 +99,6 @@ export default function IpNetworkPanel({ hostAlias, proxyUrl, proxyBinding, rece
       {!!additionalInterfaces.length && <details><summary>{t('ipnet.otherInterfaces')}</summary>{additionalInterfaces.map(item => <div className="network-service" key={item.interface}><div className="network-service-heading"><code>{item.interface}</code><span>{t(item.up ? 'ipnet.ifaceUp' : 'ipnet.ifaceDown')}</span></div><div className="network-addresses"><span>IPv4 · <code>{item.ipv4_addresses.join(' · ') || t('ipnet.noAddress')}</code></span><span>IPv6 · <code>{item.ipv6_addresses.join(' · ') || t('ipnet.noAddress')}</code></span></div></div>)}</details>}
       {inspection.limitations.map((limitation, index) => <p className="small-print" key={index}>{present(limitation,locale)}</p>)}
     </section>}
-    {!!networkReceipts.length && <details className="network-history"><summary>{t('ipnet.history')}</summary>{networkReceipts.map(receipt => <div className="fact-row network-history-row" key={receipt.id}><span>{present(receipt.title,locale)}</span><button className="text-button" onClick={() => onReceipt(receipt)}>{t(receipt.restorable ? 'ipnet.viewResultRestore' : 'app.viewResult')}</button></div>)}</details>}
+    {(!!networkReceipts.length||historyPage?.next_offset!=null||!!historyFailure) && <details className="network-history"><summary>{t('ipnet.history')}</summary>{networkReceipts.map(receipt => <div className="fact-row network-history-row" key={receipt.id}><span>{present(receipt.title,locale)}</span><button className="text-button" onClick={() => void openHistory(receipt.id)}>{t(receipt.restorable ? 'ipnet.viewResultRestore' : 'app.viewResult')}</button></div>)}{historyFailure&&<><p role="alert">{historyFailure}</p><button onClick={()=>void loadHistory()}>{t('app.refresh')}</button></>}{historyPage?.next_offset!=null&&<><p>{t('history.boundedPartial')}</p><button onClick={()=>void loadHistory(true)}>{t('history.boundedMore')}</button></>}</details>}
   </section>;
 }

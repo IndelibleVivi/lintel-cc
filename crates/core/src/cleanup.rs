@@ -658,6 +658,10 @@ pub(crate) fn quarantine_remove_bounded(
     use std::os::unix::fs::DirBuilderExt;
     fs::DirBuilder::new().mode(0o700).create(directory)?;
     let held = directory.join("state");
+    #[cfg(test)]
+    if let Some(errno) = crate::storage::io_fault::take(path) {
+        return Err(std::io::Error::from_raw_os_error(errno).into());
+    }
     fs::rename(path, &held)?;
     #[cfg(test)]
     if take_post_rename_failure() {
@@ -759,27 +763,52 @@ mod bounded_tests {
     }
     #[test]
     fn escaped_writer_cannot_hold_reader_or_operation() {
+        use std::os::unix::fs::PermissionsExt;
         for parent_waits in [false, true] {
-            for _ in 0..3 {
-                let mut c = Command::new("python3");
-                c.args(["-c", if parent_waits {
-                    "import os,time; p=os.fork(); (os.setsid(),time.sleep(.3),os._exit(0)) if p==0 else time.sleep(2)"
-                } else {
-                    "import os,time; p=os.fork(); (os.setsid(),time.sleep(.3),os._exit(0)) if p==0 else os._exit(0)"
-                }]);
-                let started = Instant::now();
-                assert_eq!(
-                    bounded_with_timeout(c, Duration::from_millis(80))
-                        .unwrap_err()
-                        .code,
-                    "adapter_timeout"
-                );
-                assert!(started.elapsed() < Duration::from_millis(250));
+            let temp = tempfile::tempdir().unwrap();
+            let base = temp.path().canonicalize().unwrap();
+            let home = base.join("home");
+            let root = home.join("cc");
+            fs::create_dir_all(&root).unwrap();
+            let bin = home.join(".local/bin");
+            fs::create_dir_all(&bin).unwrap();
+            let ready = base.join("ready");
+            let pid = base.join("escaped-pid");
+            // Resolve the inert fixture interpreter from the current test PATH.
+            let interpreter = Command::new("python3")
+                .args(["-c", "import sys;print(sys.executable)"])
+                .output()
+                .unwrap();
+            assert!(interpreter.status.success());
+            let interpreter = String::from_utf8(interpreter.stdout).unwrap();
+            let executable = bin.join("claude");
+            fs::write(&executable, format!("#!{}\nimport os,time\np=os.fork()\nif p==0:\n os.setsid()\n open({:?},'w').write(str(os.getpid()))\n open({:?},'w').write('ready')\n time.sleep(30)\n os._exit(0)\nwhile not os.path.exists({:?}): time.sleep(.005)\n{}\n", interpreter.trim(), pid.to_str().unwrap(), ready.to_str().unwrap(), ready.to_str().unwrap(), if parent_waits {"time.sleep(30)"} else {"os._exit(0)"})).unwrap();
+            fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+            let mut engine = Engine::new(home, base.join("state")).unwrap();
+            engine.executable_search_path = Some(bin.into_os_string());
+            let e = engine
+                .register("synthetic escaped writer", &root, false)
+                .unwrap();
+            let started = Instant::now();
+            let response = engine.request(json!({"command":"auth_probe","environment_id":e["id"]}));
+            // Terminate only the exact inert escaped fixture; the adapter cannot
+            // own a descendant which deliberately creates another session.
+            let escaped: i32 = fs::read_to_string(&pid).unwrap().parse().unwrap();
+            unsafe {
+                libc::kill(escaped, libc::SIGKILL);
             }
+            assert_eq!(
+                fs::read(&ready).unwrap(),
+                b"ready",
+                "fault state must precede successful timeout assertion"
+            );
+            assert_eq!(response["error"]["code"], "adapter_timeout", "{response}");
+            assert!(started.elapsed() < Duration::from_secs(24));
+            // `discover` acquires the actual Engine operation lock; it must not
+            // return target_busy after the failed auth adapter has returned.
+            let next = engine.request(json!({"command":"discover"}));
+            assert_eq!(next["ok"], true, "{next}");
         }
-        let mut c = Command::new("/bin/sh");
-        c.args(["-c", "cat; printf usable"]);
-        assert_eq!(bounded(c).unwrap().1, b"usable");
     }
     #[test]
     fn inherited_pipe_and_running_parent_obey_deadline() {

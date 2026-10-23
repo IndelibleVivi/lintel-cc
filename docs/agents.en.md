@@ -402,3 +402,17 @@ node scripts/package-cli.mjs \
 Identity `<version>-candidate-<first 12 revision characters>`, never bare 0.1.0; candidates-<identity>.json separate indices. --revision exact lowercase 40/64 hex Git object declaration, not digest-proven source. candidate.json product/version/protocol/catalog/revision/target/payload bytes/SHA/signed:false/release:false/limits/per-target identity_source: macos_input_executed only successful Mac probe, Linux declared_static. Probed Mac version authoritative/matches manifest. Failed/no probe (e.g. Linux packaging) needs explicit --version with identity_verified_executed:false or refuses. Existing archives/dangling links/same-identity index refuse before writes.
 
 Debug source cargo build -p lintel-runner → target/debug/lintel. Native host installed separately; Mac browser control requires exact host_path, no GUI/PATH assumptions. Canonical extension source/[browser guide](browser.en.md). Remote resources share [generation](remote.en.md#prepare-app-resources); explicit reviewed --bundles or LINTEL_RUNNER_BUNDLES, default beside executable remote-runners. Missing refuses without download/VPS compilation. Reading grants no real-host installation/update.
+
+### Bounded task records (current unreleased source)
+
+`lintel jobs` and `lintel work archive list` use `jobs_page`; `lintel job detail ID` uses `job_detail_page`. Lists default to at most 50 rows; explicit `--limit` accepts 1–100. Continue with the returned `next_offset` and the same `digest` (`--expected-digest`). Details load by section instead of embedding full receipts in summary lists; `detail_item_too_large` retains the original ID and file. Restart from the first page after records change rather than joining snapshots. `scan_complete`, `records_complete` and `record_errors` separately describe scanning and invalid-record gaps; an empty page does not necessarily end the scan.
+
+```sh
+lintel jobs --filter attention --limit 50
+lintel jobs --filter attention --offset 50 --expected-digest REPLACE_WITH_RETURNED_DIGEST --limit 50
+lintel job detail REPLACE_WITH_ORIGINAL_JOB_ID --section warnings --limit 50
+```
+
+The example offset is illustrative: use the preceding response's actual `next_offset` and retain its filters. `discover` owns environment discovery; the App no longer uses it to load all history. An older runner reports unsupported endpoints without a full `jobs`/`discover` fallback. Original `job show`/`job wait`, restoration, service and network recovery retain their original task IDs; pagination never clears records. Legacy protocol endpoints remain compatible, without becoming an automatic large-history fallback.
+
+Unified candidates use both local modes and full-CI consistency checks; see [App updates and the candidate gate](app-updates.en.md#unified-candidate-build-and-consistency-gate-unreleased) for exact commands, Python 3.11 and unauthenticated-origin limits.

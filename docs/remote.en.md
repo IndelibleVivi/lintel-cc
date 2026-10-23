@@ -140,15 +140,17 @@ remote_request({ payload }) returns one `{ok:true,data:...}` / `{ok:false,error:
 | execute | alias/plan_id/approval, optional archive_passphrase | one submit/durable receipt; repeat original query |
 | reconnect | alias/plan_id | saved lookup Receipt, removed original supported, never executes |
 
-Connect/preview/upload/ordinary request/execute need registered alias. Removed aliases permit only persisted original reconnect/request.job/query_install/launch_query; other requests still registered. Strict allowed requests:
+Connect/preview/upload/ordinary request/execute need registered alias. Removed aliases permit only persisted original reconnect/request.job/request.job_detail_page/query_install/launch_query; other requests still registered. Strict allowed requests:
 
 - discover/inspect/inspect_components/work_preflight/work_inventory/register/create_environment;
 - network_inspect/network_probe/plan_network_ipv6/plan_network_restore, executed remotely with remote loopback, not App channel; Linux changes unsupported, observation/tests available;
 - plan_policy/plan_reset/plan_archive/plan_preserve/plan_cleanup/plan_restore/plan_import/plan_launch/plan_resume;
 - cleanup_inspect/auth_probe/archive_inspect/archive_read/session_read/service_inspect/plan_service_quiesce/plan_service_resume;
-- jobs/job/drift/accept_drift/reactivate_environment/export_support.
+- jobs/job/jobs_page/job_detail_page/drift/accept_drift/reactivate_environment/export_support.
 
 Fields match core; unknown/shell/generic-file operations refuse. Ordinary request cannot bypass execute intent. Archive text returns only explicit reader requests, never task/diagnostics; passphrases only stdin. Terminal/service owners validate separately, without arbitrary commands/general installs/enforcement. Components/preflight/inventory readonly target operations share selected_paths schema; exact plans use submit. Invalid paths/categories/later-page missing digest refuse before SSH. Old support errors never widen to whole categories.
+
+History summaries and detail sections use `jobs_page`/`job_detail_page`, with a 256 KiB page budget below the existing 2 MiB SSH response bound. Details query an existing task’s original `lookup_id` and pinned runner without changing the local task or creating submission intent; removed aliases only permit retained original tasks. Unsupported old runners return an explicit error without falling back to full `jobs`, raising SSH limits or resubmitting operations. See [core](core.en.md) for oversized-item limits and cursor refresh.
 
 ## Connection errors and local diagnostics
 

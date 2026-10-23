@@ -5,6 +5,9 @@ const api=globalThis.browser || globalThis.chrome;
 const engine=new Engine(api);
 let port,identity,polling=false;
 const pending=new Map();
+let bridgeTail=Promise.resolve(),scheduledPoll=false;
+function serialBridge(fn){const run=bridgeTail.then(fn,fn);bridgeTail=run.catch(()=>{});return run;}
+function schedulePoll(){if(scheduledPoll)return;scheduledPoll=true;serialBridge(poll).finally(()=>{scheduledPoll=false;});}
 const ready=(async()=>{
   identity=await engine.get('identity');
   if (!identity) {identity=newIdentity();await engine.set('identity',identity);}
@@ -16,11 +19,13 @@ function newIdentity(){return {instanceId:crypto.randomUUID(),token:Array.from(c
 function connect(){
   if (port) return port;
   port=api.runtime.connectNative('app.lintel.browser');
+  const connectedPort=port,connectedIdentity=identity.instanceId;
   port.onMessage.addListener(msg=>{
     const waiter=pending.get(msg.request_id);
     if (waiter){clearTimeout(waiter.timer);pending.delete(msg.request_id);msg.ok ? waiter.resolve(msg.data) : waiter.reject(Object.assign(new Error(msg.error?.message || 'native error'),{code:msg.error?.code}));}
   });
   port.onDisconnect.addListener(()=>{
+    if(port!==connectedPort || identity.instanceId!==connectedIdentity)return;
     const message=api.runtime.lastError?.message || 'Native host disconnected';port=undefined;
     for (const waiter of pending.values()){clearTimeout(waiter.timer);waiter.reject(new Error(message));}pending.clear();
     engine.set('bridge',{connected:false,reason:message,at:Date.now()});
@@ -44,12 +49,21 @@ async function poll(){
     const data=await native('poll');
     await engine.set('pairing',{paired:true});await engine.set('bridge',{connected:true,lastSeen:Date.now()});
     for (const proposal of data.proposals){
-      try {await engine.preview(proposal.action,'app',proposal.id);}catch(e){await native('receipt',{receipt:{id:proposal.id,phase:'rejected',error:{code:e.code || 'invalid_proposal',message:e.message}}});}
+      try {await engine.bindNativeIdentity(proposal.id,identity.instanceId,proposal);await engine.preview(proposal.action,'app',proposal.id,identity.instanceId);}catch(e){try {await native('receipt',{receipt:{id:proposal.id,phase:'rejected',error:{code:e.code || 'invalid_proposal',message:e.message}}});}catch{/* A proposal-specific failure does not revoke the successful poll. */}}
     }
     // Re-send only durable receipts, never browser mutations. Lost ACK is safe.
     const all=await api.storage.local.get(null);
-    for (const [key,r] of Object.entries(all)) if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected','awaiting-browser-restart','canceled','expired'].includes(r.phase)&&!r.nativeAcknowledged){
-      await native('receipt',{receipt:receipt(r)});await engine.acknowledge(r.id,{sent:r});
+    for (const [key,stored] of Object.entries(all)) {
+      if(!key.startsWith('operation:')||stored.source!=='app')continue;
+      let r=stored;
+      if(!r.nativeInstanceId){
+        try {const observed=await native('operation_query',{operation_id:r.id});r=await engine.bindNativeIdentity(r.id,identity.instanceId,observed);}
+        catch{await engine.noteUnboundIdentity(r.id);continue;}
+      }
+      if (key.startsWith('operation:')&&r.source==='app'&&['completed','uncertain','rejected','awaiting-browser-restart','canceled','expired'].includes(r.phase)&&!r.nativeAcknowledged&&r.nativeInstanceId===identity.instanceId){
+      try {await native('receipt',{receipt:receipt(r)});await engine.acknowledge(r.id,{sent:r});}
+      catch(error){await engine.set(`receiptDelivery:${r.id}`,{code:error.code||'native-unavailable',at:Date.now()});}
+    }
     }
   }catch(error){
     await engine.set('pairing',{paired:false,reason:error.code || 'native-unavailable'});
@@ -65,12 +79,14 @@ async function handle(message,sender){
     case 'pair': return native('pair_request',{code:String(message.code).trim().toUpperCase(),label:String(message.label||'My browser profile'),browser:CONFIG.browser});
     case 'refreshPairing': await poll();return engine.status();
     case 'resetIdentity':
-      if(port)port.disconnect();identity=newIdentity();await engine.set('identity',identity);await engine.set('pairing',{paired:false,reason:'identity-reset-repair-required'});return {instanceId:identity.instanceId};
+      return engine.serial(async()=>{const oldPort=port;port=undefined;if(oldPort)oldPort.disconnect();const next=newIdentity();await engine.set('identity',next);identity=next;await engine.set('pairing',{paired:false,reason:'identity-reset-repair-required'});return {instanceId:identity.instanceId};});
     case 'preview': return engine.preview(message.action);
     case 'cancel': {const result=await engine.abandon(message.id,'user-cancelled');await pollIfConnected();return result;}
     case 'commit': {
-      const r=await engine.get(`operation:${message.id}`);
-      if (r?.source==='app') {await poll();if (!(await engine.get('pairing'))?.paired) fail('pairing_required');}
+      let r=await engine.get(`operation:${message.id}`);
+      if (r?.source==='app') {
+        if(!r.nativeInstanceId){try{r=await engine.bindNativeIdentity(r.id,identity.instanceId,await native('operation_query',{operation_id:r.id}));}catch{await engine.noteUnboundIdentity(r.id);fail('operation_identity_unverified','旧回执原实例归属尚未确认；未执行。');}}
+        if(r.nativeInstanceId!==identity.instanceId)fail('operation_identity_conflict');await poll();if (!(await engine.get('pairing'))?.paired) fail('pairing_required');}
       // Report `running` only after commit has durably crossed its running
       // journal boundary. A preflight rejection (permissions_missing,
       // preview_expired, ...) throws before onRunning, so the host is never told
@@ -83,10 +99,10 @@ async function handle(message,sender){
   }
 }
 async function pollIfConnected(){if(port) await poll();}
-api.runtime.onMessage.addListener((message,sender,sendResponse)=>{handle(message,sender).then(data=>sendResponse({ok:true,data}),e=>sendResponse({ok:false,error:{code:e.code||'extension_error',message:e.message}}));return true;});
-api.alarms.onAlarm.addListener(alarm=>{if(alarm.name==='bridge-status')poll();if(alarm.name==='resume-rules')engine.resumeRules().catch(e=>engine.set('ruleConflict',e.message));});
+api.runtime.onMessage.addListener((message,sender,sendResponse)=>{serialBridge(()=>handle(message,sender)).then(data=>sendResponse({ok:true,data}),e=>sendResponse({ok:false,error:{code:e.code||'extension_error',message:e.message}}));return true;});
+api.alarms.onAlarm.addListener(alarm=>{if(alarm.name==='bridge-status')schedulePoll();if(alarm.name==='resume-rules')engine.resumeRules().catch(e=>engine.set('ruleConflict',e.message));});
 api.runtime.onStartup.addListener(()=>engine.browserStarted());
 api.permissions.onRemoved.addListener(()=>engine.set('bridge',{connected:false,reason:'permission-removed; refresh effective status',at:Date.now()}));
 // A connected native port keeps a Chromium MV3 worker alive. Heartbeats also bind
 // concurrent copied installations; alarms recover after an actual worker restart.
-setInterval(()=>{if(port)poll();},5000);
+setInterval(()=>{if(port)schedulePoll();},5000);

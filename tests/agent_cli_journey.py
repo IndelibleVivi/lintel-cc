@@ -253,6 +253,18 @@ def run():
         restore = command('restore', 'plan', '--job', policy['id'])
         command('job', 'submit', '--plan', restore['id'], '--approval', restore['hash'])
         assert command('job', 'wait', restore['id'], '--timeout', '30s')['status'] == 'completed'
+        # Named listings are explicitly bounded pages; full raw job/show/wait remain compatible.
+        first = command('jobs', '--limit', '1')
+        assert first['order'] == 'updated_desc_id' and len(first['jobs']) <= 1
+        assert first['next_offset'] is not None
+        second = command('jobs', '--offset', str(first['next_offset']), '--expected-digest', first['digest'], '--limit', '1')
+        assert second['digest'] == first['digest']
+        details = command('job', 'detail', policy['id'], '--section', 'header')
+        assert details['job_id'] == policy['id'] and details['items'][0]['id'] == policy['id']
+        archives = command('work', 'archive', 'list', '--limit', '100')
+        assert all(item['has_work_archive'] for item in archives['jobs'])
+        assert 'next_offset' in archives and 'scan_complete' in archives
+        command('jobs', '--limit', '101', good=False)
         assert (root / 'settings.json').read_text() == original, 'Source was modified'
         for private_state in (state, base / 'other-state'):
             for file in private_state.rglob('*.json'):

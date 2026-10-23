@@ -303,6 +303,28 @@ impl Installer {
         plan["install_action"] = json!(action);
         Ok(plan)
     }
+    fn pending(&self, browser: &str) -> Result<Value> {
+        if !["chrome", "edge", "firefox"].contains(&browser) {
+            return Err("unsupported_browser_platform".into());
+        }
+        let intent = load(
+            &self
+                .install_root()
+                .join(format!("{browser}-install-intent.json")),
+        )?;
+        let receipt = load(&self.receipt_path(browser))?;
+        if intent.is_null() {
+            return Ok(Value::Null);
+        }
+        let plan = intent
+            .get("approved_plan")
+            .filter(|p| p.is_object())
+            .ok_or("storage_error:invalid install intent")?;
+        if *plan == receipt["approved_plan"] {
+            return Ok(Value::Null);
+        }
+        Ok(plan.clone())
+    }
     fn plan(&self, browser: &str, extension: &str) -> Result<Value> {
         // Validate finite browser/extension/home before reading App metadata.
         lintel_browser_host::installation::plan(
@@ -349,6 +371,15 @@ impl Installer {
             .map_err(|e| format!("storage_error:{e}"))?;
         lock.lock_exclusive()
             .map_err(|e| format!("storage_error:{e}"))?;
+        let locked_intent = load(&intent_path)?;
+        if locked_intent != intent {
+            return Err("pending_install_changed:请查询原安装后继续".into());
+        }
+        if let pending @ Value::Object(_) = self.pending(browser)? {
+            if pending != *approved {
+                return Err("pending_install:请继续原安装批准；未覆盖安装 intent".into());
+            }
+        }
         let fresh_bundle = self.bundle()?;
         let fresh = self.plan_with(browser, extension, &fresh_bundle)?;
         if fresh != current {
@@ -458,6 +489,10 @@ impl Installer {
     }
     pub(super) fn dispatch(&self, payload: Value) -> Result<Value> {
         match string(&payload, "op")? {
+            "bundled_host_pending" => {
+                fields(&payload, &["op", "browser"])?;
+                self.pending(string(&payload, "browser")?)
+            }
             "bundled_host_plan" => {
                 fields(&payload, &["op", "browser", "extension_id"])?;
                 self.plan(
@@ -509,6 +544,30 @@ mod tests {
         }
         fn db(&self, plan: &Value) -> Value {
             load(&Path::new(plan["state_path"].as_str().unwrap()).join("bridge.json")).unwrap()
+        }
+    }
+    #[test]
+    fn malformed_pending_intent_is_not_history_or_overwritten() {
+        let f = Fixture::new("macos");
+        let plan = f.plan();
+        private_dir(&f.installer.install_root()).unwrap();
+        let path = f
+            .installer
+            .install_root()
+            .join("chrome-install-intent.json");
+        for invalid in [
+            json!({}),
+            json!({"approved_plan":null}),
+            json!({"approved_plan":[]}),
+        ] {
+            save(&path, &invalid).unwrap();
+            let before = fs::read(&path).unwrap();
+            assert!(f
+                .installer
+                .dispatch(json!({"op":"bundled_host_pending","browser":"chrome"}))
+                .is_err());
+            assert!(f.installer.install(&plan).is_err());
+            assert_eq!(fs::read(&path).unwrap(), before);
         }
     }
     #[test]
@@ -600,7 +659,30 @@ mod tests {
                 platform: "macos".into(),
                 architecture: "aarch64".into(),
             };
-            let result = reopened.install(&approved).unwrap();
+            // Drop the frontend plan: recover only via the public IPC query.
+            let discovered = reopened
+                .dispatch(json!({"op":"bundled_host_pending","browser":"chrome"}))
+                .unwrap();
+            assert_eq!(discovered, approved);
+            let new_preview = reopened
+                .dispatch(
+                    json!({"op":"bundled_host_plan","browser":"chrome","extension_id":CHROME_ID}),
+                )
+                .unwrap();
+            if new_preview != discovered {
+                assert!(reopened
+                    .dispatch(json!({"op":"install_bundled_host","approved_plan":new_preview}))
+                    .is_err());
+            }
+            assert_eq!(
+                reopened
+                    .dispatch(json!({"op":"bundled_host_pending","browser":"chrome"}))
+                    .unwrap(),
+                discovered
+            );
+            let result = reopened
+                .dispatch(json!({"op":"install_bundled_host","approved_plan":discovered}))
+                .unwrap();
             assert_eq!(
                 result["plan"]["status"], "already-registered",
                 "phase {phase}: {result}"
@@ -840,7 +922,7 @@ mod tests {
             .starts_with("authorization_failed:"));
         assert!(!Path::new(p["manifest_path"].as_str().unwrap()).exists());
         assert!(!f.installer.receipt_path("chrome").exists());
-        // Repair only the observed failing state and review a fresh preview.
+        // Repair only the observed failing state, then discover the original approval.
         fs::write(
             state.join("bridge.json"),
             serde_json::to_vec(
@@ -849,7 +931,11 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        let retry = f.plan();
+        let retry = f
+            .installer
+            .dispatch(json!({"op":"bundled_host_pending","browser":"chrome"}))
+            .unwrap();
+        assert_eq!(retry, p);
         assert_eq!(retry["install_action"], "install");
         assert_eq!(f.installer.install(&retry).unwrap()["status"], "registered");
         assert_eq!(f.db(&retry)["allowed_extensions"], json!([CHROME_ID]));

@@ -884,3 +884,77 @@ fn identity_total_counts_client_state_once_across_multiple_backups() {
     assert_eq!(preview["outcome"], "identity_reset");
     assert!(backups.iter().all(|p| p.exists()));
 }
+
+#[test]
+fn engine_quarantine_failure_reopens_all_locators_without_replay() {
+    for stage in ["rename", "post_rename_sync", "final_parent_sync"] {
+        let fx = fixture();
+        let first = fx.root.join("debug/one.log");
+        let second = fx.root.join("debug/two.log");
+        write(&first, b"one");
+        write(&second, b"two");
+        let plan = clear_plan(&fx, &[&first, &second], false);
+        match stage {
+            "rename" => crate::storage::io_fault::arm(first.clone(), libc::EACCES),
+            "final_parent_sync" => cleanup::arm_final_parent_failure(),
+            _ => {
+                cleanup::arm_post_rename_failure();
+                cleanup::arm_post_rename_failure();
+            }
+        }
+        let request = json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"],"archive_passphrase":PASS});
+        let response = fx.engine.request(request.clone());
+        assert_eq!(response["ok"], true, "{response}");
+        let receipt = response["data"].clone();
+        assert_ne!(receipt["status"], "completed", "{receipt}");
+        let failures = receipt["residue_clear"]["failed"].as_array().unwrap();
+        assert_eq!(
+            failures.len(),
+            if stage == "post_rename_sync" { 2 } else { 1 }
+        );
+        for failure in failures {
+            assert!(failure["quarantine_path"].is_string(), "{failure}");
+            assert!(failure["path"].is_string(), "{failure}");
+        }
+        if stage == "rename" {
+            assert_eq!(fs::read(&first).unwrap(), b"one");
+        }
+        let entries = || {
+            let mut names: Vec<_> = fs::read_dir(first.parent().unwrap())
+                .unwrap()
+                .map(|e| e.unwrap().file_name())
+                .collect();
+            names.sort();
+            names
+        };
+        let before = entries();
+        let reopened = Engine::new(fx.home.clone(), fx.engine.state.clone()).unwrap();
+        for _ in 0..2 {
+            let query = reopened.request(json!({"command":"job","job_id":plan["id"]}));
+            assert_eq!(query["ok"], true, "{query}");
+            assert_eq!(query["data"]["residue_clear"], receipt["residue_clear"]);
+            assert_eq!(query["data"]["steps"], receipt["steps"]);
+            assert_ne!(query["data"]["status"], "completed");
+            let replay = reopened.request(request.clone());
+            assert_eq!(replay["data"]["residue_clear"], receipt["residue_clear"]);
+        }
+        assert_eq!(
+            entries(),
+            before,
+            "query/replay changed original or quarantine names"
+        );
+        if stage == "rename" {
+            assert_eq!(fs::read(&first).unwrap(), b"one");
+        }
+        if stage == "post_rename_sync" {
+            for failure in failures {
+                let held = PathBuf::from(failure["quarantine_path"].as_str().unwrap());
+                let source = PathBuf::from(failure["path"].as_str().unwrap());
+                assert_eq!(
+                    fs::read(&held).unwrap(),
+                    if source == first { b"one" } else { b"two" }
+                );
+            }
+        }
+    }
+}

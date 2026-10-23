@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, Notice, formatBytes } from './ui';
 import BrowserExtensionSetup from './BrowserExtensionSetup';
 import { useI18n } from './i18n-provider';
@@ -22,19 +22,37 @@ export default function BrowserHostSetup({ native, busy, request, run, onInstall
   const [browser, setBrowser] = useState('chrome');
   const [extensionId, setExtensionId] = useState('');
   const [plan, setPlan] = useState<HostPlan | null>(null);
-  const actionName = t(plan?.install_action === 'upgrade' ? 'bhost.approveUpgrade' : plan?.install_action === 'none' ? 'bhost.verifyInstalled' : 'bhost.approveInstall');
+  const [pendingRecovery, setPendingRecovery] = useState(false);
+  const [pendingError, setPendingError] = useState('');
+  const queryGeneration = useRef(0);
+  useEffect(() => {
+    let active = true;
+    const generation = ++queryGeneration.current;
+    setPendingError(''); setPendingRecovery(false);
+    if (native) void request<HostPlan | null>({ op: 'bundled_host_pending', browser }).then(pending => {
+      if (active && generation === queryGeneration.current && pending) { setPlan(pending); setExtensionId(pending.extension_id); setPendingRecovery(true); }
+    }).catch(error => { if (active && generation === queryGeneration.current) setPendingError(String(error)); });
+    return () => { active = false; };
+  }, [native, browser]);
+
+  const actionName = t(pendingRecovery ? 'bhost.pendingContinue' : plan?.install_action === 'upgrade' ? 'bhost.approveUpgrade' : plan?.install_action === 'none' ? 'bhost.verifyInstalled' : 'bhost.approveInstall');
   return <div className="browser-host-setup">
     <div className="browser-target-field">
       <label className="field">{t('bhost.targetBrowser')}<select disabled={busy} value={browser} onChange={event => {
-        setBrowser(event.target.value); setExtensionId(event.target.value === 'firefox' ? 'lintel@lintel.local' : ''); setPlan(null);
+        ++queryGeneration.current; setPendingError(''); setPendingRecovery(false); setBrowser(event.target.value); setExtensionId(event.target.value === 'firefox' ? 'lintel@lintel.local' : ''); setPlan(null);
       }}>{[['chrome', 'Chrome'], ['edge', 'Edge'], ['firefox', 'Firefox']].map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
     </div>
     <BrowserExtensionSetup key={browser} browser={browser} native={native} busy={busy} request={request} run={run}/>
     <h4 className="browser-setup-step"><span>2</span>{t('bhost.installStep')}</h4>
-    <label className="field browser-extension-id">{t('bhost.extensionId')}<input disabled={busy} value={extensionId} onChange={event => { setExtensionId(event.target.value); setPlan(null); }} spellCheck={false} autoComplete="off" placeholder={t('bhost.extensionIdPlaceholder')}/><small>{t(browser === 'firefox' ? 'bhost.firefoxIdNote' : 'bhost.extensionIdNote')}</small></label>
+    <label className="field browser-extension-id">{t('bhost.extensionId')}<input disabled={busy} value={extensionId} onChange={event => { ++queryGeneration.current; setExtensionId(event.target.value); setPlan(null); setPendingRecovery(false); }} spellCheck={false} autoComplete="off" placeholder={t('bhost.extensionIdPlaceholder')}/><small>{t(browser === 'firefox' ? 'bhost.firefoxIdNote' : 'bhost.extensionIdNote')}</small></label>
     <p className="small-print">{t('bhost.note')}</p>
+    {pendingError && <Notice tone="warning">{t('bhost.pendingError')} {pendingError}</Notice>}
+    {pendingRecovery && <Notice>{t('bhost.pendingNotice')}</Notice>}
     <button disabled={busy || !native || !extensionId.trim()} onClick={() => void run(async () => {
-      setPlan(null); setPlan(await request<HostPlan>({ op: 'bundled_host_plan', browser, extension_id: extensionId.trim() }));
+      ++queryGeneration.current; setPendingError('');
+      const pending = await request<HostPlan | null>({ op: 'bundled_host_pending', browser });
+      if (pending) { setExtensionId(pending.extension_id); setPlan(pending); setPendingRecovery(true); }
+      else { setPendingRecovery(false); setPlan(null); setPlan(await request<HostPlan>({ op: 'bundled_host_plan', browser, extension_id: extensionId.trim() })); }
     })}>{t('bhost.previewInstall')}<Icon name="arrow" size={14}/></button>
     {plan && <section className="installation-plan browser-host-plan" aria-label={t('bhost.planAria')}>
       <div className="browser-host-plan-heading"><h4>{t(plan.install_action === 'upgrade' ? 'bhost.planUpgrade' : plan.status === 'already-registered' ? 'bhost.planRegistered' : 'bhost.planNew')}</h4><span>v{plan.version} · {formatBytes(plan.bytes)}</span></div>
@@ -55,7 +73,7 @@ export default function BrowserHostSetup({ native, busy, request, run, onInstall
         let result: { status: string; plan: HostPlan };
         try { result = await request({ op: 'install_bundled_host', approved_plan: plan }); }
         catch (error) { setPlan(null); throw error; }
-        setPlan(null);
+        setPlan(null); setPendingRecovery(false);
         onInstalled(result.status === 'already-registered' ? 'installedVerified' : result.status === 'updated' ? 'installedUpdated' : 'installedNew');
       })}>{actionName}</button>
       <p className="small-print">{t('bhost.footer')}</p>

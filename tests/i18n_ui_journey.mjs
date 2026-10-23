@@ -39,6 +39,7 @@ try{
     if(command==='app_set_language'){menuCalls.push(args.language);return null;}
     if(command==='request'){const c=args.payload;coreCalls.push(c.command);
       if(c.command==='discover')return {ok:true,data:{environments:[environment],capabilities}};
+      if(c.command==='jobs_page')return {ok:true,data:{jobs:[{...receipt,updated_at_ns:'1760000000000000000'}],digest:'a'.repeat(64),next_offset:null,scan_complete:true,records_complete:false,record_errors:[{job_id:'22222222-2222-4222-8222-222222222222',code:'invalid_json'}]}};
       if(c.command==='jobs')return {ok:true,data:{jobs:[receipt],records_complete:false,record_errors:[{job_id:'22222222-2222-4222-8222-222222222222',code:'invalid_json'}]}};
       if(c.command==='inspect')return {ok:true,data:{environment,settings:[],assets:[],warnings:[]}};
       if(c.command==='plan_policy'){planCount++;return {ok:true,data:plan};}
