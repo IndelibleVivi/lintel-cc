@@ -239,13 +239,26 @@ try {
   {
     const routeContext = await browser.newContext({javaScriptEnabled:false,viewport:{width:1280,height:900}});
     const page = await routeContext.newPage();
+    // A cold stylesheet can still be pending at DOMContentLoaded when scripts
+    // are disabled. Hold one real guide's CSS past that event so the geometry
+    // checks prove they await the styled document, rather than warm-cache luck.
+    let delayedGuideStyle = false;
+    await page.route('**/styles.css*', async route => {
+      if (!delayedGuideStyle && route.request().headers().referer === base + '/guide/browser/') {
+        delayedGuideStyle = true;
+        await page.waitForLoadState('domcontentloaded');
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+      await route.continue();
+    });
     page.on('request',request=>{if(!request.url().startsWith(base))external.push(request.url());});
     page.on('response',response=>{if(response.status()>=400)errors.push(`${response.status()} ${response.url()}`);});
     for(const routePath of ['/download/','/guide/','/inside/','/releases/','/guide/start-here/','/guide/concepts/','/guide/troubleshooting/','/guide/operator-guide/','/guide/browser/','/guide/remote/','/guide/agents/']){
-      await page.goto(base+routePath,{waitUntil:'domcontentloaded'});
+      await page.goto(base+routePath,{waitUntil:'load'});
       assert.ok((await page.locator('#main').innerText()).trim().length>200,`no-JS ${routePath}: substantive body`);
       assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),`https://lintel.page${routePath}`);
       assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN');
+      assert.equal(await page.evaluate(()=>[...document.querySelectorAll('link[rel="stylesheet"]')].every(link=>!!link.sheet)),true,`no-JS ${routePath}: styles loaded before geometry`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`no-JS ${routePath}: no overflow`);
       const dead=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].map(a=>a.getAttribute('href').slice(1)).filter(id=>id&&!document.getElementById(id)));
       assert.deepEqual(dead,[],`no-JS ${routePath}: same-page anchors resolve`);
@@ -256,6 +269,8 @@ try {
       await page.locator('[data-site-route-language="zh"]').click();
       assert.equal(new URL(page.url()).pathname,routePath);
     }
+    assert.equal(delayedGuideStyle,true,'no-JS browser guide exercised a cold stylesheet past DOMContentLoaded');
+    check('No-JS route geometry waits for the real stylesheet, including a browser guide held past DOMContentLoaded');
     for(const article of GUIDE_ARTICLES){
       await page.goto(base+article.path,{waitUntil:'domcontentloaded'});
       assert.ok(await page.locator('.guide-body h1').count()===1,`${article.key}: source heading rendered`);

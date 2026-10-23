@@ -840,3 +840,7 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归只证明固定调用与拒绝行为；实际 cold native build、真实新 DMG、clean-Mac、RC 升级／回退与独立来源认证仍未验证。
 
 独立 metadata 规模观察：10,000 项首页约 225 ms／15,043 bytes；100,000 项首页约 5.54 s／15,044 bytes（macOS arm64、外置 SSD、debug core、limit 50）。后者的 `time -l` 最大 RSS 为 115,130,368 bytes，涵盖该测试进程的 fixture 创建与查询，不能当作单次 RPC 的独立峰值。两项均显式选择 ignored benchmark，未加入默认 CI；100k 是当前 scan 上限的观察，不承诺更高容量或恒定响应时间。
+
+Bridge 写入预算回归先复现“事务可写出超过 32 MiB、后续读取拒绝”的错误，再共享读写准入；超限事务保留原字节，原查询继续可用。Native-host 19 项单元测试通过。完整候选实跑另发现 npm 双载同一路径配置与 App/CLI runner 清单差异；采用独立空 npmrc 和有限三文件 CLI runner 投影，保留原 packager 合同。macOS 的外置 TMPDIR 挂载点实际被拒绝，同一冻结镜像改用系统临时挂载点后只读核对与 detach 均通过；大镜像副本仍由调用方 TMPDIR 容纳。以上实跑中的失败与独立 App probe 不计为完整候选 matrix 成功。
+
+网站 no-JS 布局检查也固定了冷 stylesheet 的读取边界：真实 browser guide 在 DOMContentLoaded 时可尚无 `link.sheet`，延迟 CSS 的实验观察到自然表格宽 2601px；load 后在 1280／390px 均与 viewport 一致。检查等待 load、要求 stylesheet 已加载，再执行原 no-overflow 断言，并故意将该页 CSS 延迟到 DOMContentLoaded 之后。独立 `site-ui` 通过；未修改网站样式或缓存 URL。

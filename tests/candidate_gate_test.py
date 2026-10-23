@@ -265,6 +265,7 @@ class CandidateGateTests(unittest.TestCase):
             elif command[:2] == ["cargo", "fetch"]: pass
             elif command[0] == "npm": pass
             elif command[:2] == ["node", "apps/desktop/scripts/prepare-remote-runners.mjs"]:
+                write(resources / "runner-bundles", "README.md", b"App resource maintainer note; excluded by canonical CLI packager")
                 for triple in list(gate.TARGETS.values())[1:]:
                     write(resources / "runner-bundles", triple + "/lintel", (source / "target" / triple / "release/lintel").read_bytes())
                 write(resources / "runner-bundles", "manifest.json", json.dumps({"runners":[{"target":triple,"version":"0.1.1"} for triple in list(gate.TARGETS.values())[1:]]}).encode())
@@ -305,6 +306,8 @@ class CandidateGateTests(unittest.TestCase):
         self.assertEqual(len([c for c in calls if c == ["zig", "version"]]), 2)
         self.assertEqual(receipt["cli_version"], "0.1.0")
         self.assertEqual(receipt["app_version"], "0.1.1")
+        self.assertIn("README.md", receipt["components"]["runners"]["files"])
+        self.assertNotIn("README.md", receipt["components"]["cli_runners"]["files"])
         self.assertEqual(receipt, gate.json_read(output / "build-receipt.json"))
         with mock.patch.object(gate, "dmg_inventory", side_effect=lambda path, source, app_version, expected_artifact: gate.inventory(output / "app/Lintel.app")):
             self.assertTrue(gate.verify(receipt, output, self.plan, self.results, self.docs)["consistency_passed"])
@@ -314,6 +317,8 @@ class CandidateGateTests(unittest.TestCase):
     def test_dmg_subgate_uses_readonly_mount_and_detaches_even_when_verifier_fails(self):
         mount_root = self.base / "managed-mount"
         mount_root.mkdir()
+        image_root = self.base / "private-image"
+        image_root.mkdir()
         calls = []
         (self.base / "final.dmg").write_bytes(b"synthetic DMG")
         expected = gate.digest(self.base / "final.dmg")
@@ -323,12 +328,14 @@ class CandidateGateTests(unittest.TestCase):
                 mount = Path(command[command.index("-mountpoint")+1])
                 (mount / "Lintel.app").mkdir()
             return type("Result", (), {"returncode":0})()
-        with mock.patch.object(gate.sys, "platform", "darwin"), mock.patch.object(gate.tempfile, "mkdtemp", return_value=str(mount_root)), mock.patch.object(gate.subprocess, "run", side_effect=native), mock.patch.object(gate, "run", side_effect=ValueError("synthetic invalid resource seal")):
+        with mock.patch.object(gate.sys, "platform", "darwin"), mock.patch.object(gate.tempfile, "mkdtemp", side_effect=[str(image_root), str(mount_root)]) as temporary, mock.patch.object(gate.subprocess, "run", side_effect=native), mock.patch.object(gate, "run", side_effect=ValueError("synthetic invalid resource seal")):
             with self.assertRaisesRegex(ValueError, "invalid resource seal"):
                 gate.dmg_inventory(self.base / "final.dmg", ROOT, "0.1.1", expected)
         self.assertIn("-readonly", calls[0])
         self.assertEqual(calls[-1][:2], ["hdiutil", "detach"])
         self.assertFalse(mount_root.exists())
+        self.assertFalse(image_root.exists())
+        self.assertEqual(temporary.call_args_list[1].kwargs["dir"], "/private/tmp")
 
     def test_missing_tool_wrong_zig_targets_and_rust_docs_fail_before_output_or_clone(self):
         for failure in ["missing", "zig_version", "targets", "rust_docs"]:

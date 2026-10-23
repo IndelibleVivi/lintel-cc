@@ -231,7 +231,11 @@ def protected_cli(source, target, cli_runners):
 def dmg_inventory(path, source, app_version, expected_artifact):
     require(sys.platform == "darwin", "DMG subgate requires actual macOS; unverified elsewhere")
     directory = Path(tempfile.mkdtemp(prefix="lintel-candidate-mount-"))
-    mount = directory / "volume"
+    # Keep large image bytes in TMPDIR, but use macOS's system temporary
+    # filesystem for the mountpoint. An external-volume TMPDIR may reject a
+    # mount beneath it even when the same frozen image mounts internally.
+    mount_directory = Path(tempfile.mkdtemp(prefix="lintel-candidate-volume-", dir="/private/tmp"))
+    mount = mount_directory / "volume"
     mount.mkdir()
     attached = False
     try:
@@ -258,6 +262,7 @@ def dmg_inventory(path, source, app_version, expected_artifact):
             # Do not recurse through a mount whose detach is uncertain.
             require(detached.returncode == 0, f"managed DMG detach unconfirmed; retained exact mountpoint {mount}")
         shutil.rmtree(directory)
+        shutil.rmtree(mount_directory)
 
 
 TOOL_COMMANDS = {
@@ -343,7 +348,14 @@ def build(repo, revision, output, app=False):
     # CLI packaging correctly requires the runner's own version. Project only
     # that finite manifest identity from the SAME freshly built runner bytes.
     cli_runners = output / "cli-runners"
-    shutil.copytree(resources / "runner-bundles", cli_runners)
+    cli_runners.mkdir()
+    # The App resource folder also contains its tracked maintainer README.
+    # package-cli's canonical runner payload is exactly the manifest + two
+    # executables; project that finite set rather than every adjacent file.
+    for relative in ("manifest.json", *(triple + "/lintel" for triple in list(TARGETS.values())[1:])):
+        destination = cli_runners / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(resources / "runner-bundles" / relative, destination)
     cli_manifest = json_read(cli_runners / "manifest.json")
     require(len(cli_manifest.get("runners", [])) == 2, "canonical runner manifest required")
     for runner in cli_manifest["runners"]:

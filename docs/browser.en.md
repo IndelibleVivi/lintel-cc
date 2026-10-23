@@ -198,7 +198,7 @@ Internal fields are `{op, request_id, instance_id, token}`; token is a local ran
 
 Replies retain `request_id`. Bridge directories are 0700, state/locks 0600, with exclusive locks, temporary writes, fsync, rename and directory fsync. Defaults: macOS user Application Support `Lintel/browser-bridge`; Linux user `.local/state/lintel/browser-bridge`. `LINTEL_BROWSER_STATE` can set a synthetic temporary root as process configuration, never an extension-provided path. No network listener.
 
-Existing `bridge.json` first passes bounded structural validation. Syntactically valid JSON with malformed field shapes returns `invalid_state` and retains the original bytes instead of overwriting the damaged file on read. This does not imply automatic repair of every semantic conflict.
+Existing `bridge.json` first passes bounded structural validation. Reads and writes share a 32 MiB admission limit; oversized writes are rejected before publication, retaining the original readable state. Syntactically valid JSON with malformed field shapes returns `invalid_state` and retains the original bytes instead of overwriting the damaged file on read. This does not imply automatic repair of every semantic conflict.
 
 Two concurrent native connections using identical credentials persist `duplicate_instance_conflict` and stop accepting operations on both. The extension can generate a new identity and pair again. Browsers offer no trusted ordinary-profile identity: **offline clones that never connect simultaneously cannot be proven distinct**. This portion of B02 is incomplete; connection-conflict detection is not complete arbitrary-clone detection.
 

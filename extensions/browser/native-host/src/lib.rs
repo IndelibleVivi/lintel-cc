@@ -11,6 +11,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 pub const MAX_FRAME: usize = 65536;
+const MAX_STATE_BYTES: usize = 32 * 1024 * 1024;
 /// Pairing codes are short-lived secrets. 12 hex chars = 48 bits of entropy.
 const PAIR_CODE_LEN: usize = 12;
 /// A pending pairing code is invalidated after this many failed pair_request attempts.
@@ -130,10 +131,10 @@ where
             return Err("invalid_state:expected regular file".into());
         }
         input
-            .take(32 * 1024 * 1024 + 1)
+            .take(MAX_STATE_BYTES as u64 + 1)
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
-        if bytes.len() > 32 * 1024 * 1024 {
+        if bytes.len() > MAX_STATE_BYTES {
             return Err("invalid_state:state exceeds limit".into());
         }
         serde_json::from_slice(&bytes).map_err(|e| format!("invalid_state:{e}"))?
@@ -143,13 +144,17 @@ where
     validate_state(&db)?;
     // Persist conflicts as well as successful commands.
     let result = f(&mut db);
+    let encoded = serde_json::to_vec(&db).map_err(|e| e.to_string())?;
+    if encoded.len() > MAX_STATE_BYTES {
+        return Err("invalid_state:state exceeds limit; original retained".into());
+    }
     let tmp = path.join(format!("bridge-{}.tmp", random()));
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
     options.mode(0o600);
     let mut file = options.open(&tmp).map_err(|e| e.to_string())?;
-    file.write_all(&serde_json::to_vec(&db).map_err(|e| e.to_string())?)
+    file.write_all(&encoded)
         .map_err(|e| e.to_string())?;
     file.sync_all().map_err(|e| e.to_string())?;
     fs::rename(tmp, db_path).map_err(|e| e.to_string())?;
@@ -966,6 +971,22 @@ mod tests {
         let after: Value = serde_json::from_slice(&fs::read(p.join("bridge.json")).unwrap()).unwrap();
         assert_eq!(after["operations"], original);
         fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn oversized_transaction_preserves_readable_original_state() {
+        let p = path();
+        setup(&p);
+        let before = fs::read(p.join("bridge.json")).unwrap();
+        let result = transaction(&p, |db| {
+            db["synthetic_padding"] = json!("x".repeat(32 * 1024 * 1024));
+            Ok(json!({"synthetic":true}))
+        });
+        let preserved = fs::read(p.join("bridge.json")).unwrap() == before;
+        let readable = control_at(&p, json!({"op":"instances"}))["ok"] == true;
+        fs::remove_dir_all(p).unwrap();
+        assert!(result.is_err(), "an oversized write must not strand the next read");
+        assert!(preserved);
+        assert!(readable);
     }
     #[test]
     fn pairing_and_duplicate_live_instance_conflict() {

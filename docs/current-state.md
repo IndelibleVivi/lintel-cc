@@ -9,7 +9,7 @@
 | CLI / DNS 等待 | CLI 使用 nonblocking bounded stdout；系统 DNS 由最多 32 个 slot 的独立 owner 管理，取消后的迟到结果不连接；不承诺能终止 OS DNS 或逃逸进程 |
 | 浏览器恢复 | App 重开后从只读 pending IPC 发现原 host 安装批准并继续；未决 intent 拦住新安装。Popup 能完成原 owner 的隔离释放收尾；旧回执绑定原 instance，reset／重配对／worker 重开不借新身份发送。未知 legacy 归属保留并显式报限制，外部变更保留 |
 | 残留／标识保全 | 保持 `lintel.residue/1` 原编码，共享有限预算、删除前生产 reader 校验、路径资格及逐原件隔离定位；同步不确定不记完成 |
-| 任务与诊断 | App／named CLI 改用 256 KiB 有界摘要与分段详情，环境发现独立；cursor 绑定元数据快照／筛选／搜索，坏记录与超大单项明确说明。原 journal／去重记录不删，旧 full RPC 兼容；I/O reason 在 accepted 前后、落盘与重开查询一致。Bridge 错形 JSON 返回 invalid_state 并保留原字节 |
+| 任务与诊断 | App／named CLI 改用 256 KiB 有界摘要与分段详情，环境发现独立；cursor 绑定元数据快照／筛选／搜索，坏记录与超大单项明确说明。原 journal／去重记录不删，旧 full RPC 兼容；I/O reason 在 accepted 前后、落盘与重开查询一致。Bridge 错形 JSON 返回 invalid_state 并保留原字节，32 MiB 读写准入一致 |
 | 首用／构建／CI | App/CLI 当前指引分开维护；显式 locked dependency/rust-docs 准备并检查前置工具；打包脚本、网站指南输入与 macOS signature fixture 接入对应 CI，frontend 执行与证据同用按平台过滤的清单；日常 push 不取消上一轮验证。Ubuntu native 临时 runner 优先官方 Canonical HTTPS mirror，保留依赖与严格 gate。Vite 开发依赖更新到 8.3.5 安全补丁。完整冷缓存 native 构建尚未独立验收 |
 | 本地候选 gate | 新 `prepare-candidate.py` 固定 clean SHA、fresh source／target、三平台 CLI 与可选 App／DMG，并核对最终包字节、组件／许可与同 SHA canonical full CI。当前只完成 source 与合成回归，实际新候选／冷构建未验收；本地 receipt／CI JSON 来源未独立认证 |
 | 分发与许可 | tar inspector 检查传递／循环 symlink，正式签名环境约束到达最终 gate；新 App/CLI 候选携带独立项目许可。原创功能代码 SUL-1.0、原创文档／独立图示 CC BY-NC-SA 4.0，范围／排除见[授权边界](../LICENSING.md)；项目为 source-available Preview |

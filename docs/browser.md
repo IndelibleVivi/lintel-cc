@@ -202,7 +202,7 @@ let response = lintel_browser_host::control(serde_json::json!({"op":"instances"}
 
 回复 envelope 加同一 `request_id`。桥接目录权限 0700，状态与 lock 0600；独占文件锁、写临时文件、fsync、rename、目录 fsync。默认 macOS 为用户 Application Support 下 `Lintel/browser-bridge`，Linux 为用户 `.local/state/lintel/browser-bridge`。合成环境可用 `LINTEL_BROWSER_STATE` 指定临时根；这是进程配置，不接受来自扩展的路径。无网络 listener。
 
-已有 `bridge.json` 先接受有界结构检查。语法合法但字段错形的 JSON 返回 `invalid_state` 并保留原字节，不会因读取而覆盖损坏文件；这不表示所有语义冲突都可自动修复。
+已有 `bridge.json` 先接受有界结构检查；读写共用 32 MiB 限额，超限写入在发布前拒绝并保留仍可查询的原文件。语法合法但字段错形的 JSON 返回 `invalid_state` 并保留原字节，不会因读取而覆盖损坏文件；这不表示所有语义冲突都可自动修复。
 
 两个同时在线的 native 连接若持同一实例凭据，host 持久标记 `duplicate_instance_conflict`，两个都停止接受操作。扩展提供“生成新身份重新配对”。浏览器没有可信的普通 profile 身份证明，**离线复制后从不同时连接的克隆仍无法被证明区分**；这部分 B02 不算完成。不能把连接冲突检测描述为任意 profile 克隆完整检测。
 
