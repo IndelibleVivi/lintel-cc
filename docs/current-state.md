@@ -16,14 +16,14 @@
 
 本轮定向证据包含：App host 三发布阶段丢弃前端对象后从公开 IPC 重开恢复；真实 framed native-host 与生产 background／popup 的 lost ACK→reset→重配对→重开组合；逃逸进程 readiness 与实际 operation lock 释放；32 个真实阻塞 resolver owner 加 100 次饱和拒绝及迟到结果无连接；完整 Engine 残留 rename／sync 故障重开；accepted 前后有限 I/O reason 与 bridge 错形保留。旧轮的 24 MiB 生产残留归档→reader→恢复、逐原件隔离定位证据继续按其 source 范围保留。公开旧版 CLI → 当前不同 binary 的原 job／plan、旧加密包精确正文、选中字段恢复及实际 kill 后原 ID 不重放已通过。它们均使用 synthetic roots／adapter，不是个人认证、正式浏览器或 clean-Mac 验收。本轮检查范围见[验证说明](verification.md#2026-10-24-恢复与有界历史接续)；旧轮证据见同页 10-23 节。
 
-候选验收记录（full CI 与最终 gate 尚待齐备）：
+候选验收记录（同 SHA full CI 与最终本地一致性 gate 已完成）：
 
 | 层次 | 准确范围与状态 |
 | --- | --- |
 | 产品源码 | `c7680f0656d27b5d043543df30cfae6fe5eda8a9`（本轮产品 source 已 push）；后续 proof-only docs revision 独立，不替换候选的 source SHA |
 | 本地构建 matrix | `c7680f0` fresh source clone／fresh target：macOS arm64、Linux x86_64／arm64 musl 三份 CLI 与 macOS App／DMG 构建成功；复用依赖下载，不声称全空缓存 |
-| 最终包 | 三份 CLI tar 与 macOS App／DMG 已生成；final gate 尚待同 SHA full CI evidence，不将构建完成写作 CI 验收完成 |
-| 最终 full CI | `39997130322` 的 workflow_dispatch full profile 正在运行，尚未确认结果；必须核对同一候选源码的完整 canonical evidence |
+| 最终包 | 三份 CLI tar 与 macOS App／DMG 已生成；final gate 重新读取实际 tar member、只读挂载 DMG，核对组件／notices／许可字节及同 SHA full CI，`consistency_passed:true` |
+| 最终 full CI | [CI 39997130322](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39997130322) 的 workflow_dispatch full profile 已 success，14 个 jobs 全通过；下载的 12 份 canonical reports 均为同一 clean SHA，111 次按平台计的选中 check 执行全部 passed，production aggregate 本地复核无问题 |
 | 实际 CLI 迁移 | 公开 v0.1.0 tar → `c7680f0` 实际 tar CLI probe 已通过：原 jobs／plans、完整旧加密正文、选中字段恢复保留后续无关编辑；旧 accepted worker 实际 kill 后，原 ID 查询与 execute 不重放。旧 binary 能读新 completed restore 只是有限 downgrade 观察 |
 | gate 边界 | 只证明本地一致性；`origin_authenticated`、`build_origin_authenticated`、`ci_origin_authenticated`、`release_authorized` 均为 `false`，不证明签名或来源真实性 |
 | 分发／运行 | 未发布新 Release、未安装新 App、未激活 updater、未部署官网；公开 App 0.1.1／CLI 0.1.0 及旧网站状态不变 |
@@ -32,7 +32,7 @@
 
 有界历史的独立 debug 观察：10k 项首页约 225 ms，100k 项约 5.54 s，响应均约 15 KiB；100k 测试进程（含 fixture 建立）的最大 RSS 约 110 MiB。保留元数据扫描上限与显式加载状态，没有据此宣称恒定时间或无限容量。
 
-仍需独立建设／验收：最终准确 SHA 的产物 gate 与 full CI 收口、正式 RC 跨平台升级／回退、其他架构实际 runtime 及 clean-Mac 信任／首装；物理 journal 归档先满足旧版去重／downgrade 兼容政策。Browser host 仍保留 1000 操作上限，满额可查原 ID，尚无安全归档／清理入口。完整健康／恢复中心、Client Footprint 的来源解释→精确修改→中断核对→快照→恢复旅程，以及外发／权限来源解释保留为下一产品建设；受管强隔离与可恢复退场独立试点，不阻塞当前维护修复。私密安全报告渠道与可复现演示仍未交付；完整 SPEC 不因此缩减。
+仍需独立建设／验收：正式 RC 跨平台升级／回退、其他架构实际 runtime 及 clean-Mac 信任／首装；物理 journal 归档先满足旧版去重／downgrade 兼容政策。Browser host 仍保留 1000 操作上限，满额可查原 ID，尚无安全归档／清理入口。完整健康／恢复中心、Client Footprint 的来源解释→精确修改→中断核对→快照→恢复旅程，以及外发／权限来源解释保留为下一产品建设；受管强隔离与可恢复退场独立试点，不阻塞当前维护修复。私密安全报告渠道与可复现演示仍未交付；完整 SPEC 不因此缩减。
 
 
 2026-10-20 · **[Lintel 0.1.1 开发者 Preview 已发布](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)**，修复 0.1.0 DMG 的 App bundle 签名封装。App／文档编译 revision 与 tag target 均为 clean `ebbe237cd236a2b299281e070b4758a9e9e522b2`。DMG 13,123,475 bytes，SHA-256 `867ea626ceb5101006e15c071da9627db38a555212208a4fffd577a5f5faf6d3`。Release 于 `2026-10-20T09:39:22Z` 公开，4 个上传资产均已核对公开字节；manual 记录为 `public_bytes_verified`／`publication_verified:true`。Chrome 从公开 Release 下载的副本保留 quarantine，只读挂载后的 App 通过严格签名校验。完整 ad-hoc 签名不提供 Developer ID 或公证，也没有 updater feed；干净 Mac 首装与用户信任确认仍独立。字节一致不构成源码认证。

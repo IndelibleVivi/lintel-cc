@@ -837,7 +837,7 @@ Darwin/arm64 的 canonical `cargo-workspace-test`、`desktop-rust-test`、`nativ
 
 进程测试先以 readiness 确认逃逸 child 持有 stdout，分别覆盖 parent 已退出／仍存活，再观察 deadline 和真实 operation lock 可再次取得。DNS 测试占满 32 个实际阻塞 owner，100 次后续请求不增加队列／resolver，取消与 runtime drop 能返回，晚到结果没有 TCP 连接。残留测试从完整 Engine 注入 rename／两类 parent sync 失败，重开原 ID 反复查询／execute 不重放、不将不确定状态记完成。三类 I/O reason 同时覆盖 accepted 前后、持久 journal 与重开，旧无 reason 记录仍可读。
 
-有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归证明固定调用与拒绝行为；随后 `c7680f0656d27b5d043543df30cfae6fe5eda8a9` 已完成真实 fresh clone／fresh target 三平台 CLI 与 App／DMG 构建，复用依赖下载，并非全空缓存。最终 `c7680f0656d27b5d043543df30cfae6fe5eda8a9` matrix 已构建完成，`39997130322` full CI 正在验收；最终 canonical evidence 的检查数量待 CI 完成后核对。clean-Mac、完整 RC 跨平台升级／回退、其他架构实际 runtime 与独立来源认证仍未验证。
+有界 history 使用实际 core 和 built App，保留小回执原 TaskOutcome／恢复预览，大单项返回明确 limitation；过滤空页仍显示后续游标，历史失败不遮蔽环境发现，旧 runner 无全量 fallback。候选 gate 回归证明固定调用与拒绝行为；随后 `c7680f0656d27b5d043543df30cfae6fe5eda8a9` 已完成真实 fresh clone／fresh target 三平台 CLI 与 App／DMG 构建，复用依赖下载，并非全空缓存。最终准确 clean SHA 的 [CI 39997130322](https://github.com/IndelibleVivi/lintel-cc/actions/runs/39997130322) 已完成 full profile：14 个 jobs 全部 success，下载的 12 份 canonical reports 均记录同一 clean source，111 次按平台计的选中 check 执行全部 passed。production aggregate 本地复核无问题。clean-Mac、完整 RC 跨平台升级／回退、其他架构实际 runtime 与独立来源认证仍未验证。
 
 独立 metadata 规模观察：10,000 项首页约 225 ms／15,043 bytes；100,000 项首页约 5.54 s／15,044 bytes（macOS arm64、外置 SSD、debug core、limit 50）。后者的 `time -l` 最大 RSS 为 115,130,368 bytes，涵盖该测试进程的 fixture 创建与查询，不能当作单次 RPC 的独立峰值。两项均显式选择 ignored benchmark，未加入默认 CI；100k 是当前 scan 上限的观察，不承诺更高容量或恒定响应时间。
 
@@ -850,3 +850,7 @@ Bridge 写入预算回归先复现“事务可写出超过 32 MiB、后续读取
 六项可靠性修复与 B1 有界分页已完成；未新增物理 journal archive／capacity policy。健康／恢复中心、Client Footprint 完整旅程、egress 来源解释与受管强隔离仍是后续独立建设。新 gate 的本地一致性结果不认证 build／CI 来源，不授予发布；未安装新 App、未发 Release、未激活 updater、未部署网站。
 
 Clawd 的真实 CDP touch-cancel 检查保留原高度与不重复跳跃断言。原测试在部分 hold 后跨进程发送 cancel，注入 300 ms driver 延迟时观察到 cancel 到达前已蓄满；测试改为固定 simulation step 并在已绘制的部分 hold 后暂存后续 RAF，真实 CDP cancel 到达后恢复。修复后同一延迟下通过，产品 game 代码未改；不从缺少 trace 的旧 CI 反推那次确切延迟。
+
+最终本地候选 gate 从候选保留的同 SHA clean source 执行，重新读取三个 CLI tar 的实际 member bytes，并只读挂载最终 DMG，核对 App 及 bundled runners／browser host／extensions／notices／项目许可；结果为 `consistency_passed:true`。build receipt 的 `origin_authenticated:false` 与 gate 的 `build_origin_authenticated:false`、`ci_origin_authenticated:false`、`release_authorized:false` 保持不变：实际字节和本地观察一致，不构成独立来源认证。
+
+本轮 full CI 第一 attempt 的 VM 组仅在 Azure Ubuntu mirror 下载 QEMU 依赖时耗尽 15 分钟，产品编译／测试尚未开始，未产生 VM artifact。保留该失败后，仅重跑同 SHA 的 VM 与 aggregate；第二 attempt 完成依赖安装、静态 runner 构建和真实 disposable-VM lifecycle acceptance。未跳过选中 check、提高超时或放宽断言。构建／兼容说明的独立文档提交 `1d4a53d` 也通过 [site+docs CI 40001856649](https://github.com/IndelibleVivi/lintel-cc/actions/runs/40001856649)；它不替代上述 full 产品证据。
