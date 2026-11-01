@@ -250,8 +250,8 @@ only the official signed Ubuntu base image is cached for the VM and every run
 still re-verifies its gpgv signature and checksums. Caches never replace the
 source rebuild/test. Only a newer run of the same PR cancels unfinished PR
 verification: its concurrency group includes the workflow, event and PR number.
-Every non-PR run (including each branch push, schedule and manual dispatch) has
-an independent run-ID group. This protects both running and pending push
+Every non-PR run (including each branch push, schedule and manual dispatch)
+has an independent run-ID group. This protects both running and pending push
 evidence: disabling running cancellation alone would still allow a third push
 to replace a second pending push. Standalone branch pushes stay enabled before
 a PR exists; push and PR runs remain separate because they test the pushed head
