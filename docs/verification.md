@@ -257,7 +257,8 @@ to replace a second pending push. Standalone branch pushes stay enabled before
 a PR exists; push and PR runs remain separate because they test the pushed head
 and the PR merge checkout respectively. Weekly complete acceptance and all
 finite profiles/platforms stay unchanged. Permissions stay `contents: read`.
-The grouping policy follows [GitHub's concurrency semantics](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+The grouping policy follows
+[GitHub's concurrency semantics](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 
 The 2026-10-26 [weekly full run](https://github.com/IndelibleVivi/lintel-cc/actions/runs/40295960891)
 completed 14 jobs in about 1,230 seconds wall time (5,360 seconds summed job execution).
