@@ -23,13 +23,14 @@ on:
 permissions:
   contents: read
 
-# Do not cancel running product verification when a later push changes docs.
-# Scheduled and manual acceptance runs have independent groups keyed by run id.
-# GitHub may replace an older pending run; exact candidate evidence is still a
-# separate release gate, never inferred from the latest lightweight aggregate.
+# Only newer runs of the same PR supersede unfinished PR verification.
+# Every non-PR event has its own run group: cancel-in-progress: false alone
+# would still let a third push replace the second pending push on main.
+# Branch pushes remain enabled even before a PR exists; push and PR evidence
+# describe different checkouts and are not deduplicated here.
 concurrency:
-  group: verify-${{ github.ref }}-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('acceptance-{0}', github.run_id) || 'change' }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   plan:

@@ -716,13 +716,23 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertIn(name, triggers)
         self.assertEqual(self.doc["permissions"], {"contents": "read"})
 
-    def test_concurrency_is_run_scoped_for_acceptance(self):
-        concurrency = self.doc["concurrency"]
-        self.assertIn("github.run_id", concurrency["group"])
-        self.assertIn("cancel-in-progress", concurrency)
-        # Keep unfinished product evidence alive across later docs-only pushes;
-        # scheduled/manual acceptance runs also retain their own run scope.
-        self.assertIs(concurrency["cancel-in-progress"], False)
+    def test_concurrency_groups_only_pr_runs_together(self):
+        # Pin the actual Actions expression. A shared branch/ref suffix would
+        # allow commit C to replace pending commit B even with cancellation off.
+        # Event + PR number also keeps separate PRs and push evidence isolated.
+        self.assertEqual(self.doc["concurrency"]["group"],
+                         "${{ github.workflow }}-${{ github.event_name }}-"
+                         "${{ github.event_name == 'pull_request' && "
+                         "github.event.pull_request.number || github.run_id }}")
+
+    def test_concurrency_cancels_only_superseded_pr_runs(self):
+        self.assertEqual(self.doc["concurrency"]["cancel-in-progress"],
+                         "${{ github.event_name == 'pull_request' }}")
+
+    def test_standalone_pushes_and_weekly_full_acceptance_remain_enabled(self):
+        triggers = self._triggers()
+        self.assertEqual(triggers["push"], {"branches": ["**"]})
+        self.assertEqual(triggers["schedule"], [{"cron": "17 3 * * 1"}])
 
     def test_evidence_dir_is_outside_the_repo(self):
         self.assertNotIn("EVIDENCE_DIR", self.doc.get("env", {}))
