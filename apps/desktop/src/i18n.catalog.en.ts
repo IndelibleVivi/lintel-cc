@@ -2417,7 +2417,7 @@ export const en: Catalog = {
   "cleanup.authPreciselyRemovable": "Exact removal supported",
   "cleanup.authAtLines": "Location: line {lines}",
   "cleanup.authKindFile": "Credential file",
-  "cleanup.authKindCredential": "Saved Claude login",
+  "cleanup.authKindCredential": "Login in a config file",
   "cleanup.authKindSavedKey": "Authentication field saved by the client",
   "cleanup.authKindSettings": "Environment variable in Claude settings",
   "cleanup.authKindHelper": "Credential helper",
@@ -2606,4 +2606,5 @@ export const en: Catalog = {
   "app.registerMissingSource": "A required file or directory could not be found while adding the environment. Check the full config directory path, confirm the directory exists, and try again.",
   "app.registerFailed": "Environment registration could not be completed. Check the name and config directory, review the diagnostic, and try again.",
   "app.registerDiagnostics": "View original diagnostic",
+  "present.title.archiveOnly": "Archive selected work only",
 };

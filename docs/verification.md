@@ -44,6 +44,21 @@ executed check fails. `deferred` and `skipped` checks never count as passes.
 
 The table below lists the equivalent raw commands; [开发与文档](../README.md#开发与文档) points to this entrypoint.
 
+## 文档与 App 版式收尾
+
+本轮只改变 App 排列／展示与文档、官网来源。通过原入口选择相关检查：
+
+```bash
+python3 tests/verify.py --checks i18n-test,i18n-coverage-test,recipe-test,i18n-ui,client-control-ui,history-ui,work-ui,auth-sources-ui,baseline-ui --require-passed
+python3 tests/verify.py --checks app-release-test,site-ui --require-passed
+node scripts/prepare-site-languages.mjs --check
+node --test tests/site_languages.test.mjs
+```
+
+本机 9 项 App checks、23 项发行／打包 testcase、15 项网站语言／路由 testcase 通过；site-ui 使用既有真实短片并通过主动播放／关闭检查。内盘空间不足后，保留初次失败，转到独立临时目录串行补跑客户端控制、记录和 baseline 三项通过，没有删除断言或放宽等待边界。
+
+新增回归检查提示与 dock 不重叠、英文标签／页签可见，以及清理页折叠配方的应用／编辑／保存、语言切换与草稿保持。所有操作使用 synthetic roots、真实 Core 与 bundled Chromium，不使用个人 browser profile；当前样式的原生 WebKit、个人认证和下载首装仍独立。网站回归要求每一篇 paired guide 在两语言目录中恰好出现一次，发行原说明仍可展开，安全与版本限制保持可见。生成源码、本地冻结包及线上部署分别记录，见[当前状态](current-state.md)。
+
 ## 新版 App 和 CLI 使用测试收尾
 
 2026-11-13 的 QA 将真实 macOS WebKit 与 built-App Chromium 分开。原生 debug QA bundle 使用独立 App identifier、合成 HOME／state 与 inert Claude，只通过正常控件完成三份原件的归档批准、错误口令、Quit／重开、重新解锁、指令／记忆／会话结构化与 raw 阅读，以及五项文件／测试 Keychain／注入来源的同计划清理和独立复查。原件及邻接字段逐项读回，只有一个归档 job 和一个清理 job；认证 receipt 的 legacy status 与所选 task_result 仍分开，未将本地移除声称为服务端撤销。个人账号和真实 Keychain 未参与。

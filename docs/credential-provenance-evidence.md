@@ -4,7 +4,7 @@
 
 ## 1. 本轮怎样取得证据
 
-核对 Anthropic 官方当前文档，并阅读 `crates/core/src/cleanup.rs`、`auth_sources.rs`、`auth_cleanup.rs`、`keychain.rs`／`keychain/macos.rs`、`components.rs`、`startup.rs`、App 清理入口与已有操作契约。文档的抓取日期为 2026-11-13；下列版本号是相应文档明确列出的门槛，不代表本轮运行过这些版本。本轮没有执行真实 Claude、登录、注销、Keychain 操作或模型请求。开发测试限定在 synthetic roots 与 inert adapters。
+核对 Anthropic 官方当前文档，并阅读 `crates/core/src/cleanup.rs`、`auth_sources.rs`、`auth_cleanup.rs`、`keychain.rs`／`keychain/macos.rs`、`components.rs`、`startup.rs`、App 清理入口与已有操作契约。文档的抓取日期为 2026-11-13；下列版本号是相应文档明确列出的门槛，不代表本轮运行过这些版本。这次机制静态核对不执行真实 Claude、登录、注销、Keychain 操作或模型请求。常规开发测试使用 synthetic roots 与 inert adapters；后来独立进行的临时 Keychain 平台 API 验证另见[当前状态](current-state.md)，不代表个人账号验收。
 
 当前官方文档可更新，不能当成所有历史客户端的执行规范。源码中的有限识别规则、当前执行器的只读观察、显式 CLI 状态结果、真实客户端实效分别保留证据等级。
 

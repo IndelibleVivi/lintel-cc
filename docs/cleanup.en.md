@@ -8,7 +8,7 @@
 
 `claude setup-token` prints a long-lived OAuth token without saving it. A shell, Claude settings, an IDE, service or CI system may later inject that token. There is no fixed setup-token file to remove. Ordinary login files and Keychain are separate sources. See the [engineering evidence record](credential-provenance-evidence.en.md) for official sources and version conditions.
 
-The authentication list in Clear local login reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.
+Open Cleanup & rebuild in the sidebar to reach Clear local login. Its authentication list reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.
 
 | Observation | What it establishes | What it does not establish |
 | --- | --- | --- |

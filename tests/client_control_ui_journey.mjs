@@ -334,6 +334,10 @@ try{
  await promptsRow.locator('select').selectOption('enable');
  await page.getByRole('button',{name:'把当前方案存为个人默认',exact:true}).click();
  await personalRow.waitFor();
+ const savedNotice=page.locator('.toast');await savedNotice.waitFor();
+ const noticeClearance=await savedNotice.evaluate(element=>{const notice=element.getBoundingClientRect(),dock=document.querySelector('.workspace-actions').getBoundingClientRect();return notice.bottom<=dock.top||notice.top>=dock.bottom;});
+ assert.equal(noticeClearance,true,'saved feedback must not cover the active operation dock');
+ assert.equal(await page.locator('.workspace-actions .primary').isEnabled(),true,'saving a personal default keeps the current action reachable');
  assert.equal(await recipes.locator('.recipe-row').filter({hasText:L.recipeReduce}).count(),0,'a personal default that enables recording may not keep the reduce name');
  assert.ok((await personalRow.locator('strong').innerText()).includes('个人默认 · 自定义'));
  const detail=await personalRow.locator('.recipe-copy p').innerText();
@@ -622,6 +626,8 @@ try{
  }
  await page.locator('.target-bar .language-control select').selectOption('en');
  assert.equal(await rawInput.inputValue(),`${rawDirectory}/next`,'language switching preserves the exact custom value');
+ const actionLabelFits=await raw.locator('.policy-rule-choice select').evaluate(element=>{const style=getComputedStyle(element),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;const text=element.selectedOptions[0].text;return context.measureText(text).width<=element.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-16;});
+ assert.equal(actionLabelFits,true,'English API recording action remains readable without truncating the chosen mode');
  await page.screenshot({path:path.join(fixture,'policy-api-english.png')});
  await page.locator('.target-bar .language-control select').selectOption('zh-CN');
  await page.locator('.policy-current-config > summary').click();

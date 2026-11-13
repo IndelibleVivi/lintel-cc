@@ -4,6 +4,8 @@
 
 Choose a page by what you need to do. First use does not require reading the full specification or learning protocol fields.
 
+These guides follow current development source. Public downloads remain App 0.1.1/CLI 0.1.0 and lack the latest authentication-source/Keychain cleanup, bounded task history and other enhancements. [First use](start-here.en.md) separates download and source entry points. For downloads, follow the matching Release notes, bundled help and actual binary capabilities; updated guides do not upgrade the binary.
+
 ## New here
 
 [First use](start-here.en.md) walks through the interface and a synthetic archive task. [Core concepts](concepts.en.md) explains hosts, configuration roots, plans and work packages. For a complete command-line example with explicit checks, use the [CLI trial](quickstart.en.md).
@@ -14,7 +16,8 @@ Choose a page by what you need to do. First use does not require reading the ful
 | --- | --- |
 | Protection (including 27-field individual/bulk editing), work preservation, cleanup, recovery and recipes | [Operator guide](operator-guide.en.md) |
 | CLI use, standalone candidates or agent handoff | [Agent CLI](agents.en.md) |
-| Development authentication sources, exact cleanup and independent verification (not in 0.1.1) | [Authentication cleanup](cleanup.en.md) |
+| Exact file/Keychain login and injection cleanup with independent checks (not in App 0.1.1/CLI 0.1.0) | [Authentication cleanup](cleanup.en.md) |
+| Configuration editing/restoration, residue/identity, semantic snapshots and composite recipes | [Client-control operations](operator-guide.en.md#client-control) / [CLI entries](agents.en.md#client-control) |
 | App pages, language and desktop use | [Desktop](desktop.en.md) |
 | Extension setup, pairing and post-restart cleanup | [Browser](browser.en.md) |
 | SSH hosts, remote runners and disconnected tasks | [Remote](remote.en.md) |

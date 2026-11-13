@@ -121,6 +121,7 @@ export const PRESENTATION_KEYS: Record<string, string> = {
   '修复目标登录': 'present.title.repairLogin',
   '退役此环境': 'present.title.retire',
   '加密工作归档': 'present.title.archive',
+  '仅加密归档所选工作内容': 'present.title.archiveOnly',
   '保全': 'present.title.preserve',
   '工作内容迁入': 'present.title.import',
   '保留内容，准备新环境': 'present.title.preserveNewEnv',

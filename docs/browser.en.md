@@ -2,7 +2,7 @@
 
 [简体中文 (canonical)](browser.md) · English · [Documentation](index.en.md)
 
-Status: 0.1.0 development candidate. Chrome/Edge MV3 packages and the independent Firefox event-page adapter can be built; formal browser installation, store publication and full three-browser acceptance are incomplete. This document corresponds to the [full target (Chinese)](SPEC.md#9-模块-c浏览器能力必须真实可操作) and [B01–B15 acceptance (Chinese)](ACCEPTANCE.md#c-浏览器实测), without claiming delivery of the complete target.
+This guide follows current development source; public downloads remain App 0.1.1/CLI 0.1.0 and lack the recovery enhancements described below. Chrome/Edge MV3 packages and the independent Firefox event-page adapter can be built; formal browser installation, store publication and full three-browser acceptance are incomplete. This document corresponds to the [full target (Chinese)](SPEC.md#9-模块-c浏览器能力必须真实可操作) and [B01–B15 acceptance (Chinese)](ACCEPTANCE.md#c-浏览器实测), without claiming delivery of the complete target.
 
 Pending host-installation discovery, popup isolation-release recovery and legacy receipt ownership checks below are current-source enhancements, not a newly published App or extension release. Exact source, candidate and published-version facts are separate in [current state (Chinese)](current-state.md).
 

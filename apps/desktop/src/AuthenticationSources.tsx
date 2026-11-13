@@ -35,12 +35,13 @@ export function authenticationMethodLabel(method:string,t:(key:string)=>string):
 /** Display only the core's finite public projection. No field values or helper text. */
 export function AuthenticationSourceRow({source,selected,onToggle,disabled=false,expanded=false}:{source:AuthenticationSource;selected?:boolean;onToggle?:(id:string,selected:boolean)=>void;disabled?:boolean;expanded?:boolean}) {
   const {t}=useI18n();
-  const title=['credential_field','keychain_field'].includes(source.kind)&&source.name==='claudeAiOauth'?t('cleanup.authSavedClaude'):source.name || source.locator || (kindKeys[source.kind]?t(kindKeys[source.kind]):source.kind);
+  const friendlyLogin=['credential_field','keychain_field'].includes(source.kind)&&source.name==='claudeAiOauth';
+  const title=friendlyLogin?t('cleanup.authSavedClaude'):source.name || source.locator || (kindKeys[source.kind]?t(kindKeys[source.kind]):source.kind);
   const label=source.removable?t('cleanup.authSelectSource',{name:title}):title;
   const valueStateKey=source.value_state&&Object.hasOwn(valueStateKeys,source.value_state)?valueStateKeys[source.value_state]:undefined;
   return <div className={`authentication-source ${selected?'selected':''}`} data-auth-source={source.id} data-auth-kind={source.kind} data-auth-reason={source.reason||undefined}>
     <div className="authentication-source-heading">
-      <div><span className="small-label">{kindKeys[source.kind]?t(kindKeys[source.kind]):source.kind}</span><strong><code>{title}</code></strong></div>
+      <div><span className="small-label">{kindKeys[source.kind]?t(kindKeys[source.kind]):source.kind}</span><strong>{friendlyLogin?title:<code>{title}</code>}</strong></div>
       {onToggle&&source.removable&&<input type="checkbox" aria-label={label} checked={selected===true} disabled={disabled} onChange={event=>onToggle(source.id,event.target.checked)}/>}
     </div>
     {source.reason&&keychainReasonKeys[source.reason]&&<p className="small-print authentication-keychain-state">{t(keychainReasonKeys[source.reason])}</p>}

@@ -32,7 +32,7 @@ for(const [index,alias] of [null,...aliases].entries()){
  const executable=path.join(bin,'claude');
  await writeFile(executable,'#!/bin/sh\nif [ "$1" = "auth" ] && [ "$2" = "status" ]; then\n  printf \'{"authMethod":"oauth_token","configDirectory":"%s"}\\n\' "$CLAUDE_CONFIG_DIR"\n  exit 0\nfi\nexit 8\n');await chmod(executable,0o700);
  // Deliberate allowlist: no actual process credential or HOME reaches fixtures.
- const actor={HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:bin,USER:'synthetic',CLAUDE_CODE_OAUTH_TOKEN:'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'};
+ const actor={HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,TMPDIR:os.tmpdir(),PATH:bin,USER:'synthetic',CLAUDE_CODE_OAUTH_TOKEN:'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'};
  const registered=await raw(actor,['env','register','--name',alias||'Synthetic local authentication','--root',root]);assert.ok(registered.ok,registered.error?.message);
  cores.set(alias,{actor,root,home,state,service,keychainPath,keychain,environment:registered.data});
 }
@@ -78,8 +78,32 @@ try{
  await component.getByRole('button',{name:'检查认证来源',exact:true}).click();await component.locator('[data-auth-kind=credential_field]').waitFor();
  assert.equal(calls.some(call=>call.payload.command==='auth_probe'),false);report.checks.push('environment components require explicit bounded source read and never start Claude automatically');
  await page.getByRole('button',{name:'清理与重建',exact:true}).click();
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('main h1'));
  let inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field] input').waitFor();
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),2);
+ const quickRecipes=page.locator('.cleanup-recipes');
+ assert.equal(await quickRecipes.evaluate(element=>element.open),false,'cleanup begins with login choices, keeping quick recipes available on demand');
+ await quickRecipes.locator(':scope > summary').click();
+ const quickRows=quickRecipes.locator('.recipe-row');assert.equal(await quickRows.count(),3);
+ for(const row of await quickRows.all()){
+  await row.getByRole('button',{name:'应用配方',exact:true}).click({trial:true});
+  await row.getByRole('button',{name:'编辑',exact:true}).click();
+  await row.locator('.recipe-edit').waitFor();
+  await row.getByRole('button',{name:'保存为个人默认',exact:true}).click({trial:true});
+ }
+ await page.getByRole('combobox',{name:'界面语言',exact:true}).selectOption('en');
+ assert.equal(await quickRecipes.evaluate(element=>element.open),true,'language switching preserves quick-recipe disclosure and mounted editor');
+ assert.equal(await quickRecipes.locator('.recipe-edit:visible').count(),1);
+ await page.getByRole('combobox',{name:'Interface language',exact:true}).selectOption('zh-CN');
+ await quickRows.nth(2).getByRole('button',{name:'应用配方',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('input[name=cleanup-recipe]')[1]?.checked===true);
+ assert.equal(await page.getByRole('radio',{name:/^清理并重建/}).isChecked(),true,'cleanup recipe still fills the current draft');
+ assert.equal(calls.some(call=>call.payload.command==='plan_cleanup'),false,'applying a recipe does not reuse or execute an approval');
+ await page.getByRole('radio',{name:/^清理登录/}).check();
+ await quickRecipes.locator(':scope > summary').click();
+ assert.equal(await quickRecipes.evaluate(element=>element.open),false);
+ report.checks.push('optional quick recipes retain all three apply/edit/save controls, mounted editor across language switches and draft-only application; collapsing leaves source selection and action dock available');
+
  for(const [width,height,theme] of [[1120,820,'light'],[1120,820,'dark'],[900,720,'light'],[900,720,'dark']]){
   await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
   await page.getByRole('heading',{name:'清理本机登录',exact:true}).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));

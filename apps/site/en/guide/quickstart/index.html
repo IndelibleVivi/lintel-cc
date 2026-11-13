@@ -24,7 +24,7 @@
   <meta property="og:locale" content="en_US">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Complete CLI trial · Lintel</title>
 </head>
@@ -39,13 +39,14 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">These guides follow current development source; public downloads may not include every update.</span> <a href="/en/releases/" data-route-copy="versionScope">Check version scope</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="quickstart">
         <h1 id="quickstart-a-first-local-trial-from-public-source">Quickstart: a first local trial from public source</h1>
 <p><a href="/en/guide/quickstart/">简体中文 (canonical)</a> · English · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.en.md">Documentation</a></p>
 <p>This page walks a new visitor through one small journey inside a <strong>disposable synthetic fixture</strong>: register a Claude config environment, generate synthetic instruction / memory / session originals (plus one file you will deliberately <strong>not</strong> select), preview the scope with an exact selection, review the original plan and its hash, submit an <strong>archive-only</strong> preservation, query the original ID and the final result, then re-inspect and read from the explicit <code>archive_path</code> in a <strong>separate independent state</strong> — and finally verify byte-for-byte that the source originals, settings and placeholder credential were never touched.</p>
 <p>Audience: someone who has the Lintel source and wants to confirm the CLI&#39;s real behavior on their own machine.</p>
-<blockquote><p>This is <strong>Lintel 0.1.0 Preview / development preview</strong>. Real authentication and native resume, production Chrome/Edge/Firefox/AdsPower, production VPS and signed distribution are <strong>not verified</strong>. See <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current state (Chinese)</a> for exact evidence and gaps.</p></blockquote>
+<blockquote><p>This trial builds the CLI from current source and verifies only synthetic archiving and independent package reading, without authentication or client launch. Public CLI 0.1.0 and current source have different capabilities; for a download, check <code>version</code>, <code>capabilities</code> and the required command’s <code>describe</code>/<code>schema</code> first. Real authentication/native resume, production browsers/VPS and first-install trust retain separate acceptance; see <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current state</a>.</p></blockquote>
 <p>This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the <a href="/en/guide/network/">network guide</a>.</p>
 <hr>
 <h2 id="0-prerequisites">0. Prerequisites</h2>
@@ -53,7 +54,7 @@
 <p>Get the source and build the CLI. <code>cargo build</code> writes to <code>target/</code> and may fetch dependencies — that is a normal local build; it does <strong>not</strong> run Claude, discover personal directories, or initialize Lintel state.</p>
 <pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
-cargo build -p lintel-runner</code></pre>
+cargo build -p lintel-runner --locked</code></pre>
 <p>The artifact is <code>target/debug/lintel</code>. Run every command below with the <strong>repository root as the current directory</strong>.</p>
 <h2 id="1-open-a-separate-interactive-shell">1. Open a separate interactive shell</h2>
 <p>Run <code>sh</code> to open a separate interactive shell, then execute the blocks one at a time. Each block runs immediately, so you can read the actual plan before approving it. Finish with <code>exit</code> to return to your original shell. We define a <strong>disposable fixture</strong> and a <code>lintel</code> function that injects the environment only for each CLI call. Your original shell&#39;s <code>HOME</code> and <code>PATH</code> stay unchanged; your installed Python 3 remains available.</p>

@@ -24,7 +24,7 @@
   <meta property="og:locale" content="en_US">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Authentication sources and cleanup · Lintel</title>
 </head>
@@ -39,6 +39,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">These guides follow current development source; public downloads may not include every update.</span> <a href="/en/releases/" data-route-copy="versionScope">Check version scope</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="cleanup">
         <h1 id="authentication-sources-cleanup-and-independent-verification">Authentication sources, cleanup and independent verification</h1>
@@ -46,7 +47,7 @@
 <p><strong>This guide describes the November 13, 2026 development source. The published App 0.1.1 and CLI 0.1.0 do not include this work.</strong> It extends Lintel&#39;s environment management, work preservation, rebuilding and original-job recovery. Every operation retains an explicit host and configuration root.</p>
 <h2 id="understand-the-inventory">Understand the inventory</h2>
 <p><code>claude setup-token</code> prints a long-lived OAuth token without saving it. A shell, Claude settings, an IDE, service or CI system may later inject that token. There is no fixed setup-token file to remove. Ordinary login files and Keychain are separate sources. See the <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/credential-provenance-evidence.en.md">engineering evidence record</a> for official sources and version conditions.</p>
-<p>The authentication list in Clear local login reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.</p>
+<p>Open Cleanup &amp; rebuild in the sidebar to reach Clear local login. Its authentication list reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.</p>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">Observation</th><th class="align-left">What it establishes</th><th class="align-left">What it does not establish</th></tr></thead><tbody><tr><td class="align-left">Identified local source</td><td class="align-left">An exact file, Keychain login field, JSON field or supported shell assignment exists</td><td class="align-left">Claude is currently using it, or the token remains valid</td></tr><tr><td class="align-left">Observed in the current execution environment</td><td class="align-left">The Lintel App/current runner inherited the variable; an empty value is labeled separately</td><td class="align-left">Which declaration supplied it, whether its value authenticates, or whether other terminals and IDEs have it</td></tr><tr><td class="align-left">Declaration only</td><td class="align-left">A helper, dynamic shell expression or authentication selector is declared</td><td class="align-left">The script ran, returned a valid token, or was selected by this client</td></tr><tr><td class="align-left">Inaccessible or unattributed</td><td class="align-left">Permissions, format, file type, budget or ownership prevents a conclusion</td><td class="align-left">No credential exists, or deletion is safe</td></tr><tr><td class="align-left">Other contexts outside coverage</td><td class="align-left">Other processes, IDEs, services, machines, CI or administrator systems may supply credentials</td><td class="align-left">This local check covered those systems</td></tr></tbody></table></div>
 <p>Stored credentials and credentials in use are distinct facts. Several sources may coexist; a simplified priority table does not determine the active account. Explicitly request the official CLI report when needed. It represents only this executor, exact root and observation time.</p>
 <h2 id="complete-a-cleanup-in-the-app">Complete a cleanup in the App</h2>

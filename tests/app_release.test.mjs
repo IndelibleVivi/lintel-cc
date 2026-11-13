@@ -99,7 +99,8 @@ test('site projects manual downloads without any updater feed',async()=>{
   assert.match(page,/\b[a-f0-9]{64}\b/,'verified page carries the asset digest');
   assert.match(page,/Manual download|仅手动|notarization|公证|In-app updates|未启用 App 内更新/);
   assert.ok(page.includes(outputs.release.source_revision));
-  assert.ok(page.includes('Synthetic test only'),'release notes remain visible');
+  assert.ok(page.includes('Synthetic test only'),'original release notes remain available');
+  assert.match(page,/<details class="release-notes"><summary>[^<]+<\/summary><p>Synthetic test only<\/p><\/details>/,'raw notes have a readable, initially closed disclosure');
   assert.ok(page.includes('2026-10-09T00:00:00Z'),'the declared record date remains visible');
   assert.doesNotMatch(page,/现在还没有公开二进制|尚无公开 App 下载|没有一个可下载的正式 App Release|there is no public App binary/,'verified downloads do not retain unavailable page claims');
  }

@@ -14,6 +14,8 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 
 Current manual downloads: [App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), [CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.
 
+Those downloads do not include the latest one-approval file/Keychain cleanup, bounded history or interface fixes. The source trial below matches current guides; downloads follow their own bundled help and Release notes. App help shows the build version/docs revision; the CLI exposes `version --json` and `capabilities --json`.
+
 Read the Release's INSTALL and checksums first. If macOS blocks the app, stop and use the source trial below. Ordinary `npm run dev` starts only the frontend, without the native execution channel used by this trial.
 
 ## Synthetic interface trial
@@ -31,7 +33,7 @@ npm run dev:synthetic
 
 Open the URL printed by the terminal and confirm the interface identifies a **test space**. This starts Vite fixture mode with the real CLI and a fresh HOME/state. The script creates `CLAUDE.md`, `projects/synthetic/memory/notes.md` and synthetic settings. It prints the temporary directory path.
 
-This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial path. On 10-20, the clean `fcae6cb` native app extracted from its DMG completed empty-workspace registration, exact three-file archiving, quit/reopen, original-job lookup and independent-file reading in another isolated HOME/state. The delivered CLI in a separate empty state verified all three originals byte for byte. That still does not establish personal authentication or download/install on a clean Mac.
+This is a browser-based development UI, not evidence of native WebKit, real authentication or production browser integration. Your personal login and browser profile are outside this trial. Independent native-App checks cover archiving synthetic originals, quitting/reopening and reading them back; [current state](current-state.md) records exact sources and scope. They do not establish personal authentication or download/install on a clean Mac.
 
 ### Create an archive only
 
@@ -39,6 +41,8 @@ This is a browser-based development UI, not evidence of native WebKit, real auth
 2. Select the synthetic instructions and memory. Review the file list, count and archive destination. This task requires neither cleanup nor a new configuration root.
 3. Generate the preview. Review the host, complete root, two selected originals and destination. Enter a temporary archive passphrase of at least 12 characters, then approve the reviewed task.
 4. Inspect the original task result and wait for the archive step to finish. Keep its ID and the package location, then unlock the package with the same passphrase and read the selected material.
+
+In current source, archive-only previews show selected originals, the frozen destination, encryption and preserved scope without an irrelevant empty configuration diff. Completion offers archive reading without asking you to launch Claude or restore unchanged settings. Creating an environment, importing or launching remains a separate explicit choice.
 
 **Completion means:** the original task says `completed`, its archive step succeeded, the package opens with the selected instructions and memory, the originals remain, and archive-only did not create a new environment. `accepted` means the task was received; you still need its completion result.
 
@@ -74,7 +78,7 @@ A local build uses the source you checked out. Matching version numbers do not e
 
 ## Connect your own environment
 
-Use Add existing environment to register an explicit Claude Code configuration directory. Registration records its location without changing its settings. Open the orange `>_` in the toolbar to inspect the host, configuration root and environment ID, then inspect the configuration sources under Environment details before choosing a task.
+Use Add existing environment to register an explicit Claude Code configuration directory. Registration records its location without changing its settings. The directory must already exist. A missing required file/directory keeps the entered name and path so you can correct and retry, with original diagnostics available to expand. Use New environment to create a root; registration failure is not a reason to clean or remove an existing environment. Open the orange `>_` in the toolbar to inspect the host, configuration root and environment ID, then inspect the configuration sources under Environment details before choosing a task.
 
 Create an empty environment for new local state, or preserve work to carry instructions, memory and session material forward. Select the configuration root, project cwd and browser profile separately; see [Core concepts](concepts.en.md).
 

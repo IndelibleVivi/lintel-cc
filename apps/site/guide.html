@@ -24,7 +24,7 @@
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Lintel 使用指南</title>
 </head>
@@ -41,6 +41,7 @@
       <p class="eyebrow" data-route-copy="guideEyebrow">READ BY TASK / MAINTAINED GUIDES</p>
       <h1><span data-route-copy="guideTitleA">从眼前这件事</span><br><span data-route-copy="guideTitleB">开始读。</span></h1>
       <p class="route-intro" data-route-copy="guideIntro">从第一次试用开始，按眼前的任务继续读。遇到结果不确定时，先保留原任务 ID，再从排错页面核对；每篇指南都能回到仓库原文。</p>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。</span> <a href="/releases/" data-route-copy="versionScope">核对版本范围</a></p>
       <div class="route-actions"><a class="button primary" href="/guide/start-here/" data-route-copy="trialUiLink">第一次使用</a><a class="text-link" href="/guide/quickstart/" data-route-copy="trialCliLink">完整 CLI 试用</a></div>
     </section>
     <section class="route-section wrap" aria-labelledby="start-guides-title">
@@ -56,14 +57,15 @@
       <div class="route-section-heading"><p class="eyebrow" data-route-copy="tasksEyebrow">02 / SIX TASKS</p><h2 id="task-guides-title" data-route-copy="tasksTitle">按任务使用</h2><p data-route-copy="tasksIntro">从操作目标进入，再按需要阅读具体模块。</p></div>
       <div class="guide-index guide-index-two">
         <a href="/guide/operator-guide/" data-guide="operator-guide"><span>01</span><div><strong data-route-guide-title="operator-guide">操作指南</strong><p data-route-guide-summary="operator-guide">六类实际任务、完成标志与逐步操作边界。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/agents/" data-guide="agents"><span>02</span><div><strong data-route-guide-title="agents">Agent CLI</strong><p data-route-guide-summary="agents">接口发现、秘密 stdin、portable work 与候选安装。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/desktop/" data-guide="desktop"><span>03</span><div><strong data-route-guide-title="desktop">桌面应用</strong><p data-route-guide-summary="desktop">首页、目标栏、语言、会话资料与本地构建。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/browser/" data-guide="browser"><span>04</span><div><strong data-route-guide-title="browser">浏览器</strong><p data-route-guide-summary="browser">扩展准备、profile 配对、有限站点操作与清理。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/remote/" data-guide="remote"><span>05</span><div><strong data-route-guide-title="remote">SSH 与远端</strong><p data-route-guide-summary="remote">runner、远端任务和断线后的原 ID 查询。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/network/" data-guide="network"><span>06</span><div><strong data-route-guide-title="network">网络与出口</strong><p data-route-guide-summary="network">受控通道、IPv4／IPv6 实测与配置边界。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/services/" data-guide="services"><span>07</span><div><strong data-route-guide-title="services">systemd 服务</strong><p data-route-guide-summary="services">准确绑定、暂停与单独恢复一个服务。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/telemetry/" data-guide="telemetry"><span>08</span><div><strong data-route-guide-title="telemetry">遥测目标</strong><p data-route-guide-summary="telemetry">目录、配置、受控测试与普通观察分开。</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/guide/app-updates/" data-guide="app-updates"><span>09</span><div><strong data-route-guide-title="app-updates">安装与更新</strong><p data-route-guide-summary="app-updates">更新入口、候选验收与公开发行准备。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/cleanup/" data-guide="cleanup"><span>02</span><div><strong data-route-guide-title="cleanup">认证来源与清理</strong><p data-route-guide-summary="cleanup">开发版：辨认本机认证来源，预览精确清理，并分别核对本地、运行上下文和撤销状态。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/agents/" data-guide="agents"><span>03</span><div><strong data-route-guide-title="agents">Agent CLI</strong><p data-route-guide-summary="agents">接口发现、秘密 stdin、portable work 与候选安装。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/desktop/" data-guide="desktop"><span>04</span><div><strong data-route-guide-title="desktop">桌面应用</strong><p data-route-guide-summary="desktop">首页、目标栏、语言、会话资料与本地构建。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/browser/" data-guide="browser"><span>05</span><div><strong data-route-guide-title="browser">浏览器</strong><p data-route-guide-summary="browser">扩展准备、profile 配对、有限站点操作与清理。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/remote/" data-guide="remote"><span>06</span><div><strong data-route-guide-title="remote">SSH 与远端</strong><p data-route-guide-summary="remote">runner、远端任务和断线后的原 ID 查询。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/network/" data-guide="network"><span>07</span><div><strong data-route-guide-title="network">网络与出口</strong><p data-route-guide-summary="network">受控通道、IPv4／IPv6 实测与配置边界。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/services/" data-guide="services"><span>08</span><div><strong data-route-guide-title="services">systemd 服务</strong><p data-route-guide-summary="services">准确绑定、暂停与单独恢复一个服务。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/telemetry/" data-guide="telemetry"><span>09</span><div><strong data-route-guide-title="telemetry">遥测目标</strong><p data-route-guide-summary="telemetry">目录、配置、受控测试与普通观察分开。</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/guide/app-updates/" data-guide="app-updates"><span>10</span><div><strong data-route-guide-title="app-updates">安装与更新</strong><p data-route-guide-summary="app-updates">更新入口、候选验收与公开发行准备。</p></div><b aria-hidden="true">↗</b></a>
       </div>
     </section>
     <section class="route-section route-section-ruled wrap" aria-labelledby="engineering-guides-title">

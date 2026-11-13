@@ -4,7 +4,7 @@
 
 ## 准备公开文件
 
-[`prepare-site.mjs`](../scripts/prepare-site.mjs) 是唯一官网打包入口：从 [`apps/site`](../apps/site/README.md) 的有限文件清单（五类路由、15 篇单源指南的中英投影，共 40 路静态页面，以及有限 locale modules 与同源资源）、canonical 分享图和两份明确指定的媒体复制出静态 payload。输出目录必须不存在；仓库内输出必须 ignored。它拒绝空文件、symlink 与超过 25 MiB 的单个文件，不扫描整个 repo，也不包含 README、QA、native 演示、制作 runtime、音轨或账户资料。
+[`prepare-site.mjs`](../scripts/prepare-site.mjs) 是唯一官网打包入口：从 [`apps/site`](../apps/site/README.md) 的有限文件清单（五类路由、16 篇单源指南的中英投影，共 42 路静态页面，以及有限 locale modules 与同源资源）、canonical 分享图和两份明确指定的媒体复制出静态 payload。输出目录必须不存在；仓库内输出必须 ignored。它拒绝空文件、symlink 与超过 25 MiB 的单个文件，不扫描整个 repo，也不包含 README、QA、native 演示、制作 runtime、音轨或账户资料。
 
 先按[独立电影制作说明](../scripts/preview-film/README.md)准备已审阅的英文短片。网页媒体目录只需 `lintel-intro.mp4` 和 `lintel-film-poster.jpg`：目前采用 20 秒、1920×1080／60fps 的 H.264 + AAC 带配音版本，保留音乐／SFX；网页压制为约 16.4 MiB，原版单独保留。无需为官网安装电影制作依赖。下面的目录名是示例，替换为本次实际媒体与新输出目录：
 
@@ -19,7 +19,7 @@ python3 -m http.server 4317 --bind 127.0.0.1 \
   --directory candidate-packages/site-build
 ```
 
-中文 markup／paired copy 有变更时，先运行 `node scripts/prepare-site-languages.mjs`；`--check` 和 `site-ui` 会拒绝过期 English 页面。完整 payload 供应 `/`、`/download/`、`/guide/`、`/inside/`、`/releases/`、15 篇 `/guide/<article>/` 及精确 `/en/` mirrors；无需 JavaScript 就有各自的正文、SVG 图注、元数据与指南。`site-routes.mjs` 是 finite route／文档源 map，指南正文由成对 repo Markdown 生成；修改 guide source 后须重新生成。首页语言在原节点更新，次级页切换到同一 article／route 的另一语言。下载与发行页只消费已核对公开字节的 canonical release record；缺少记录时保留明确不可下载状态。`site-ui` 另检查切换／history 后游戏、视频播放、details 与旅程仍是原实例。源文件也可直接本地预览，但只有完整 payload 含实际短片与分享图。`site-build.json` 记录打包时的 source revision、dirty 状态及公开文件字节数，不包含输入目录或账户信息；它是来源声明，不是签名或完整性认证。正式更新优先在已提交的 clean source 上重新打包，不修改旧 manifest 来冒充另一个 revision。
+中文 markup／paired copy 有变更时，先运行 `node scripts/prepare-site-languages.mjs`；`--check` 和 `site-ui` 会拒绝过期 English 页面。完整 payload 供应 `/`、`/download/`、`/guide/`、`/inside/`、`/releases/`、16 篇 `/guide/<article>/` 及精确 `/en/` mirrors；无需 JavaScript 就有各自的正文、SVG 图注、元数据与指南。`site-routes.mjs` 是 finite route／文档源 map，指南正文由成对 repo Markdown 生成；修改 guide source 后须重新生成。首页语言在原节点更新，次级页切换到同一 article／route 的另一语言。下载与发行页只消费已核对公开字节的 canonical release record；缺少记录时保留明确不可下载状态。`site-ui` 另检查切换／history 后游戏、视频播放、details 与旅程仍是原实例。源文件也可直接本地预览，但只有完整 payload 含实际短片与分享图。`site-build.json` 记录打包时的 source revision、dirty 状态及公开文件字节数，不包含输入目录或账户信息；它是来源声明，不是签名或完整性认证。正式更新优先在已提交的 clean source 上重新打包，不修改旧 manifest 来冒充另一个 revision。
 
 正式域名曾实际返回 CSS `max-age=14400`；回访浏览器会继续使用旧样式，即使 `_headers` 的目标策略已经改为立即 revalidate。两条 canonical stylesheet 入口因此使用版本 query，CSS 字节变更时更新该 query 并重新生成 English。线上检查要包含一次正常缓存的回访，不以禁用浏览器缓存代替最终验收；此做法不改变 Cloudflare 账号缓存设置。
 
@@ -86,7 +86,7 @@ Pages 的 Custom domains 维护 `lintel.page` 关联；Cloudflare 的同名 DNS 
 
 等待 Pages domain 状态和证书生效，再核对：
 
-- 依 `site-routes.mjs` 核对五类路由、15 篇 guide 与全部 `/en/` mirrors 返回 200，TLS 正常；canonical／OG／hreflang、分享图、robots 与 sitemap 指向正式域名；guide 的内部链接／anchors 和同页语言切换可达；不存在的路径返回真正 404。
+- 依 `site-routes.mjs` 核对五类路由、16 篇 guide 与全部 `/en/` mirrors 返回 200，TLS 正常；canonical／OG／hreflang、分享图、robots 与 sitemap 指向正式域名；guide 的内部链接／anchors 和同页语言切换可达；不存在的路径返回真正 404。
 - `.mjs` 为 JavaScript、`film.vtt` 为 `text/vtt`、MP4 为 `video/mp4`；正式域名的视频 Range 请求须返回 206，可播放、seek，四条英文 captions 正常加载。Pages preview 曾对同一 Range 请求返回 200 与完整文件，旧 preview 也相同；此时核对完整媒体字节并实际播放，不能把它记作 206 通过，也不能用 preview 的结果替代正式域名分段响应验收。
 - [`_headers`](../apps/site/_headers) 的 CSP 与安全 headers 生效；页面和播放器在此策略下正常运行。播放器初始 `preload=none`，点开不开播，主动播放后才请求电影，关闭停止并复位。
 - 桌面与手机日夜布局无溢出，两路六能力标题图标＋交错场景／四步正文无需 JavaScript 即可阅读；切换和 back／forward 保留同一游戏、视频播放进度、details 与旅程步骤。站点不增加 analytics beacon、远程字体或外部视频 iframe；所有页面资源同源。Cloudflare 作为托管平台处理普通 HTTP 请求。
@@ -109,7 +109,7 @@ node scripts/prepare-site.mjs \
   --out candidate-packages/site-seo-build
 ```
 
-按既有授权先验收 preview，再把同一冻结包更新到 production。Preview 的 `X-Robots-Tag: noindex` 应保留；正式域名可索引页面不能继承它。逐页核对全部 40 个 locale URL 的 HTTP 200、唯一且自指的 HTTPS canonical、准确的 title／description、完整中英 alternate 与 sitemap 对应关系，未知路径仍须真正 404。Sitemap 只列 canonical URL，不把构建日期当作内容的 `lastmod`；参见 [多语言页面](https://developers.google.com/search/docs/specialty/international/localized-versions)与 [sitemap 规范](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)。分享图与 favicon 必须可同源抓取；按前节继续检查 CSP、指南技术标识及无第三方请求。
+按既有授权先验收 preview，再把同一冻结包更新到 production。Preview 的 `X-Robots-Tag: noindex` 应保留；正式域名可索引页面不能继承它。逐页核对当前 payload 全部 42 个 locale URL 的 HTTP 200、唯一且自指的 HTTPS canonical、准确的 title／description、完整中英 alternate 与 sitemap 对应关系，未知路径仍须真正 404。Sitemap 只列 canonical URL，不把构建日期当作内容的 `lastmod`；参见 [多语言页面](https://developers.google.com/search/docs/specialty/international/localized-versions)与 [sitemap 规范](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)。分享图与 favicon 必须可同源抓取；按前节继续检查 CSP、指南技术标识及无第三方请求。
 
 结构化数据只投影真实可见的站点身份、页面与阅读路径，不填虚构评分、价格、许可或发行日期。使用 [Schema Markup Validator](https://validator.schema.org/) 检查 schema；Google 的 Rich Results Test 不支持 site-name 检查，不能用它的“无适用项目”判断 `WebSite` 无效。站名由 canonical 首页的 `WebSite` 提供，具体规则见 [site names](https://developers.google.com/search/docs/appearance/site-names)与[结构化数据政策](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)。
 

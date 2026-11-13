@@ -15,10 +15,7 @@ were never touched.
 Audience: someone who has the Lintel source and wants to confirm the CLI's real
 behavior on their own machine.
 
-> This is **Lintel 0.1.0 Preview / development preview**. Real authentication and
-> native resume, production Chrome/Edge/Firefox/AdsPower, production VPS and
-> signed distribution are **not verified**. See
-> [current state (Chinese)](current-state.md) for exact evidence and gaps.
+> This trial builds the CLI from current source and verifies only synthetic archiving and independent package reading, without authentication or client launch. Public CLI 0.1.0 and current source have different capabilities; for a download, check `version`, `capabilities` and the required command’s `describe`/`schema` first. Real authentication/native resume, production browsers/VPS and first-install trust retain separate acceptance; see [current state](current-state.md).
 
 This synthetic home does not permit real host-network inspection or mutation and sends no public IP probes. Separately selected network features and their privacy boundary are described in the [network guide](network.en.md).
 
@@ -37,7 +34,7 @@ discover personal directories, or initialize Lintel state.
 ```sh
 git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
-cargo build -p lintel-runner
+cargo build -p lintel-runner --locked
 ```
 
 The artifact is `target/debug/lintel`. Run every command below with the

@@ -24,7 +24,7 @@
   <meta property="og:locale" content="en_US">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Lintel guides</title>
 </head>
@@ -41,6 +41,7 @@
       <p class="eyebrow" data-route-copy="guideEyebrow">READ BY TASK / MAINTAINED GUIDES</p>
       <h1><span data-route-copy="guideTitleA">Start with the task</span><br><span data-route-copy="guideTitleB">in front of you.</span></h1>
       <p class="route-intro" data-route-copy="guideIntro">Start with a first trial, then read by the task in front of you. If a result is uncertain, retain the original task ID and check the troubleshooting guide. Every article links to its maintained source.</p>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">These guides follow current development source; public downloads may not include every update.</span> <a href="/en/releases/" data-route-copy="versionScope">Check version scope</a></p>
       <div class="route-actions"><a class="button primary" href="/en/guide/start-here/" data-route-copy="trialUiLink">Open first-use guide</a><a class="text-link" href="/en/guide/quickstart/" data-route-copy="trialCliLink">Open complete trial</a></div>
     </section>
     <section class="route-section wrap" aria-labelledby="start-guides-title">
@@ -56,14 +57,15 @@
       <div class="route-section-heading"><p class="eyebrow" data-route-copy="tasksEyebrow">02 / SIX TASKS</p><h2 id="task-guides-title" data-route-copy="tasksTitle">Use by task</h2><p data-route-copy="tasksIntro">Start from a task, then read the relevant module.</p></div>
       <div class="guide-index guide-index-two">
         <a href="/en/guide/operator-guide/" data-guide="operator-guide"><span>01</span><div><strong data-route-guide-title="operator-guide">Operator guide</strong><p data-route-guide-summary="operator-guide">Follow six practical tasks through settings, preservation, cleanup, browser, SSH and recovery.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/agents/" data-guide="agents"><span>02</span><div><strong data-route-guide-title="agents">Agent CLI</strong><p data-route-guide-summary="agents">Standalone CLI, interface discovery, secret stdin, portable work and candidate installation.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/desktop/" data-guide="desktop"><span>03</span><div><strong data-route-guide-title="desktop">Desktop app</strong><p data-route-guide-summary="desktop">App pages, language, target bar, sessions, appearance and local builds.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/browser/" data-guide="browser"><span>04</span><div><strong data-route-guide-title="browser">Browser</strong><p data-route-guide-summary="browser">Extension preparation, profile pairing, finite site actions and cleanup after a full restart.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/remote/" data-guide="remote"><span>05</span><div><strong data-route-guide-title="remote">SSH and remote hosts</strong><p data-route-guide-summary="remote">Register an alias, prepare a runner, and query the original task after a disconnect.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/network/" data-guide="network"><span>06</span><div><strong data-route-guide-title="network">Network and egress</strong><p data-route-guide-summary="network">Separate the controlled channel, IPv4/IPv6 tests, configuration readback and enforcement.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/services/" data-guide="services"><span>07</span><div><strong data-route-guide-title="services">systemd services</strong><p data-route-guide-summary="services">Inspect, pause and restore one service explicitly bound to a configuration root.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/telemetry/" data-guide="telemetry"><span>08</span><div><strong data-route-guide-title="telemetry">Telemetry targets</strong><p data-route-guide-summary="telemetry">Separate the static catalog, configured rules, controlled tests and ordinary observations.</p></div><b aria-hidden="true">↗</b></a>
-        <a href="/en/guide/app-updates/" data-guide="app-updates"><span>09</span><div><strong data-route-guide-title="app-updates">Install and update</strong><p data-route-guide-summary="app-updates">The real order for App updates, candidate install acceptance and release-record preparation.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/cleanup/" data-guide="cleanup"><span>02</span><div><strong data-route-guide-title="cleanup">Authentication sources and cleanup</strong><p data-route-guide-summary="cleanup">Development version: inspect local authentication sources, preview exact cleanup, and distinguish local, runtime and revocation coverage.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/agents/" data-guide="agents"><span>03</span><div><strong data-route-guide-title="agents">Agent CLI</strong><p data-route-guide-summary="agents">Standalone CLI, interface discovery, secret stdin, portable work and candidate installation.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/desktop/" data-guide="desktop"><span>04</span><div><strong data-route-guide-title="desktop">Desktop app</strong><p data-route-guide-summary="desktop">App pages, language, target bar, sessions, appearance and local builds.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/browser/" data-guide="browser"><span>05</span><div><strong data-route-guide-title="browser">Browser</strong><p data-route-guide-summary="browser">Extension preparation, profile pairing, finite site actions and cleanup after a full restart.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/remote/" data-guide="remote"><span>06</span><div><strong data-route-guide-title="remote">SSH and remote hosts</strong><p data-route-guide-summary="remote">Register an alias, prepare a runner, and query the original task after a disconnect.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/network/" data-guide="network"><span>07</span><div><strong data-route-guide-title="network">Network and egress</strong><p data-route-guide-summary="network">Separate the controlled channel, IPv4/IPv6 tests, configuration readback and enforcement.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/services/" data-guide="services"><span>08</span><div><strong data-route-guide-title="services">systemd services</strong><p data-route-guide-summary="services">Inspect, pause and restore one service explicitly bound to a configuration root.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/telemetry/" data-guide="telemetry"><span>09</span><div><strong data-route-guide-title="telemetry">Telemetry targets</strong><p data-route-guide-summary="telemetry">Separate the static catalog, configured rules, controlled tests and ordinary observations.</p></div><b aria-hidden="true">↗</b></a>
+        <a href="/en/guide/app-updates/" data-guide="app-updates"><span>10</span><div><strong data-route-guide-title="app-updates">Install and update</strong><p data-route-guide-summary="app-updates">The real order for App updates, candidate install acceptance and release-record preparation.</p></div><b aria-hidden="true">↗</b></a>
       </div>
     </section>
     <section class="route-section route-section-ruled wrap" aria-labelledby="engineering-guides-title">

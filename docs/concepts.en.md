@@ -34,6 +34,12 @@ A work package can open in independent state without the source inventory/job. C
 
 A protection draft belongs to one host and environment. Ordinary editing chooses an action on the row for that field. Bulk edit offers only actions common to every selected item, without silently omitting selections outside the filter. A personal default stores non-secret intent only; if it differs from a built-in recipe, the label describes the fields actually enabled, disabled or removed, and the next application still reads the target and generates a fresh plan.
 
+## Login sources, client identity and local data
+
+Saved Claude login, shell/settings injection, current process environment and server credential state are different objects. Clear local login handles only selected file/Keychain fields or declarations supported for exact editing. Independent checks reread those locations without executing the original task again. Existing processes, unselected sources or other contexts can still supply authentication after a file edit; see [authentication cleanup](cleanup.en.md).
+
+The client’s local `userID`, runtime residue and ordinary configuration each have separate operations. Resetting a local identifier does not log out, change a server account or establish unlinkable identity. Configuration/residue recovery packages and selected work packages have different purposes; authentication cleanup creates no token-recovery backup. Use [client-control operations](operator-guide.en.md#client-control) to choose the actual target and preview its exact scope.
+
 ## Configuration readback and actual outbound behaviour
 
 Settings readback verifies that the target fields were handled as planned; an existing Claude process is not restarted automatically. Controlled-channel observations cover connections through that proxy, not direct outbound traffic. An explicit IPv4/IPv6 probe describes the tested route at that time.

@@ -10,9 +10,9 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 
 **0.1.1 开发者 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1) 手动下载 Apple Silicon macOS App，先阅读双语 INSTALL 与 SHA256SUMS。本版修复 0.1.0 的 App bundle 资源签名封装；四个公开资产已下载核对，新 DMG 内的 App 也通过严格签名校验。App 使用完整 ad-hoc 签名，**没有 Developer ID、Apple 公证或 updater feed**；首次打开可能需要在“系统设置 → 隐私与安全性”为这一 App 选择“仍要打开”。旧 DMG 与 tag 保留供历史核对，CLI 继续使用下方原候选下载。准确来源、安装步骤与验收范围见 [App 安装说明](docs/app-updates.md) 和[当前状态](docs/current-state.md)。
 
-当前 `main` 的六项可靠性修复与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。`c7680f0` 已完成 fresh clone／fresh target 的三平台 CLI 与 macOS App／DMG 本地构建（复用依赖下载缓存）。候选源码与 full CI 的准确状态见[当前状态](docs/current-state.md)；构建不代表已安装 App、通过干净 Mac 信任验收或创建 Release。
+本页与 `main` 指南描述当前开发源码；公开下载仍为 App 0.1.1／CLI 0.1.0。新增认证来源清理、有界任务记录和最新界面修复尚未进入这些下载包。试用当前能力请按下方从源码构建，使用下载版时先核对它的版本与内置帮助。准确候选、CI 与原生测试范围见[当前状态](docs/current-state.md)。
 
-**11-13 开发版：清理本机登录与独立复查。** App／CLI 可选择精确登录字段、认证注入和 shell 赋值，沿同一计划批准、执行、重新检查。macOS 开发源码已接入有限 Keychain 服务中的 Claude 登录字段清理，保留 MCP／插件与其他字段；原生 API 与真实客户端验收仍独立。App 默认建议可处理的已保存登录，认证注入按需选择，结果优先显示本地移除、仍存在与待核对数量。`setup-token` 没有固定保存文件；共享 profiles、其他上下文与服务端撤销仍单列。官方 logout 范围过宽，仍拒绝自动调用。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App 或 0.1.0 CLI。
+**11-13 开发版：清理本机登录与独立复查。** App／CLI 可选择精确登录字段、认证注入和 shell 赋值，沿同一计划批准、执行、重新检查。macOS 开发源码已接入有限 Keychain 服务中的 Claude 登录字段清理，保留 MCP／插件与其他字段；一次性临时 Keychain 的原生 API 检查已通过，个人账号／真实 Claude 验收仍独立。App 默认建议可处理的已保存登录，认证注入按需选择，结果优先显示本地移除、仍存在与待核对数量。`setup-token` 没有固定保存文件；共享 profiles、其他上下文与服务端撤销仍单列。官方 logout 范围过宽，仍拒绝自动调用。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App 或 0.1.0 CLI。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
@@ -31,7 +31,7 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 | 修复登录、清理旧状态、退役环境 | 有界认证来源清单、精确选择与统一批准、清理后独立复查；重建前保全工作 | [清理与重建](docs/operator-guide.md#cleanup)／[开发版认证来源](docs/cleanup.md) |
 | 管理某个浏览器 profile | 配对扩展与本地 host，处理对应权限和站点状态 | [浏览器](docs/browser.md) |
 | 从 Mac 或 CLI 操作 SSH 主机 | 核对远端 runner，在目标主机执行，断线后查询原任务 | [远程](docs/remote.md) |
-| 找回结果，恢复配置或服务 | 原任务记录、变化检查、字段恢复与明确绑定的 systemd 服务恢复 | [记录与恢复](docs/operator-guide.md#recovery) |
+| 管理配置与本地资料，找回结果 | 配置编辑与恢复、残留／身份的明确处理、变化比较、原任务记录及 systemd 服务恢复 | [客户端配置与本地数据](docs/operator-guide.md#client-control)／[记录与恢复](docs/operator-guide.md#recovery) |
 
 App 支持简体中文／English 与 Day／Night／System。首页的 Clawd、字符风景和小彩蛋保留在工具之外的轻松一层；使用这些交互不需要聊天模型。界面动画、Logo 光标和终端光标各有本机开关，默认只保留 Logo 慢闪，系统减少动态优先。顶栏主机名左侧的橙色 `>_` 可向下展开准确配置路径与环境 ID。
 

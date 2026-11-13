@@ -11,9 +11,7 @@
 
 目标读者：已经拿到 Lintel 源码、想在本机确认 CLI 真实行为的人。
 
-> 本文覆盖的都是**Lintel 0.1.0 Preview / 开发预览**能力。真实认证／native resume、正式
-> Chrome/Edge/Firefox/AdsPower、生产 VPS 与签名发行都**未验收**。当前证据与
-> 缺口见 [当前状态](current-state.md)。
+> 本旅程按当前源码构建 CLI，只验证合成原件的归档与独立读包，不执行认证或启动客户端。公开 CLI 0.1.0 与当前源码能力不完全相同；用下载版时先检查 `version`、`capabilities` 及所需命令的 `describe`／`schema`。真实认证／native resume、正式浏览器、生产 VPS 和首装信任仍分别验收，见[当前状态](current-state.md)。
 
 本文的合成 home 不开放真实宿主网络观察或修改，也不进行公网出口测试。另行明确选择的网络功能及其隐私边界见 [网络指南](network.md)。
 
@@ -31,7 +29,7 @@
 ```sh
 git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
-cargo build -p lintel-runner
+cargo build -p lintel-runner --locked
 ```
 
 产物是 `target/debug/lintel`。下面的命令都以 **repository 根目录为当前目录**
