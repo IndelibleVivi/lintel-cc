@@ -110,7 +110,7 @@ export function Modal({ title, children, onClose, wide = false }: { title: strin
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  useEffect(() => { const previous = document.activeElement as HTMLElement | null; ref.current?.showModal(); return () => { ref.current?.close(); if (previous?.isConnected) previous.focus(); else requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const target=document.querySelector<HTMLElement>('main h1,main h2');if(target){target.tabIndex=-1;target.focus({preventScroll:true})}}); }; }, []);
+  useEffect(() => { const previous = document.activeElement as HTMLElement | null; ref.current?.showModal(); return () => { ref.current?.close(); if (previous?.isConnected) previous.focus(); else requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const target=document.querySelector<HTMLElement>('main h1')??document.querySelector<HTMLElement>('main h2');if(target){target.tabIndex=-1;target.focus({preventScroll:true})}}); }; }, []);
   // Reset scroll only when the dialog opens, not on a language-only title
   // change (which would jump a scrolled approval/dialog back to the top).
   useEffect(() => { ref.current?.querySelector('.modal-body')?.scrollTo({ top: 0 }); }, []);

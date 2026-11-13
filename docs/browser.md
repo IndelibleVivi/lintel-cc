@@ -2,7 +2,7 @@
 
 简体中文（canonical） · [English](browser.en.md) · [文档入口](index.md)
 
-状态：0.1.0 开发候选。Chrome/Edge 的 MV3 包和 Firefox 独立 event-page 适配可构建；正式浏览器安装、商店发布和完整三浏览器验收尚未完成。本文对应 [完整目标](SPEC.md#9-模块-c浏览器能力必须真实可操作) 与 [B01–B15 验收](ACCEPTANCE.md#c-浏览器实测)，不是完成整版目标的声明。
+本页对应当前开发源码；公开下载仍为 App 0.1.1／CLI 0.1.0，后述恢复增强尚未进入这些包。Chrome/Edge 的 MV3 包和 Firefox 独立 event-page 适配可构建；正式浏览器安装、商店发布和完整三浏览器验收尚未完成。本文对应 [完整目标](SPEC.md#9-模块-c浏览器能力必须真实可操作) 与 [B01–B15 验收](ACCEPTANCE.md#c-浏览器实测)，不是完成整版目标的声明。
 
 下述未决 host 安装发现、popup 隔离释放恢复和旧回执身份核对属于当前源码增强，尚未随新的公开 App／扩展发行。准确源码、候选与已发布版本分别见[当前状态](current-state.md)。
 

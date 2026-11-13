@@ -24,7 +24,7 @@
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Agent CLI · Lintel</title>
 </head>
@@ -39,12 +39,14 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。</span> <a href="/releases/" data-route-copy="versionScope">核对版本范围</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="agents">
         <h1 id="lintel-agent-cli">Lintel Agent CLI</h1>
 <p>简体中文（canonical） · <a href="/guide/agents/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
 <p>此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.1.0 开发者 Preview 使用协议 1 / catalog 1，已提供<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">公开手动下载</a>，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。</p>
 <p>首次试用可先走 <a href="/guide/quickstart/">中文 quickstart</a> / <a href="/guide/quickstart/">English quickstart</a>，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。</p>
+<p>本页同时维护公开包安装与当前源码接口。公开 CLI 0.1.0 不包含最新 <code>auth inventory</code>／<code>auth verify</code>、精确认证来源选择和有界记录；要用这些入口需从当前源码构建。执行前始终用所选 binary 的 <code>version</code>、<code>capabilities</code>、<code>describe</code>／<code>schema</code> 核对；远端还要核对目标 runner，App 升级不会替它升级。</p>
 <h2 id="从-app-接到终端或-agent">从 App 接到终端或 Agent</h2>
 <p>App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。</p>
 <p>macOS 在读取外置宗卷等受保护位置的 CLI 时可能先等待系统文件访问授权；CLI 的子进程时限不包含这段 OS 等待。核对长期停在等待时，先查看原生权限提示。也可将已核验候选按原目录结构复制到已允许的本地新版本／测试目录，再选择其中的 <code>bin/lintel</code> 重新核对；系统权限由用户自行决定。</p>
@@ -127,6 +129,7 @@ lintel snapshot compare --environment &#39;&lt;environment-id&gt;&#39; --old-sna
 <p><code>snapshot_save</code> 保存不可覆盖的脱敏观察，返回快照 ID 和公开摘要；<code>snapshot_list</code> 最多展示 200 份记录、一次最多检查 2,000 个目录项，<code>scan_complete</code> 与逐项错误说明覆盖，损坏记录不隐藏其余快照。快照保留普通设置、有限声明与残留统计；请求头、带认证信息的接收端和原始身份不进入快照。身份比较材料仅在本地私有 state 内，比较响应只给相同／改变／未知；盐域不一致时不能据此判定身份变化。即时 <code>env_compare</code> 使用同一次临时盐，不保存快照或持久盐。</p>
 <p>缺失、损坏或读取失败的配置不能当作“关闭”；对应区域标为未完成，其余独立观察继续返回。遮蔽值的相等性也保持未知。脱敏快照用于比较，配置恢复仍须来源明确的原任务或加密备份和新批准，不能用摘要还原正文。普通命令沿用现有 state／锁行为，这些观察不启动 Claude、执行 hooks 或访问公网。</p>
 <p><code>lintel snapshot accept --environment &#39;&lt;environment-id&gt;&#39; --old-snapshot-id &#39;&lt;old-snapshot-id&gt;&#39; --new-snapshot-id &#39;&lt;new-snapshot-id&gt;&#39; --selected-changes &#39;[&quot;&lt;returned-change-id&gt;&quot;]&#39;</code> 只将 <code>snapshot compare</code> 返回的所选 <code>changes[].id</code> 接受为比较基线，不改配置。它会重新核对当前所选值；陈旧观察与遮蔽值不能被接受。形成语义基线后，旧的 <code>accept_drift</code> 返回 <code>semantic_baseline_selection_required</code>，应继续用逐项 <code>snapshot accept</code>；旧字段基线仅为尚未迁入语义基线的调用方保留。</p>
+<a id="client-control"></a>
 <h3 id="高级配置本地数据与配方的可写入口">高级配置、本地数据与配方的可写入口</h3>
 <p>下列命名入口都进入同一计划／批准／job／receipt 链，只有明确批准后才写入；秘密（归档口令）仍只经 JSON stdin，不放 argv。</p>
 <pre class="guide-code" data-language="sh"><code>lintel config inspect --environment &#39;&lt;environment-id&gt;&#39; [--project-cwd /abs/project]

@@ -4,7 +4,7 @@ November 13, 2026 · Engineering evidence record · [中文](credential-provenan
 
 ## 1. How evidence was obtained
 
-The review used current official Anthropic documentation and the repository's `cleanup.rs`, `auth_sources.rs`, `auth_cleanup.rs`, `keychain.rs`/`keychain/macos.rs`, `components.rs`, `startup.rs`, App cleanup flow and operation contracts. The retrieval date is November 13, 2026. Version numbers below are prerequisites stated by the documents, not versions executed during this review. No real Claude process, login, logout, Keychain operation or model request was used. Development tests use synthetic roots and inert adapters.
+The review used current official Anthropic documentation and the repository's `cleanup.rs`, `auth_sources.rs`, `auth_cleanup.rs`, `keychain.rs`/`keychain/macos.rs`, `components.rs`, `startup.rs`, App cleanup flow and operation contracts. The retrieval date is November 13, 2026. Version numbers below are prerequisites stated by the documents, not versions executed during this review. This static mechanism review runs no real Claude process, login, logout, Keychain operation or model request. Ordinary development checks use synthetic roots and inert adapters; later independent temporary-Keychain platform API checks are recorded in [current state](current-state.md), without establishing personal-account acceptance.
 
 Current documents may change and do not specify every historical client. Finite source recognition, observations from the current executor, explicit CLI status and real-client behavior remain separate evidence levels.
 

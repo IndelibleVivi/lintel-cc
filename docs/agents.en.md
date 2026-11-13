@@ -6,6 +6,8 @@ For coding agents/script authors with existing operation authorization. Lintel 0
 
 Start with [English quickstart](quickstart.en.md) / [中文 quickstart](quickstart.md) for disposable synthetic preservation/original-query/independent package reading, then prepare real operations here.
 
+This page covers public-package installation and current source interfaces. Public CLI 0.1.0 lacks the latest `auth inventory`/`auth verify`, exact authentication-source selection and bounded history. Build current source for those entries. Check the selected binary’s `version`, `capabilities` and `describe`/`schema` before use; also check the target runner remotely. Updating the App does not update that runner.
+
 ## From App to terminal or Agent
 
 Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual CLI downloads for three platforms. Read INSTALL and SHA256SUMS first; Linux is experimental. Website/App main-doc links mean latest development documentation.
@@ -140,6 +142,8 @@ lintel snapshot compare --environment '<environment-id>' --old-snapshot-id '<old
 Missing, malformed or unreadable configuration never becomes an off verdict: that area is incomplete while independent observations remain available. Hidden values cannot attest equality. Sanitized snapshots support comparison; restoration still needs the original task or an encrypted backup and a new approval. A digest cannot reconstruct content. Ordinary state/lock behavior remains; these observations do not start Claude, run hooks or contact public endpoints.
 
 `lintel snapshot accept --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>' --selected-changes '["<returned-change-id>"]'` accepts only selected `changes[].id` values returned by `snapshot compare` as a comparison baseline, without editing configuration. It rechecks the current selected values; stale observations and masked values cannot be accepted. Once a semantic baseline exists, legacy `accept_drift` returns `semantic_baseline_selection_required`; continue with per-item `snapshot accept`. Legacy field baselines remain only for callers that have not adopted a semantic baseline.
+
+<a id="client-control"></a>
 
 ### Writable advanced configuration, local data and recipe entries
 

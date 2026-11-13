@@ -6,7 +6,7 @@ Lintel desktop uses Tauri 2 + React. `src/App.tsx` manages host/environment sele
 
 The [operator guide](operator-guide.en.md) covers goals through results. App help provides six task paths, scenario guides and [Agent CLI](agents.en.md). Links open only fixed named HTTPS documents.
 
-The current reliability and bounded-history changes on `main` are unreleased. The public App remains 0.1.1 and the independent CLI remains 0.1.0. Source checks do not establish a new candidate, a native cold build, a verified new DMG, clean-Mac installation or a Release.
+This guide follows current `main`, including authentication-source/Keychain cleanup, bounded history and interface refinements; these enhancements are unreleased. The public App remains 0.1.1 and the independent CLI remains 0.1.0. Source checks do not establish a new candidate, a native cold build, a verified new DMG, clean-Mac installation or a Release.
 
 `HistoryPanel.tsx` loads `jobs_page` summaries and `job_detail_page` sections on demand in Records and recovery; changing a record or section does not load all history. Continuation pages bind the original `digest`; follow `next_offset` to load more. Scan completion and incompleteness from invalid records are separate; an oversized detail item reports a limitation and retains the original record. Environment discovery through `discover` is independent of the history list. An older runner without these endpoints explicitly reports bounded history as unsupported, with no full `jobs`/`discover` fallback. Details, archive reading and restoration retain the owning host and original task ID; pagination never deletes, rewrites or replays tasks.
 
@@ -51,9 +51,11 @@ Components reads finite sources independently even with damaged settings, showin
 
 Work preservation offers encrypted archive only or preservation/new root. Both succeed against their own goal, retaining old login. Archives open from tasks or independent absolute paths, without source-state dependency; users explicitly transfer ciphertext using system tools. See [work workflow](operator-guide.en.md#work).
 
+In current source, archive-only previews show selected originals, the frozen destination, encryption and preserved scope without an irrelevant empty configuration diff. Completion offers archive reading without asking you to launch Claude or restore unchanged settings. Creating an environment, importing or launching remains a separate explicit choice.
+
 `WorkFileSelection.tsx` provides project-path/session-file groups and individual files, loads bounded metadata pages and refuses missing/changed pages without transcript reads. Search affects display only; oversized files can be excluded explicitly. Selected paths are not persisted in drafts, new files never silently selected. `WorkCapacity` preflights the same selection; `PlanReview` shows originals/frozen destinations. Without confirmed exact-selection support, approval is unavailable; old-runner errors never silently fall back to categories.
 
-The following authentication cleanup belongs to the November 13, 2026 development source, not the published App 0.1.1/CLI 0.1.0. Environment and Components lead into the same Cleanup and rebuild flow with three paths:
+The following authentication cleanup belongs to the November 13, 2026 development source, not the published App 0.1.1/CLI 0.1.0. Environment and Components lead into the same Clear local login flow with three paths:
 
 | Path | Current scope |
 | --- | --- |
@@ -62,6 +64,8 @@ The following authentication cleanup belongs to the November 13, 2026 developmen
 | Retire environment | Preserve selected work, handle selected authentication sources, disable the entry and recheck. Original work remains; reactivation never restores deleted credentials. |
 
 All require confirming target terminals/IDEs/automatic restarters closed. Core rechecks writers; unassignable Claude writers block cleanup without global killing. Source inspection reads necessary content only at bounded known locations. The UI receives locations, evidence, supported selections and limitations, never tokens, helper bodies or original shell lines. Inventory runs no shell startup, helper or Claude and scans no history.
+
+The sidebar entry remains Cleanup & rebuild; the page heading is Clear local login.
 
 Clear local login retains the repair/rebuild/retire recipes and six task entries. Supported saved login fields in files and Keychain are suggested by default; injections support individual selection or explicit group select/clear, with no automatic selection of shared shell sources. Technical evidence and paths expand progressively; approval locations are expanded by default. Results lead with removed, remaining and unresolved counts, list the current executor separately, and expand other-context/server details. Rechecking the original ID reads without executing again. Keychain cleanup removes only recognized `/claudeAiOauth` in finite services, preserving MCP/plugin/unknown fields and item identity without whole-item deletion or secret exports. Locked, denied, unknown-format and oversized sources explain their limits; complete finite-service reads never establish whole-machine or whole-Keychain cleanup. See [current state](current-state.md) for native API/real-client acceptance.
 
@@ -89,7 +93,9 @@ Changes and comparison saves a sanitized semantic snapshot and compares two snap
 
 Advanced configuration editing offers strict validation, a per-field masked diff and original-task restoration for an explicitly chosen user/project-local JSON file: writes reuse the existing plan chain, recheck the digest before approval, seal an age `lintel.config/1` backup before writing, and restore only the original task's fields while retaining unrelated later edits; credential values and unrecognized keys stay masked by default.
 
-The Protect plan and Cleanup and rebuild pages hold three editable quick recipes: "reduce body recording" disables the known content-recording fields while keeping metrics, "clear runtime residue" uses the residue currently selected in the local-data view, and "preserve work and rebuild" archives and imports the selected work content. Recipes store only non-secret intent such as the preset and finite field choices; drafts and original tasks do not drift across host or environment switches, and every run regenerates a fresh plan for the current host and environment, never replaying an old approval.
+The Protect plan and Clear local login pages hold three editable quick recipes: "reduce body recording" disables the known content-recording fields while keeping metrics, "clear runtime residue" uses the residue currently selected in the local-data view, and "preserve work and rebuild" archives and imports the selected work content. Recipes store only non-secret intent such as the preset and finite field choices; drafts and original tasks do not drift across host or environment switches, and every run regenerates a fresh plan for the current host and environment, never replaying an old approval.
+
+On the cleanup page, the current task and login sources come first. Expand Quick recipes when needed to apply, edit or save a recipe; collapsing the section keeps its draft.
 
 Each row groups its name, description, target and option summary, with one Apply recipe action on the right. Edit and Save personal default sit in a secondary action row. When the personal default saved for a host/environment differs from the built-in preset (for example, enabling content recording in the "reduce body recording" slot), the row instead shows "Personal default · preset name" plus a description generated from the actual intent, instead of the original preset promise; the built-in name returns when the intent matches or no intent is saved. The current page's target has a quiet emphasis; other targets remain available and open their corresponding page. `Recipes.css` is the single styling entry for this layout.
 

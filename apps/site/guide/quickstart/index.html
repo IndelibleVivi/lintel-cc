@@ -24,7 +24,7 @@
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>CLI 完整试用 · Lintel</title>
 </head>
@@ -39,13 +39,14 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。</span> <a href="/releases/" data-route-copy="versionScope">核对版本范围</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="quickstart">
         <h1 id="快速上手从公开源码做一次本地试用">快速上手：从公开源码做一次本地试用</h1>
 <p>简体中文（canonical） · <a href="/guide/quickstart/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
 <p>这份文档带新访客在<strong>一次性合成 fixture</strong> 里走完一条小旅程：登记一个 Claude 配置环境，生成合成的指令／记忆／会话原件（另加一个<strong>故意不选</strong>的原件）， 用精确选择预览范围，审阅原计划与其 hash，提交一次<strong>只归档</strong> （archive-only）保全，查询原 ID 和最终结果，再从明确的 <code>archive_path</code> 在 <strong>另一份独立 state</strong> 里重新检查与阅读，最后逐字节确认源原件、settings 与 占位凭据都没有被动过。</p>
 <p>目标读者：已经拿到 Lintel 源码、想在本机确认 CLI 真实行为的人。</p>
-<blockquote><p>本文覆盖的都是<strong>Lintel 0.1.0 Preview / 开发预览</strong>能力。真实认证／native resume、正式 Chrome/Edge/Firefox/AdsPower、生产 VPS 与签名发行都<strong>未验收</strong>。当前证据与 缺口见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p></blockquote>
+<blockquote><p>本旅程按当前源码构建 CLI，只验证合成原件的归档与独立读包，不执行认证或启动客户端。公开 CLI 0.1.0 与当前源码能力不完全相同；用下载版时先检查 <code>version</code>、<code>capabilities</code> 及所需命令的 <code>describe</code>／<code>schema</code>。真实认证／native resume、正式浏览器、生产 VPS 和首装信任仍分别验收，见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p></blockquote>
 <p>本文的合成 home 不开放真实宿主网络观察或修改，也不进行公网出口测试。另行明确选择的网络功能及其隐私边界见 <a href="/guide/network/">网络指南</a>。</p>
 <hr>
 <h2 id="0-前置条件">0. 前置条件</h2>
@@ -53,7 +54,7 @@
 <p>先取得源码并构建 CLI。<code>cargo build</code> 会写入 <code>target/</code> 并可能拉取依赖，属于 正常本地构建；它<strong>不</strong>运行 Claude、不发现个人目录、不初始化 Lintel state。</p>
 <pre class="guide-code" data-language="sh"><code>git clone https://github.com/IndelibleVivi/lintel-cc.git
 cd lintel-cc
-cargo build -p lintel-runner</code></pre>
+cargo build -p lintel-runner --locked</code></pre>
 <p>产物是 <code>target/debug/lintel</code>。下面的命令都以 <strong>repository 根目录为当前目录</strong> 运行。</p>
 <h2 id="1-一次明确的子-shell-边界">1. 一次明确的子 shell 边界</h2>
 <p>先运行 <code>sh</code> 打开一份独立的交互 shell，再逐块执行下面的命令。每块会立即执行， 可以在批准前停下来阅读实际计划；最后用 <code>exit</code> 回到原来的 shell。 这里定义一份<strong>一次性 fixture</strong> 和只给每次 CLI 调用注入环境变量的 <code>lintel</code> 函数。原 shell 的 <code>HOME</code>、<code>PATH</code> 保持不变，已安装的 Python 3 仍可用。</p>

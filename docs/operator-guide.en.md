@@ -2,11 +2,11 @@
 
 [简体中文 (canonical)](operator-guide.md) · English · [Documentation](index.en.md)
 
-Applies to Lintel 0.1.0 Preview/development preview, based on current source/module contracts. These instructions precede formal release; [current state (Chinese)](current-state.md) owns candidate/runtime status. For a first trial use the [English quickstart](quickstart.en.md) / [中文 quickstart](quickstart.md).
+This guide follows current development source. Public downloads remain App 0.1.1/CLI 0.1.0 and lack the latest authentication-source/Keychain cleanup, bounded history and interface refinements. Check a download’s matching Release, bundled help and actual capabilities first. For source trials, start with [First use](start-here.en.md) or the [CLI trial](quickstart.en.md); [current state](current-state.md) owns exact candidate/runtime evidence.
 
 Lintel handles specific Claude environments: reduce selected optional egress, manage browser permissions/site state, preserve work, clean identified old state and manage similar Linux VPS tasks from Mac. Identify the target, review actual changes, then use receipts to continue or restore.
 
-**0.1.0 Preview** has the connected paths below. Formal browser installation, real authentication, production VPS, real first-use and non-developer installation still have acceptance gaps. A module test does not verify the whole environment.
+The connected source paths are described below. Formal browser installation, real authentication, production VPS, real first-use and non-developer installation still have acceptance gaps. A module test does not verify the whole environment.
 
 ## Getting started
 
@@ -23,7 +23,7 @@ App source supports Simplified Chinese/English, follows system by default with l
 | Reduce egress, continue using Claude | Home Start a task → Protect plan, or sidebar | Exact settings/readback, then a new selected-environment session |
 | Browser exposure/permissions/old login | Home Browser | Selected-profile pairing/settings/clear receipts |
 | Preserve work/change environment | Work preservation → archive only or new environment | Encrypted archive; new root/import when selected |
-| Login repair/old state/retirement | Cleanup and rebuild recipe | Exact files/results, optional new root/retirement |
+| Login repair/old state/retirement | Sidebar Cleanup & rebuild → Clear local login recipe | Exact files/results, optional new root/retirement |
 | VPS/background services from Mac | Top host or Settings → Hosts and SSH | Remote workspace, original-query receipts, separate service restore |
 | Drift/restoration/interruption | Environment details → Check changes; Records and recovery | Differences, accept/restore decision, latest original result |
 
@@ -45,7 +45,7 @@ Components inspects finite root sources/static CLI/auth locations/exact recorded
 
 ### Register an existing environment or create an empty one
 
-Add existing environment/sidebar plus: supply name/full config-root path; registration itself edits no settings. New environment → create with name makes a new root without login/settings/hooks/MCP, then choose protection/open/login normally. Empty lists keep both actions; work transfer uses §3.
+Add existing environment/sidebar plus: supply name/full config-root path; registration itself edits no settings. The root must already exist; missing-directory feedback retains the input and exposes original diagnostics. Correct the path and retry, or use New environment when you need a new root. New environment → create with name makes a new root without login/settings/hooks/MCP, then choose protection/open/login normally. Empty lists keep both actions; work transfer uses §3.
 
 A new directory separates local state but cannot prevent same-user file access/shared outside authentication. Test-space labels describe synthetic data, never personal scans. Ordinary web preview saying start from desktop has no native execution channel.
 
@@ -169,6 +169,8 @@ Selection remains only this host/environment page; leave/reselect, no passphrase
 
 Optional full output path belongs to **target host**, existing non-symlink parent/unused filename. No overwrite. Preview freezes destination/count; replaced parent/remount requires preview. Old explicit-output plans without identity repreview; completed queries remain. Passphrase ≥12, repeated, user-held/unrecoverable if lost. Approve once. Completion provides path/categories/count without root/login/settings/original changes.
 
+In current source, archive-only previews show selected originals, the frozen destination, encryption and preserved scope without an irrelevant empty configuration diff. Completion offers archive reading without asking you to launch Claude or restore unchanged settings. Creating an environment, importing or launching remains a separate explicit choice.
+
 ### 3.2 Preserve and prepare a new environment
 
 Choose new-environment goal/categories/optional name. Preview ordered archive/create/import and frozen ID/full root/file destinations without creating. Outside occupancy/changed parent requires preview. Execute archives first then creates/imports/readback; success completes this goal.
@@ -228,6 +230,8 @@ No real login in this development. Official entry/inert argument correctness/rea
 
 <a id="cleanup"></a>
 ## 4. Login repair, old state and retirement
+
+Open Cleanup & rebuild in the sidebar; the page heading is Clear local login.
 
 This section describes the November 13, 2026 development source; the published App 0.1.1/CLI 0.1.0 retain their earlier capabilities. See [Authentication sources and cleanup](cleanup.en.md) for the complete scope matrix and CLI examples. Network errors or failed responses are not automatically bans; local cleanup never changes server account status.
 
@@ -344,6 +348,8 @@ Some raw labels remain English; color is not proof. Latest result queries origin
 
 Preview support data locally before copying/saving JSON. Allowlisted platform/version/count/capability only, without environment names/directories/config/tokens/sessions; user decides sharing, no upload. SSH summary separate manual action. Help offers GitHub/source/VPS 101/SSH guides. Themes/Clawd/play/album/game never execute environment work.
 
+<a id="client-control"></a>
+
 ### 6.5 Manage local data, identity and configuration, then run a recipe
 
 This section folds the individual goals into one ordinary journey: choose an environment → turn off unwanted content recording → preserve and clear selected residue → execute and review → continue launching. A normal same-target task gets one complete preview and one approval; backups, edits and verification in between are done by the tool.
@@ -356,7 +362,9 @@ This section folds the individual goals into one ordinary journey: choose an env
 
 **Advanced configuration editing:** For an explicitly chosen user/project-local JSON file it offers strict validation, a per-field masked diff and original-task restoration. Writes reuse the existing plan chain: the digest is rechecked before approval, an age `lintel.config/1` backup is sealed before writing, then the file is read back; restoration changes only the original task's fields and retains unrelated later edits, and credential values (such as `OTEL_EXPORTER_OTLP_HEADERS` or a credential-bearing receiver URL) and unrecognized keys stay masked by default. Organization-enforced configuration retains its permission boundary.
 
-**Quick recipes:** The Protect plan and Cleanup and rebuild pages offer three editable recipes. "Reduce body recording" disables the known content-recording fields while keeping metrics; "clear runtime residue" uses the residue currently selected in the local-data view; "preserve work and rebuild" archives and imports the selected work content. Recipes store only non-secret intent such as the preset and finite field choices; drafts and original tasks do not drift across host or environment switches, and every run regenerates a fresh plan for the current host and environment, never replaying an old approval. A personal default saved with different intent (for example, enabling content recording) is labeled as a "personal default" describing the actual intent, not the built-in name's promise.
+**Quick recipes:** The Protect plan and Clear local login pages offer three editable recipes. "Reduce body recording" disables the known content-recording fields while keeping metrics; "clear runtime residue" uses the residue currently selected in the local-data view; "preserve work and rebuild" archives and imports the selected work content. Recipes store only non-secret intent such as the preset and finite field choices; drafts and original tasks do not drift across host or environment switches, and every run regenerates a fresh plan for the current host and environment, never replaying an old approval. A personal default saved with different intent (for example, enabling content recording) is labeled as a "personal default" describing the actual intent, not the built-in name's promise.
+
+On the cleanup page, the current task and login sources come first. Expand Quick recipes when needed to apply, edit or save a recipe; collapsing the section keeps its draft.
 
 ## Hand off from App to Agent
 

@@ -2417,7 +2417,7 @@ export const zhCN: Catalog = {
   "cleanup.authPreciselyRemovable": "可精确移除",
   "cleanup.authAtLines": "位置：第 {lines} 行",
   "cleanup.authKindFile": "凭据文件",
-  "cleanup.authKindCredential": "已保存的 Claude 登录",
+  "cleanup.authKindCredential": "配置文件中的登录",
   "cleanup.authKindSavedKey": "客户端保存的认证字段",
   "cleanup.authKindSettings": "Claude settings 环境变量",
   "cleanup.authKindHelper": "凭据 helper",
@@ -2606,4 +2606,5 @@ export const zhCN: Catalog = {
   "app.registerMissingSource": "添加环境时找不到所需文件或目录。请检查配置目录的完整路径，确认目录已存在后重试。",
   "app.registerFailed": "未能完成环境登记。请核对名称和配置目录，并查看诊断后重试。",
   "app.registerDiagnostics": "查看原始诊断",
+  "present.title.archiveOnly": "仅加密归档所选工作内容",
 };

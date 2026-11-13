@@ -123,6 +123,19 @@ test('home schema projects only actual site and localized page facts with safe s
     await readFile(new URL('../apps/desktop/src-tauri/icons/128x128.png',import.meta.url)), 'favicon reuses the supplied identity export byte for byte');
 });
 
+test('every paired guide is reachable from its language index and language routing', async () => {
+  assert.deepEqual([...ENGLISH_GUIDES].sort(), GUIDE_ARTICLES.map(article => article.doc).sort());
+  for (const language of ['zh', 'en']) {
+    const file = new URL(`../apps/site/${language === 'en' ? 'en/' : ''}guide/index.html`, import.meta.url);
+    const html = await readFile(file, 'utf8');
+    const listed = [...html.matchAll(/data-guide="([^"]+)"/g)].map(match => match[1]);
+    assert.deepEqual(listed.sort(), GUIDE_ARTICLES.map(article => article.key).sort(), `${language} guide index must expose every guide once`);
+    for (const article of GUIDE_ARTICLES) {
+      assert.ok(html.includes(`href="${localePath(article.path, language)}" data-guide="${article.key}"`), `${language}/${article.key} index destination`);
+    }
+  }
+});
+
 test('route map has exact locale mirrors, metadata and sitemap coverage', async () => {
   assert.equal(SITE_ROUTES.length,21);
   assert.equal(GUIDE_ARTICLES.length,16);

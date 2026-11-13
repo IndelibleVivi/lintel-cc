@@ -24,7 +24,7 @@
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>桌面应用 · Lintel</title>
 </head>
@@ -39,13 +39,14 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。</span> <a href="/releases/" data-route-copy="versionScope">核对版本范围</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="desktop">
         <h1 id="桌面使用与界面约定">桌面使用与界面约定</h1>
 <p>简体中文（canonical） · <a href="/guide/desktop/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
 <p>Lintel 桌面使用 Tauri 2 + React。<code>src/App.tsx</code> 管理主机与环境选择、草案、计划和执行回执；<code>src/api.ts</code> 将同一 typed core 请求送到本机或当前 SSH 主机。浏览器和本机网络通道使用各自有限的 native commands。界面不合成登录清空、保护成功或网络强约束状态。</p>
 <p>完整从目标到结果的说明见 <a href="/guide/operator-guide/">operator-guide.md</a>；App 帮助提供六条目标路径、关键场景指南与 <a href="/guide/agents/">Agent CLI</a> 入口。链接仍只打开固定命名 HTTPS 文档。</p>
-<p>当前 <code>main</code> 的本轮可靠性与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。源码检查通过不代表已生成新候选、完成原生冷构建、核对新 DMG、通过干净 Mac 安装或创建 Release。</p>
+<p>本指南描述当前 <code>main</code>，包括认证来源／Keychain 清理、有界记录和界面收尾；这些增强尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。源码检查通过不代表已生成新候选、完成原生冷构建、核对新 DMG、通过干净 Mac 安装或创建 Release。</p>
 <p>“记录与恢复”由 <code>HistoryPanel.tsx</code> 按需读取 <code>jobs_page</code> 摘要与 <code>job_detail_page</code> 详情；切换记录或详情 section 不读取全部历史。后续页绑定原 <code>digest</code>，有 <code>next_offset</code> 时继续加载；扫描完成与坏记录造成的不完整分别显示，单项超出详情预算会明确报错并保留原记录。环境发现 <code>discover</code> 独立于历史列表，不再靠发现响应携带全量回执。旧 runner 缺少这两个入口时显示有界历史不支持，不回退全量 <code>jobs</code>／<code>discover</code>。详情、归档阅读及恢复仍指向所属主机与原任务 ID；分页不删除、重写或重放原任务。</p>
 <h2 id="日常使用">日常使用</h2>
 <ol><li>在顶部确认主机与环境。首页默认是安静的伙伴空间，点击“开始一项任务”展开六类目标；当前目标持续显示，空环境也有主机、创建／登记、浏览器与 CLI 入口。选择环境后在专业工作区生成预览，不调用模型。完整功能取舍在“保护方案”中调整：会静态识别已安装产品版本，逐项解释变量值，并显示 Remote Control 的版本／Trusted Devices 条件。组织条件只记录用户声明，不读取账号；未知信息不能当成可用证明。已有冲突值需要明确勾选解除，准确删除项进入批准预览。</li><li>对照计划中的“将修改 / 将保留 / 实际步骤”，批准一次执行。执行结果区分已完成、部分完成、已接收和待核对；字段读回不等于运行效果已验证。</li><li>首页旁的“环境详情”展开概况、外发与权限、本地状态、启动与来源、关联组件及检查时间。首页任务选择中的“工作保全”与侧栏同名入口进入同一独立任务。侧栏“会话与资料”拥有独立阅读布局，“终端与 Agent”核对执行器并交接操作元数据。保护方案、清理与重建、记录与恢复从侧栏进入。完整路径可查看和复制；手动刷新重新读取状态。漂移检查列出差异，可重新应用方案或接受当前基线，不会自动清理。</li><li>“记录与恢复”保存真实回执，可按环境或文字筛选。可恢复的配置先检查后续编辑；连接中断时用原任务 ID 查询，不能把没收到响应当成未执行。</li><li>脱敏支持资料先在本地预览，可复制或保存 JSON。不会自动上传。</li></ol>
@@ -64,10 +65,12 @@
 <h2 id="清理工作归档与迁入">清理、工作归档与迁入</h2>
 <p>“关联组件”独立读取有限来源，在 settings 内容损坏时仍可查看；只展示 hooks/MCP 是否声明，不展示命令或凭据。原任务与当前观察分开，主机切换会丢弃晚到结果；旧 runner 缺少操作时显示明确错误。容量预检随工作类别刷新；发现阻塞项时禁用保全预览，分类取消后重新检查，不删除或截断原件。</p>
 <p>“工作保全”提供只生成加密包、保全并准备新根两个目标；两者成功为完成，旧登录保留。工作归档面板可从任务或独立绝对路径打开，清单和选择性迁入不依赖源机器 state；密文文件的跨主机传输由用户明确使用系统工具完成。详细步骤见 <a href="/guide/operator-guide/#work">人类操作指南</a>。</p>
+<p>当前源码的只归档预览显示选中原件、冻结归档落点、加密与保留范围，不显示不适用的空配置 diff；完成后提供阅读归档入口，不要求启动 Claude 或恢复未修改的配置。创建新环境、迁入或启动是另外明确选择的操作。</p>
 <p><code>WorkFileSelection.tsx</code> 在同一工作页提供项目路径组、会话文件组和单文件选择，加载有界 metadata 页并拒绝缺页／变动，不读取会话正文。文件搜索只改变显示，超限文件可明确排除；选中路径不持久保存到草案，新出现文件不自动加入。<code>WorkCapacity</code> 使用同一选择重新预检，<code>PlanReview</code> 展示批准中的原件范围与已有冻结落点；runner 未确认 exact selection 时不开放批准。旧 runner 清单错误明确显示，不隐式变回整类。</p>
-<p>以下认证清理能力属于 2026-11-13 开发版，公开 App 0.1.1／CLI 0.1.0 尚未包含。环境与关联组件可进入同一个“清理与重建”流程，提供三条路径：</p>
+<p>以下认证清理能力属于 2026-11-13 开发版，公开 App 0.1.1／CLI 0.1.0 尚未包含。环境与关联组件可进入同一个“清理本机登录”流程，提供三条路径：</p>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">路径</th><th class="align-left">当前处理范围</th></tr></thead><tbody><tr><td class="align-left">修复本地登录</td><td class="align-left">核验写入者已停，精确移除选中的受支持认证字段或 shell 赋值，再独立重新检查。</td></tr><tr><td class="align-left">清理并重建</td><td class="align-left">先加密归档选中工作、按冻结落点建立新根并迁入，再编辑所选认证来源；不生成混合客户端状态或 token 恢复备份。</td></tr><tr><td class="align-left">退役此环境</td><td class="align-left">先保全选中工作、处理所选认证来源，再停用本环境入口并复查；原始工作目录保留，重新启用不恢复已删凭据。</td></tr></tbody></table></div>
 <p>三条路径都要求先确认目标终端、IDE 和自动重启来源已关闭。core 会复查写入进程，不能归属的 Claude 写入者会阻止清理；不会全局杀进程。来源检查在已知位置有界读取必要内容，界面只接收位置、证据、可选范围与限制，不接收 token、helper 正文或 shell 原文。它不运行 shell 初始化、helper 或 Claude，也不扫描历史记录。</p>
+<p>侧栏入口仍为“清理与重建”，页内主标题为“清理本机登录”。</p>
 <p>“清理本机登录”保留修复登录／重建／退役三种流程和六任务入口。已保存登录按可处理文件与 Keychain 字段默认建议；认证注入可逐项选择或显式组选／清空，共享 shell 不自动全选。技术依据与路径渐进展开，批准预览的位置默认展开。结果优先显示本地移除、仍存在和待核对数量；当前执行器另列，其他上下文与服务端详情可展开。原 ID 重新检查只读，不重执行。Keychain 只移除有限服务中已识别 <code>/claudeAiOauth</code>，保留 MCP／插件／未知字段与 item 身份，不整删 item 或导出秘密。锁定、拒绝访问、格式未知和超限分别显示限制；有限服务读取完整不代表整机或整个 Keychain 清理完成。原生 API／真实客户端验收状态见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
 <p>认证来源列表区分已确认本地来源、当前 Lintel／runner 观察到的变量、仅发现声明、无法检查和其他上下文；存在、空／非空都不证明实际使用。可补充目标主机的项目 cwd，刷新后选择可编辑来源，查看其位置、共享影响和不可处理原因；未支持项不可选择。支持 <code>claudeAiOauth</code>、目标客户端状态的 <code>primaryApiKey</code>、用户 settings 认证字段／helper 和保守识别的简单 shell 赋值，其他字段、MCP／插件和工作内容保留。只选择的来源进入同一份预览与一次批准；不选任何来源时，预览明确是仅验证，不扩大为文件删除。原有精确文件元数据仍作补充观察，不能替代来源证据。</p>
 <p>默认清单与复查不运行客户端。显式认证状态按钮或清理后的可选状态检查才调用当前执行器／目标 root 的 <code>auth status</code>，可能访问认证设施、运行 helper 或联网；若选择此检查，会先运行状态命令，再做最终文件读回，以观察其可能重新生成的凭据。结果分别展示选中本地来源、当前执行器、其他运行上下文和服务端撤销；已处理文件与当前仍可认证可以同时成立。Shell／settings 编辑不会清除已有进程的环境，需在实际 Terminal／IDE／服务重新启动后核对。</p>
@@ -81,7 +84,8 @@
 <p>“身份与登录材料”只识别已核实的 <code>userID</code> 与账号痕迹 <code>oauthAccount</code>，默认只显示存在性；点“显示原始值”后才在本页内存读取 <code>userID</code>，可复制，但不写入 localStorage、普通快照、支持导出或日志。“重置本地客户端标识”先对完整原始客户端状态及你明确选中的备份加密保全，再移除 <code>userID</code> 并逐值保留其他键；它不注销、不清凭据，是否由客户端重新生成按重新检查的结果展示。已有的 <code>lintel.residue/1</code> 备份可用“读取与恢复残留备份”独立解锁与按原路径恢复，已有文件不覆盖，也不作为工作 import。</p>
 <p>“环境详情 → 变化与对照”的“变化与对照”面板保存脱敏语义快照并比较两份快照或两个已登记环境，可按新增／删除／修改筛选；“接受所选当前值”只形成比较基线，不是恢复来源。跨环境“将普通配置应用到目标环境”只复制已识别普通字段、显示目标 diff，登录凭据与本地身份不随之复制。轻量变化检查在打开环境或经 Lintel 启动时只读有限配置来源并在有变化或读取不完整时留下提示，没有常驻 watcher。</p>
 <p>“高级配置编辑”对明确选择的 user／project-local JSON 配置提供严格校验、逐字段遮蔽 diff 与原任务恢复：写入复用现有计划链，批准前复查摘要，写前生成 age 加密 <code>lintel.config/1</code> 备份，恢复只改原任务字段并保留后续无关编辑，凭据值与未识别键默认遮蔽。</p>
-<p>“保护方案”和“清理重建”页内的“快捷配方”面板提供三条可编辑配方：“减少正文记录”关闭已知内容记录字段并保留指标，“清理运行残留”使用本地数据视图当前选中的残留，“保住工作并重建”归档并迁入选中的工作内容。配方只保存方案与有限字段选择等非秘密意图，切换主机或环境后草稿与原任务绑定不漂移；每次运行都按当前主机与环境重新生成计划，绝不重放旧审批。</p>
+<p>“保护方案”和“清理本机登录”页内的“快捷配方”面板提供三条可编辑配方：“减少正文记录”关闭已知内容记录字段并保留指标，“清理运行残留”使用本地数据视图当前选中的残留，“保住工作并重建”归档并迁入选中的工作内容。配方只保存方案与有限字段选择等非秘密意图，切换主机或环境后草稿与原任务绑定不漂移；每次运行都按当前主机与环境重新生成计划，绝不重放旧审批。</p>
+<p>清理页默认先显示当前任务与登录来源；按需展开“快捷配方”后，应用、编辑与保存入口均可使用，收起不会清除草稿。</p>
 <p>每条配方按名称、说明、目标与选项摘要排列，右侧保留一个“应用配方”；“编辑”和“保存为个人默认”位于次级操作行。当某主机／环境保存的个人默认与内置预置不同（例如在“减少正文记录”槽位中开启内容记录），该条改显示“个人默认 · 方案名”与按实际意图生成的说明，不再沿用原预置承诺；恢复或没有保存意图时保留原名。当前页面对应的目标有轻强调，其他目标仍可应用并进入对应页面。<code>Recipes.css</code> 是这一组布局的唯一样式入口。</p>
 <p>本轮源码中，重开 App 的浏览器安装区会只读查询未完成安装，显示原批准计划与“继续原安装”；查询失败会显示原因。新预览不能覆盖锁内的未决 intent；恢复重新核对原 executable／manifest 身份和资源，外部登记或已变化资源保留为冲突，不凭相同内容认领所有权。完成的历史 intent 不阻止下一次正常升级。扩展向 native host 回传的待 ACK 结果绑定原 instance 与 operation；重新配对不会把旧结果借新身份投递。旧记录仅在认证查询确认同 instance、同 ID、完全相同 action 后补齐归属；未知记录保留，不自动重投。</p>
 <p>隔离网络规则已移除、但旧 owner 记录删除失败时，重开扩展 popup 仍显示原 owner 的“完成隔离释放恢复”。该动作只完成匹配旧记录的清理，不重复站点数据删除或网络规则移除，也不触碰新 owner。native bridge 的持久 JSON 错形会返回结构化 <code>invalid_state</code> 并保留原字节，不能把损坏状态视为空白登记。</p>
@@ -118,7 +122,7 @@ node scripts/local-fonts.mjs /absolute/path/to/authorized-font-directory</code><
 <p>此命令仅读取六个精确字体文件名，不扫描来源项目。开发服务器可使用这些本地字体；<strong>默认 <code>npm run build</code> 和 <code>npm run desktop:build</code> 排除 <code>public/</code>（当前仅含可选本地字体）与字体加载列表，使用系统 fallback</strong>，已有本地字体文件保留。只有显式 <code>npm run build -- --mode local-candidate</code> 才把它们带入本机候选；此类候选不得视为可公开分发包。此处只解决构建夹带字体的边界，签名／公证、扩展发布和正式分发仍未完成。</p>
 <p>App 图标 master 是 <code>src/brand.svg</code>，Tauri 使用提供的五个 exports（PNG、ICNS、ICO），图形为陶土横梁、两根中性色支撑和右下光标。App 内 <code>Brand()</code> 使用同一几何并跟随 Day / Night tokens；侧栏 <code>lintel_</code>、分割线和 2.6 秒慢闪保留，reduced motion 下静止。可编辑展示资产与使用边界见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/visual-language.md">视觉身份</a>。构建包含图标不代表正式 macOS / Linux launcher 已验收。</p>
 <h2 id="开发与验证">开发与验证</h2>
-<p>在“清理与重建”选择修复登录、清理并重建或退役时，可展开“目标后台服务”。输入准确 <code>.service</code> 名称，选择当前用户管理器或系统管理器（runner 须为 root），点击“检查服务”；该动作只读取绑定与状态。确认 unit 确实属于选定配置根后，预览暂停计划，再批准执行。暂停回执或再次检查已暂停的 unit 可准备独立恢复计划；外部 unit 编辑冲突会阻止恢复并保留修改。服务操作完成后返回清理范围，仍需关闭交互终端／IDE 并核对其他写入者。</p>
+<p>在“清理本机登录”选择修复登录、清理并重建或退役时，可展开“目标后台服务”。输入准确 <code>.service</code> 名称，选择当前用户管理器或系统管理器（runner 须为 root），点击“检查服务”；该动作只读取绑定与状态。确认 unit 确实属于选定配置根后，预览暂停计划，再批准执行。暂停回执或再次检查已暂停的 unit 可准备独立恢复计划；外部 unit 编辑冲突会阻止恢复并保留修改。服务操作完成后返回清理范围，仍需关闭交互终端／IDE 并核对其他写入者。</p>
 <p>此能力限于 Linux systemd 的明确绑定服务，不自动 sudo、不修改邻居服务或 enablement。具体来源、暂停项、限制与 CLI 操作见 <a href="/guide/services/">服务指南</a>。任务回包丢失时只查询原 ID，不能通过再次提交恢复连接。当前 UI 的合成 manager 旅程证明操作与布局；真实 Linux VM、生产 VPS和 native WebKit 证据分别记录。</p>
 <pre class="guide-code" data-language="sh"><code>cargo build -p lintel-runner
 cd apps/desktop

@@ -24,7 +24,7 @@
   <meta property="og:locale" content="zh_CN">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>第一次使用 · Lintel</title>
 </head>
@@ -39,6 +39,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。</span> <a href="/releases/" data-route-copy="versionScope">核对版本范围</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="start-here">
         <h1 id="第一次使用-lintel">第一次使用 Lintel</h1>
@@ -47,6 +48,7 @@
 <h2 id="选择入口">选择入口</h2>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">你手里有什么</th><th class="align-left">使用方式</th></tr></thead><tbody><tr><td class="align-left">源码，想先看界面</td><td class="align-left">按下面的“合成界面试用”启动</td></tr><tr><td class="align-left">已由自己或可信提供方构建的 macOS App</td><td class="align-left">打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a></td></tr><tr><td class="align-left">Linux，或只需要 CLI</td><td class="align-left"><a href="/guide/agents/">Agent CLI</a>负责安装；<a href="/guide/quickstart/">CLI 完整试用</a>提供全程合成示例</td></tr></tbody></table></div>
 <p>当前手动下载：<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1">App v0.1.1</a>、<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">CLI v0.1.0</a>。App v0.1.0 因封装签名缺陷已被替代。没有 Developer ID 签名、公证或 updater feed；干净 Mac 首装仍未验证。</p>
+<p>这些下载包不包含最新文件＋Keychain 一次批准清理、有界记录和界面修复。下方源码试用对应当前指南；下载版先按它自己的内置帮助和 Release 说明操作。需要比较来源时，App 帮助显示构建版本／docs revision，CLI 使用 <code>version --json</code> 和 <code>capabilities --json</code>。</p>
 <p>先阅读 Release 内的 INSTALL 与校验和。系统阻止时停止，继续下方源码试用。普通 <code>npm run dev</code> 只启动前端，没有下面这条本机执行通道。</p>
 <h2 id="合成界面试用">合成界面试用</h2>
 <p>准备 Git、Rust stable 与 Node.js &gt;=22.12.0／npm &gt;=10：</p>
@@ -57,9 +59,10 @@ cd apps/desktop
 npm ci
 npm run dev:synthetic</code></pre>
 <p>打开终端报告的地址，确认页面显示<strong>测试空间</strong>。这个入口启动 Vite 合成模式，通过真实 CLI 使用一份新建 HOME／state。脚本准备了 <code>CLAUDE.md</code>、<code>projects/synthetic/memory/notes.md</code> 和合成 settings；目录路径会打印在终端。</p>
-<p>这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。10-20 已用从 DMG 取出的 clean <code>fcae6cb</code> 原生 App，在另一份隔离 HOME／state 中完成空白登记、精确三件归档、退出重开、原任务核对与独立文件阅读；实际交付 CLI 在独立空 state 核对三份原文字节一致。它仍不等于真实个人认证或干净 Mac 下载首装验收。</p>
+<p>这是浏览器中的开发界面，不能据此判断原生 WebKit、真实认证或正式浏览器集成。你自己的登录与 browser profile 不在这条试用路径里。原生 App 对合成原件的归档、退出重开与读回已有独立验证；具体来源与范围见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>，不等于个人认证或干净 Mac 下载首装验收。</p>
 <h3 id="做一次只生成工作归档">做一次“只生成工作归档”</h3>
 <ol><li>选择合成环境，打开“工作保全”，选择“只生成工作归档”。</li><li>选中合成指令与记忆。查看原件清单、数量和最终归档位置；本次不需要清理或创建新配置根。</li><li>生成预览，核对主机、完整配置目录、两份选中原件和归档目标。输入至少 12 字符的临时归档口令，审阅后批准执行。</li><li>查看原任务结果，等待归档步骤完成。保存原任务 ID 和工作包位置，再用同一口令解锁并阅读选中的资料。</li></ol>
+<p>当前源码的只归档预览显示选中原件、冻结归档落点、加密与保留范围，不显示不适用的空配置 diff；完成后提供阅读归档入口，不要求启动 Claude 或恢复未修改的配置。创建新环境、迁入或启动是另外明确选择的操作。</p>
 <p><strong>这次完成的标志：</strong> 原任务显示 <code>completed</code>，归档步骤成功；工作包能打开并读到所选指令和记忆；源文件仍在，没有因为只归档而建立新配置环境。<code>accepted</code> 只说明任务已经被接收，仍要继续查看完成结果。</p>
 <p>需要证明独立 state 也能打开、未选文件没有混入，以及源文件逐字节不变时，继续 <a href="/guide/quickstart/">CLI 完整试用</a>。这份较长文档保留完整验证过程。</p>
 <h3 id="结束试用">结束试用</h3>
@@ -76,7 +79,7 @@ npm run desktop:build</code></pre>
 <p>构建同时准备当前平台 browser host、Chromium／Firefox 扩展和第三方许可资源。它不会自动安装到 Applications，也不会替你完成 Developer ID 签名、公证或正式发行。当前仅支持匹配 Rust host 的原生构建。更多说明见<a href="/guide/desktop/">桌面指南</a>与<a href="/guide/app-updates/">App 更新</a>。</p>
 <p>本地构建来自你检出的源码。候选版本号相同不代表文件相同：核对 source revision、包内资源与实际操作范围；当前候选与更早候选的原生、Chromium 和 CLI 证据按<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>分别理解。</p>
 <h2 id="接入自己的环境">接入自己的环境</h2>
-<p>打开 App 后，用“添加现有环境”登记明确的 Claude Code 配置目录；登记记录位置，不修改该目录设置。先点顶栏橙色 <code>&gt;_</code> 查看主机、配置根与环境 ID，再在“环境详情”核对配置来源，然后选择自己的任务。</p>
+<p>打开 App 后，用“添加现有环境”登记明确的 Claude Code 配置目录；登记记录位置，不修改该目录设置。目录必须已经存在；找不到所需文件或目录时，界面保留名称与路径，可修正后重试，并展开“查看原始诊断”。要建立目录请使用“新建环境”，不要把登记失败当成清理或删除旧环境的理由。先点顶栏橙色 <code>&gt;_</code> 查看主机、配置根与环境 ID，再在“环境详情”核对配置来源，然后选择自己的任务。</p>
 <p>想从新的本地状态开始，可建立空白环境；要带走指令、记忆或会话资料，使用工作保全。配置根、项目 cwd、浏览器 profile 分开选择，参见<a href="/guide/concepts/">基本概念</a>。</p>
 <p>下一次不必重走试用：<a href="/guide/operator-guide/">操作指南</a>直接按六种目标进入。出错时保留原 ID，查<a href="/guide/troubleshooting/">排错指南</a>。</p>
       </article>

@@ -37,7 +37,7 @@ const pairs = [
   ["c033","到工作的下一站。","to your next stretch of work."],
   ["c034","六个入口，对应六类实际任务。","Six ways in, for six real kinds of task."],
   ["c035","在本机或指定的主机上，把范围和变化说清楚。","Know the scope and changes, on your machine or a selected host."],
-  ["c036","当前为源码开发预览，正式分发与真实环境验收仍在继续。","A source development preview. Formal distribution and verification in real environments are still in progress."],
+  ["c036","以下为当前开发源码预览；公开下载版的范围请核对版本状态。","Preview of current development source; check version status for the scope of public downloads."],
   ["c037","一次操作，怎样走到结果","Follow an operation through to its result"],
   ["c038","六个示意场景 · 不读取电脑，不执行操作","Six illustrative scenes · No computer access or execution"],
   ["c039","调整外发配置","Adjust outbound settings"],
@@ -52,8 +52,8 @@ const pairs = [
   ["c048","选中的原件","Selected originals"],
   ["c049","原件保留","Originals remain"],
   ["c050","整理旧环境","Put an old environment in order"],
-  ["c051","为修复本地登录、清理并重建或退役选择准确范围。先保全工作，再按批准的顺序处理已识别的本地状态。","Choose the exact scope for local sign-in repair, cleanup and rebuilding, or retirement. Preserve work first, then handle identified local state in the approved order."],
-  ["c052","官方注销有独立条件；本地文件处理不等于服务端账号撤销。","Official logout has separate conditions. Handling local files does not revoke a server-side account."],
+  ["c051","辨认文件、Keychain 与认证注入，按选中来源一次预览、批准和复查。也可保全工作后重建或退役环境。","Review file and Keychain sign-ins and optional authentication injections. Preview, approve and recheck selected sources together, or preserve work before rebuilding or retiring an environment."],
+  ["c052","只处理预览内已识别的来源；本地移除不等于服务端撤销。","Only identified sources in the preview are changed. Local removal does not establish server-side revocation."],
   ["c053","把工作留下，再整理旧环境。","Keep the work before tidying the old environment."],
   ["c054","旧环境","Old environment"],
   ["c055","工作包","Work package"],
@@ -232,7 +232,7 @@ export const PAGE_METADATA = Object.freeze({
     }),
   }),
 });
-export const ENGLISH_GUIDES = Object.freeze(['start-here','quickstart','concepts','troubleshooting','operator-guide','agents','desktop','browser','remote','network','services','telemetry','app-updates','core','architecture']);
+export const ENGLISH_GUIDES = Object.freeze(['start-here','quickstart','concepts','troubleshooting','operator-guide','cleanup','agents','desktop','browser','remote','network','services','telemetry','app-updates','core','architecture']);
 export const ROUTE_COPY = Object.freeze({
   nav: Object.freeze({zh:'主导航',en:'Main navigation'}),
   language: Object.freeze({zh:'语言 / Language',en:'Language'}),
@@ -260,6 +260,8 @@ export const ROUTE_COPY = Object.freeze({
   guideCrumb: Object.freeze({zh:'指南',en:'Guides'}),
   articleCrumb: Object.freeze({zh:'文章',en:'Article'}),
   articleLabel: Object.freeze({zh:'指南文章',en:'Guide article'}),
+  currentSourceDocs: Object.freeze({zh:'本指南跟随当前开发源码；公开下载版可能尚未包含其中的更新。',en:'These guides follow current development source; public downloads may not include every update.'}),
+  versionScope: Object.freeze({zh:'核对版本范围',en:'Check version scope'}),
   downloadEyebrow: Object.freeze({zh:'DOWNLOAD / APP & CLI',en:'DOWNLOAD / APP & CLI'}),
   downloadTitleA: Object.freeze({zh:'选择你的方式。',en:'Choose your way in.'}),
   downloadTitleB: Object.freeze({zh:'先核对，再开始。',en:'Verify, then begin.'}),
@@ -392,6 +394,7 @@ export const ROUTE_COPY = Object.freeze({
   limitsNote: Object.freeze({zh:'详细证据与候选范围由仓库的 current-state 和验证文档维护；这里只呈现用户需要知道的状态，不把目标写成已交付。',en:'Detailed evidence and candidate scope remain in the repository current-state and verification documents. This page presents only user-facing status and never presents targets as delivered.'}),
 });
 export const RELEASE_COPY = Object.freeze({
+  originalNotes:{zh:'查看原始发行说明',en:'View original release notes'},
   installation:{zh:'初次安装使用 DMG，先阅读安装说明。未公证的 Preview 可能需要在“隐私与安全性”中选择“仍要打开”。',en:'Read the installation notes before opening the DMG. An unnotarized Preview may require “Privacy & Security → Open Anyway”.'},
   manual:{zh:'本版本未启用 App 内更新；新版本发布后回到此页下载。',en:'In-app updates are not enabled in this build; return to this page for new versions.'},
   security:{zh:'版本记录已核对公开二进制字节；Developer ID 与公证状态：',en:'Public binary bytes were checked against the release record. Developer ID / notarization status: '},

@@ -8,7 +8,7 @@
 
 `claude setup-token` 生成的长期 OAuth token 只会打印到终端，命令本身不保存它。之后可能由 shell、Claude settings、IDE、服务或 CI 注入，所以没有一个固定的“setup-token 文件”可全部删除。普通登录的文件与 Keychain 又是不同来源。官方机制与版本依据见[工程证据记录](credential-provenance-evidence.md)。
 
-在“清理本机登录”查看认证来源。清单只在有限的已知位置读取必要内容，不运行 shell 初始化、helper、hooks、MCP 或 Claude，不扫描历史记录或整块磁盘，也不展示 token。环境／组件入口指向同一清理流程。
+从侧栏“清理与重建”进入“清理本机登录”，查看认证来源。清单只在有限的已知位置读取必要内容，不运行 shell 初始化、helper、hooks、MCP 或 Claude，不扫描历史记录或整块磁盘，也不展示 token。环境／组件入口指向同一清理流程。
 
 | 看到的事实 | 它能说明什么 | 不能据此认定什么 |
 | --- | --- | --- |

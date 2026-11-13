@@ -24,7 +24,7 @@
   <meta property="og:locale" content="en_US">
   <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
   <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
-  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <link rel="stylesheet" href="/styles.css?v=20261113-guide-polish-1">
   <script type="module" src="/site.mjs"></script>
   <title>Core concepts · Lintel</title>
 </head>
@@ -39,6 +39,7 @@
   <main id="main">
     <div class="article-shell wrap">
       <nav class="article-breadcrumb" aria-label="Breadcrumb"><a href="/en/guide/" data-route-copy="guideCrumb">Guides</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">Article</span></nav>
+      <p class="route-note guide-version-note" data-guide-version><span data-route-copy="currentSourceDocs">These guides follow current development source; public downloads may not include every update.</span> <a href="/en/releases/" data-route-copy="versionScope">Check version scope</a></p>
       <!--email_off-->
       <article class="guide-body" data-guide-document="concepts">
         <h1 id="core-concepts">Core concepts</h1>
@@ -59,6 +60,9 @@
 <p><strong>Observation, baseline acceptance and restoration.</strong> Sanitized semantic snapshots support comparison. Accepting current values item by item only establishes a comparison baseline and does not create recoverable work content. Configuration restore, residue-backup restore and work import read different sources and each requires its own preview and approval; one original ID cannot substitute for another kind of restoration evidence.</p>
 <h2 id="presets-ordinary-editing-and-bulk-changes">Presets, ordinary editing and bulk changes</h2>
 <p>A protection draft belongs to one host and environment. Ordinary editing chooses an action on the row for that field. Bulk edit offers only actions common to every selected item, without silently omitting selections outside the filter. A personal default stores non-secret intent only; if it differs from a built-in recipe, the label describes the fields actually enabled, disabled or removed, and the next application still reads the target and generates a fresh plan.</p>
+<h2 id="login-sources-client-identity-and-local-data">Login sources, client identity and local data</h2>
+<p>Saved Claude login, shell/settings injection, current process environment and server credential state are different objects. Clear local login handles only selected file/Keychain fields or declarations supported for exact editing. Independent checks reread those locations without executing the original task again. Existing processes, unselected sources or other contexts can still supply authentication after a file edit; see <a href="/en/guide/cleanup/">authentication cleanup</a>.</p>
+<p>The client’s local <code>userID</code>, runtime residue and ordinary configuration each have separate operations. Resetting a local identifier does not log out, change a server account or establish unlinkable identity. Configuration/residue recovery packages and selected work packages have different purposes; authentication cleanup creates no token-recovery backup. Use <a href="/en/guide/operator-guide/#client-control">client-control operations</a> to choose the actual target and preview its exact scope.</p>
 <h2 id="configuration-readback-and-actual-outbound-behaviour">Configuration readback and actual outbound behaviour</h2>
 <p>Settings readback verifies that the target fields were handled as planned; an existing Claude process is not restarted automatically. Controlled-channel observations cover connections through that proxy, not direct outbound traffic. An explicit IPv4/IPv6 probe describes the tested route at that time.</p>
 <p>Continue with <a href="/en/guide/operator-guide/#protect">Protection</a>, <a href="/en/guide/network/">Network</a> or <a href="/en/guide/telemetry/">Telemetry</a>.</p>

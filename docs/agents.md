@@ -6,6 +6,8 @@
 
 首次试用可先走 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。
 
+本页同时维护公开包安装与当前源码接口。公开 CLI 0.1.0 不包含最新 `auth inventory`／`auth verify`、精确认证来源选择和有界记录；要用这些入口需从当前源码构建。执行前始终用所选 binary 的 `version`、`capabilities`、`describe`／`schema` 核对；远端还要核对目标 runner，App 升级不会替它升级。
+
 ## 从 App 接到终端或 Agent
 
 App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。
@@ -145,6 +147,8 @@ lintel snapshot compare --environment '<environment-id>' --old-snapshot-id '<old
 缺失、损坏或读取失败的配置不能当作“关闭”；对应区域标为未完成，其余独立观察继续返回。遮蔽值的相等性也保持未知。脱敏快照用于比较，配置恢复仍须来源明确的原任务或加密备份和新批准，不能用摘要还原正文。普通命令沿用现有 state／锁行为，这些观察不启动 Claude、执行 hooks 或访问公网。
 
 `lintel snapshot accept --environment '<environment-id>' --old-snapshot-id '<old-snapshot-id>' --new-snapshot-id '<new-snapshot-id>' --selected-changes '["<returned-change-id>"]'` 只将 `snapshot compare` 返回的所选 `changes[].id` 接受为比较基线，不改配置。它会重新核对当前所选值；陈旧观察与遮蔽值不能被接受。形成语义基线后，旧的 `accept_drift` 返回 `semantic_baseline_selection_required`，应继续用逐项 `snapshot accept`；旧字段基线仅为尚未迁入语义基线的调用方保留。
+
+<a id="client-control"></a>
 
 ### 高级配置、本地数据与配方的可写入口
 

@@ -309,6 +309,12 @@ try{
   await page.getByRole('button',{name:'Start a task',exact:true}).waitFor();
   assert.deepEqual(errors,[]);
   report.checks.push('minimal EN/中文 face tracks effective locale; full native choices and visible keyboard focus remain accessible at 900px in Day/Night');
+  await page.getByRole('button',{name:'Environment details',exact:true}).click();
+  const environmentTabs=page.getByRole('tablist');await environmentTabs.scrollIntoViewIfNeeded();
+  assert.equal(await environmentTabs.getByRole('tab').count(),6);
+  assert.equal(await environmentTabs.evaluate(element=>{const bounds=element.getBoundingClientRect();return element.scrollWidth<=element.clientWidth&&[...element.querySelectorAll('[role=tab]')].every(tab=>{const box=tab.getBoundingClientRect();return box.width>0&&box.left>=bounds.left-1&&box.right<=bounds.right+1;});}),true,'all six English environment destinations remain readable without horizontal clipping');
+  await page.screenshot({path:path.join(output,'environment-tabs-en-900.png')});
+  report.checks.push('six English environment tabs remain fully inside the inspector at 900px');
   // The development build runs the real main.tsx StrictMode setup/cleanup/setup.
   // A preference refresh after this mount must still apply (production React
   // does not exercise this lifecycle).
