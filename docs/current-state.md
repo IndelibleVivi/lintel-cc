@@ -28,7 +28,7 @@
 
 首轮 workspace 的两处失败已处理后重跑通过：旧 baseline 测试改为已识别字段清理并核对 MCP 保留；宿主 `/usr/bin/true` 被映射为 UID 65534 的测试假设改用自有 synthetic 可执行文件，生产所有者校验没有放宽。下方 `c7680f0` 的构建／CI 表仅属于 10-24 候选，不作为本轮认证改动的验收。
 
-首个实现提交 `67b8f4e000e6d69797adefd449afd32ce5f650f5` 的 [CI 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211) 已在 Ubuntu x86_64 与 macOS arm64 分别通过 native 18/18、browser 19/19 检查；两边认证专项均为 37/37。实际 checkout 为与基线 main 合并的 `89b97e7c2d3cf93bd4c6368b0574a127b6b65532`。首轮还暴露了新增指南后的旧 payload 数量断言，已修正并本地通过。截图审阅发现的两条英文警示投影和滚动取景缺口也已补齐；这些后续修订需读取 PR 当前 SHA 的实际 checks，不能借用首轮通过结果。Headless Chromium、synthetic native 与正式 App／Keychain 验收保持独立。
+首个实现提交 `67b8f4e000e6d69797adefd449afd32ce5f650f5` 的 [CI 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211) 已在 Ubuntu x86_64 与 macOS arm64 分别通过 native 18/18、browser 19/19、heavy 6/6 检查；两边认证专项均为 37/37。实际 checkout 为与基线 main 合并的 `89b97e7c2d3cf93bd4c6368b0574a127b6b65532`。首轮还暴露了新增指南后的旧 payload 数量断言，以及 VM 认证用例的 HOME 位于 `/home` 而非独立临时子树的问题。前者已修正并本地通过；后者仅将该用例改到 `/tmp/lintel-vm-auth-scope`，不改变其他跨 reboot 布局或生产边界，34 项 VM 控制测试通过，真实 guest 全流程结果由相应修订的 PR checks 记录。截图审阅发现的两条英文警示投影和滚动取景缺口也已补齐；这些后续修订需读取 PR 当前 SHA 的实际 checks，不能借用首轮通过结果。Headless Chromium、synthetic native 与正式 App／Keychain 验收保持独立。
 
 ## 2026-10-24：未发布的恢复闭环与有界历史
 

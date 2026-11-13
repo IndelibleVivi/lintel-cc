@@ -71,11 +71,15 @@ its socket operation; the escalation was automatically rejected. SSR/build
 are not substituted for browser interaction or visual evidence. Native macOS
 App/WebKit, Keychain, real Claude versions and personal-account acceptance remain separate.
 
-The first implementation commit `67b8f4e` passed 18 native and 19 browser checks
+The first implementation commit `67b8f4e` passed 18 native, 19 browser and six heavy checks
 on both Ubuntu x86_64 and macOS arm64 in [run 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211),
 using merge checkout `89b97e7`. Both focused authentication suites passed all
 37 tests. The old website payload count was corrected after that run exposed
-the new guide pair. Screenshot review also led to exact bilingual warning
+the new guide pair. The VM auth-only case moved from the persistent guest home
+to the exact `/tmp/lintel-vm-auth-scope` subtree required by the existing
+synthetic boundary; other reboot cases and production guards remain unchanged.
+All 34 VM control tests pass; exact-revision PR checks record the real guest result.
+Screenshot review also led to exact bilingual warning
 projections, completed-response evidence, and separate visible captures of
 local, runner and unresolved coverage. Read [PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4)
 for the current revision's checks; earlier passing results do not validate a

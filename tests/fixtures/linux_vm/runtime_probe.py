@@ -11,6 +11,10 @@ import time
 
 TARGET = "lintel-fixture"
 BASE = Path("/home") / TARGET / "vm-journey"
+# This case does not cross reboot. Its readonly authentication inventory must
+# share one independent temporary subtree with LINTEL_TEST_HOME; keep the PAM
+# and reboot fixtures in their existing persistent guest layout.
+AUTH_BASE = Path("/tmp/lintel-vm-auth-scope")
 RUNNER = Path("/opt/lintel-vm/lintel")
 
 
@@ -27,9 +31,18 @@ def properties(text):
 
 def synthetic(path):
     path = Path(path)
-    if not path.resolve().is_relative_to(BASE.resolve()):
-        raise RuntimeError("Probe files must belong to the disposable VM fixture")
-    return path
+    if path.resolve().is_relative_to(BASE.resolve()):
+        return path
+    # Add only the exact auth fixture, never /tmp or its other children. Refuse
+    # traversal and symlink components in this additional root, including an
+    # externally occupied root symlink before prepare() has run.
+    if path.is_relative_to(AUTH_BASE) and ".." not in path.parts:
+        current = path
+        while not current.is_symlink():
+            if current == AUTH_BASE:
+                return path
+            current = current.parent
+    raise RuntimeError("Probe files must belong to the disposable VM fixture")
 
 
 def session(session_id=None):
@@ -235,7 +248,7 @@ def prepare(case, uid=None, username=None, home=None, base=None):
     if home is None:
         home = Path.home()
     if base is None:
-        base = BASE / case
+        base = AUTH_BASE if case == "supervised-auth-scope" else BASE / case
     base.mkdir(parents=True, exist_ok=False)
     base.chmod(0o700)
     # The system-manager case runs as root but must still keep its synthetic home
@@ -264,7 +277,7 @@ esac
 
 
 def auth_scope_evidence():
-    base = synthetic(BASE / "supervised-auth-scope")
+    base = synthetic(AUTH_BASE)
     marker = "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"
     return {"credentials_preserved": json.loads((base / "root/.credentials.json").read_text()) == {"synthetic": "preserved"},
             "logout_called": (base / "root/unexpected-logout").exists(),

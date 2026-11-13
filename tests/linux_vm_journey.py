@@ -539,6 +539,9 @@ def journey(guest, process, args, report):
     report["managed_auth_scope"] = {"stage": "prepare"}
     auth = guest.probe("prepare", "supervised-auth-scope")
     auth["as_root"] = True
+    # The auth-only case lives below /tmp, so the existing synthetic startup
+    # boundary can cover home/root/state without using the real PAM user's home.
+    report["managed_auth_scope"]["fixture_root"] = auth["base"]
     report["managed_auth_scope"]["stage"] = "register"
     environment = guest.request(auth, {"command": "register", "name": "Synthetic managed auth scope", "root": auth["root"]})
     report["managed_auth_scope"]["stage"] = "preview"
@@ -571,7 +574,7 @@ def journey(guest, process, args, report):
     require(evidence == {"credentials_preserved": True, "logout_called": False,
                          "job_accepted": True, "environment_value_persisted": False},
             f"Managed auth context violated source preservation or secret persistence: {evidence}")
-    report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], "preview_seconds": preview_seconds, **evidence,
+    report["managed_auth_scope"] = {"fixture_root": auth["base"], "expected_error": refused["error"]["code"], "preview_seconds": preview_seconds, **evidence,
                                     "caller_environment_preserved": True, "real_claude_or_network_requests": False}
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")

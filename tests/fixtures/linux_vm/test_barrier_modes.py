@@ -161,6 +161,68 @@ class PrepareCaseTests(TempBase):
             self.case("logout-kill-running")
 
 
+class AuthFixtureBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="lintel-vm-auth-probe-")
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name).resolve()
+        self.auth = self.base / "auth"
+        self.persistent = self.base / "persistent"
+        self.patch_base = patch.object(probe, "BASE", self.persistent)
+        self.patch_auth = patch.object(probe, "AUTH_BASE", self.auth)
+        self.patch_base.start()
+        self.patch_auth.start()
+        self.addCleanup(self.patch_base.stop)
+        self.addCleanup(self.patch_auth.stop)
+
+    def prepare_auth(self):
+        return probe.prepare("supervised-auth-scope", uid=0, username="root")
+
+    def test_auth_home_root_and_evidence_share_the_independent_temporary_fixture(self):
+        case = self.prepare_auth()
+        self.assertEqual(Path(case["home"]), self.auth)
+        self.assertEqual(Path(case["base"]), self.auth)
+        for name in ("root", "state", "barrier", "release", "session"):
+            self.assertTrue(Path(case[name]).is_relative_to(self.auth), name)
+            self.assertEqual(probe.synthetic(case[name]), Path(case[name]))
+        self.assertEqual(self.auth.stat().st_mode & 0o777, 0o700)
+        self.assertTrue((self.auth / ".local/bin/claude").is_file())
+        self.assertFalse(self.persistent.exists())
+        self.assertEqual(probe.auth_scope_evidence(), {
+            "credentials_preserved": True, "logout_called": False,
+            "job_accepted": False, "environment_value_persisted": False})
+
+    def test_reboot_fixture_keeps_its_existing_persistent_layout(self):
+        case = probe.prepare("supervised-system-reboot", uid=0, username="root")
+        self.assertEqual(Path(case["home"]), self.persistent / "supervised-system-reboot")
+        self.assertFalse(self.auth.exists())
+
+    def test_auth_probe_refuses_other_temporary_paths_and_path_escape(self):
+        self.prepare_auth()
+        for path in (self.base, self.base / "auth-neighbor/receipt.json",
+                     self.auth / "../outside.json"):
+            with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, "disposable VM fixture"):
+                probe.synthetic(path)
+
+    def test_auth_probe_refuses_symlinks_and_occupied_root(self):
+        self.prepare_auth()
+        outside = self.base / "outside"
+        outside.mkdir()
+        (self.auth / "linked").symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "disposable VM fixture"):
+            probe.synthetic(self.auth / "linked/receipt.json")
+        with self.assertRaises(FileExistsError):
+            self.prepare_auth()
+        shutil.rmtree(self.auth)
+        self.auth.symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "disposable VM fixture"):
+            probe.auth_scope_evidence()
+        with self.assertRaises(FileExistsError):
+            self.prepare_auth()
+        self.assertTrue(outside.is_dir())
+        self.assertEqual(list(outside.iterdir()), [])
+
+
 class SessionEvidenceTests(TempBase):
     """Assert the REAL probe commands and filtering, not forwarding."""
     def test_evidence_is_scoped_to_the_original_session(self):
