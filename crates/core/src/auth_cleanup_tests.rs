@@ -91,6 +91,10 @@ fn one_approval_removes_exact_sources_and_preserves_work_mcp_and_unselected_conf
         .map(|s| s["id"].clone())
         .collect();
     let p = plan(&engine, &e, Some(ids));
+    assert!(!p["warnings"]
+        .to_string()
+        .contains("这里只检查已登记 root 的 user settings"));
+    assert!(p["warnings"].to_string().contains("本地认证来源"));
     assert_eq!(
         p["authentication"]["selected_sources"]
             .as_array()

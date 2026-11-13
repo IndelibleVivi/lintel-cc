@@ -153,8 +153,9 @@ test('every presentation projection key resolves in both catalogs', () => {
   }
 });
 
-test('inherited core scope warnings have exact bilingual projections without rewriting unknown diagnostics',()=>{
+test('authentication and inherited core scope warnings have exact bilingual projections without rewriting unknown diagnostics',()=>{
   const warnings=[
+    ['按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。','Remove exactly the local authentication sources selected in this preview. Presence does not prove a source is in use; other execution contexts and server revocation still need separate verification.'],
     ['这里只检查已登记 root 的 user settings；项目、组织策略、IDE 与已有进程的生效状态尚未确认。','Only user settings in the registered root are checked here; effects from projects, organization policy, IDEs, and existing processes are not yet verified.'],
     ['独立配置目录不是 OS sandbox；某类 Console 登录位于目录外。','A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'],
   ];

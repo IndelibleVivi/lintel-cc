@@ -479,6 +479,10 @@ impl Engine {
         if kind == "config_edit" {
             warnings[0] =
                 "只修改预览内明确选择的配置来源；静态配置、真实加载与运行效果分别核对。".into();
+        } else if kind == "cleanup"
+            && extra["authentication"]["schema"] == "lintel.auth-cleanup/1"
+        {
+            warnings[0] = "按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。".into();
         }
         if extra["policy"]["keep_remote_control"] == true {
             warnings.push(

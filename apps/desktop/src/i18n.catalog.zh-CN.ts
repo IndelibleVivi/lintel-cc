@@ -2569,6 +2569,7 @@ export const zhCN: Catalog = {
   "cleanup.authRetainedLocationUnknown": "位置已无法确认；下方仅为最后已知路径，不能确认凭据材料已经移除。",
   "cleanup.authShowOriginal": "查看原任务复查记录",
   "present.authCleanup.serverCoverage": "本机来源移除不会证明服务端 token 已撤销",
+  "present.authCleanup.scopeWarning": "按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。",
   "present.warning.userSettingsScope": "这里只检查已登记 root 的 user settings；项目、组织策略、IDE 与已有进程的生效状态尚未确认。",
   "present.warning.configNotSandbox": "独立配置目录不是 OS sandbox；某类 Console 登录位于目录外。",
   "cleanup.authValueEmpty": "值为空",

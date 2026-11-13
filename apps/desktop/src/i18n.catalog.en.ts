@@ -2569,6 +2569,7 @@ export const en: Catalog = {
   "cleanup.authRetainedLocationUnknown": "Location unknown; this is only the last known path. Credential material has not been confirmed removed.",
   "cleanup.authShowOriginal": "Show original task verification",
   "present.authCleanup.serverCoverage": "Removing local sources does not prove server tokens have been revoked",
+  "present.authCleanup.scopeWarning": "Remove exactly the local authentication sources selected in this preview. Presence does not prove a source is in use; other execution contexts and server revocation still need separate verification.",
   "present.warning.userSettingsScope": "Only user settings in the registered root are checked here; effects from projects, organization policy, IDEs, and existing processes are not yet verified.",
   "present.warning.configNotSandbox": "A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.",
   "cleanup.authValueEmpty": "Empty value",

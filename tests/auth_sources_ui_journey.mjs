@@ -93,8 +93,11 @@ try{
  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Confirm this plan',exact:true}).waitFor();
  const planCall=calls.findLast(call=>call.payload.command==='plan_cleanup');assert.equal(planCall.payload.auth_source_ids.length,chosen);assert.equal(planCall.payload.official_logout,false);assert.equal(planCall.payload.verify_auth_status,true);
  await dialog.getByRole('region',{name:'Authentication sources selected for exact removal',exact:true}).waitFor();
- assert.ok((await dialog.innerText()).includes('A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'));
- assert.equal((await dialog.innerText()).includes('这里只检查已登记 root 的 user settings'),false);
+ const planText=await dialog.innerText();
+ assert.ok(planText.includes('Remove exactly the local authentication sources selected in this preview. Presence does not prove a source is in use; other execution contexts and server revocation still need separate verification.'));
+ assert.ok(planText.includes('A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'));
+ assert.equal(planText.includes('Only user settings in the registered root are checked here'),false);
+ assert.equal(planText.includes('这里只检查已登记 root 的 user settings'),false);
  await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png'),animations:'disabled'});
  const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,1);
  await dialog.getByRole('button',{name:'Approve and run',exact:true}).click();

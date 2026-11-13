@@ -23,6 +23,7 @@ const catalogs = { 'zh-CN': zhCN, en } as const;
 // grouped by where core emits the string. New core wording renders raw until it
 // is added here with a matching catalog entry (fail-open, never a guess).
 export const PRESENTATION_KEYS: Record<string, string> = {
+  "按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。": "present.authCleanup.scopeWarning",
   "这里只检查已登记 root 的 user settings；项目、组织策略、IDE 与已有进程的生效状态尚未确认。": "present.warning.userSettingsScope",
   "独立配置目录不是 OS sandbox；某类 Console 登录位于目录外。": "present.warning.configNotSandbox",
   "本机来源移除不会证明服务端 token 已撤销": "present.authCleanup.serverCoverage",
