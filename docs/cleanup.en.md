@@ -31,6 +31,8 @@ Stored credentials and credentials in use are distinct facts. Several sources ma
 
 One approval combines only sources this plan can safely handle. Unsupported objects retain explicit explanations and next steps. The plan never silently expands to another machine or account.
 
+When post-cleanup runtime status is explicitly selected, the plan freezes the authentication executable’s path and identity, including its absence. Installing or discovering a client after preview makes the old approval return `executable_changed` and requires a fresh preview. For a plan that selected runtime status, rechecking its original job also cannot silently adopt a later executable. A new explicit check without an original job ID may use the currently discovered client.
+
 ## Supported and preserved scope
 
 | Source | Development-source behavior |

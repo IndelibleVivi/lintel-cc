@@ -201,20 +201,33 @@ impl Engine {
             ));
         }
         auth_sources::check(&a["groups"], string(a, "nonce")?)?;
-        if a["runtime_verification_requested"] == true && a["executable"].is_string() {
-            let exe = string(a, "executable")?;
-            if e["executable"] != a["executable"]
-                || self.executable().as_deref() != Some(exe)
-                || crate::launch::exec_identity(Path::new(exe))? != a["executable_snapshot"]
-            {
-                return Err(err(
-                    "executable_changed",
-                    "认证检查程序在预览后变化；请重新预览",
-                ));
-            }
+        if a["runtime_verification_requested"] == true {
+            self.check_auth_executable(e, a)?;
         }
         if p["extra"]["archive_passphrase_required"] == true {
             work::check_passphrase(r)?;
+        }
+        Ok(())
+    }
+
+    fn check_auth_executable(&self, e: &Value, a: &Value) -> Result<()> {
+        // Absence is part of the frozen approval too. A later installation or
+        // discovery must not turn a missing status adapter into permission to
+        // run a program that was never identified in the original preview.
+        let exe = a["executable"].as_str();
+        if e["executable"] != a["executable"]
+            || self.executable().as_deref() != exe
+            || match exe {
+                Some(exe) => {
+                    crate::launch::exec_identity(Path::new(exe))? != a["executable_snapshot"]
+                }
+                None => !a["executable_snapshot"].is_null(),
+            }
+        {
+            return Err(err(
+                "executable_changed",
+                "认证检查程序在预览后变化；请重新预览",
+            ));
         }
         Ok(())
     }
@@ -356,17 +369,8 @@ impl Engine {
             json!({"state":"not_requested"})
         } else {
             let observation = (|| {
-                if let Some(a) = a.filter(|a| {
-                    a["runtime_verification_requested"] == true && a["executable"].is_string()
-                }) {
-                    if crate::launch::exec_identity(Path::new(string(a, "executable")?))?
-                        != a["executable_snapshot"]
-                    {
-                        return Err(err(
-                            "executable_changed",
-                            "认证状态程序改变；未自动执行新程序",
-                        ));
-                    }
+                if let Some(a) = a.filter(|a| a["runtime_verification_requested"] == true) {
+                    self.check_auth_executable(e, a)?;
                 }
                 self.auth_probe(&json!({"environment_id":e["id"]}))
             })();

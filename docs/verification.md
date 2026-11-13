@@ -17,10 +17,10 @@ Run the new checks through the same entrypoint:
 
 ```bash
 python3 tests/verify.py --checks auth-sources-core-test,journey-auth-sources,auth-sources-render-test --require-passed
-python3 tests/verify.py --checks auth-sources-ui --require-passed
+python3 tests/verify.py --checks desktop-build,auth-sources-ui --require-passed
 ```
 
-`auth-sources-core-test` exercises bounded provenance, mixed credential-store preservation, exact shared-file edits, immutable source bindings, competing writers, directory substitution, interruption, original-ID query-only recovery, retained credential material and final readback after a status command recreates credentials. It uses temporary synthetic roots and inert executables only. `journey-auth-sources` crosses named/raw CLI boundaries in fresh processes, including a single approved detached task, inherited OAuth remaining active after local source removal, default/custom roots, stale previews and no secret copies in persistent state.
+`auth-sources-core-test` exercises bounded provenance, mixed credential-store preservation, exact shared-file edits, immutable source bindings (including a missing status executable before later discovery), competing writers, directory substitution, interruption, original-ID query-only recovery, retained credential material and final readback after a status command recreates credentials. It uses temporary synthetic roots and inert executables only. `journey-auth-sources` crosses named/raw CLI boundaries in fresh processes, including a single approved detached task, inherited OAuth remaining active after local source removal, default/custom roots, stale previews and no secret copies in persistent state.
 
 `auth-sources-render-test` checks bilingual source/plan/result markup without a browser. `auth-sources-ui` runs the built App against temporary-root Core with a real headless browser and explicitly modeled invoke/SSH boundaries. It covers shared-source selection, one approval, independent verification, host response isolation and bounded layouts. Neither SSR nor headless Chromium establishes macOS WebKit, personal Keychain or real account acceptance. All four checks are explicit; the implicit default group is unchanged. CI owns the core/CLI checks in native, SSR in frontend and browser interaction in browser. Official authentication facts and unverified version boundaries are recorded in [credential provenance evidence](credential-provenance-evidence.en.md).
 

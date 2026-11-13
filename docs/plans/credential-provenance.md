@@ -1,6 +1,6 @@
 # Credential provenance and verified cleanup
 
-Status: implemented and locally verified, 2026-11-13. Baseline: `77be003` on main.
+Status: source-complete; baseline full CI verified, integration fix awaiting its own exact-head CI, 2026-11-13. Base: `77be003` on main.
 Branch: `codex/credential-provenance`. Exact committed revision and hosted checks
 are recorded by the pull request; no release or deployment is implied.
 
@@ -65,45 +65,36 @@ bindings, parent identity before readback, consistent status parsing and final
 local readback after optional status. Synthetic boundaries are checked before
 credential reads.
 
-`auth-sources-ui` is registered in the existing browser CI with retained JSON
-and screenshots. Local Chromium could not start because the executor denied
-its socket operation; the escalation was automatically rejected. SSR/build
-are not substituted for browser interaction or visual evidence. Native macOS
-App/WebKit, Keychain, real Claude versions and personal-account acceptance remain separate.
+The original verified PR baseline is `dcb280693970c3d89ce2b2dd5a2c3a4be97dcb4f`.
+[Full CI 43376396653](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43376396653)
+passed all 14 jobs. The 12 downloaded canonical reports bind the same clean
+merge checkout `ccd5c6bd9645d6ee7bafc9f43e3581f104216a05`; all 119 selected
+check executions passed, and the production aggregate was independently rerun.
+Both platforms passed the focused 37-test authentication suite and all 19
+browser checks. A subsequent macOS arm64 run passed eight targeted canonical
+checks on the source head, including the built-App authentication journey.
+This is Chromium with synthetic Core, not native WebKit or real credentials.
 
-The first implementation commit `67b8f4e` passed 18 native, 19 browser and six heavy checks
-on both Ubuntu x86_64 and macOS arm64 in [run 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211),
-using merge checkout `89b97e7`. Both focused authentication suites passed all
-37 tests. The old website payload count was corrected after that run exposed
-the new guide pair. The VM auth-only case moved from the persistent guest home
-to the exact `/tmp/lintel-vm-auth-scope` subtree required by the existing
-synthetic boundary; other reboot cases and production guards remain unchanged.
-All 34 VM control tests pass; exact-revision PR checks record the real guest result.
-Screenshot review also led to exact bilingual warning
-projections, completed-response evidence, and separate visible captures of
-local, runner and unresolved coverage. Read [PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4)
-for the current revision's checks; earlier passing results do not validate a
-later revision automatically.
+Earlier runs exposed an outdated website payload count, the auth-only VM
+fixture's temporary-root boundary, and a harness assumption that admission
+always acknowledges within the production 40-second window. Those failures
+were fixed without weakening production timeouts, safety checks or no-replay.
+The final VM report records one submission and 14 original-ID queries, with
+`initial_outcome: accepted`, followed by real reboot reconciliation and service
+restoration. It does not claim late acceptance after an uncertain ACK in that
+run; controller regressions and both browser journeys cover that branch.
+
+The integration review found and repaired a missing-executable approval gap:
+absence is now frozen alongside path and identity, both before acceptance and
+when rechecking an original task. Two synthetic regressions failed before the
+fix and passed after it; a new explicit observation without an original job ID
+remains available. The corrected source needs its own exact-head CI evidence.
 
 ## Continue here
 
-Revision `09e92ff` passed all 118 selected check executions outside the VM in
-[run 43372794800](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43372794800),
-at clean merge checkout `3519541`; both platforms' 16 authentication screenshots
-were inspected. The corrected VM fixture reached submission, but its 77-second
-TCG safety preview exposed a test assumption: production's bounded 40-second
-ACK wait may return `submission_uncertain` before durable acceptance. That run
-stopped without querying the original ID, so reboot evidence was not produced.
-The acceptance harness now submits once and queries the exact original ID within
-a deadline, allows `job_not_found` only before the first observed receipt, retains
-other errors, and verifies the original manager context and eventual result.
-All 43 controller tests pass; the existing browser journey also gains the
-preaccept-missing-receipt sequence without allowing another approval or submit. No
-production timeout, safety check or no-replay rule is relaxed. Read the final
-revision's checks for its actual guest and aggregate outcome.
-
-Review the PR's exact source checks, including its browser journey and macOS
-compile evidence. The next product increment is an attributed, version-bound
+PR integration status and current source/release boundaries live in
+[current-state](../current-state.md); use that entry instead of rerunning
+superseded intermediate CI investigations. The next product increment is an attributed, version-bound
 Keychain/profile adapter only when it can preserve MCP/plugin credentials,
 followed by separate native acceptance. Do not infer universal erasure or
 server revocation from this local source work. No App release, updater

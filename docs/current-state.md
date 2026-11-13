@@ -14,23 +14,22 @@
 | 兼容与恢复 | 旧 accepted 原 ID 保持 query-only。未执行旧计划缺新绑定须重预览；旧 raw caller 可省略新增字段，但新计划仅默认选择精确可识别的目标本地登录字段 |
 | 平台边界 | 开发与测试只用 synthetic roots／inert adapters。macOS Keychain、实际 Terminal/IDE 登录、其他架构与生产 SSH 的真实行为仍需独立验收；历史 CI／native 通过不覆盖本轮 |
 
-实现分支为 `codex/credential-provenance`，基于 main `77be0034df4d174d24203dedcb05e3f65f0f4688`。本机 Linux x86_64、Rust 1.100.0，所有认证测试使用临时 synthetic HOME/state 与惰性客户端，未触及真实凭据、Keychain 或账号。本地证据如下；准确提交和托管 CI 结论以 [PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4) 的 source SHA/checks 为准。
+原 PR 验证基线为 `dcb280693970c3d89ce2b2dd5a2c3a4be97dcb4f`，基于 main `77be0034df4d174d24203dedcb05e3f65f0f4688`；[PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4) 记录集成状态。源码、验证和发行分开：下列证据不代表已安装 App 或公开下载已更新。
 
-| 检查 | 实际结果与范围 |
+| 层次 | 最终证据与边界 |
 | --- | --- |
-| `cargo-workspace-test` | PASS，187.783 秒；core、operations、remote、runner、egress 的整个 workspace 及原有 ignored 边界保留 |
-| `auth-sources-core-test` | PASS，37 项；其中 16 项精确清理事务测试，包含竞态、中断、暂存归属失联与 status 重建凭据 |
-| CLI 与相邻行为 | `journey-auth-sources`、`journey-client-control`、`shared-remote-journey`、`journey-portable-work`、`journey-cli`、`journey-submission` 均 PASS；私有 worker 环境的认证变量值不进入回执 |
-| GUI 静态与渲染 | desktop typecheck/build PASS；两套 i18n 与认证 SSR 合计 29/29 PASS，其中 SSR 6 项；这不是浏览器交互或原生视觉证据 |
-| Python SSH | canonical `python-ssh-test` PASS，17 项；有限请求通过固定 argv／JSON stdin，非法范围在 SSH 前拒绝，只用 fake SSH |
-| 验证与文档路由 | `verify.py --self-test` PASS；双语网站源投影 21 routes／16 guides／42 URLs，语言与路由测试 14/14 PASS；没有部署 |
-| 浏览器与原生边界 | 新 `auth-sources-ui` 已加入现有 browser CI 并保留截图／JSON。本机浏览器因 socket 权限被阻止，提权被自动审批拒绝；macOS App／Keychain／真实 Claude／生产 SSH 本轮本地均未验收 |
+| 原 PR 基线完整 CI | [CI 43376396653](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43376396653) 的 14 个 jobs 全部 success；12 份 canonical reports 均绑定 clean merge checkout `ccd5c6bd9645d6ee7bafc9f43e3581f104216a05`，119 次选中检查执行全部 passed；接续审查已下载读回报告并复跑 production aggregate，通过 |
+| Core／CLI | 两平台 native 各 18/18 checks，认证专项各 37/37 testcase；同一批 testcase 的跨平台执行不合计成不同测试。精确字段、共享文件保留、外部改写、中断暂存、原 ID 查询、状态命令重建凭据与无秘密持久化均有 synthetic 证据 |
+| 前端／浏览器 | Ubuntu frontend 14/14、macOS 15/15；browser 各 19/19。built App 通过真实 Chromium 与 synthetic Core 验证来源选择、单次批准、四层结果、独立复查、主机迟到响应及接收不确定期间不重提；不等于 native WebKit／真实 Keychain 验收 |
+| 工作／CLI 包／SSH | 两平台 heavy 各 6/6、CLI candidate 各 1/1，Ubuntu loopback OpenSSH 1/1。CLI candidate 内部的 `real_input_smoke` 缺正式输入而 skipped；不能扩大为完整正式发行包 gate |
+| Linux VM | disposable guest 全旅程通过；认证场景只提交一次、查询同一原 ID 14 次，保留 manager／调用环境、未知凭据且不持久化私有变量；真实 reboot 后核对与服务恢复通过。本次首次 ACK 是 `accepted`，不是迟到接收实证；`submission_uncertain`／接收前 `job_not_found` 由控制测试和两平台浏览器回归覆盖 |
+| 当前 Mac 接续 | 原 PR 基线在本机 fresh 通过 8 个 canonical checks（认证 core、CLI、SSR、i18n、SSH、desktop build／built-App UI）。接续审查发现并修复 runtime 执行器缺失→发现后跳过冻结的问题：两条新回归修复前均失败、修复后均通过；修复后 workspace、认证 core 39/39、CLI 与 built-App UI 四项 canonical checks 通过，最新提交的完整 CI 状态仍须按 PR 当前 head 核对 |
+| 网站源投影 | 21 logical routes／16 paired guides／42 locale URLs，生成和语言路由检查属于源码证据；线上仍为下文 10-21 的 40 页部署 |
+| 独立未验收 | native macOS WebKit、真实 Claude 版本／账号／Keychain、生产 SSH 和其他架构实际 runtime。没有新 Release、App 安装、updater 激活或官网部署 |
 
-首轮 workspace 的两处失败已处理后重跑通过：旧 baseline 测试改为已识别字段清理并核对 MCP 保留；宿主 `/usr/bin/true` 被映射为 UID 65534 的测试假设改用自有 synthetic 可执行文件，生产所有者校验没有放宽。下方 `c7680f0` 的构建／CI 表仅属于 10-24 候选，不作为本轮认证改动的验收。
+接续修订统一复查状态程序的登记路径、当前发现值及冻结身份，缺失状态同样属于批准绑定；原批准与带原 ID 的复查不会采用后来出现的程序，新的显式当前状态观察保持可用。所有检查只用 synthetic HOME/state、惰性客户端和 bundled Chromium。
 
-首个实现提交 `67b8f4e000e6d69797adefd449afd32ce5f650f5` 的 [CI 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211) 已在 Ubuntu x86_64 与 macOS arm64 分别通过 native 18/18、browser 19/19、heavy 6/6 检查；两边认证专项均为 37/37。实际 checkout 为与基线 main 合并的 `89b97e7c2d3cf93bd4c6368b0574a127b6b65532`。首轮还暴露了新增指南后的旧 payload 数量断言，以及 VM 认证用例的 HOME 位于 `/home` 而非独立临时子树的问题。前者已修正并本地通过；后者仅将该用例改到 `/tmp/lintel-vm-auth-scope`，不改变其他跨 reboot 布局或生产边界，34 项 VM 控制测试通过，真实 guest 全流程结果由相应修订的 PR checks 记录。截图审阅发现的两条英文警示投影和滚动取景缺口也已补齐；这些后续修订需读取 PR 当前 SHA 的实际 checks，不能借用首轮通过结果。Headless Chromium、synthetic native 与正式 App／Keychain 验收保持独立。
-
-修订 `09e92ff` 的 [CI 43372794800](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43372794800) 在 clean merge `3519541478e1b429b7e95c95b808d395ea4ba29e` 上通过了两平台 native／frontend／browser／heavy、CLI candidate 与隔离 loopback OpenSSH，共 11 份 canonical 报告、118 次选中检查执行；两平台 16 张认证页面截图已检查。VM 的临时目录问题已通过，但 TCG guest 的预览安全检查耗时 77.018 秒，提交因既有 40 秒 ACK 上限返回 `submission_uncertain`。该轮用例未查询原任务便退出，因此 reboot／supervised reboot 未执行，整体 CI 仍是失败。后续验收已补充单次提交后的有界原 ID 查询，覆盖尚未持久接收时的 `job_not_found`，并保留其他错误和执行上下文校验；43 项控制测试通过，浏览器旅程另补先缺回执、后观察到原任务的断言。不延长生产 ACK 上限、不重提任务、不跳过安全检查。最终修订的完整 guest 与 aggregate 结果仍以 PR 对应 SHA 的 checks 为准。
+原 PR 前轮失败均已在上述基线 revision 收口：新增指南后的精确 payload 数量、认证专用 VM fixture 的临时目录／symlink 边界，以及慢 guest 超过既有 40 秒 ACK 窗口后只查询原 ID 的 harness。生产 timeout、安全检查和 no-replay 规则没有放宽。下方 `c7680f0` 构建／CI 仅属于 10-24 候选，不作为本轮认证改动的验收。
 
 ## 2026-10-24：未发布的恢复闭环与有界历史
 
@@ -150,11 +149,11 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 
 ## 完整目标仍缺少
 
-1. **真实认证与写入者控制：** Keychain/共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。官方注销已加入观察主体与状态绑定，并拒绝缺失主体的预览；同账号 Keychain 内部 token 更新如果不反映到 CLI 状态，仍无法识别。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。官方 auth 命令仅有合成 CLI 证据，不能宣称生产注销已验收。
+1. **真实认证与写入者控制：** Keychain/共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。当前源码拒绝自动官方注销（`official_logout_scope_unsafe`），旧未执行认证计划必须重新预览；先前主体／状态绑定不构成当前可执行路径。后续 Keychain adapter 需证明对象归属、版本与 MCP／插件保全；CLI 状态仍不能证明内部 token 世代。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。显式 auth status 仅有合成 CLI 证据，不能宣称真实认证或生产注销已验收。
 2. **完整外发策略与强约束：** v5 的 27 个字段与逐项编辑已接入；真实客户端入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
 3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、符合既有条件的 system/user manager 严格 logout 后续跑、原任务完成与 reboot 后核对。setsid 不保证 logout 存活，托管路径也不保证 reboot 续跑；生产 VPS 安装与任务实跑、aarch64 runtime、其他 supervisor 和完整 G03 仍未验收。
 4. **浏览器旅程：** 独立 Chromium 临时测试 profile 已完成真实持久安装／onStartup 两阶段清理；仍需正式 Chrome、Edge、Firefox 与 AdsPower 的安装、配对与清理验收。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。
 5. **发行与维护：** App updater 与本地 release／feed／首装资料准备已接通源码，手动开发者 Preview 已发布，签名 updater 未激活；0.1.0 bundle signing 缺陷已由 0.1.1 修复并公开；未公证 Preview 的用户信任确认、干净 Mac 首装／升级与正式签名/公证分层验收。菜单栏、定时漂移、签名规则更新、卸载与性能预算继续保留。
-6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。混合状态加密备份不支持自动恢复；会话/记忆迁入不证明可以续聊。
+6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。历史混合状态加密备份不支持自动恢复；新认证清理不再生成凭据恢复备份，未决敏感暂存须核对原任务。会话/记忆迁入不证明可以续聊。
 
 这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、生产 VPS 任务验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。

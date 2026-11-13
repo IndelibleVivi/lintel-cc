@@ -612,3 +612,77 @@ fn credentials_recreated_by_status_are_observed_by_the_final_readback() {
     assert_eq!(j["error"]["code"], "auth_cleanup_unverified");
     assert!(!j.to_string().contains("SYNTHETIC_REFRESH_DURING_STATUS"));
 }
+
+fn install_marked_status_client(engine: &Engine) -> PathBuf {
+    let exe = engine.home.join(".local/bin/claude");
+    fs::create_dir_all(exe.parent().unwrap()).unwrap();
+    fs::write(&exe, "#!/bin/sh\n[ \"$1 $2\" = 'auth status' ] || exit 9\nprintf ran > \"$CLAUDE_CONFIG_DIR/status-executed\"\nprintf '{\"configDirectory\":\"%s\",\"authMethod\":\"oauth_token\",\"loggedIn\":true}' \"$CLAUDE_CONFIG_DIR\"\n").unwrap();
+    fs::set_permissions(&exe, fs::Permissions::from_mode(0o700)).unwrap();
+    exe
+}
+
+#[test]
+fn auth_runtime_missing_executable_cannot_follow_discovery_before_acceptance() {
+    let (_temp, engine, e, root) = fixture(false);
+    seed(&root);
+    assert!(e["executable"].is_null());
+    let before = fs::read(root.join(".credentials.json")).unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","official_logout":false,"writers_confirmed_stopped":true,"verify_auth_status":true}),
+    );
+    let exe = install_marked_status_client(&engine);
+    let found = ok(&engine, json!({"command":"discover"}));
+    assert!(found["environments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|current| current["id"] == e["id"] && current["executable"] == json!(exe)));
+    let response =
+        engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+    assert_eq!(
+        response["error"]["code"], "executable_changed",
+        "{response}"
+    );
+    assert!(!engine.path("jobs", p["id"].as_str().unwrap()).exists());
+    assert_eq!(fs::read(root.join(".credentials.json")).unwrap(), before);
+    assert!(!root.join("status-executed").exists());
+}
+
+#[test]
+fn auth_runtime_missing_executable_cannot_follow_discovery_when_rechecking_original() {
+    let (_temp, engine, e, root) = fixture(false);
+    seed(&root);
+    let p = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","official_logout":false,"writers_confirmed_stopped":true,"verify_auth_status":true}),
+    );
+    let j = execute(&engine, &p);
+    assert_eq!(j["local_cleanup"], "completed");
+    assert_eq!(
+        j["auth_verification"]["runtime"]["error_code"],
+        "executable_missing"
+    );
+    let journal = engine.path("jobs", j["id"].as_str().unwrap());
+    let before = fs::read(&journal).unwrap();
+    install_marked_status_client(&engine);
+    ok(&engine, json!({"command":"discover"}));
+    let fresh = ok(
+        &engine,
+        json!({"command":"auth_verify","environment_id":e["id"],"job_id":j["id"],"observe_runtime":true}),
+    );
+    assert_eq!(
+        fresh["runtime"]["error_code"], "executable_changed",
+        "{fresh}"
+    );
+    assert!(!root.join("status-executed").exists());
+    assert_eq!(fs::read(&journal).unwrap(), before);
+    // A new explicit observation has no old approval binding and may use the
+    // newly discovered client; retaining an original must not disable that path.
+    let current = ok(
+        &engine,
+        json!({"command":"auth_verify","environment_id":e["id"],"observe_runtime":true}),
+    );
+    assert_eq!(current["runtime"]["state"], "observed");
+    assert!(root.join("status-executed").exists());
+}
