@@ -14,19 +14,21 @@
 | 兼容与恢复 | 旧 accepted 原 ID 保持 query-only。未执行旧计划缺新绑定须重预览；旧 raw caller 可省略新增字段，但新计划仅默认选择精确可识别的目标本地登录字段 |
 | 平台边界 | 开发与测试只用 synthetic roots／inert adapters。macOS Keychain、实际 Terminal/IDE 登录、其他架构与生产 SSH 的真实行为仍需独立验收；历史 CI／native 通过不覆盖本轮 |
 
-实现分支为 `codex/credential-provenance`，基于最新 main `77be0034df4d174d24203dedcb05e3f65f0f4688`。本机 Linux x86_64、Rust 1.100.0，所有认证测试使用临时 synthetic HOME/state 与惰性客户端，未触及真实凭据、Keychain 或账号。提交前的最终本地证据如下；准确提交和托管 CI 结论以本轮 PR 的 source SHA/checks 为准。
+实现分支为 `codex/credential-provenance`，基于 main `77be0034df4d174d24203dedcb05e3f65f0f4688`。本机 Linux x86_64、Rust 1.100.0，所有认证测试使用临时 synthetic HOME/state 与惰性客户端，未触及真实凭据、Keychain 或账号。本地证据如下；准确提交和托管 CI 结论以 [PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4) 的 source SHA/checks 为准。
 
 | 检查 | 实际结果与范围 |
 | --- | --- |
 | `cargo-workspace-test` | PASS，187.783 秒；core、operations、remote、runner、egress 的整个 workspace 及原有 ignored 边界保留 |
 | `auth-sources-core-test` | PASS，37 项；其中 16 项精确清理事务测试，包含竞态、中断、暂存归属失联与 status 重建凭据 |
 | CLI 与相邻行为 | `journey-auth-sources`、`journey-client-control`、`shared-remote-journey`、`journey-portable-work`、`journey-cli`、`journey-submission` 均 PASS；私有 worker 环境的认证变量值不进入回执 |
-| GUI 静态与渲染 | desktop typecheck/build PASS；两套 i18n 与认证 SSR 合计 28/28 PASS，其中 SSR 6 项；这不是浏览器交互或原生视觉证据 |
+| GUI 静态与渲染 | desktop typecheck/build PASS；两套 i18n 与认证 SSR 合计 29/29 PASS，其中 SSR 6 项；这不是浏览器交互或原生视觉证据 |
 | Python SSH | canonical `python-ssh-test` PASS，17 项；有限请求通过固定 argv／JSON stdin，非法范围在 SSH 前拒绝，只用 fake SSH |
 | 验证与文档路由 | `verify.py --self-test` PASS；双语网站源投影 21 routes／16 guides／42 URLs，语言与路由测试 14/14 PASS；没有部署 |
 | 浏览器与原生边界 | 新 `auth-sources-ui` 已加入现有 browser CI 并保留截图／JSON。本机浏览器因 socket 权限被阻止，提权被自动审批拒绝；macOS App／Keychain／真实 Claude／生产 SSH 本轮本地均未验收 |
 
 首轮 workspace 的两处失败已处理后重跑通过：旧 baseline 测试改为已识别字段清理并核对 MCP 保留；宿主 `/usr/bin/true` 被映射为 UID 65534 的测试假设改用自有 synthetic 可执行文件，生产所有者校验没有放宽。下方 `c7680f0` 的构建／CI 表仅属于 10-24 候选，不作为本轮认证改动的验收。
+
+首个实现提交 `67b8f4e000e6d69797adefd449afd32ce5f650f5` 的 [CI 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211) 已在 Ubuntu x86_64 与 macOS arm64 分别通过 native 18/18、browser 19/19 检查；两边认证专项均为 37/37。实际 checkout 为与基线 main 合并的 `89b97e7c2d3cf93bd4c6368b0574a127b6b65532`。首轮还暴露了新增指南后的旧 payload 数量断言，已修正并本地通过。截图审阅发现的两条英文警示投影和滚动取景缺口也已补齐；这些后续修订需读取 PR 当前 SHA 的实际 checks，不能借用首轮通过结果。Headless Chromium、synthetic native 与正式 App／Keychain 验收保持独立。
 
 ## 2026-10-24：未发布的恢复闭环与有界历史
 

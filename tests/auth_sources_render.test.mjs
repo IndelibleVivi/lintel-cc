@@ -77,6 +77,8 @@ test('result keeps removed sources, still-active auth, unknown scopes and retain
   const html=render(AuthenticationResult,{receipt},locale);
   assert.ok(html.includes(catalogs[locale]['cleanup.authRemoved']));assert.ok(html.includes(catalogs[locale]['cleanup.authChanged']));
   assert.ok(html.includes(translate(catalogs,locale,'cleanup.authRuntimeStillLoggedIn',{method:catalogs[locale]['cleanup.authMethodOauth']})));
+  assert.ok(html.includes(catalogs[locale]['cleanup.authRuntimeScope']));
+  for(const instruction of locale==='en'?['The runner may still inherit old values.','After the current task finishes','This does not change the parent shell or already running processes.']:['执行器自身也可能继承旧值','当前任务结束后重新启动','不会自动改变父 Shell 或已有进程。'])assert.ok(html.includes(instruction));
   assert.ok(html.includes(catalogs[locale]['cleanup.authOtherUnverified']));assert.ok(html.includes(catalogs[locale]['cleanup.authServerUnverified']));
   assert.ok(html.includes(catalogs[locale]['cleanup.authRetainedTitle']));assert.ok(html.includes(catalogs[locale]['cleanup.authRetainedLocationUnknown']));assert.ok(html.includes('/synthetic/.lintel-held/state'));
   assert.ok(html.includes(catalogs[locale]['cleanup.authFreshDoesNotRewrite']));assert.equal(html.includes(secret),false);

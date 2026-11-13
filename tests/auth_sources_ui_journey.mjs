@@ -93,7 +93,9 @@ try{
  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Confirm this plan',exact:true}).waitFor();
  const planCall=calls.findLast(call=>call.payload.command==='plan_cleanup');assert.equal(planCall.payload.auth_source_ids.length,chosen);assert.equal(planCall.payload.official_logout,false);assert.equal(planCall.payload.verify_auth_status,true);
  await dialog.getByRole('region',{name:'Authentication sources selected for exact removal',exact:true}).waitFor();
- await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png')});
+ assert.ok((await dialog.innerText()).includes('A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'));
+ assert.equal((await dialog.innerText()).includes('这里只检查已登记 root 的 user settings'),false);
+ await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png'),animations:'disabled'});
  const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,1);
  await dialog.getByRole('button',{name:'Approve and run',exact:true}).click();
  await dialog.getByRole('region',{name:'Authentication cleanup verification',exact:true}).waitFor();
@@ -116,7 +118,24 @@ try{
  const storage=await page.evaluate(()=>JSON.stringify(localStorage));for(const id of planCall.payload.auth_source_ids)assert.equal(storage.includes(id),false);
  report.checks.push('explicit selection, one exact plan and execution; bilingual switch preserves choices; no credential values or source IDs persisted; MCP/work and neighboring shell fields retained');
  report.checks.push('fresh post-cleanup sources and still-authenticated runner are separate; static/runtime recheck retains original receipt and never executes again');
- for(const [width,height,theme] of [[1120,820,'light'],[900,720,'dark']]){await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await verification.evaluate(element=>element.scrollIntoView({block:'start'}));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await verification.evaluate(element=>element.scrollWidth>element.clientWidth),false);await page.screenshot({path:path.join(artifacts,`auth-result-en-${theme}-${width}.png`)});}
+ const coverage=verification.locator('.authentication-coverage > section');assert.equal(await coverage.count(),4);
+ for(const [width,height,theme] of [[1120,820,'light'],[900,720,'dark']]){
+  await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await coverage.nth(0).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await verification.evaluate(element=>element.scrollWidth>element.clientWidth),false);
+  await page.screenshot({path:path.join(artifacts,`auth-result-en-${theme}-${width}.png`),animations:'disabled'});
+  await assertInScrollViewport(coverage.nth(0),'selected local source results');
+  // Actual viewport captures at successive scroll positions; the fixed footer
+  // must not hide the still-active runner or either unresolved coverage layer.
+  await coverage.nth(1).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  await page.screenshot({path:path.join(artifacts,`auth-result-context-en-${theme}-${width}.png`),animations:'disabled'});
+  await assertInScrollViewport(coverage.nth(1),'current runner result and restart guidance');
+  if(width>960)await assertInScrollViewport(coverage.nth(2),'other contexts remain unknown');
+  await coverage.nth(width>960?3:2).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  await page.screenshot({path:path.join(artifacts,`auth-result-unverified-en-${theme}-${width}.png`),animations:'disabled'});
+  if(width<=960)await assertInScrollViewport(coverage.nth(2),'other contexts remain unknown');
+  await assertInScrollViewport(coverage.nth(3),'server revocation remains unverified');
+ }
  await dialog.getByRole('button',{name:'Close panel',exact:true}).click();await page.getByRole('combobox',{name:'Interface language',exact:true}).selectOption('zh-CN');
  async function selectHost(alias){await page.locator('.host-switch').click();await page.getByRole('dialog').locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'连接并管理',exact:true}).click();await page.locator('.host-switch').getByText(alias,{exact:true}).waitFor();await page.getByRole('button',{name:'清理与重建',exact:true}).click();}
  await selectHost(aliases[0]);inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field]').waitFor();
@@ -129,9 +148,21 @@ try{
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  const finalText=await inventory.innerText();assert.ok(finalText.includes(cores.get(aliases[1]).root));assert.equal(finalText.includes(cores.get(aliases[0]).root),false);
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),1);assert.equal(await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).isChecked(),false);
- await page.screenshot({path:path.join(artifacts,'auth-inventory-zh-dark-900.png')});
+ const sourceCard=inventory.locator('[data-auth-kind=credential_field]').first();
+ await inventory.locator('.authentication-inventory > .small-print').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+ await page.screenshot({path:path.join(artifacts,'auth-inventory-zh-dark-900.png'),animations:'disabled'});
+ await assertInScrollViewport(sourceCard,'actual source card in the selected host inventory');
  for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'])assert.equal((await page.locator('body').innerText()).includes(secret),false);
  assert.deepEqual(errors,[]);report.checks.push('late A inventory cannot enter B; confirmations/selection isolated; 1120/900 Day/Night no overflow or runtime error');report.passed=true;console.log('PASS: authentication provenance, exact selection, verified cleanup and host-isolation built-App journey');
-} catch(error){report.error=error.stack;report.calls=calls;report.errors=errors;report.body=await page?.locator('body').innerText().catch(()=>null);await page?.screenshot({path:path.join(artifacts,'failure.png')}).catch(()=>{});throw error;}
+} catch(error){report.error=error.stack;report.calls=calls;report.errors=errors;report.body=await page?.locator('body').innerText().catch(()=>null);await page?.screenshot({path:path.join(artifacts,'failure.png'),animations:'disabled'}).catch(()=>{});throw error;}
 finally{held?.release();await browser?.close();if(preview.exitCode===null){const ended=new Promise(resolve=>preview.once('exit',resolve));preview.kill('SIGTERM');await ended;}await writeFile(process.env.LINTEL_AUTH_SOURCES_UI_REPORT||path.join(os.tmpdir(),'lintel-auth-sources-ui.json'),JSON.stringify(report,null,2));}
 async function wait(check){const deadline=Date.now()+15000;while(Date.now()<deadline){if(await check())return;await new Promise(resolve=>setTimeout(resolve,25));}throw new Error('boundary not observed');}
+async function assertInScrollViewport(locator,label){
+ const visible=await locator.evaluate(element=>{
+  const rect=element.getBoundingClientRect(),scroller=element.closest('.modal-body,.main-content');
+  if(!scroller)return false;
+  const bounds=scroller.getBoundingClientRect();
+  return rect.width>0&&rect.height>0&&rect.top>=bounds.top-1&&rect.bottom<=bounds.bottom+1&&rect.left>=bounds.left-1&&rect.right<=bounds.right+1;
+ });
+ assert.equal(visible,true,label+' must be fully visible in its actual scrolling viewport');
+}

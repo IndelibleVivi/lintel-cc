@@ -153,6 +153,18 @@ test('every presentation projection key resolves in both catalogs', () => {
   }
 });
 
+test('inherited core scope warnings have exact bilingual projections without rewriting unknown diagnostics',()=>{
+  const warnings=[
+    ['这里只检查已登记 root 的 user settings；项目、组织策略、IDE 与已有进程的生效状态尚未确认。','Only user settings in the registered root are checked here; effects from projects, organization policy, IDEs, and existing processes are not yet verified.'],
+    ['独立配置目录不是 OS sandbox；某类 Console 登录位于目录外。','A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'],
+  ];
+  for(const [raw,english] of warnings){
+    assert.equal(present(raw,'en'),english);
+    assert.equal(present(raw,'zh-CN'),raw);
+    assert.equal(present(raw+' /synthetic/unknown-diagnostic','en'),raw+' /synthetic/unknown-diagnostic');
+  }
+});
+
 test('authentication action presentation keeps the frozen path and unknown labels unchanged',()=>{
   const pathname='/synthetic/with spaces/用户名/.zshrc';
   const action={id:'auth_edit_2',label:'精确移除所选认证声明：'+pathname};

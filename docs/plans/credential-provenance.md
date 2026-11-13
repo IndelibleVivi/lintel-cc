@@ -50,7 +50,7 @@ Verified through the repository entrypoint: `cargo-workspace-test`,
 `journey-client-control`, `shared-remote-journey`, `journey-portable-work`,
 `journey-cli`, `journey-submission`, `python-ssh-test` (17 tests), desktop
 typecheck/build, both i18n checks and `auth-sources-render-test` (six SSR tests).
-The i18n/SSR group contains 28 passing tests. The verification/CI planner
+The i18n/SSR group contains 29 passing tests. The verification/CI planner
 self-test also passed. Paired website projection has 21 routes, 16 guides and
 42 sitemap URLs; its 14 language/route tests pass.
 
@@ -68,8 +68,18 @@ credential reads.
 `auth-sources-ui` is registered in the existing browser CI with retained JSON
 and screenshots. Local Chromium could not start because the executor denied
 its socket operation; the escalation was automatically rejected. SSR/build
-are not substituted for browser interaction or visual evidence. macOS native,
-Keychain, real Claude versions and personal-account acceptance remain separate.
+are not substituted for browser interaction or visual evidence. Native macOS
+App/WebKit, Keychain, real Claude versions and personal-account acceptance remain separate.
+
+The first implementation commit `67b8f4e` passed 18 native and 19 browser checks
+on both Ubuntu x86_64 and macOS arm64 in [run 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211),
+using merge checkout `89b97e7`. Both focused authentication suites passed all
+37 tests. The old website payload count was corrected after that run exposed
+the new guide pair. Screenshot review also led to exact bilingual warning
+projections, completed-response evidence, and separate visible captures of
+local, runner and unresolved coverage. Read [PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4)
+for the current revision's checks; earlier passing results do not validate a
+later revision automatically.
 
 ## Continue here
 
