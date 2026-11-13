@@ -59,7 +59,7 @@ try{
   await page.exposeFunction('syntheticInvoke',invoke);
   await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
   await page.goto(url);await page.getByRole('button',{name:'清理与重建',exact:true}).click();
-  await page.getByRole('radio',{name:/修复本地登录/}).check();
+  await page.getByRole('radio',{name:/^清理登录/}).check();
   const writersWarning=page.getByText(/仍有无法归属到此目录的 Claude 写入进程/);
   await writersWarning.waitFor();
   const control=page.locator('.service-control');await control.locator('summary').click();
@@ -90,7 +90,7 @@ try{
   assert.equal(calls.some(c=>c.command==='plan_cleanup'),false,'blocked preview reached core');
   await page.getByRole('checkbox',{name:/^个人指令/}).check();
   assert.equal(await cleanupPreview.isEnabled(),true,'one selected category enables preview');
-  await page.getByRole('radio',{name:/^修复本地登录/}).check();
+  await page.getByRole('radio',{name:/^清理登录/}).check();
   report.checks.push('empty reset/retire selection blocks cleanup preview; selected work and repair login remain available');
   await page.getByRole('button',{name:'记录与恢复',exact:true}).click();
   await page.locator('.job-row').filter({hasText:makePlan(false).title}).getByRole('button',{name:'查看结果',exact:true}).click();
@@ -101,7 +101,7 @@ try{
   report.checks.push('resume has separate preview/approval and keyboard execution');
   const artifacts=process.env.LINTEL_SERVICE_UI_ARTIFACTS;if(artifacts){await mkdir(artifacts,{recursive:true});await page.screenshot({path:path.join(artifacts,'service-day-receipt.png')});}
   await dialog.getByRole('button',{name:'返回清理与重建',exact:true}).click();await page.getByRole('button',{name:'深色 Night',exact:true}).click();await page.setViewportSize({width:900,height:640});
-  await page.getByRole('radio',{name:/修复本地登录/}).check();if(!await control.evaluate(el=>el.open))await control.locator('summary').click();
+  await page.getByRole('radio',{name:/^清理登录/}).check();if(!await control.evaluate(el=>el.open))await control.locator('summary').click();
   await control.getByLabel('服务 unit').fill(held.unit);
   await control.getByRole('button',{name:'检查服务',exact:true}).click();await control.getByText('运行中',{exact:true}).waitFor();
   await control.getByRole('button',{name:'预览暂停服务',exact:true}).click({trial:true});assert.equal(await control.evaluate(el=>el.scrollWidth>el.clientWidth),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

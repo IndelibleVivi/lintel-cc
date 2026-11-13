@@ -9,11 +9,11 @@
 | Keychain | Security.framework 对已确认有限 service/account 的原 item 做 data-only 更新，只移除 `/claudeAiOauth`，保留 MCP／plugin／未知字段及 item identity；不整删 item、不扫全库、不导出秘密备份。默认服务与 config-dir NFC hash 来源见机制证据；不是硬版本白名单 |
 | 批准与恢复 | 文件和 Keychain 共用原 Engine。冻结私有 item identity 与完整 payload 加盐绑定，更新前核对、更新后完整读回；不确定保留原 ID 查询，不自动重试。没有外部 writer CAS 或跨来源原子性 |
 | 易用性 | “清理本机登录”主流程默认建议已保存的文件／Keychain 登录；注入来源显式逐项或组选，位置与依据渐进展开。结果先显示移除／仍存在／待核对和复查，locked／denied 可见并可刷新恢复 |
-| 本机证据 | auth Core 47/47、runner／desktop build、SSR＋i18n 23、built-App synthetic Core journey 与 NFC 纯函数检查通过。文件＋Keychain＋所选注入同计划／一次执行；邻接数据保留、原 ID 不重放、主机隔离及秘密不进入公共结果均已检查 |
-| 原生证据 | 独立 `keychain-native-test` 已接 canonical native CI，仅一次性 GitHub-hosted macOS 账号的临时 Keychain；当前待真实 CI 运行。普通 synthetic 检查不会访问个人 Keychain，Linux 不选择此项 |
+| 本机证据 | auth Core 47/47、runner／desktop build、SSR＋i18n 23、built-App synthetic Core journey 与 NFC 纯函数检查通过；完整 workspace 有限并发复跑通过。文件＋Keychain＋所选注入同计划／一次执行；邻接数据保留、原 ID 不重放、主机隔离及秘密不进入公共结果均已检查 |
+| 原生证据 | source `088e4a14fb6bbaaa99310fea363ca2c0577a4872` 的 [CI 43415394655](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43415394655) 中，独立 `keychain-native-test` 真实通过（1 testcase），两平台 native checks 全通过。临时库验证默认／custom root、保留字段与 item identity、旧批准拒绝及原 ID 不重放；个人 Keychain 未参与。普通 synthetic 检查不访问个人 Keychain，Linux 不选择此项 |
 | 独立边界 | 真实 Claude 版本／个人账号／ACL、native WebKit、生产 SSH 及其他架构实际 runtime 未验收。官方 logout 仍因 MCP／plugin 范围不符返回 `official_logout_scope_unsafe`；本地移除不等于服务端撤销 |
 
-下节 PR #4 的 full CI 是此前认证基线，不覆盖本次 Keychain 与界面接续。新 exact-source CI 结果尚待收口。
+下节 PR #4 的 full CI 是此前认证基线，不覆盖本次 Keychain 与界面接续。首批新 CI 的两个既有 UI journeys 未适配新文案／收起的文件区；已保留原断言并通过普通控件修复，本机两项 canonical 检查通过。新最终 source 的 full CI 结果尚待收口，原生 API 的通过不能代替整批 CI。
 
 ## 2026-11-13：认证来源基线（PR #4）
 
@@ -164,7 +164,7 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 
 ## 完整目标仍缺少
 
-1. **真实认证与写入者控制：** 共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。当前源码拒绝自动官方注销（`official_logout_scope_unsafe`），旧未执行认证计划必须重新预览；先前主体／状态绑定不构成当前可执行路径。有限 Keychain 字段适配已接源码并验证 synthetic MCP／插件保全，真实 native API、客户端账号／ACL 和凭据更新按上表独立验收；CLI 状态不能证明内部 token 世代。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。显式 auth status 仅有合成 CLI 证据，不能宣称真实认证或生产注销已验收。
+1. **真实认证与写入者控制：** 共享 profile、Desktop/IDE/service 的完整定位与生命周期；有限 systemd 暂停已接通，其他 supervisor 暂停、重新登录及旧会话续用。当前源码拒绝自动官方注销（`official_logout_scope_unsafe`），旧未执行认证计划必须重新预览；先前主体／状态绑定不构成当前可执行路径。有限 Keychain 字段适配已验证 synthetic 保全和临时库真实 native API，真实客户端账号／ACL 和凭据更新仍须独立验收；CLI 状态不能证明内部 token 世代。当前识别部分 Claude 进程及可访问 manager 的直接 root 绑定服务；明确要求目标写入者先停，不能归属的进程阻止清理。显式 auth status 仅有合成 CLI 证据，不能宣称真实认证或生产注销已验收。
 2. **完整外发策略与强约束：** v5 的 27 个字段与逐项编辑已接入；真实客户端入口实效矩阵、macOS Network Extension 签名与权限、Linux namespace；直接 socket、UDP、DNS、NO_PROXY、子进程不能由代理覆盖证明。
 3. **远程运行：** 用户级安装／版本绑定已接入候选；Ubuntu 隔离 OpenSSH 已验证安装／丢 ACK 核对／原任务查询／交互 PTY，真实 VM 已完成有限 system-manager 暂停恢复、符合既有条件的 system/user manager 严格 logout 后续跑、原任务完成与 reboot 后核对。setsid 不保证 logout 存活，托管路径也不保证 reboot 续跑；生产 VPS 安装与任务实跑、aarch64 runtime、其他 supervisor 和完整 G03 仍未验收。
 4. **浏览器旅程：** 独立 Chromium 临时测试 profile 已完成真实持久安装／onStartup 两阶段清理；仍需正式 Chrome、Edge、Firefox 与 AdsPower 的安装、配对与清理验收。Firefox 独立 CacheStorage、按站点 proxy、容器后台停写、克隆识别和专用 browser 启动仍有缺口。

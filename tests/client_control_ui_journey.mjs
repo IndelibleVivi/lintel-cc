@@ -449,6 +449,10 @@ try{
   await page.locator('.sidebar nav').getByRole('button',{name:'清理与重建',exact:true}).click();
   await waitForResult('cleanup_inspect',previousScope);
   const scope=page.locator('.cleanup-scope');
+  // File-presence metadata now has its own disclosure, separate from the
+  // exact authentication-source choices. Open it as a user before testing
+  // the existing per-file full-path disclosure.
+  await scope.getByText('查看客户端文件存在情况（不代表整文件删除）',{exact:true}).click();
   await scope.locator('.cleanup-file-path').first().waitFor();
   await scope.scrollIntoViewIfNeeded();
   assert.equal(await scope.locator('.cleanup-file-path').first().evaluate(element=>element.open),false,'full paths are initially quiet');
