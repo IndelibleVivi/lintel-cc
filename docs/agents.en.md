@@ -74,6 +74,8 @@ lintel schema plan_policy
 lintel env list --json
 lintel env inspect <environment-id> --json
 lintel env components <environment-id> --project-cwd /synthetic/project --json
+lintel auth inventory --environment <environment-id> --json
+lintel auth verify --environment <environment-id> --json
 lintel work preflight --environment <environment-id> --categories instructions,memory,sessions --json
 lintel work inventory --environment <environment-id> --categories memory,sessions --json
 lintel work archive plan --environment <environment-id> --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
@@ -96,7 +98,23 @@ Named/finite environment_id/plan_id/job_id follow UUID 8-4-4-4-12 hex, either ca
 
 Named execute/new finite remote approval requires 64 lowercase hex. Bad syntax refuses before state/intent/SSH; valid syntax still exact hash/target checked by core. Existing remote execute stays query-only without deletion/replay, reconnect is recovery. TTY launch/target capabilities also validate IDs before core; launch first requires stdin/stdout TTY and no prompt.
 
-env list/discover may register roots/save inventory; job may persist interruption. auth_probe explicitly runs official status, returning identity_observed; missing logout subject refuses, changed auth stales approval, unattempted legacy needs preview, accepted query-only. archive_read returns text. These are not all effect-free metadata. discover shortcut/request share capabilities.
+env list/discover may register roots/save inventory; job may persist interruption. auth_inventory and default auth_verify read bounded sources without running the client. Explicit auth_probe or auth_verify.observe_runtime:true runs official status, returning identity_observed. This represents the current executor, not all terminals/IDEs. archive_read returns text. These are not all effect-free metadata. discover shortcut/request share capabilities.
+
+### Authentication sources and cleanup (November 13 development source)
+
+The published App 0.1.1/CLI 0.1.0 do not have these additions. `auth_inventory(environment_id, project_cwd?)` returns locations and finite evidence without tokens, helper bodies or original shell lines. `auth_verify(environment_id, job_id?, observe_runtime?)` independently rereads sources; `observe_runtime` defaults to false. Current process variables, declarations and official CLI status are distinct facts. Keychain, shared profiles and dynamic injection retain explicit unknown coverage.
+
+```sh
+lintel auth inventory --environment <environment-id> --project-cwd /synthetic/project --json
+lintel auth cleanup plan --environment <environment-id> --recipe repair_login --writers-confirmed-stopped --auth-source '<source-id-from-inventory>'
+lintel plan show <returned-plan-id>
+lintel job submit --plan <returned-plan-id> --approval <returned-plan-hash>
+lintel auth verify --environment <environment-id> --job <original-job-id> --json
+```
+
+Repeatable `--auth-source` maps to `plan_cleanup.auth_source_ids`, using the same cleanup engine for freezing, approval and execution. `--verify-auth-status`, or independent verify's `--observe-runtime`, requests official status. Ordinary inventory never runs shell startup, helpers or Claude. See the [cleanup guide](cleanup.en.md) for complete fields and raw `call` examples. Missing supported selections never expands to arbitrary deletion.
+
+New cleanup edits recognized `claudeAiOauth`/`primaryApiKey`, selected authentication fields/helper in user settings and supported simple shell assignments, preserving other fields, MCP/plugins and work. It creates no old-token backup; an interrupted edit may retain a privately staged original, explicitly listed in `retained_sensitive_material` rather than reported complete. Official logout also removes MCP logins/plugin sensitive values, so `official_logout:true` returns `official_logout_scope_unsafe` without execution. Accepted jobs remain query-only; old unexecuted plans without the new binding need a fresh preview. Raw callers may omit additive fields, but new plans default only to precisely recognized target-local login fields. This is an explicit safety tightening.
 
 Ordinary stdout is one envelope, ok:false nonzero, stderr diagnostics. Launch takes interactive process control with stderr failures. network serve is the explicit long-running NDJSON exception. ok:true is request success; data.status/steps/coverage/error determine task completion.
 
@@ -191,9 +209,9 @@ lintel call service_inspect <<'JSON'
 JSON
 ```
 
-Describe/schema then real inspect before plans. Cleanup order backup/archive → new-root import(reset_client) → approved logout → exact files → selected retirement. No full-environment export/global killing/restore-all. Service pause/resume separately approved, no auto root rebind.
+Describe/schema then real inspect before plans. Authentication cleanup order: encrypted work preservation for reset/retire → new-root import for reset_client → exact authentication edits → selected retirement → independent recheck. No automatic logout, new token backup or whole mixed credential/client-state deletion. No full-environment export/global killing/restore-all. Service pause/resume remains separately approved without automatic root rebinding; independent residue/identity preservation retains its own contract.
 
-Legacy request/submit/discover/inspect ID/jobs/job ID/launch ID/tui remain. Raw protocol-1 defaults stay; named/SSH strict fields never silently tighten raw callers. request execute foreground, submit detached/original query. launch TTY/no prompt, not background mutation. Old rebuild/partial receipts never become preservation outcomes.
+Legacy request/submit/discover/inspect ID/jobs/job ID/launch ID/tui remain. Raw protocol-1 retains defaults outside the explicit authentication safety tightening above; named/SSH uses strict fields. request execute foreground, submit detached/original query. launch TTY/no prompt, not background mutation. Old rebuild/partial receipts never become preservation outcomes.
 
 <a id="portable-work"></a>
 ## Secret stdin and portable work

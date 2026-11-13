@@ -23,6 +23,35 @@ const catalogs = { 'zh-CN': zhCN, en } as const;
 // grouped by where core emits the string. New core wording renders raw until it
 // is added here with a matching catalog entry (fail-open, never a guess).
 export const PRESENTATION_KEYS: Record<string, string> = {
+  "本机来源移除不会证明服务端 token 已撤销": "present.authCleanup.serverCoverage",
+  "清理所选本地认证来源": "present.authCleanup.titleRepair",
+  "保全工作并重建环境": "present.authCleanup.titleReset",
+  "清理所选认证并退役环境": "present.authCleanup.titleRetire",
+  "复查目标写入者与冻结的认证来源": "present.authCleanup.recheck",
+  "先加密归档所选工作；不复制认证存储": "present.authCleanup.archive",
+  "建立新环境并迁入选中工作（在清理之前）": "present.authCleanup.rebuild",
+  "精确移除所选认证声明：": "present.authCleanup.editPrefix",
+  "停用此环境的启动入口；保留原工作目录": "present.authCleanup.retire",
+  "显式运行当前执行器上下文的官方认证状态命令": "present.authCleanup.runtime",
+  "独立复查所选来源；其他上下文与服务端状态分别报告": "present.authCleanup.verify",
+  "所有原始会话、指令、项目文件与工作内容": "present.authCleanup.preserveWork",
+  "未选择的配置、MCP、插件与未知凭据字段": "present.authCleanup.preserveConfig",
+  "其他运行上下文、其他机器和服务端状态不自动改变": "present.authCleanup.preserveContexts",
+  "清理前复查": "present.authCleanup.beforeCleanup",
+  "核对写入者、服务与每份冻结来源；保全产物已完成时继续保留。": "present.authCleanup.beforeCleanupMessage",
+  "启动入口已停用，原目录和工作保留。": "present.authCleanup.retiredMessage",
+  "认证来源复查": "present.authCleanup.verifyTitle",
+  "只核对原选择；其他进程、Keychain、共享 profile 和服务端撤销保留各自覆盖状态。": "present.authCleanup.verifyMessage",
+  "所选本地声明已处理；现有进程环境不会随文件编辑改变，服务端 token 撤销未验证。": "present.authCleanup.warning",
+  "精确移除所选声明；原凭据不创建备份。": "present.authCleanup.editMessage",
+  "已读回精确修改并移除隔离原件；其余字段保持。": "present.authCleanup.editDone",
+  "按原选择重新读取；未选择或无法检查的来源继续单列": "present.authCleanup.localCoverage",
+  "仅当前 Lintel 执行器与目标 root；不代表原 Terminal、IDE 或 SSH 会话": "present.authCleanup.runtimeCoverage",
+  "运行中进程、Keychain、共享 profiles 与其他机器需独立核对": "present.authCleanup.contextCoverage",
+  "未选择可移除的认证来源；没有执行删除，请核对仍存在与未知的来源": "present.authCleanup.noSelection",
+  "认证位置": "present.authCleanup.componentTitle",
+  "已识别文件及目录外共享 profile": "present.authCleanup.componentScope",
+  "未读取凭据、未调用认证命令。文件存在不代表已登录，Keychain 与服务端状态未知；认证来源需另行显式检查。": "present.authCleanup.componentDetail",
   'Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理': 'present.cleanupScope',
 
   "OTel 数据收集总开关": "present.client.CLAUDE_CODE_ENABLE_TELEMETRY.label",
@@ -269,4 +298,13 @@ export function present(value: string | null | undefined, locale: Locale): strin
   if (value === null || value === undefined) return '';
   const key = Object.hasOwn(PRESENTATION_KEYS, value) ? PRESENTATION_KEYS[value] : undefined;
   return key ? translate(catalogs as Record<Locale, Catalog>, locale, key) : value;
+}
+
+/** Known auth-edit action: project its finite prefix and retain the path bytes. */
+export function presentAction(action:{id:string;label:string},locale:Locale):string {
+  const prefix='精确移除所选认证声明：';
+  if(/^auth_edit_[0-9]+$/.test(action.id)&&action.label.startsWith(prefix)) {
+    return present(prefix,locale)+action.label.slice(prefix.length);
+  }
+  return present(action.label,locale);
 }

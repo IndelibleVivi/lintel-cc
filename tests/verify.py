@@ -112,6 +112,8 @@ CHECKS: List[Check] = [
              "extensions/browser/native-host/Cargo.toml"), tools=("cargo",)),
     _check("runner-build", "cargo build -p lintel-runner (prerequisite for journeys)", "rust",
            *(CARGO or "cargo", "build", "-p", "lintel-runner"), tools=("cargo",)),
+    _check("auth-sources-core-test", "authentication inventory, exact cleanup, race/interruption and final-readback regression tests", "rust",
+           *(CARGO or "cargo", "test", "-p", "lintel-core", "auth_", "--locked"), tools=("cargo",), explicit_only=True),
     _check("js-engine-test", "browser engine JS unit tests (node:test, no deps)", "js",
            *(NODE or "node", "--test", "extensions/browser/tests/engine.test.mjs"), tools=("node",)),
     _check("site-game-test", "shared Clawd silhouette, whole-body pose, jump, varied reachable stars, collision and pause physics (node:test, no deps)", "js",
@@ -127,6 +129,9 @@ CHECKS: List[Check] = [
     _check("i18n-coverage-test", "every desktop source translation key resolves in both zh-CN/en catalogs (node:test, no deps)", "i18n",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/i18n_coverage.test.mjs"), tools=("node",),
            explicit_only=True),
+    _check("auth-sources-render-test", "bilingual authentication evidence, frozen selections and result coverage (SSR; no browser)", "desktop",
+           *(NODE or "node", "--test", "tests/auth_sources_render.test.mjs"), tools=("node",),
+           paths=(ROOT / "apps/desktop/node_modules",), explicit_only=True),
     _check("recipe-test", "fresh recipe intent, host scope and non-secret personal defaults", "js",
            *(NODE or "node", "--experimental-strip-types", "--test", "tests/recipe_intent.test.mjs"), tools=("node",), explicit_only=True),
     _check("app-release-test", "SemVer, actual Ed25519 signature/version, synthetic App archive and finite website payload", "js",
@@ -218,6 +223,7 @@ CHECKS: List[Check] = [
            independent=True, reason="headless Chromium UI evidence; service manager and invoke are synthetic"),
     _check("work-ui", "built App exact selection, archive/preserve and portable import (real synthetic core)", "independent", *(NODE or "node", "tests/work_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="isolated headless Chromium and invoke fixture; not native WebKit"),
     _check("components-ui", "built component/original task/metadata capacity journey (real synthetic core)", "independent", *(NODE or "node", "tests/components_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic cores; finite SSH/invoke modeled; not native WebKit/production"),
+    _check("auth-sources-ui", "built App source selection, exact approval, local cleanup and independent verification (synthetic core)", "independent", *(NODE or "node", "tests/auth_sources_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + temporary-root core; inert status fixture, no real login/Keychain/native WebKit"),
     _check("baseline-ui", "built product-baseline task/session/Agent/approval journey (real synthetic core)", "independent", *(NODE or "node", "tests/baseline_ui_journey.mjs"), tools=("node", "cargo"), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, build=_CARGO_BUILD_RUNNER, independent=True, reason="Chromium + real synthetic core; static CLI/clipboard/launch-error boundary modeled; not native WebKit/Claude"),
     _check("archive-wait-ui", "built App delayed package read, accessible feedback and cross-page queue lifecycle", "independent", *(NODE or "node", "tests/archive_wait_ui_journey.mjs"), tools=("node",), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, independent=True, reason="isolated Chromium + delayed synthetic invoke; not decryption performance or native WebKit"),
     _check("drift-ui", "built App drift result and acceptance bound to host/environment/request generation", "independent", *(NODE or "node", "tests/drift_ui_journey.mjs"), tools=("node",), paths=(Path(os.environ["PLAYWRIGHT_MODULE"]) if os.environ.get("PLAYWRIGHT_MODULE") else ROOT / "extensions/browser/node_modules/playwright", ROOT / "apps/desktop/dist/index.html"), loopback=True, independent=True, reason="isolated Chromium + controlled synthetic invoke; not native WebKit"),
@@ -245,6 +251,7 @@ CHECKS: List[Check] = [
 
 CHECKS.append(_check("journey-network", "finite network CLI admission/defaults and synthetic-home host boundary", "journey", PYTHON, "tests/network_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER))
 CHECKS.append(_check("journey-client-control", "client controls, private snapshots and environment comparison through fresh CLI processes", "journey", PYTHON, "tests/client_control_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER, explicit_only=True))
+CHECKS.append(_check("journey-auth-sources", "named/raw CLI authentication provenance, one approval and post-cleanup runtime coverage", "journey", PYTHON, "tests/auth_sources_journey.py", tools=("cargo",), build=_CARGO_BUILD_RUNNER, explicit_only=True))
 CHECKS.append(_check("shared-remote-journey", "shared finite SSH public API and target request contracts (synthetic transport)", "python", PYTHON, "tests/shared_remote_journey.py", tools=("cargo",), paths=(ROOT / "tests/shared_remote_journey.py",)))
 
 # Synthetic end-to-end journeys sharing the runner-build prerequisite.

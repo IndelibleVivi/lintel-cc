@@ -97,9 +97,9 @@
 
 当前可识别：根 `CLAUDE.md`、`projects/**/memory/*.md`、`projects/**/*.jsonl`，以及此前迁入的 `lintel-imports/CLAUDE.md`、直接待用区中的 `lintel-N-CLAUDE.md` 和 `lintel-imports/projects/**`（保留原类别，不会包裹成 `lintel-imports/lintel-imports`）。内容准入为单文件 256 MiB、总量 1 GiB、10,000 个文件、50,000 个 entries、30 秒；超限拒绝计划，不将截断扫描称为完整扫描。持久计划、回执与 registry 的 JSON 读写共用 16 MiB 预算，保存前拒绝超限记录，不留下随后无法 `load` 的计划；正文容量通过不保证深路径及完整落点清单仍在计划预算内，可缩小精确原件选择重新预览。路径和文件身份在执行时重新核验；加密归档写入前检查冻结目标父目录所在存储的可用空间，显式导出不以 Lintel state 所在盘代替目标盘。
 
-工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态。
+工作包是标准 age 口令加密的 JSON（`schema: "lintel.work/1"`，携带 `generator`、`created_at` 与逐文件 `path`/`category`/`digest`），生成后重新读取并核对归档字节。新包记录 `generator:"Lintel"`；inspect 从包内读取此自声明字段，旧包或无可识别字段的兼容包返回 `generator:null`，外部包不被直接归因为 Lintel，元数据也不是来源认证。package 自包含，因此可显式带去没有原 job/state 的另一个 Lintel 安装：`archive_inspect`/`archive_read`/`plan_import` 只接受 `job_id` 或绝对 `archive_path` 之一（两者同给或缺省都拒绝）。job 来源会复核任务记录的 `archive_path` 和已记录的 `archive_digest`，原路径被另一个有效包替换也返回 `stale_archive`；旧回执缺少 digest 时保留兼容读取。外部 `archive_path` 来源独立按包内容判断，不归属某个原 job。读完限额、错误口令、损坏包、绝对/父目录跳转/重复路径、未支持类别与文件摘要校验与自身包一致，安全保护不因来源不同而弱化。`plan_import` 冻结来源与 encrypted digest，执行时重读来源，`stale_archive` 会拒绝；同名冲突、未选类别与原文件均受保护，`create_new` 防止覆盖。公开 `import_manifest` 来自冻结清单：`package:{format,generator,sha256}` 是包内格式／自声明生成器与准确加密包摘要；`files:[{source,destination,category,size,sha256}]` 是来源相对路径、相对目标 root 的最终位置、类别、字节数与文件摘要。预览、`plan_show` 和 GUI 使用相同投影，包含 `lintel-N-` 重名分配，不包含正文、口令或其余内部 `extra`。历史状态备份 `lintel.state/1` 与工作包分开，不支持自动导入混合状态；本轮新认证计划不再生成这种备份。
 
-`package.rs` 是工作包唯一生产 codec，复用 serde `DeserializeSeed`／`Visitor`、已有重复键检查及 age 流；旧完整 `Value` reader 只用于小包测试，`lintel.state/1` 的有限备份 writer 保留现有调用。正文逐块摘要并从冻结来源写入私有 0700／0600 暂存；读入将 byte arrays 逐 u8 写入暂存，不物化整包。元数据单字段最多 1 MiB、合计 16 MiB；单个 data token 在交给 serde 前限 128 字节，完整 JSON／密文另有按总内容计算的有限编码预算。缓冲位于预算 gate 下方，不能让上一字段预取的字节绕过当前预算。密文摘要、完整认证与尾部来自同一 non-following handle，读取前后核对 handle／path 身份；只返回有限 metadata 和请求窗口。age header 读取最多 64 KiB，scrypt reader 拒绝 `log N > 20`，不改变包原有强度；正常 writer 沿用 age 的设备成本选择，实际 KDF 内存与构建条件单独测量。
+`package.rs` 是工作包唯一生产 codec，复用 serde `DeserializeSeed`／`Visitor`、已有重复键检查及 age 流；旧完整 `Value` reader 只用于小包测试；`lintel.state/1` 仅作为历史客户端状态格式说明，不是本轮新认证清理的写入步骤。正文逐块摘要并从冻结来源写入私有 0700／0600 暂存；读入将 byte arrays 逐 u8 写入暂存，不物化整包。元数据单字段最多 1 MiB、合计 16 MiB；单个 data token 在交给 serde 前限 128 字节，完整 JSON／密文另有按总内容计算的有限编码预算。缓冲位于预算 gate 下方，不能让上一字段预取的字节绕过当前预算。密文摘要、完整认证与尾部来自同一 non-following handle，读取前后核对 handle／path 身份；只返回有限 metadata 和请求窗口。age header 读取最多 64 KiB，scrypt reader 拒绝 `log N > 20`，不改变包原有强度；正常 writer 沿用 age 的设备成本选择，实际 KDF 内存与构建条件单独测量。
 
 发布前记录准确目的地与密文摘要，重新核对冻结输出父目录，原子不覆盖发布并同步目的地父目录，再完整解密读回；完成事实不由 intent 推断。目录同步失败保留准确发布路径与原 intent，原 ID 查询保持 `needs_reconciliation`，可读产物不追认为完成。迁入／resume 副本逐块复制到同目录临时文件，摘要匹配与文件 fsync 后再原子不覆盖发布并同步目的地父目录，目标读回之后才完成；失败保留原 job／已发布产物，不改名重发。本次临时密文与复制文件由准确临时名的 RAII guard 清理，正常写入／同步／保存 intent 失败不会积累未发布临时文件；已发布产物保留。解密暂存通常由本操作 RAII 清理，resume 在可能成功 `exec` 前另行明确关闭整包暂存，清除失败阻止启动并保留原 ID；kill 后可能保留私有随机目录，不自动扫历史暂存。state 与输出磁盘分别需要展开／密文／临时发布空间，流式内存路线不消除磁盘和核验时间成本。
 
@@ -121,7 +121,7 @@ flowchart TD
 
 每次打开或翻页都会走完整核验路径。resume 在完整解包后、首个 intent／复制前再次复查冻结 root、cwd、客户端及 startup binding，复制和明确清除整包暂存后再于启动前复查；后续变化保留已记 intent 与准确副本，只查询原 ID。RAII 只清理本操作的私有解密暂存，强制终止后的残留需按原任务核对。
 
-工作包与状态备份仅在归档完成后才创建新根。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
+当前流程在工作归档完成后才创建新根；历史清理中的状态备份另作兼容记录，不是新计划的前置步骤。App 默认将指令、会话和记忆准备到 `lintel-imports`；只有明确选择个人指令 activation 才将根 `CLAUDE.md` 放入新 root 的活跃指令位置，旧 raw caller 保留历史默认。不恢复 settings、hooks、MCP、插件或凭据。再次归档或重建时，此前迁入 `lintel-imports` 的参考指令、记忆与会话按保留的类别重新计入 manifest，直接待用区中已有 `lintel-N-CLAUDE.md` 也会保全；参考不因重新归档自动激活。活跃 `projects` 与已有待用区映射到同名文件或文件／父目录冲突时，共同迁入路径分配先保留整批原名称与父目录，再为冲突的文件项加 `lintel-N-` 文件名前缀；两份内容都保留，后缀和类别不变，不覆盖、不重复嵌套。独立包迁入使用同一分配，预览冻结实际目标，执行复核后才写入；目标已有文件仍拒绝。未选定 `output_path` 的独立归档留在 Lintel 私有 state，旧包继续受支持。
 
 ## 有限关联组件与容量预检
 
@@ -151,21 +151,27 @@ flowchart TD
 
 ## 有限清理与认证
 
-`cleanup_inspect` 只读取精确状态文件元数据和进程名称；`auth_probe` 是独立显式动作，调用已登记程序的 `auth status`。必须返回可核对的 `configDirectory` 与认证类别，否则拒绝推断；只新增 `identity_observed` 布尔值，不返回邮箱或原始认证输出。真实 Claude / Keychain 尚未验收，当前回归测试用合成 fake CLI。
+本节描述 2026-11-13 开发源码，公开 App 0.1.1／CLI 0.1.0 不含新增来源选择与验证能力。完整操作与官方机制证据见[认证清理指南](cleanup.md)和[机制核对](credential-provenance-evidence.md)。
 
-官方注销的已登录 claude.ai 预览必须观察到非空 `email`；缺失时返回 `auth_identity_unverified`，独立 auth probe 与仅本地清理仍可用。私有 `extra.auth_binding` 保存 `lintel.auth-status/1`、本计划随机 nonce 和完整解析 JSON／登录结果的摘要，不保存原始主体或未知字段。执行前及保全后的 `check_cleanup` 使用相同 nonce 核对；观察字段变化返回 `stale_auth`。凭据文件身份／内容变化或 fallback 新出现仍由原文件快照返回 `stale_plan`。完整状态中的其他字段变化也需要新预览。public_plan 删除整个 extra，回执和 Agent 元数据不携带此绑定。未尝试的旧官方注销计划缺少绑定须新预览；既有接受任务优先查询原 ID。CLI 报告不是 Keychain 凭据世代或来源认证，真实认证、同账号 Keychain-only token 更新和外部并发边界仍未验收。
+`cleanup_inspect` 保留精确状态文件元数据与写入者观察。新的 `auth_inventory(environment_id, project_cwd?)` 由 `auth_sources.rs` 有界读取已知位置，区分已确认本地来源、当前执行器环境观察、仅声明、无法检查及其他上下文；它不运行 Claude、shell 初始化、helper、hooks 或 MCP，不读取历史记录，不返回 token、helper 正文或稳定凭据指纹。`presence` 与空／非空值状态不证明实际使用来源。
 
-`plan_cleanup` 接受 `repair_login`、`reset_client`、`retire`，要求 `writers_confirmed_stopped: true`，可选 `official_logout`。默认根的混合状态是 home 下 `.claude.json`；专用根使用其 `.claude.json`。修复登录只处理 `.credentials.json`；其余两类还处理预览中的混合状态文件。工作、settings、hooks、MCP 与插件文件不会被通配删除。
+`plan_cleanup` 的 `repair_login`／`reset_client`／`retire` 继续使用同一计划、批准与原任务 authority，要求 `writers_confirmed_stopped:true`；新增 `auth_source_ids`、可选 `project_cwd` 和默认关闭的 `verify_auth_status`。选择来自同一环境清单的可编辑来源 ID，不能把路径或秘密当作来源 ID。旧 raw caller 省略选择时只默认处理可精确识别的目标本地字段：`.credentials.json` 中的 `claudeAiOauth`，以及目标客户端状态中的 `primaryApiKey`。默认 root 的状态是 home 下 `.claude.json`，自定义 root 使用其内部 `.claude.json`。明确选择时还可移除受支持的用户 settings 认证字段／helper 和简单 shell 赋值；未知格式、其他字段、MCP／插件和工作资料保留，不再整删混合存储。
 
-reset_client 的冻结 `actions` 与 receipt 有序 `steps` 采用同一 canonical 顺序：复查写入者 → 状态备份 + 工作加密归档 → 新根创建与迁入 → 再次复查写入者与冻结范围 → 官方注销（如选）→ 精确移除旧文件。任何破坏性动作都不早于保全；reset_client 重读刚生成的工作包时核对本任务的 archive_digest，包被替换返回 stale_archive，在新根创建／迁入／注销／删除前停止。官方注销失败时保留已生成的归档、新根与 create/migrate 完成步骤，后续旧文件移除与 retire 不执行，同 ID 查询原任务不重跑。retire 停用启动入口；`reactivate_environment` 只恢复登记状态，不恢复凭据。
+私有 `extra.authentication` 使用 `lintel.auth-cleanup/1`，冻结来源 ID、准确定位、文件／父目录身份和每计划加盐的内容摘要；不保存原始字节或账户身份。接受前、保全后及编辑边界再次核对，选中来源改变返回 `stale_auth_source`。要求运行状态检查时另冻结 executable 并复查，不能通过重新 discover 把旧批准指向另一程序。缺少新绑定或要求官方注销的未执行旧计划返回 `stale_auth_plan`；已接受原任务仍优先按原 ID 查询，不重放。预览后出现但未被选中的来源不会被顺带删除，重新检查应报告它仍存在。
 
-执行被持久接受后失败时，receipt 额外写入结构化 `error: {code,message,phase,recovery}`：`phase` 记录失败发生的真实 receipt 状态（如 `verifying`），`recovery` 指向以同一 ID 查询原任务，机器不必猜中文 warnings；已完成的步骤与产物（归档、新根）保留，不可逆步骤不重放。
+当前官方文档明确记载 `/logout` 还会移除保存的 MCP 登录和插件敏感值。CLI `auth logout` 尚无已验证、能满足本轮保留范围的适配，所以新 `official_logout:true` 请求返回 `official_logout_scope_unsafe`，不调用命令。这个决定来自文档与范围约束，不是本轮真实 CLI／Keychain 实跑结论；不猜测 Keychain 服务名，也不以整文件删除绕过。Keychain、共享 profiles 和服务端撤销继续单列未知。
 
-已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper。Linux 的明确绑定 systemd unit 需通过独立暂停计划，清理前再读回 owned hold、inactive、MainPID 与空 cgroup；手工 `stopped` 声明不能代替该证据。非 systemd 与其他写入者仍须单独处理，详见 [服务指南](services.md)。官方注销仅接受可验证的本地登录来源；存在共享 Anthropic profile 或相应环境变量时，先于较慢的 service／进程检查拒绝。该范围在预览、执行检查及实际注销前复查。实际认证探测前还核对计划冻结的 executable、当前 inventory 与实时发现，重新 discover 不能让旧批准改指另一个程序。不选官方注销时同样在归档／迁入后、删除前复查写入者。仅调用官方 `auth logout`，不猜测 Keychain service 名；服务端 token 撤销始终另列 `unverified`。
+执行顺序为：接受前核对 →（reset／retire）工作加密归档 →（reset）按冻结落点创建新根并迁入 → 再次复查写入者与冻结来源 → 精确认证编辑 →（retire）停用入口 → 独立复查。新认证计划不生成 `lintel.state/1` 或 token 恢复备份。工作包仍按原任务 `archive_digest` 重读，替换返回 `stale_archive` 并在创建／迁入／编辑前停止。后续失败保留已完成归档、新根和步骤。`reactivate_environment` 只恢复登记资格，不恢复已删凭据。
 
-本地删除先将对象原子移入同目录的私有隔离目录，再核对被冻结的对象，避免按原路径误删随后替换的新文件。冲突时不覆盖新文件；无法回到原位置的对象保留在回执所列隔离目录，必须核对。它不等于对持有开放文件描述符的外部写入者建立 OS 级 CAS。官方命令导致额外状态变化或状态重新出现时，会停止后续动作。未选择官方注销的回执为 `partially_completed`；精确文件已处理不代表 Keychain、Desktop、IDE、浏览器或目录外认证已清空。
+已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper。Linux 的明确绑定 systemd unit 需通过独立暂停计划，清理前再读回 owned hold、inactive、MainPID 与空 cgroup；手工 `stopped` 声明不能代替证据。其他写入者独立处理，见[服务指南](services.md)。共享文件只修改冻结的支持范围；复杂 shell 整文件只报告声明，不执行内容来判断归属。
 
-TUI 通过 `lintel tui` 提供上述配方、认证检查、归档阅读/迁入与重新启用。口令只从关闭 echo 的交互终端读取，自动化应使用 JSON stdin；不会写入 plan、journal 或支持资料。
+精确编辑在有界内存生成替代内容，将原文件移动到同目录旁私有暂存，再不覆盖地发布替代文件并读回；成功后删除暂存原件。它不对持有开放描述符的外部 writer 建立 OS 级 CAS。冲突或中断可能保留含凭据材料，`retained_sensitive_material` 列出状态和位置；暂存目录被改名／替换而身份失联时为 `location_unknown`，路径仅是最后已知位置，不通过扫描追踪。此类未确认残留阻止本地完成判断，原任务查询不会重放修改或自动扫除。
+
+`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读并可关联原任务，不改写旧回执；默认 `observe_runtime:false` 不启动客户端。显式选择时运行当前执行器／root 的 `auth status`，随后再读取最终文件状态，以观察 status／helper 可能重新生成的凭据。旧 `auth_probe` 继续是单独显式入口，验证 `configDirectory` 与有限认证类别，只返回脱敏状态及 `identity_observed`，不返回邮箱或原始输出；该命令可能访问认证设施、执行 helper 或联网。真实 Claude／Keychain 仍需独立验收。
+
+回执分别给出所选本地来源、当前执行器、其他运行上下文和服务端撤销；本地来源移除与当前仍可认证可以同时成立。成功处理所选范围仍保留既有 `partially_completed` 总状态，`local_cleanup`／逐来源结果解释准确完成范围；未知项不变成整机注销成功。接受后失败保留结构化 `error:{code,message,phase,recovery}`、完成步骤和产物，恢复指向同一 ID 查询。
+
+TUI 通过 `lintel tui` 提供来源检查、有限来源选择、上述配方、归档阅读／迁入与重新启用；named CLI 和 raw JSON 共享 core。口令只从关闭 echo 的终端或一次性 JSON stdin 读取，不进入 plan、journal 或支持资料。
 
 ## 启动与支持资料
 
@@ -183,16 +189,16 @@ macOS 显式启动动作生成私有 `.command` 并请求 Terminal 打开准确�
 
 `export_support` 使用白名单，只含平台、版本、计数与能力信息；不包含目录、环境名、配置正文、令牌、会话或目的地主机。它不自动上传。
 
-验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py`、`python3 tests/policy_journey.py`、`python3 tests/work_preservation_journey.py`、`python3 tests/portable_work_journey.py` 与新增的 `python3 tests/client_control_journey.py`（独立选择项 `journey-client-control`）均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询、加密迁移，以及此前新增的 archive-only 不新建环境、output_path 冻结/拒绝覆盖、跨独立 home/state 的包读取与迁入、stale/错误口令/损坏包拒绝、preserve 完成而旧 reset 仍 partial、canonical reset 顺序、logout 假失败保留产物与结构化 error 跨 Engine 持久、`plan_show` 不泄露秘密；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、27 项 inspect 状态、自定义选择/显式取值/空改动/回执冻结/字段恢复和外部编辑拒绝，portable work journey 跨独立进程验证包携带、只读清单、显式路径迁入与 accepted 后失败码持久。client-control journey 用全新 CLI 进程验证残留清单／遮蔽身份／脱敏快照／即时对照、非法或未配对请求拒绝、损坏记录不隐藏邻居、原值不进入普通输出，并确认观察不执行客户端、不创建 mutation job；core 单元回归另覆盖私密配置备份／恢复／重放、跨环境 apply 排除私密材料、残留清除与标识重置逐文件重查、`lintel.residue/1` 读／恢复与占用拒绝。版本探测使用 inert executable，不运行 Claude。
+验证：`cargo test -p lintel-core`、`python3 tests/cli_journey.py`、`python3 tests/policy_journey.py`、`python3 tests/work_preservation_journey.py`、`python3 tests/portable_work_journey.py` 与新增的 `python3 tests/client_control_journey.py`（独立选择项 `journey-client-control`）均只修改新建的合成目录。core 回归覆盖错误输入、陈旧计划与旧规则、链接拒绝、字段恢复冲突、重复执行、中断记录、并发查询、加密迁移，以及此前新增的 archive-only 不新建环境、output_path 冻结/拒绝覆盖、跨独立 home/state 的包读取与迁入、stale/错误口令/损坏包拒绝、preserve 完成而旧 reset 仍 partial、canonical reset 顺序、自动 logout 在副作用前拒绝、精确编辑冲突保留工作与结构化 error 跨 Engine 持久、`plan_show` 不泄露秘密；CLI journey 跨实际进程验证配置往返，policy journey 进一步验证静态版本身份、Remote Control 条件、27 项 inspect 状态、自定义选择/显式取值/空改动/回执冻结/字段恢复和外部编辑拒绝，portable work journey 跨独立进程验证包携带、只读清单、显式路径迁入与 accepted 后失败码持久。client-control journey 用全新 CLI 进程验证残留清单／遮蔽身份／脱敏快照／即时对照、非法或未配对请求拒绝、损坏记录不隐藏邻居、原值不进入普通输出，并确认观察不执行客户端、不创建 mutation job；core 单元回归另覆盖私密配置备份／恢复／重放、跨环境 apply 排除私密材料、残留清除与标识重置逐文件重查、`lintel.residue/1` 读／恢复与占用拒绝。版本探测使用 inert executable，不运行 Claude。
 
 
 独立加密包和迁入的新文件使用同目录临时文件写入/同步后，以系统原子不覆盖 rename 发布（不会替换已出现的文件）；临时名在同一操作中消失，不产生发布后的双链接清理窗口，再读回核验。import 在预览和正文写入前核对整批实际目标的祖先：path guard 拒绝非目录／链接，批准 root 内的现有目录必须属于当前执行器 UID，实际权限须允许访问和在最近现有父目录写入。已知错误分别为 `path_unreadable`、`wrong_owner`、`migration_destination_unwritable`，在整批正文写入前拒绝；Lintel 不更改已有权限。共同迁入路径只将新建父目录设为 `0700`，已有目标根和父目录权限保留，文件为 `0600`。macOS 使用 renameatx_np(RENAME_EXCL)，Linux 使用 renameat2(RENAME_NOREPLACE)；目标文件系统或内核不支持时返回 atomic_publication_unsupported，保留原数据与原任务，不退回 hard link 或覆盖式写入。settings 的按字段恢复继续使用既有冻结快照与写前复查；这不把外部编辑器纳入原子 CAS。
 
-接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建在 mkdir 前分配并持久保存准确 new_root/new_environment_id 与执行中步骤；登记失败或中断后原任务仍能定位目录，意图不证明登记成功。整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；已完成状态备份与工作归档分开保留，不被后续 archive step 覆盖。
+接受后 `error` 还包含可用的 `step_id` 和 `uncertain_side_effects`：执行中步骤、写后验证的未知效果须从原回执/产物核对；新环境创建在 mkdir 前分配并持久保存准确 new_root/new_environment_id 与执行中步骤；登记失败或中断后原任务仍能定位目录，意图不证明登记成功。整批迁入在开始写入前先持久记录执行中步骤，迁入失败时保留新 root 与已发布文件，并标明仍在执行的 create/migrate 步骤和可能的部分写入；工作归档与历史任务已有的状态备份分开保留，不被后续 archive step 覆盖；新认证计划不产生状态备份。
 
 归档发布前先持久记录执行中的 archive 步骤、`archive_path` 与 `archive_intent_digest`，后者绑定待发布的准确密文；写后读回成功才记录完成和 `archive_digest`。中断回执中的路径不表示包已完成：查询原任务核对产物，包存在时可用原 job 解锁，尚不存在时返回具体读错误。job 读取先采用完成 digest，没有完成 digest 时核对 intent digest；旧回执两者都没有才沿用兼容行为。
 
-清理产生的混合客户端状态备份同样在发布前保存 `state_archive_path` 和执行中步骤，写入并读回成功才标记完成。路径仅表示原任务的准确目标；中断时先查询原任务并核对产物，不自动重发、覆盖或迁入状态备份。
+历史清理回执中的混合客户端状态备份可能在发布前已保存 `state_archive_path` 和执行中步骤，只有写入与读回成功才表示完成。该字段保留历史查询兼容，不是本轮新计划步骤。路径只表示原任务记录的目标；中断时先查询原任务并核对产物，不自动重发、覆盖或迁入历史备份。
 
 批准后的迁入先在实际目标文件系统的私有临时目录里，以空文件验证整批路径。preserve/reset 使用新根所在的 environments 目录，import 使用已批准的目标 root；这一步不写归档正文，正常返回清理自身创建的空文件和目录，不递归删除额外内容。大小写折叠或 Unicode 规范化等仍使路径等价时，返回 migration_path_conflict，在新环境创建或任何正文迁入前整批拒绝。包仍可检查与阅读；整理源内容重新归档，或选择可区分这些路径的文件系统。此检查只在已批准执行中运行，预览保持无目标写入。
 

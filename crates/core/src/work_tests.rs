@@ -502,7 +502,7 @@ fn failure_after_verifying_records_real_phase() {
 }
 
 #[test]
-fn logout_failure_reports_ordered_steps_and_does_not_delete() {
+fn unsafe_logout_refuses_before_work_and_safe_cleanup_keeps_preservation_order() {
     let temp = tempfile::tempdir().unwrap();
     let base = temp.path().canonicalize().unwrap();
     let home = base.join("home");
@@ -514,7 +514,7 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
     fs::create_dir_all(script.parent().unwrap()).unwrap();
     fs::write(
         &script,
-        "#!/bin/sh\ncase \"$2\" in\n status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n logout) exit 3;;\nesac\nexit 9\n",
+        "#!/bin/sh\ntouch \"$CLAUDE_CONFIG_DIR/unexpected-auth-call\"\nexit 3\n",
     )
     .unwrap();
     fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
@@ -522,11 +522,25 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
     e["executable"] = json!(script);
     save(&engine.state.join("inventory.json"), &json!([e.clone()])).unwrap();
     fs::write(root.join("CLAUDE.md"), "Synthetic instruction only.").unwrap();
-    fs::write(root.join(".credentials.json"), "synthetic credential").unwrap();
+    fs::write(root.join(".credentials.json"), r#"{"claudeAiOauth":{"accessToken":"SYNTHETIC_LOCAL_LOGIN"},"mcpOAuth":{"keep":"SYNTHETIC_MCP_LOGIN"}}"#).unwrap();
     fs::write(root.join(".claude.json"), "{\"synthetic\":true}").unwrap();
+    let original = fs::read(root.join(".credentials.json")).unwrap();
+    let refused = engine.request(json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":true,"categories":["instructions"]}));
+    assert_eq!(
+        refused["error"]["code"], "official_logout_scope_unsafe",
+        "{refused}"
+    );
+    assert_eq!(fs::read(root.join(".credentials.json")).unwrap(), original);
+    assert!(!root.join("unexpected-auth-call").exists());
+    assert_eq!(fs::read_dir(engine.state.join("plans")).unwrap().count(), 0);
+    assert_eq!(fs::read_dir(engine.state.join("jobs")).unwrap().count(), 0);
+    assert_eq!(
+        fs::read_dir(engine.state.join("archives")).unwrap().count(),
+        0
+    );
     let p = ok(
         &engine,
-        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":true,"categories":["instructions"]}),
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"reset_client","writers_confirmed_stopped":true,"official_logout":false,"categories":["instructions"]}),
     );
     let ids: Vec<String> = p["actions"]
         .as_array()
@@ -535,37 +549,34 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
         .map(|a| a["id"].as_str().unwrap().to_string())
         .collect();
     let pos = |name: &str| ids.iter().position(|x| x == name).unwrap();
-    // Canonical reset order in the frozen preview: archive, then the fresh root
-    // + migration, then logout, then removals. No destructive action leads.
-    assert!(pos("archive") < pos("logout"), "{ids:?}");
+    // The same plan preserves work and constructs the fresh root before the
+    // approved exact credential edit. Broad logout has no admitted action.
     assert!(pos("archive") < pos("rebuild"), "{ids:?}");
-    assert!(pos("rebuild") < pos("logout"), "{ids:?}");
-    assert!(pos("logout") < pos("credentials"), "{ids:?}");
+    assert!(pos("rebuild") < pos("auth_edit_0"), "{ids:?}");
+    assert!(pos("auth_edit_0") < pos("auth_verify"), "{ids:?}");
+    assert!(!ids.iter().any(|id| id == "logout" || id == "state_backup"));
     let j = ok(
         &engine,
         json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
     );
-    assert_eq!(j["status"], "needs_reconciliation", "{j}");
-    assert_eq!(j["error"]["code"], "logout_failed", "{j}");
-    assert_eq!(j["error"]["phase"], "executing");
-    assert_eq!(j["error"]["uncertain_side_effects"], true);
-    assert_eq!(j["error"]["step_id"], "logout");
-    assert!(j["error"]["recovery"].is_string());
+    assert_eq!(j["status"], "partially_completed", "{j}");
+    assert_eq!(j["local_cleanup"], "completed");
+    assert!(j["error"].is_null());
     assert!(j["archive_path"].is_string());
-    assert!(j["state_archive_path"].is_string());
-    // The fresh root and its migration were produced BEFORE the failed logout and
-    // are retained; the approved local files were not deleted.
-    assert!(
-        j["new_root"].is_string(),
-        "fresh root must be retained across logout failure"
-    );
+    assert!(j["state_archive_path"].is_null());
+    assert!(j["new_root"].is_string());
     let new_root = PathBuf::from(j["new_root"].as_str().unwrap());
     assert_eq!(
         fs::read_to_string(new_root.join("CLAUDE.md")).unwrap(),
         "Synthetic instruction only."
     );
-    assert!(root.join(".credentials.json").exists());
-    assert!(root.join(".claude.json").exists());
+    let credentials = load(&root.join(".credentials.json")).unwrap();
+    assert!(credentials.get("claudeAiOauth").is_none());
+    assert_eq!(credentials["mcpOAuth"]["keep"], "SYNTHETIC_MCP_LOGIN");
+    assert_eq!(
+        fs::read(root.join(".claude.json")).unwrap(),
+        b"{\"synthetic\":true}"
+    );
     let steps = j["steps"].as_array().unwrap();
     assert_eq!(
         steps.iter().find(|s| s["id"] == "archive").unwrap()["status"],
@@ -580,21 +591,31 @@ fn logout_failure_reports_ordered_steps_and_does_not_delete() {
         "completed"
     );
     assert_eq!(
-        steps.iter().find(|s| s["id"] == "logout").unwrap()["status"],
-        "executing"
+        steps.iter().find(|s| s["id"] == "auth_edit_0").unwrap()["status"],
+        "completed"
     );
-    // Ordered execution: create and migrate precede the logout step.
+    // Ordered execution: create and migrate precede the exact edit.
     let step_pos = |name: &str| steps.iter().position(|s| s["id"] == name).unwrap();
     assert!(step_pos("archive") < step_pos("create"), "{steps:?}");
-    assert!(step_pos("create") < step_pos("logout"), "{steps:?}");
-    // No local removal step was executed after the failed logout.
+    assert!(step_pos("create") < step_pos("migrate"), "{steps:?}");
+    assert!(step_pos("migrate") < step_pos("auth_edit_0"), "{steps:?}");
+    assert!(
+        step_pos("auth_edit_0") < step_pos("auth_verify"),
+        "{steps:?}"
+    );
     assert!(steps.iter().all(|s| s["id"] != "credentials"), "{steps:?}");
     assert!(steps.iter().all(|s| s["id"] != "client_state"), "{steps:?}");
+    assert!(!root.join("unexpected-auth-call").exists());
+    fs::write(root.join(".credentials.json"), &original).unwrap();
     let queried = ok(&engine, json!({"command":"job","job_id":p["id"]}));
-    assert_eq!(queried["status"], "needs_reconciliation");
-    assert_eq!(queried["error"]["code"], "logout_failed");
+    assert_eq!(queried["status"], "partially_completed");
     assert_eq!(queried["new_root"], j["new_root"]);
-    assert!(root.join(".credentials.json").exists());
+    let repeated = ok(
+        &engine,
+        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),
+    );
+    assert_eq!(repeated["id"], j["id"]);
+    assert_eq!(fs::read(root.join(".credentials.json")).unwrap(), original);
     assert_eq!(queried["id"], j["id"]);
 }
 

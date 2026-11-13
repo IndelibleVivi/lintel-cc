@@ -1,0 +1,153 @@
+{
+  "schema": "lintel.legacy-cleanup-display/1",
+  "source_revision": "77be0034df4d174d24203dedcb05e3f65f0f4688",
+  "purpose": "Display-only compatibility for original cleanup receipts. These phrases do not advertise or authorize current cleanup actions.",
+  "historical_statuses": [
+    "completed",
+    "partially_completed",
+    "needs_reconciliation",
+    "failed"
+  ],
+  "phrases": [
+    {
+      "text": "清理并重建",
+      "presentation_key": "present.title.rebuild",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "修复目标登录",
+      "presentation_key": "present.title.repairLogin",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "退役此环境",
+      "presentation_key": "present.title.retire",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "官方注销与读回",
+      "presentation_key": "present.action.officialLogoutReadback",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "调用官方 auth logout（可能联系服务端），再核验登录状态",
+      "presentation_key": "present.action.callLogout",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "先加密备份混合客户端状态",
+      "presentation_key": "present.action.backupClientState",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "混合客户端状态备份",
+      "presentation_key": "present.action.clientStateBackup",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "从可启动环境中退役；保留原工作目录",
+      "presentation_key": "present.action.retire",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "破坏性操作前复查",
+      "presentation_key": "present.action.preDestroyRecheck",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "建立新环境并迁入选中的工作内容（在任何删除之前）",
+      "presentation_key": "present.action.createAndImport",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "settings、hooks、MCP 与插件文件（不自动激活到新环境）",
+      "presentation_key": "present.preserve.0",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "其他环境、浏览器与目录外认证",
+      "presentation_key": "present.preserve.3",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "所有原始工作内容与项目文件",
+      "presentation_key": "present.preserve.9",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "CLI 报告已退出登录；服务端 token 撤销未独立验证。",
+      "presentation_key": "present.msg.0",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "仅处理预览冻结的文件。",
+      "presentation_key": "present.msg.3",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "加密状态备份已写入并读回；独立于可迁入的工作包。",
+      "presentation_key": "present.msg.5",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "命令结果不确定时不会自动重跑。",
+      "presentation_key": "present.msg.9",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "复查写入进程、service hold 与冻结文件；失败时保留已完成工作产物。",
+      "presentation_key": "present.msg.10",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "正在写入加密状态备份；尚未注销或删除旧文件。",
+      "presentation_key": "present.msg.20",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    },
+    {
+      "text": "环境停止作为启动目标；原始工作文件仍保留。",
+      "presentation_key": "present.msg.25",
+      "sources": [
+        "crates/core/src/cleanup.rs"
+      ]
+    }
+  ]
+}

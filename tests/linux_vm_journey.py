@@ -531,31 +531,46 @@ def journey(guest, process, args, report):
     # route. KillUserProcesses=yes is the strict policy that matters for survival.
     report["supervised"] = [supervised_case(guest, kind, True)
                             for kind in ("system", "user", "setsid")]
-    # The original shell gains a shared profile AFTER an otherwise valid preview.
-    # A manager worker must preserve that presence and refuse official logout
-    # before durable accept. The fake Claude is inert and never makes requests.
+    # Unsafe official logout refuses at preview. For a supported local plan the
+    # manager still has to preserve the caller's private environment: a profile
+    # introduced after preview must appear as an observed, unverified source in
+    # the independent result, without exposing its value. The unknown fixture
+    # credential is outside the empty selection and must remain untouched.
     report["managed_auth_scope"] = {"stage": "prepare"}
     auth = guest.probe("prepare", "supervised-auth-scope")
     auth["as_root"] = True
     report["managed_auth_scope"]["stage"] = "register"
     environment = guest.request(auth, {"command": "register", "name": "Synthetic managed auth scope", "root": auth["root"]})
     report["managed_auth_scope"]["stage"] = "preview"
-    # Unbound cleanup previews inspect every system service; under TCG the
-    # read-only scan exceeded the generic 60s SSH budget. Use the same finite
-    # extended test budget family as the existing real service suite.
+    refused = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
+                                  "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True},
+                            expected_error="official_logout_scope_unsafe")
+    require(guest.probe("auth-scope-evidence") == {"credentials_preserved": True, "logout_called": False,
+                                                 "job_accepted": False, "environment_value_persisted": False},
+            "Unsafe logout preview produced a side effect")
+    # Safe cleanup previews inspect system services; under TCG the bounded
+    # read-only scan can exceed the generic 60s SSH budget.
     preview_started = time.monotonic()
     auth_plan = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
-                                     "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True}, timeout=180)
+                                     "recipe": "repair_login", "writers_confirmed_stopped": True,
+                                     "official_logout": False, "auth_source_ids": []}, timeout=180)
     preview_seconds = round(time.monotonic() - preview_started, 3)
     report["managed_auth_scope"]["preview_seconds"] = preview_seconds
     report["managed_auth_scope"]["stage"] = "submit"
-    refused = guest.request(auth, {"command": "execute", "plan_id": auth_plan["id"], "approval": auth_plan["hash"]},
-                            submit=True, extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"},
-                            expected_error="shared_auth_scope")
+    auth["plan"] = auth_plan
+    ack = guest.request(auth, {"command": "execute", "plan_id": auth_plan["id"], "approval": auth_plan["hash"]},
+                        submit=True, extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"}, timeout=180)
+    require(ack["status"] == "accepted", f"Safe auth coverage did not acknowledge acceptance: {ack}")
+    receipt = terminal_receipt(guest, auth, timeout=180)
+    require(receipt["status"] == "partially_completed" and receipt["local_cleanup"] == "completed", str(receipt))
+    profile = next(source for source in receipt["auth_verification"]["inventory"]["sources"]
+                   if source["kind"] == "process_env" and source["name"] == "ANTHROPIC_PROFILE")
+    require(profile["presence"] == "present" and profile["evidence"] == "observed_context"
+            and profile["actual_use"] == "unverified", f"Manager dropped the original profile context: {profile}")
     evidence = guest.probe("auth-scope-evidence")
     require(evidence == {"credentials_preserved": True, "logout_called": False,
-                         "job_accepted": False, "environment_value_persisted": False},
-            f"Managed auth context violated pre-accept/refuse/no-secret-persistence: {evidence}")
+                         "job_accepted": True, "environment_value_persisted": False},
+            f"Managed auth context violated source preservation or secret persistence: {evidence}")
     report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], "preview_seconds": preview_seconds, **evidence,
                                     "caller_environment_preserved": True, "real_claude_or_network_requests": False}
     guest.probe("configure-logind", "no")

@@ -4,7 +4,7 @@ import {useI18n} from './i18n-provider';
 import {present} from './i18n-presentation';
 
 const outcomeKeys:Record<string,string>={completed:'outcome.completed',partial:'outcome.partial',blocked:'outcome.blocked',failed:'outcome.failed',uncertain:'outcome.uncertain',query_only:'outcome.queryOnly',in_progress:'outcome.inProgress'};
-const coverageKeys:Record<string,string>={done:'coverage.done',not_requested:'coverage.notRequested',not_checked:'coverage.notChecked',unverified:'coverage.unverified'};
+const coverageKeys:Record<string,string>={done:'coverage.done',not_requested:'coverage.notRequested',not_checked:'coverage.notChecked',unverified:'coverage.unverified',observed:'coverage.observed',unavailable:'coverage.unavailable'};
 export default function TaskOutcome({receipt}:{receipt:Receipt}) {
   const {t,locale}=useI18n();
   const p=(value:string|null|undefined)=>present(value,locale);

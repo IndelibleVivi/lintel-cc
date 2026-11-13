@@ -68,6 +68,17 @@ export const GUIDE_ARTICLES = Object.freeze([
     }),
   }),
   Object.freeze({
+    key: 'cleanup',
+    path: '/guide/cleanup/',
+    doc: 'cleanup',
+    group: 'tasks',
+    title: Object.freeze({ zh: '认证来源与清理', en: 'Authentication sources and cleanup' }),
+    summary: Object.freeze({
+      zh: '开发版：辨认本机认证来源，预览精确清理，并分别核对本地、运行上下文和撤销状态。',
+      en: 'Development version: inspect local authentication sources, preview exact cleanup, and distinguish local, runtime and revocation coverage.',
+    }),
+  }),
+  Object.freeze({
     key: 'agents',
     path: '/guide/agents/',
     doc: 'agents',

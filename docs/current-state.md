@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-11-13：未发布的认证来源与验证清理
+
+本轮在现有 core 计划／批准／回执路径发展认证管理；公开 App 仍为 0.1.1、CLI 仍为 0.1.0。下列能力不属于旧发行包；没有因此发布 App、激活 updater、部署官网或完成个人认证验收。[中文操作](cleanup.md)／[English](cleanup.en.md)，[官方机制与产品决定](credential-provenance-evidence.md)。
+
+| 范围 | 本轮实现契约与证据边界 |
+| --- | --- |
+| 来源清单 | `auth_inventory` 只读、有界，区分已识别本地来源、当前执行器变量、声明、无法读取与其他上下文；不执行 shell/helper/Claude、不读历史、不输出凭据值 |
+| 精确清理 | `plan_cleanup` 增加来源选择，继续同一 core engine。有限识别的 `claudeAiOauth`／`primaryApiKey`、用户 settings 认证字段／helper、简单 shell 赋值按冻结范围编辑；未知／不支持来源保留，混合凭据和 `.claude.json` 不再整文件删除；受支持共享 shell 需明确选择 |
+| 工作与秘密 | reset/retire 保持原有工作加密保全、新 root 和任务查询；认证清理不把 token 复制进恢复备份、公共计划、日志或回执，MCP／插件和未知字段保留；中断编辑留下的敏感原件／暂存由 `retained_sensitive_material` 报告并阻止完成判断 |
+| 独立复查 | `auth_verify` 重新读取来源；默认不运行 Claude，显式 `observe_runtime` 才调用官方状态。所选本地结果、当前执行器、其他上下文及服务端撤销分列，不声称整机无认证 |
+| 官方注销 | 当前官方文档确认 logout 可移除 MCP 登录／插件敏感值；本轮拒绝自动执行，返回 `official_logout_scope_unsafe`。不猜 Keychain 服务名；该范围仍未验证 |
+| 兼容与恢复 | 旧 accepted 原 ID 保持 query-only。未执行旧计划缺新绑定须重预览；旧 raw caller 可省略新增字段，但新计划仅默认选择精确可识别的目标本地登录字段 |
+| 平台边界 | 开发与测试只用 synthetic roots／inert adapters。macOS Keychain、实际 Terminal/IDE 登录、其他架构与生产 SSH 的真实行为仍需独立验收；历史 CI／native 通过不覆盖本轮 |
+
+实现分支为 `codex/credential-provenance`，基于最新 main `77be0034df4d174d24203dedcb05e3f65f0f4688`。本机 Linux x86_64、Rust 1.100.0，所有认证测试使用临时 synthetic HOME/state 与惰性客户端，未触及真实凭据、Keychain 或账号。提交前的最终本地证据如下；准确提交和托管 CI 结论以本轮 PR 的 source SHA/checks 为准。
+
+| 检查 | 实际结果与范围 |
+| --- | --- |
+| `cargo-workspace-test` | PASS，187.783 秒；core、operations、remote、runner、egress 的整个 workspace 及原有 ignored 边界保留 |
+| `auth-sources-core-test` | PASS，37 项；其中 16 项精确清理事务测试，包含竞态、中断、暂存归属失联与 status 重建凭据 |
+| CLI 与相邻行为 | `journey-auth-sources`、`journey-client-control`、`shared-remote-journey`、`journey-portable-work`、`journey-cli`、`journey-submission` 均 PASS；私有 worker 环境的认证变量值不进入回执 |
+| GUI 静态与渲染 | desktop typecheck/build PASS；两套 i18n 与认证 SSR 合计 28/28 PASS，其中 SSR 6 项；这不是浏览器交互或原生视觉证据 |
+| Python SSH | canonical `python-ssh-test` PASS，17 项；有限请求通过固定 argv／JSON stdin，非法范围在 SSH 前拒绝，只用 fake SSH |
+| 验证与文档路由 | `verify.py --self-test` PASS；双语网站源投影 21 routes／16 guides／42 URLs，语言与路由测试 14/14 PASS；没有部署 |
+| 浏览器与原生边界 | 新 `auth-sources-ui` 已加入现有 browser CI 并保留截图／JSON。本机浏览器因 socket 权限被阻止，提权被自动审批拒绝；macOS App／Keychain／真实 Claude／生产 SSH 本轮本地均未验收 |
+
+首轮 workspace 的两处失败已处理后重跑通过：旧 baseline 测试改为已识别字段清理并核对 MCP 保留；宿主 `/usr/bin/true` 被映射为 UID 65534 的测试假设改用自有 synthetic 可执行文件，生产所有者校验没有放宽。下方 `c7680f0` 的构建／CI 表仅属于 10-24 候选，不作为本轮认证改动的验收。
+
 ## 2026-10-24：未发布的恢复闭环与有界历史
 
 当前源码新增下列修复；公开 App 仍为下文的 0.1.1，独立 CLI 仍为原 0.1.0 候选。本轮没有发布新 Release、激活 updater 或更新官网部署。

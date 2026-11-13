@@ -12,6 +12,8 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 
 当前 `main` 的六项可靠性修复与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。`c7680f0` 已完成 fresh clone／fresh target 的三平台 CLI 与 macOS App／DMG 本地构建（复用依赖下载缓存）。候选源码与 full CI 的准确状态见[当前状态](docs/current-state.md)；构建不代表已安装 App、通过干净 Mac 信任验收或创建 Release。
 
+**11-13 开发版：认证来源与清理后复查。** App／CLI 可查看有限认证来源、选择能安全处理的精确字段或 shell 赋值，并沿同一计划批准、执行、重新检查；结果分别说明本地来源、当前执行环境、其他上下文与服务端撤销。`setup-token` 没有固定保存文件，Keychain 与共享 profiles 的未知范围继续可见。当前官方 logout 还会影响 MCP／插件凭据，因此开发版拒绝自动注销，不以整文件删除替代。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App。
+
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
 <a id="现在可以做什么"></a>
@@ -26,7 +28,7 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 | --- | --- | --- |
 | 减少外发，保留需要的功能 | 保护方案、逐项配置、受控代理通道与出口测试 | [保护方案](docs/operator-guide.md#protect) |
 | 收好工作，或准备新环境 | 精确选择指令、记忆和会话；加密归档、独立阅读与选择性迁入 | [工作保全](docs/operator-guide.md#work) |
-| 修复登录、清理旧状态、退役环境 | 按目标预览文件与认证处理范围；涉及删除时先完成所需保全 | [清理与重建](docs/operator-guide.md#cleanup) |
+| 修复登录、清理旧状态、退役环境 | 有界认证来源清单、精确选择与统一批准、清理后独立复查；重建前保全工作 | [清理与重建](docs/operator-guide.md#cleanup)／[开发版认证来源](docs/cleanup.md) |
 | 管理某个浏览器 profile | 配对扩展与本地 host，处理对应权限和站点状态 | [浏览器](docs/browser.md) |
 | 从 Mac 或 CLI 操作 SSH 主机 | 核对远端 runner，在目标主机执行，断线后查询原任务 | [远程](docs/remote.md) |
 | 找回结果，恢复配置或服务 | 原任务记录、变化检查、字段恢复与明确绑定的 systemd 服务恢复 | [记录与恢复](docs/operator-guide.md#recovery) |

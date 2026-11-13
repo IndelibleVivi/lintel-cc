@@ -150,6 +150,18 @@ class ProfileTests(unittest.TestCase):
             owners = [job.id for job in selected.jobs if "i18n-ui" in job.checks]
             self.assertEqual(owners, ["browser"])
 
+    def test_authentication_evidence_has_separate_frontend_native_and_browser_owners(self):
+        profile, _ = ci_plan.plan_for_event("push", ["tests/auth_sources_render.test.mjs"])
+        self.assertEqual(profile.name, "app-ui")
+        self.assertIn("auth-sources-render-test", profile.job("frontend").checks)
+        self.assertIn("auth-sources-ui", profile.job("browser").checks)
+        for name in ("core", "full"):
+            selected = ci_plan.PROFILES[name]
+            for check, owner in (("auth-sources-render-test", "frontend"),
+                                 ("journey-auth-sources", "native"),
+                                 ("auth-sources-ui", "browser")):
+                self.assertEqual([job.id for job in selected.jobs if check in job.checks], [owner])
+
     def test_core_profile_has_heavy_and_vm(self):
         profile, _ = ci_plan.plan_for_event("push", ["crates/core/src/lib.rs"])
         self.assertEqual(profile.name, "core")

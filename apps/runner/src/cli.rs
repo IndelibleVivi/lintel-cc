@@ -13,7 +13,7 @@ pub const HELP: &str = concat!(
   "  lintel schema OPERATION                     JSON Schema envelope, no discovery\n",
   "  lintel context [--json]                      Readonly state/user/executable facts; no state made\n",
   "  lintel tasks [--json]                        The one finite six-task map; no state made\n",
-  "  lintel help [GROUP]                         Static help; GROUP ∈ env/policy/config/data/snapshot/work/job/restore/remote/launch/session\n",
+  "  lintel help [GROUP]                         Static help; GROUP ∈ env/auth/policy/config/data/snapshot/work/job/restore/remote/launch/session\n",
   "  lintel env list | inspect ID | components ID [--project-cwd PATH] | create --name NAME | register --name NAME --root PATH\n",
   "  lintel env residue ID | identity ID         Local metadata and masked identity presence\n",
   "  lintel env compare ID --other-environment-id ID  Fresh local environment comparison\n",
@@ -63,6 +63,9 @@ pub const HELP: &str = concat!(
   "  lintel remote launch query ALIAS ID          Query original runner; no Terminal\n",
   "  lintel remote launch list ALIAS              Local original-launch metadata; no SSH\n",
   "  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n",
+  "  lintel auth inventory --environment ID      Bounded source inventory; no values or CLI execution\n",
+  "  lintel auth verify --environment ID [--job ID] [--observe-runtime]\n",
+  "  lintel auth cleanup plan --environment ID --recipe repair_login --writers-confirmed-stopped [--auth-source ID ...]\n",
   "  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\n",
   "Legacy: request, submit, discover, inspect ID, jobs, job ID, launch ID, tui.\n",
   "Ordinary commands print one ok/data or ok/error envelope. Network serve is explicitly NDJSON.\n",
@@ -215,6 +218,8 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
             "--archive-only",
             "--delete-work",
             "--lightweight",
+            "--verify-auth-status",
+            "--observe-runtime",
         ]
         .contains(&flag)
         {
@@ -227,6 +232,8 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
                 "--archive-only" => "archive_only",
                 "--delete-work" => "delete_work",
                 "--lightweight" => "lightweight",
+                "--verify-auth-status" => "verify_auth_status",
+                "--observe-runtime" => "observe_runtime",
                 _ => "official_logout",
             };
             if request.get(key).is_some() {
@@ -246,6 +253,18 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
             _ => flag.trim_start_matches("--"),
         };
         let key = key.replace('-', "_");
+        if request["command"] == "plan_cleanup" && key == "auth_source" {
+            let list = request
+                .as_object_mut()
+                .unwrap()
+                .entry("auth_source_ids")
+                .or_insert_with(|| json!([]))
+                .as_array_mut()
+                .ok_or_else(|| error("invalid_argument", "auth_source_ids 必须是数组"))?;
+            list.push(json!(args[i + 1]));
+            i += 2;
+            continue;
+        }
         if repeats_path && key == "path" {
             let raw = &args[i + 1];
             let list = request
@@ -271,6 +290,7 @@ fn flags(args: &[String], mut request: Value) -> Result<Value, Value> {
             "custom_values",
             "probe",
             "selected_keys",
+            "auth_source_ids",
             "selected_changes",
             "selected_paths",
             "residue_paths",
@@ -413,6 +433,7 @@ fn timeout(raw: &str) -> Option<Duration> {
 /// execution, so `lintel <group> help` never creates state. Each entry lists
 /// only real parser/schema operations.
 const GROUP_HELP: &[(&str, &str)] = &[
+    ("auth", "auth inventory --environment ID [--project-cwd PATH]\n  auth cleanup plan --environment ID --recipe repair_login --writers-confirmed-stopped [--auth-source ID ...] [--verify-auth-status]\n  auth verify --environment ID [--job ID] [--observe-runtime]\n  有界来源检查不返回秘密，不执行 Claude/helper；计划一次批准只编辑选择的精确来源。独立复查不重写原回执。运行时状态检查需显式选择，可能执行 helper 或联网；其他上下文与服务端撤销仍未验证。"),
     ("plan", "plan show ID\n  读回原冻结计划；不生成新的计划或授权。"),
     ("browser", "browser operations | instances | pair create|pending|approve | submit | query | control\n  明确实例与有限原生操作；清理要真正重启后独立确认。"),
     ("network", "network inspect\n  network catalog\n  network probe [--ipv4-url HTTPS_URL --ipv6-url HTTPS_URL --proxy-url LOOPBACK_HTTP --timeout-seconds 10]\n  network ipv6 plan --service-id ID --mode off|link_local [同样的探测 flags] [--baseline-id ID]\n  network restore plan --job ID [--baseline-id ID]\n  network serve --config PATH [--test-telemetry ID,...]\n  inspect 离线读取宿主共享状态；catalog 只读静态 telemetry 目标；probe 显式访问 https://api.ipify.org 与 https://api6.ipify.org，可指定自己的 HTTPS 回显端点。IPv6 plan 会前测，批准后自动沿用同目标复测；macOS 可能申请系统网络配置授权。submit 需精确计划/hash，恢复另外批准。serve 是前台 NDJSON owner；Ctrl-C 只关闭自己的通道；--test-telemetry 要求冻结草案已显式阻止每个目录目标，否则拒绝启动，且从不连接目标。"),
@@ -576,6 +597,12 @@ pub fn run(args: &[String]) -> Value {
                 "invalid_argument",
                 "env list | inspect ID | components ID | residue ID | identity ID | compare ID --other-environment-id ID | register | create",
             ),
+        },
+        "auth" => match (word(1), word(2)) {
+            ("inventory", _) => named("auth_inventory", &args[2..], json!({}), false),
+            ("verify", _) => named("auth_verify", &args[2..], json!({}), false),
+            ("cleanup", "plan") => named("plan_cleanup", &args[3..], json!({"official_logout":false}), false),
+            _ => error("invalid_argument", "auth inventory|verify --environment ID | auth cleanup plan --environment ID --recipe repair_login --writers-confirmed-stopped"),
         },
         "snapshot" => match word(1) {
             "save" | "list" | "compare" | "accept" => named(match word(1) { "save" => "snapshot_save", "list" => "snapshot_list", "accept"=>"snapshot_accept", _ => "snapshot_compare" }, &args[2..], json!({}), false),

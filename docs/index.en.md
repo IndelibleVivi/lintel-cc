@@ -14,6 +14,7 @@ Choose a page by what you need to do. First use does not require reading the ful
 | --- | --- |
 | Protection (including 27-field individual/bulk editing), work preservation, cleanup, recovery and recipes | [Operator guide](operator-guide.en.md) |
 | CLI use, standalone candidates or agent handoff | [Agent CLI](agents.en.md) |
+| Development authentication sources, exact cleanup and independent verification (not in 0.1.1) | [Authentication cleanup](cleanup.en.md) |
 | App pages, language and desktop use | [Desktop](desktop.en.md) |
 | Extension setup, pairing and post-restart cleanup | [Browser](browser.en.md) |
 | SSH hosts, remote runners and disconnected tasks | [Remote](remote.en.md) |

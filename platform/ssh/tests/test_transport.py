@@ -111,6 +111,83 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(self.calls()[0]["request"], request)
         self.assertNotIn("custom_settings", " ".join(self.calls()[0]["args"]))
 
+    def test_authentication_inventory_verify_and_selection_use_fixed_command_and_stdin(self):
+        environment = "00000000-0000-4000-8000-000000000001"
+        job = "00000000-0000-4000-8000-000000000002"
+        source = "auth-0123456789abcdef01234567"
+        sentinel = self.root / "must-not-exist"
+        # A target-host path remains literal JSON data even with shell syntax.
+        project = f"{self.root}/project; $(touch {sentinel})"
+        requests = [
+            {"command": "auth_inventory", "environment_id": environment},
+            {"command": "auth_inventory", "environment_id": environment, "project_cwd": project},
+            {"command": "auth_verify", "environment_id": environment},
+            {"command": "auth_verify", "environment_id": environment, "job_id": job, "observe_runtime": True},
+            {"command": "plan_cleanup", "environment_id": environment, "recipe": "repair_login",
+             "writers_confirmed_stopped": True, "official_logout": False, "auth_source_ids": [source],
+             "project_cwd": project, "verify_auth_status": False},
+        ]
+        for request in requests:
+            self.assertTrue(self.controller.request("synthetic-host", request)["ok"])
+        calls = self.calls()
+        self.assertEqual([call["request"] for call in calls], requests)
+        for call in calls:
+            self.assertEqual(call["args"][-3:], ["synthetic-host", "lintel", "request"])
+            self.assertIn("-oStrictHostKeyChecking=yes", call["args"])
+            for value in (environment, job, source, project):
+                self.assertNotIn(value, call["args"])
+        self.assertFalse(sentinel.exists())
+
+    def test_authentication_source_ids_are_unique_bounded_and_never_paths_or_values(self):
+        environment = "00000000-0000-4000-8000-000000000001"
+        source = "auth-0123456789abcdef01234567"
+        request = {"command": "plan_cleanup", "environment_id": environment, "recipe": "repair_login",
+                   "writers_confirmed_stopped": True, "official_logout": False, "auth_source_ids": [source]}
+        for sources in ([], [f"auth-{index:024x}" for index in range(128)]):
+            valid = request | {"auth_source_ids": sources}
+            self.assertEqual(ssh.validate_request(valid), valid)
+        for sources in ("all", None, [source, source], [f"auth-{index:024x}" for index in range(129)],
+                        ["/synthetic/.zshrc"], ["SYNTHETIC_OAUTH_VALUE_MUST_NOT_BE_AN_ID"],
+                        ["auth-ABCDEF0123456789abcdef01"], ["auth-" + "0" * 23], [42], [{}]):
+            with self.subTest(selection=sources), self.assertRaises(ssh.ControllerError) as error:
+                self.controller.request("synthetic-host", request | {"auth_source_ids": sources})
+            self.assertEqual(error.exception.code, "invalid_request")
+            self.assertNotIn("SYNTHETIC_OAUTH_VALUE_MUST_NOT_BE_AN_ID", str(error.exception))
+        self.assertFalse((self.root / "calls.jsonl").exists())
+
+    def test_authentication_fields_reject_wrong_types_unknown_values_and_residue_mixing(self):
+        environment = "00000000-0000-4000-8000-000000000001"
+        inventory = {"command": "auth_inventory", "environment_id": environment}
+        verify = {"command": "auth_verify", "environment_id": environment}
+        cleanup = {"command": "plan_cleanup", "environment_id": environment, "recipe": "repair_login",
+                   "writers_confirmed_stopped": True, "official_logout": False, "auth_source_ids": []}
+        invalid = [
+            inventory | {"environment_id": "not-a-uuid"}, inventory | {"environment_id": False},
+            inventory | {"project_cwd": "relative"}, inventory | {"project_cwd": "/synthetic/../other"},
+            inventory | {"project_cwd": "/synthetic/new\nline"}, inventory | {"project_cwd": False},
+            inventory | {"token": "SYNTHETIC_SECRET"}, inventory | {"source_path": "/synthetic/.credentials.json"},
+            verify | {"job_id": "not-a-uuid"}, verify | {"observe_runtime": "true"},
+            verify | {"observe_runtime": 1}, verify | {"project_cwd": "/synthetic/project"},
+            cleanup | {"environment_id": "not-a-uuid"}, cleanup | {"verify_auth_status": "false"},
+            cleanup | {"verify_auth_status": 0}, cleanup | {"auth_source_paths": ["/synthetic/.zshrc"]},
+            cleanup | {"token": "SYNTHETIC_SECRET"}, cleanup | {"helper_command": "never-execute"},
+        ]
+        residue = {"command": "plan_cleanup", "environment_id": environment, "recipe": "clear_residue",
+                   "writers_confirmed_stopped": True, "official_logout": False,
+                   "residue_paths": ["/synthetic/debug/old.log"]}
+        for fields in ({"auth_source_ids": []}, {"verify_auth_status": False}, {"project_cwd": "/synthetic/project"}):
+            invalid.append(residue | fields)
+        for request in invalid:
+            with self.subTest(request=request), self.assertRaises(ssh.ControllerError) as error:
+                self.controller.request("synthetic-host", request)
+            self.assertEqual(error.exception.code, "invalid_request")
+            self.assertNotIn("SYNTHETIC_SECRET", str(error.exception))
+        # Existing callers without the additive authentication contract retain
+        # their old syntax; the target runner still validates actual identity.
+        legacy = residue | {"environment_id": "synthetic-legacy-environment"}
+        self.assertEqual(ssh.validate_request(legacy), legacy)
+        self.assertFalse((self.root / "calls.jsonl").exists())
+
     def test_lost_ack_reconnect_and_repeated_execute_query_one_original_job(self):
         with patch.dict(os.environ, {"LINTEL_FAKE_MODE": "lose_ack"}):
             with self.assertRaises(ssh.ControllerError) as error:

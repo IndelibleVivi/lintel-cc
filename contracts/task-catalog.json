@@ -80,16 +80,20 @@
     {
       "id": "repair_cleanup_retire",
       "label": "修复本地登录、清理重建、退役环境",
-      "summary": "先停写入者，再按批准范围处理已识别的本地状态；官方注销单独表达。归档与新环境准备先于任何删除。",
+      "summary": "查看本机认证来源，停写后一次批准精确清理所选声明；保全与新环境准备先于清理。本地结果、当前执行环境与未核验范围分别说明。",
       "route": "#/cleanup",
       "help_anchor": "cleanup",
       "operations": [
         "cleanup_inspect",
+        "auth_inventory",
         "auth_probe",
-        "plan_cleanup"
+        "plan_cleanup",
+        "auth_verify"
       ],
       "cli_examples": [
-        "lintel call plan_cleanup"
+        "lintel auth inventory --environment <environment-id>",
+        "lintel call plan_cleanup",
+        "lintel auth verify --environment <environment-id> --job <job-id>"
       ],
       "preconditions": [
         "writers_confirmed_stopped",
@@ -100,7 +104,7 @@
         "ssh_remote"
       ],
       "label_en": "Repair local login, clean and rebuild, retire an environment",
-      "summary_en": "Stop writers first, then handle the recognized local state within the approved scope; official logout is expressed separately. Archive and new-environment preparation come before any deletion."
+      "summary_en": "Inspect local authentication sources, stop writers and approve exact removal of selected declarations once. Preserve work and prepare a new environment before cleanup. Local results, the current executor and unverified coverage remain distinct."
     },
     {
       "id": "browser_profile",

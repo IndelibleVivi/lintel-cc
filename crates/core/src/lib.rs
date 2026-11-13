@@ -1,5 +1,9 @@
 //! Lintel's single filesystem plan/execution authority.
 mod archive;
+mod auth_cleanup;
+#[cfg(test)]
+mod auth_cleanup_tests;
+mod auth_sources;
 #[cfg(test)]
 mod baseline_tests;
 mod cleanup;
@@ -468,7 +472,7 @@ impl Engine {
         } else {
             root.join("settings.json")
         };
-        let snap = snapshot(&settings_path)?;
+        let snap = auth_cleanup::settings_binding(&settings_path, &extra)?;
         let rm = fs::metadata(&root)?;
         use std::os::unix::fs::MetadataExt;
         let mut warnings = self.warnings(e);
@@ -697,6 +701,8 @@ impl Engine {
             "snapshot_accept" => self.snapshot_accept(r),
             "env_compare" => self.env_compare(r),
             "auth_probe" => self.auth_probe(r),
+            "auth_inventory" => self.auth_inventory(r),
+            "auth_verify" => self.auth_verify(r),
             "plan_cleanup" => self.plan_cleanup(r),
             "plan_identity_reset" => self.plan_identity_reset(r),
             "plan_client_workflow" => self.plan_client_workflow(r),
@@ -921,7 +927,7 @@ impl Engine {
                 | "cleanup" | "import" | "service_quiesce" | "service_resume",
             ) => {
                 let path = root.join("settings.json");
-                let snap = snapshot(&path)?;
+                let snap = auth_cleanup::settings_binding(&path, &p["extra"])?;
                 (path, Value::Null, snap)
             }
             Some("policy" | "restore") => self.settings(&e)?,
@@ -1358,7 +1364,7 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
             .and_then(|step| step["status"].as_str())
             .is_some_and(|status| matches!(status, "completed" | "preserved"))
     };
-    if kind == "cleanup" {
+    if kind == "cleanup" && plan["extra"]["authentication"].is_null() {
         let logout_state = if !logout {
             "not_requested"
         } else if step_done("logout") {
@@ -1385,6 +1391,15 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
             "state": "not_checked",
             "detail": "仅覆盖预览列出的 Claude Code 状态；浏览器、Desktop/IDE 与目录外 profile 不在本次范围",
         }));
+    }
+    if receipt["auth_verification"].is_object() {
+        let v = &receipt["auth_verification"];
+        let local_done = receipt["local_cleanup"] == "completed";
+        let no_selection = v["local_sources"].as_array().is_some_and(Vec::is_empty);
+        coverage.push(json!({"scope":"authentication_local_sources","state":if no_selection{"not_requested"}else if local_done{"done"}else{"unverified"},"detail":"按原选择重新读取；未选择或无法检查的来源继续单列"}));
+        coverage.push(json!({"scope":"authentication_runtime","state":v["runtime"]["state"],"detail":"仅当前 Lintel 执行器与目标 root；不代表原 Terminal、IDE 或 SSH 会话"}));
+        coverage.push(json!({"scope":"authentication_other_contexts","state":"unverified","detail":"运行中进程、Keychain、共享 profiles 与其他机器需独立核对"}));
+        coverage.push(json!({"scope":"authentication_server_revocation","state":"unverified","detail":"本机来源移除不会证明服务端 token 已撤销"}));
     }
     if plan["extra"]["network"].is_object() {
         // Configuration change and the post-write probe are separate facts. A
@@ -1444,7 +1459,15 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
             "detail": format!("计划目标 {}；执行时按冻结映射复查，冻结本身不代表已创建或已迁入", plan["extra"]["frozen_target"]["new_root"]),
         }));
     }
-    let primary = if kind == "cleanup" && plan["extra"]["official_logout"] != true {
+    let primary = if kind == "cleanup"
+        && plan["extra"]["authentication"]["sources"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+        && plan["extra"]["recipe"] == "repair_login"
+        && receipt["status"] != "needs_reconciliation"
+    {
+        "未选择可移除的认证来源；没有执行删除，请核对仍存在与未知的来源"
+    } else if kind == "cleanup" && plan["extra"]["official_logout"] != true {
         // The selected local steps are the whole requested scope here; report
         // them as completed and state the unrequested/unchecked scopes separately.
         if selected_done && receipt["status"] != "needs_reconciliation" {
@@ -1465,7 +1488,10 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
     if receipt["status"] == "needs_reconciliation" {
         next_actions.push(json!({"label": "查询原任务", "entry": format!("job {}", receipt["id"].as_str().unwrap_or(""))}));
     }
-    if kind == "cleanup" && plan["extra"]["official_logout"] != true {
+    if kind == "cleanup"
+        && plan["extra"]["official_logout"] != true
+        && plan["extra"]["authentication"].is_null()
+    {
         next_actions.push(json!({"label": "需要时另选官方注销配方", "entry": "plan_cleanup(recipe=repair_login|reset_client, official_logout=true)"}));
     }
     if let Some(steps) = receipt["next_steps"].as_array() {
@@ -1484,6 +1510,10 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
 }
 
 fn public_plan(mut p: Value) -> Result<Value> {
+    if p["extra"]["authentication"]["schema"] == "lintel.auth-cleanup/1" {
+        let a = &p["extra"]["authentication"];
+        p["authentication"] = json!({"schema":"lintel.auth-cleanup/1","selected_sources":a["sources"],"local_source_count":a["sources"].as_array().map_or(0,Vec::len),"context":a["context"],"runtime_verification_requested":a["runtime_verification_requested"],"boundaries":["selected_local_sources_only","existing_process_environment_unchanged","keychain_and_external_profiles_unverified","server_revocation_unverified","no_credential_backup","official_logout_scope_unsafe"]});
+    }
     if p["extra"]["lightweight_changes"].is_object() {
         p["lightweight_changes"] = p["extra"]["lightweight_changes"].clone();
     }
@@ -1788,14 +1818,30 @@ mod tests {
     }
     #[test]
     fn finite_io_reason_survives_acceptance_and_reopen() {
-        for (errno, reason) in [(libc::ENOSPC, "storage_full"), (libc::EACCES, "permission_denied"), (libc::EROFS, "read_only_filesystem")] {
+        for (errno, reason) in [
+            (libc::ENOSPC, "storage_full"),
+            (libc::EACCES, "permission_denied"),
+            (libc::EROFS, "read_only_filesystem"),
+        ] {
             for accepted in [false, true] {
                 let (_temp, engine, e, root) = setup();
                 let p = plan(&engine, &e);
                 let journal = engine.path("jobs", p["id"].as_str().unwrap());
-                storage::io_fault::arm(if accepted { root.join("settings.json") } else { journal.clone() }, errno);
-                let response = engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
-                let error = if accepted { &response["data"]["error"] } else { &response["error"] };
+                storage::io_fault::arm(
+                    if accepted {
+                        root.join("settings.json")
+                    } else {
+                        journal.clone()
+                    },
+                    errno,
+                );
+                let response = engine
+                    .request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+                let error = if accepted {
+                    &response["data"]["error"]
+                } else {
+                    &response["error"]
+                };
                 assert_eq!(error["code"], "io_error", "{response}");
                 assert_eq!(error["reason"], reason, "{response}");
                 assert!(!error.to_string().contains(root.to_str().unwrap()));
@@ -1805,13 +1851,20 @@ mod tests {
                     let reopened = Engine::new(engine.home.clone(), engine.state.clone()).unwrap();
                     let query = reopened.request(json!({"command":"job","job_id":p["id"]}));
                     assert_eq!(query["data"]["error"], *error, "{query}");
-                    let replay = reopened.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+                    let replay = reopened.request(
+                        json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}),
+                    );
                     assert_eq!(replay["data"]["error"], *error);
                     let mut legacy = persisted;
                     legacy["error"].as_object_mut().unwrap().remove("reason");
                     save(&journal, &legacy).unwrap();
-                    assert_eq!(reopened.request(json!({"command":"job","job_id":p["id"]}))["ok"], true);
-                } else { assert!(!journal.exists()); }
+                    assert_eq!(
+                        reopened.request(json!({"command":"job","job_id":p["id"]}))["ok"],
+                        true
+                    );
+                } else {
+                    assert!(!journal.exists());
+                }
             }
         }
     }

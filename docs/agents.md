@@ -75,6 +75,8 @@ lintel schema plan_policy
 lintel env list --json
 lintel env inspect <environment-id> --json
 lintel env components <environment-id> --project-cwd /synthetic/project --json
+lintel auth inventory --environment <environment-id> --json
+lintel auth verify --environment <environment-id> --json
 lintel work preflight --environment <environment-id> --categories instructions,memory,sessions --json
 lintel work inventory --environment <environment-id> --categories memory,sessions --json
 lintel work archive plan --environment <environment-id> --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
@@ -101,7 +103,23 @@ Named execute 与有限远端新提交的 `approval` 必须是原计划返回的
 
 专用真实 TTY `lintel launch ID` 与 `capabilities --environment ID` 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 `invalid_request`，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。
 
-`env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_probe` 会显式运行官方认证状态命令，并以 `identity_observed` 布尔值说明主体是否可核对；官方注销的主体缺失会拒绝预览，认证状态变化会使旧批准失效。未执行旧注销计划缺少绑定时需要新预览，已接受任务仍只查询原 ID。`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
+`env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_inventory` 和默认 `auth_verify` 有界读取认证来源，不运行客户端；显式 `auth_probe` 或 `auth_verify.observe_runtime:true` 才执行官方状态命令，并以 `identity_observed` 布尔值说明主体能否核对。结果属于当前执行器，不能代表其他 Terminal／IDE。`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
+
+### 认证来源与清理（11-13 开发源码）
+
+公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。`auth_inventory(environment_id, project_cwd?)` 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读，默认 `observe_runtime:false`。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，Keychain／共享 profiles／动态注入保留未知范围。
+
+```sh
+lintel auth inventory --environment <environment-id> --project-cwd /synthetic/project --json
+lintel auth cleanup plan --environment <environment-id> --recipe repair_login --writers-confirmed-stopped --auth-source '<source-id-from-inventory>'
+lintel plan show <returned-plan-id>
+lintel job submit --plan <returned-plan-id> --approval <returned-plan-hash>
+lintel auth verify --environment <environment-id> --job <original-job-id> --json
+```
+
+`--auth-source` 可重复，映射 `plan_cleanup.auth_source_ids`；仍由同一清理 engine 冻结、批准和执行。`--verify-auth-status`／独立 verify 的 `--observe-runtime` 才请求官方状态；普通 inventory 不执行 shell、helper 或 Claude。完整字段和原始 `call` 示例见[认证清理指南](cleanup.md)。未选择支持来源不会扩大为任意文件删除。
+
+新清理只编辑已识别 `claudeAiOauth`／`primaryApiKey`、所选用户 settings 认证字段／helper 及受支持的简单 shell 赋值，保留其他字段、MCP／插件与工作。认证清理不备份旧 token；中断编辑可能保留原文件的私有暂存，结果以 `retained_sensitive_material` 明确列出而不报完成。当前官方 logout 还删除 MCP 登录／插件敏感值，所以 `official_logout:true` 返回 `official_logout_scope_unsafe`，不运行命令。旧已接受任务继续 query-only；旧未执行计划缺新绑定须重新预览。旧 raw caller 省略新字段时，新计划仅默认选择可精确识别的目标本地登录字段，这是一项明确安全收紧。
 
 普通命令 stdout 只有一个 JSON envelope，`ok:false` 退出非零，诊断走 stderr。专用 `launch` 是交互进程接管入口，启动失败诊断写 stderr。`network serve` 是唯一这里明确使用 NDJSON stream 的长期入口。`ok:true` 说明请求处理成功；任务是否完成由 `data.status`、steps、coverage 和 error 判断。
 
@@ -198,9 +216,9 @@ lintel call service_inspect <<'JSON'
 JSON
 ```
 
-先 `describe` / `schema`，再从真实 inspection 准备准确计划。清理顺序为状态备份/工作归档 → 新根迁入（reset_client）→ 官方注销（若批准）→ 精确文件处理 → 退役（若选）。没有“全环境 export”“全局杀 Claude”“恢复全部”。service pause/resume 是独立批准任务，不自动改绑新根。
+先 `describe` / `schema`，再从真实 inspection 准备准确计划。认证清理顺序为工作加密保全（reset/retire）→ 新根迁入（reset_client）→ 精确认证来源编辑 → 退役（若选）→ 独立复查；不自动注销、不新备份 token、不整删混合凭据／客户端状态。没有“全环境 export”“全局杀 Claude”“恢复全部”。service pause/resume 是独立批准任务，不自动改绑新根；独立 residue／identity 保全遵守各自既有契约。
 
-旧 `request`、`submit`、`discover`、`inspect ID`、`jobs`、`job ID`、`launch ID`、`tui` 保留。协议 1 raw core request 保留历史 defaults；named CLI 和有限 SSH 使用明确严格字段，不会静默收紧已有 raw caller。`request` 的 execute 为前台处理；后台原 ID 回收使用 submit。`launch` 需要真实 TTY、不接受 prompt，启动的是准确程序和配置根，不能用于后台 mutation。旧 plan_reset/rebuild 及历史“部分完成”回执不改写为新 preservation outcome。
+旧 `request`、`submit`、`discover`、`inspect ID`、`jobs`、`job ID`、`launch ID`、`tui` 保留。协议 1 raw core request 保留未受本节明确认证安全收紧影响的历史 defaults；named CLI 和有限 SSH 使用明确严格字段。`request` 的 execute 为前台处理；后台原 ID 回收使用 submit。`launch` 需要真实 TTY、不接受 prompt，启动的是准确程序和配置根，不能用于后台 mutation。旧 plan_reset/rebuild 及历史“部分完成”回执不改写为新 preservation outcome。
 
 <a id="portable-work"></a>
 

@@ -74,7 +74,7 @@ impl Engine {
         let mut items = vec![
             item("cli", "Claude Code CLI", if executable.is_some(){"observed"}else{"not_found"}, "static_discovery", "当前 runner 的 PATH 优先发现及当前用户 native fallback", "仅静态识别，不执行 Claude；其他安装来源、登录与实际加载未核验。", json!({"selected_executable":executable,"registered_executable":environment["executable"],"product":cli}), "launch"),
             item("configuration", "配置与项目来源", if restricted{"access_limited"}else if contents_unknown{"unknown"}else{"observed"}, "finite_config_files", "当前 root；可选项目 cwd 与有限上级候选；managed 文件及 drop-ins", "文件存在和声明只表示可能参与；组织下发、worktree 主 checkout、目录内容与实际加载仍未核验。", json!({"sources":sources,"project_selected":project.is_some(),"startup":observed.view}), "policy"),
-            item("authentication", "认证位置", "unknown", "metadata_only", "已识别文件及目录外共享 profile", "未读取凭据、未调用认证命令。文件存在不代表已登录，Keychain 与服务端状态未知；认证来源需另行显式检查。", json!({"credential_file":credentials,"shared_profile":profile,"keychain":"not_checked","account":"not_checked"}), "cleanup"),
+            item("authentication", "认证位置", "unknown", "metadata_only", "已识别文件及目录外共享 profile", "未读取凭据、未调用认证命令。文件存在不代表已登录，Keychain 与服务端状态未知；认证来源需另行显式检查。", json!({"credential_file":credentials,"shared_profile":profile,"keychain":"not_checked","account":"not_checked","inventory_operation":"auth_inventory","inventory_requires_explicit_read":true}), "cleanup"),
             item("desktop_ide", "Desktop／IDE", "unsupported", "adapter_support", "独立客户端与编辑器入口", "尚无存储与生命周期 adapter；暂不支持不能解释为未发现。", json!({}), "none"),
             item("browser", "浏览器 profiles", "separate_module", "native_browser_host", "本机浏览器独立配对的具体 profile", "配置 root 不证明浏览器 profile 归属；从浏览器工作空间按原 clear ID 完成重启后的步骤。远端环境不改绑本机 profile。", json!({"environment_binding":"unverified"}), "browser"),
         ];
