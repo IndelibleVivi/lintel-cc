@@ -87,6 +87,21 @@ later revision automatically.
 
 ## Continue here
 
+Revision `09e92ff` passed all 118 selected check executions outside the VM in
+[run 43372794800](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43372794800),
+at clean merge checkout `3519541`; both platforms' 16 authentication screenshots
+were inspected. The corrected VM fixture reached submission, but its 77-second
+TCG safety preview exposed a test assumption: production's bounded 40-second
+ACK wait may return `submission_uncertain` before durable acceptance. That run
+stopped without querying the original ID, so reboot evidence was not produced.
+The acceptance harness now submits once and queries the exact original ID within
+a deadline, allows `job_not_found` only before the first observed receipt, retains
+other errors, and verifies the original manager context and eventual result.
+All 43 controller tests pass; the existing browser journey also gains the
+preaccept-missing-receipt sequence without allowing another approval or submit. No
+production timeout, safety check or no-replay rule is relaxed. Read the final
+revision's checks for its actual guest and aggregate outcome.
+
 Review the PR's exact source checks, including its browser journey and macOS
 compile evidence. The next product increment is an attributed, version-bound
 Keychain/profile adapter only when it can preserve MCP/plugin credentials,

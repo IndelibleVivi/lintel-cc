@@ -24,6 +24,7 @@ const executionContext={product:'Lintel',version:'0.1.0',protocol:1,platform:'ma
 const calls=[],receipts=[],tasks=[],installations=[];
 const installation={install_id:'synthetic-install',alias,probe:{os:'Linux',architecture:'x86_64',uid:'1000'},bundle:{version:'0.1.0',target:'x86_64-unknown-linux-musl',bytes:1024,sha256:'b'.repeat(64)},destination:'$HOME/.local/share/lintel/runners/'+ 'b'.repeat(64) +'/lintel',approval:'synthetic-install-approval',status:'previewed',effects:['Synthetic frozen approval']};let removed=false,conflict=false;
 let heldDiscover,heldJob,discoverRequested=false,jobRequested=false;
+let pendingAdmission=null,admissionQueried=false;
 function plan(restore=false){return {id:restore?restoreId:original,hash:restore?'synthetic-restore-approval':'synthetic-policy-approval',environment_id:remote.id,title:restore?'恢复原任务配置':'减少外发',changes:[],preserves:['后续编辑与邻居环境'],warnings:[],actions:[{id:'settings',label:restore?'恢复本任务原值':'写入当前环境设置',reversible:!restore}],created_at:new Date().toISOString(),status:'planned'};}
 const ok=data=>({ok:true,data});
 async function invoke(command,args){
@@ -40,10 +41,21 @@ async function invoke(command,args){
       case 'query_install':assert.equal(p.install_id,'original-install');installations[0]={...installations[0],status:'superseded'};return ok({...installations[0]});
       case 'connect':assert.ok([alias,otherAlias].includes(p.alias));return ok({status:'connected'});
       case 'remove_host':removed=true;return ok({status:'removed'});
-      case 'reconnect':assert.equal(p.alias,alias);assert.equal(p.plan_id,original);return ok(await core({command:'job',job_id:p.plan_id},true));
+      case 'reconnect':
+        assert.equal(p.alias,alias);assert.equal(p.plan_id,original);
+        if(pendingAdmission){
+          // The local intent already exists, but the runner has not durably
+          // accepted yet. Production wraps its job_not_found as reconciliation.
+          if(!admissionQueried){admissionQueried=true;return {ok:false,error:{code:'reconciliation_required',message:'Synthetic job_not_found: original submission is still being admitted; query the original ID only.'}};}
+          receipts.push(pendingAdmission);tasks.find(task=>task.plan_id===original).status=pendingAdmission.status;pendingAdmission=null;
+        }
+        return ok(await core({command:'job',job_id:p.plan_id},true));
       case 'launch_query':assert.equal(p.alias,alias);assert.equal(p.request_id,launchId);return ok({...launches[0],root:remote.root,project_cwd:'/synthetic/project',message:'Synthetic original launch remains query-only'});
       case 'request':assert.ok([alias,otherAlias].includes(p.alias));return ok(await core(p.request,true,p.alias));
-      case 'execute':assert.equal(p.alias,alias);return ok(await core({...p,command:'execute'},true));
+      case 'execute':{
+        assert.equal(p.alias,alias);const receipt=await core({...p,command:'execute'},true);
+        return p.plan_id===original?{ok:false,error:{code:'submission_uncertain',message:'Synthetic ACK timeout before durable acceptance'}}:ok(receipt);
+      }
       default:throw new Error('unexpected remote operation: '+p.op);
     }
   }
@@ -67,10 +79,11 @@ async function core(p,isRemote,selectedAlias=alias){
       return {...plan(),launch_request:{id:launchId,config_root:remote.root,project_cwd:p.project_cwd,executable:remote.executable,client_version:'synthetic'}};
     case 'execute':{
       assert.ok(isRemote);const restore=p.plan_id===restoreId;
-      assert.equal(p.approval,plan(restore).hash);assert.ok(!receipts.some(r=>r.id===p.plan_id),'duplicate submission');
+      assert.equal(p.approval,plan(restore).hash);assert.ok(!tasks.some(task=>task.plan_id===p.plan_id),'duplicate submission, including before durable acceptance');
       const receipt={id:p.plan_id,plan_id:p.plan_id,environment_id:remote.id,title:plan(restore).title,status:restore?'completed':'accepted',created_at:new Date().toISOString(),restorable:false,warnings:[],execution:{mode:'setsid',manager:null,unit:null,continuation:'Synthetic host: logout continuation unverified; reboot interrupts',limitation:'Synthetic existing user manager has no linger',reboot_survival:false},steps:restore?[{id:'settings',label:'恢复本任务原值',status:'completed',message:'Synthetic original values restored; external edits preserved'}]:[]};
-      receipts.push(receipt);tasks.push({alias,plan_id:p.plan_id,lookup_id:p.plan_id,status:receipt.status});
-      if(!restore)throw new Error('Synthetic ACK lost after durable acceptance');return {...receipt};
+      tasks.push({alias,plan_id:p.plan_id,lookup_id:p.plan_id,status:restore?receipt.status:'submission_unknown'});
+      if(restore)receipts.push(receipt);else pendingAdmission=receipt;
+      return {...receipt};
     }
     case 'job':
       if(heldJob){jobRequested=true;await heldJob.promise;}
@@ -114,6 +127,21 @@ try{
   await page.getByRole('button',{name:'预览变更',exact:true}).click();await dialog.getByRole('button',{name:'批准并执行',exact:true}).click();
   await dialog.getByRole('heading',{name:'结果待核对',exact:true}).waitFor();
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
+  assert.equal(receipts.length,0,'the runner has not accepted during the initial ACK timeout');
+  const earlyQueryStart=calls.length;
+  await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
+  await dialog.getByText('Synthetic job_not_found: original submission is still being admitted; query the original ID only.',{exact:true}).waitFor();
+  await dialog.getByRole('heading',{name:'结果待核对',exact:true}).waitFor();
+  await dialog.getByText('没有再次执行。请查询这份计划的原任务；未收到结果不代表操作没有发生。',{exact:true}).waitFor();
+  assert.deepEqual(calls.slice(earlyQueryStart).filter(c=>c.op==='reconnect'),[{command:'remote_request',op:'reconnect',alias,plan_id:original}]);
+  assert.equal(calls.filter(c=>c.op==='execute').length,1);
+  assert.equal(await dialog.getByRole('button',{name:'批准并执行',exact:true}).count(),0);
+  assert.match(await dialog.locator('.plan-target').innerText(),new RegExp(alias));
+  assert.ok((await dialog.locator('.plan-target').innerText()).includes(remote.root));
+  await dialog.locator('.plan-identity summary').click();await dialog.locator('.plan-identity').getByText(original,{exact:true}).waitFor();
+  assert.equal(receipts.length,0,'job_not_found must not create a successful receipt');
+  assert.deepEqual(tasks[0],{alias,plan_id:original,lookup_id:original,status:'submission_unknown'});
+  report.checks.push('slow admission: initial original-ID job_not_found retains the original host, plan and uncertainty; no approval or second submit');
   await dialog.getByRole('button',{name:'返回记录',exact:true}).click();
   await page.reload();await page.getByRole('button',{name:'本机',exact:true}).click();
   await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
@@ -123,7 +151,8 @@ try{
   await dialog.getByText('断线后的继续执行未获保证',{exact:true}).waitFor();
   assert.match(await dialog.locator('.plan-target').innerText(),new RegExp(alias));
   assert.equal(calls.filter(c=>c.op==='execute').length,1);
-  report.checks.push('ACK loss then App reload queries same original task; keyboard opens full receipt on exact alias/environment; no resubmit');
+  assert.equal(calls.filter(c=>c.op==='reconnect').length,2);assert.equal(pendingAdmission,null);assert.equal(receipts[0].id,original);
+  report.checks.push('missing ACK then App reload queries the same original task after admission; keyboard opens full receipt on exact alias/environment; no resubmit');
 
   async function openFrom(sourceHost) {
     if (await page.getByRole('dialog').count()) await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();

@@ -30,6 +30,8 @@
 
 首个实现提交 `67b8f4e000e6d69797adefd449afd32ce5f650f5` 的 [CI 43369547211](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43369547211) 已在 Ubuntu x86_64 与 macOS arm64 分别通过 native 18/18、browser 19/19、heavy 6/6 检查；两边认证专项均为 37/37。实际 checkout 为与基线 main 合并的 `89b97e7c2d3cf93bd4c6368b0574a127b6b65532`。首轮还暴露了新增指南后的旧 payload 数量断言，以及 VM 认证用例的 HOME 位于 `/home` 而非独立临时子树的问题。前者已修正并本地通过；后者仅将该用例改到 `/tmp/lintel-vm-auth-scope`，不改变其他跨 reboot 布局或生产边界，34 项 VM 控制测试通过，真实 guest 全流程结果由相应修订的 PR checks 记录。截图审阅发现的两条英文警示投影和滚动取景缺口也已补齐；这些后续修订需读取 PR 当前 SHA 的实际 checks，不能借用首轮通过结果。Headless Chromium、synthetic native 与正式 App／Keychain 验收保持独立。
 
+修订 `09e92ff` 的 [CI 43372794800](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43372794800) 在 clean merge `3519541478e1b429b7e95c95b808d395ea4ba29e` 上通过了两平台 native／frontend／browser／heavy、CLI candidate 与隔离 loopback OpenSSH，共 11 份 canonical 报告、118 次选中检查执行；两平台 16 张认证页面截图已检查。VM 的临时目录问题已通过，但 TCG guest 的预览安全检查耗时 77.018 秒，提交因既有 40 秒 ACK 上限返回 `submission_uncertain`。该轮用例未查询原任务便退出，因此 reboot／supervised reboot 未执行，整体 CI 仍是失败。后续验收已补充单次提交后的有界原 ID 查询，覆盖尚未持久接收时的 `job_not_found`，并保留其他错误和执行上下文校验；43 项控制测试通过，浏览器旅程另补先缺回执、后观察到原任务的断言。不延长生产 ACK 上限、不重提任务、不跳过安全检查。最终修订的完整 guest 与 aggregate 结果仍以 PR 对应 SHA 的 checks 为准。
+
 ## 2026-10-24：未发布的恢复闭环与有界历史
 
 当前源码新增下列修复；公开 App 仍为下文的 0.1.1，独立 CLI 仍为原 0.1.0 候选。本轮没有发布新 Release、激活 updater 或更新官网部署。
