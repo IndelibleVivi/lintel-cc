@@ -59,6 +59,10 @@ node --test tests/site_languages.test.mjs
 
 新增回归检查提示与 dock 不重叠、英文标签／页签可见，以及清理页折叠配方的应用／编辑／保存、语言切换与草稿保持。所有操作使用 synthetic roots、真实 Core 与 bundled Chromium，不使用个人 browser profile；当前样式的原生 WebKit、个人认证和下载首装仍独立。网站回归要求每一篇 paired guide 在两语言目录中恰好出现一次，发行原说明仍可展开，安全与版本限制保持可见。生成源码、本地冻结包及线上部署分别记录，见[当前状态](current-state.md)。
 
+本轮完整 core profile 的 [CI 43461405010](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43461405010) 最终 14/14 jobs success，包含两平台 19 项 browser／UI checks、native／CLI、大包、Linux OpenSSH 和 VM；production aggregate 实际下载 12 份 canonical evidence，日志确认全部选中 job／check 通过。首轮两项 macOS job 未获 hosted runner 而取消，恢复缺失项后取得真实执行证据；没有把取消算成通过。测试 checkout `ec634d4c733d0e30d6056476b39e0b5668c1698f` 与产品 source 4127656／main merge d3ba15e 的完整 tree 相同。
+
+本轮独立原生 QA 包的构建与严格 ad-hoc 签名校验通过；后台窗口捕获报告无可共享显示内容，因此最新样式仍未记成 WebKit 目视验收。App 安装、公开发行和官网部署均未因源码合并发生。
+
 ## 新版 App 和 CLI 使用测试收尾
 
 2026-11-13 的 QA 将真实 macOS WebKit 与 built-App Chromium 分开。原生 debug QA bundle 使用独立 App identifier、合成 HOME／state 与 inert Claude，只通过正常控件完成三份原件的归档批准、错误口令、Quit／重开、重新解锁、指令／记忆／会话结构化与 raw 阅读，以及五项文件／测试 Keychain／注入来源的同计划清理和独立复查。原件及邻接字段逐项读回，只有一个归档 job 和一个清理 job；认证 receipt 的 legacy status 与所选 task_result 仍分开，未将本地移除声称为服务端撤销。个人账号和真实 Keychain 未参与。

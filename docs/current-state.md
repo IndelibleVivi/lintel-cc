@@ -4,6 +4,8 @@
 
 本轮维护当前开发源码；公开 App 0.1.1／CLI 0.1.0 及已部署官网尚未更新。没有安装、Release、updater 激活或生产部署。
 
+[PR #7](https://github.com/IndelibleVivi/lintel-cc/pull/7) 已合并。产品 source 为 `41276561743c86a535c576548f970e26115995d0`，main merge 为 `d3ba15ecd75f2e5a5275c9a926f71ea368d16fbd`；两者及本轮 CI merge checkout 的完整 tree 相同。后续证据说明提交不替换产品 source。
+
 | 范围 | 当前源码与本机证据 |
 | --- | --- |
 | App 排列 | 英文策略动作留足完整标签宽度，环境详情六页签改为三列两行；成功提示进入工作区正常文流，不遮住操作 dock；记录筛选／搜索统一控件间距，单列归档保留区不再留下空分隔 |
@@ -11,7 +13,8 @@
 | 读者说明 | README、入口、首次使用、操作／CLI、桌面、浏览器与排错等双语表面区分当前源码和旧公开包；补齐客户端控制阅读路径及登记／归档／认证结果说明。39 页的 590 条相对文件链接与 anchors 无缺失 |
 | 官网源码 | 16 篇指南均进入中英文目录与语言路由；42 个 locale 页面完整生成。文章明确开发源码范围，主页认证说明跟随当前机制；下载／状态页原始发行说明按需展开，架构、版本、信任与更新限制保持可见 |
 | 检查 | 本机 i18n、coverage、recipes、built-App 语言／客户端控制／记录／工作／认证／baseline 共 9 项 canonical checks 通过。网站生成及 15 项语言／路由测试通过，23 项发行／打包测试通过，真实既有短片的独立 site-ui 通过 |
-| 边界 | App 布局为 bundled Chromium + synthetic Core 证据，未将本轮样式记成原生 WebKit／个人账号验收。内盘空间不足时保留失败报告，临时目录转到独立磁盘后串行补跑失败的三项通过；没有放宽产品或测试断言。跨平台 CI 待本轮 source 提交后独立核对 |
+| 跨平台 CI | [CI 43461405010](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43461405010) 最终 14/14 jobs success；production aggregate 实际下载 12 份 canonical evidence，确认全部选中 job／check 通过。测试 checkout 为 `ec634d4c733d0e30d6056476b39e0b5668c1698f`。首轮两项 macOS job 因 hosted runner 容量不足未执行即取消；仅恢复缺失项与汇总后通过，11 项已有通过结果保留 |
+| 边界 | App 布局为 bundled Chromium + synthetic Core 证据，未将本轮样式记成原生 WebKit／个人账号验收。内盘空间不足时保留失败报告，临时目录转到独立磁盘后串行补跑失败的三项通过；没有放宽产品或测试断言。本轮最新原生 QA bundle 构建与严格 ad-hoc 签名校验通过；后台窗口无可共享显示内容，未升级为原生目视通过 |
 
 本轮不改变 Core、CLI 接口、批准范围、原任务恢复或依赖。官网生成／本地 payload 与线上激活是独立事实：线上仍为此前 40 页部署，本轮 42 页尚未部署。验证入口与范围见[文档与 App 版式收尾](verification.md#文档与-app-版式收尾)。
 
