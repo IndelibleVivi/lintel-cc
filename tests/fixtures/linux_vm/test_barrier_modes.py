@@ -221,6 +221,13 @@ class AuthFixtureBoundaryTests(unittest.TestCase):
             self.prepare_auth()
         self.assertTrue(outside.is_dir())
         self.assertEqual(list(outside.iterdir()), [])
+        self.auth.unlink()
+        self.persistent.mkdir()
+        self.auth.symlink_to(self.persistent, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, "disposable VM fixture"):
+            probe.auth_scope_evidence()
+        with self.assertRaises(FileExistsError):
+            self.prepare_auth()
 
 
 class SessionEvidenceTests(TempBase):

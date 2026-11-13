@@ -31,17 +31,19 @@ def properties(text):
 
 def synthetic(path):
     path = Path(path)
-    if path.resolve().is_relative_to(BASE.resolve()):
-        return path
     # Add only the exact auth fixture, never /tmp or its other children. Refuse
     # traversal and symlink components in this additional root, including an
     # externally occupied root symlink before prepare() has run.
-    if path.is_relative_to(AUTH_BASE) and ".." not in path.parts:
-        current = path
-        while not current.is_symlink():
-            if current == AUTH_BASE:
-                return path
-            current = current.parent
+    if path.is_relative_to(AUTH_BASE):
+        if ".." not in path.parts:
+            current = path
+            while not current.is_symlink():
+                if current == AUTH_BASE:
+                    return path
+                current = current.parent
+        raise RuntimeError("Probe files must belong to the disposable VM fixture")
+    if path.resolve().is_relative_to(BASE.resolve()):
+        return path
     raise RuntimeError("Probe files must belong to the disposable VM fixture")
 
 
