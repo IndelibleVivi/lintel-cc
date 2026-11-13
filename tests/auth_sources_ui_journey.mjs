@@ -30,7 +30,7 @@ for(const [index,alias] of [null,...aliases].entries()){
  await writeFile(path.join(home,'.bashrc'),'export ANTHROPIC_AUTH_TOKEN="$(printf synthetic-dynamic)"\n');
  await writeFile(path.join(root,'CLAUDE.md'),'Synthetic work remains byte-for-byte.\n');
  const executable=path.join(bin,'claude');
- await writeFile(executable,'#!/bin/sh\nif [ "$1" = "auth" ] && [ "$2" = "status" ]; then\n  printf \'{"authMethod":"oauth_token","configDirectory":"%s"}\\n\' "$CLAUDE_CONFIG_DIR"\n  exit 0\nfi\nexit 8\n');await chmod(executable,0o700);
+ await writeFile(executable,'#!/bin/sh\nif [ "$1" = "auth" ] && [ "$2" = "status" ]; then\n  printf \'{"authMethod":"oauth_token","configDirectory":"%s"}\\n\' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"\n  exit 0\nfi\nexit 8\n');await chmod(executable,0o700);
  // Deliberate allowlist: no actual process credential or HOME reaches fixtures.
  const actor={HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,TMPDIR:os.tmpdir(),PATH:bin,USER:'synthetic',CLAUDE_CODE_OAUTH_TOKEN:'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'};
  const registered=await raw(actor,['env','register','--name',alias||'Synthetic local authentication','--root',root]);assert.ok(registered.ok,registered.error?.message);
@@ -152,6 +152,9 @@ try{
  assert.ok(planText.includes('A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'));
  assert.equal(planText.includes('Only user settings in the registered root are checked here'),false);
  assert.equal(planText.includes('这里只检查已登记 root 的 user settings'),false);
+ await page.setViewportSize({width:1120,height:820});
+ await page.evaluate(()=>document.documentElement.dataset.theme='light');
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
  await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png'),animations:'disabled'});
  const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,1);
  await dialog.getByRole('button',{name:'Approve and run',exact:true}).click();

@@ -20,6 +20,7 @@ const localGuidanceKeys:Record<string,string>={
   browser_component_unavailable:'failure.guidance.browserComponentUnavailable',
   stale_auth_plan:'failure.guidance.authStale',
   stale_auth_source:'failure.guidance.authStale',
+  stale_auth_context:'failure.guidance.authStale',
   auth_source_conflict:'failure.guidance.authConflict',
   auth_quarantine_changed:'failure.guidance.authConflict',
   auth_cleanup_unverified:'failure.guidance.authUnverified',

@@ -59,7 +59,7 @@
 <p>更新记录保留原 ID、起止版本与尝试结果。重开时未完成的安装意图显示 interrupted，失败或记录发布未确认显示 uncertain，不自动重放。旧版本尚在运行且有未确认安装时，下一次安装被拒绝；核对 App 位置与版本，必要时用官方 DMG 手动修复。读到目标或更高运行版本可以解除对未来升级的阻挡，但不把原 interrupted 记录改写成已完成。</p>
 <p>同用户多个 App 副本共用记录时，锁与读回比较阻止旧副本覆盖新意图。activity 与代理检查只覆盖当前 App 进程，不能证明其它 App 副本、CLI 或外部程序已停；安装前关闭其它 Lintel 副本。记录损坏或外部改写会明确拒绝，保留文件供核对。</p>
 <p>取消操作等待不会提前释放仍在运行的 blocking core 检查；通道停止等待被取消时，未结束的原通道仍挡住安装，后续显式停止继续核对同一任务。</p>
-<p>SemVer 只按 precedence 比较：<code>0.1.0-preview.1</code> 低于 <code>0.1.0</code>，<code>+build</code> 不提高优先级，相同版本不能作为升级。下一次 preview 可使用高于当前版本的 <code>0.2.0-preview.1</code>。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub <code>releases/latest</code> 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。</p>
+<p>SemVer 只按 precedence 比较：<code>0.1.0-preview.1</code> 低于 <code>0.1.0</code>，<code>+build</code> 不提高优先级，相同版本不能作为升级。本轮候选使用数值版本 <code>0.2.0</code>，发行定位保持 Preview：当前 Tauri 将版本直接写入 macOS plist，而 Apple 要求这些版本字段使用数值格式。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub <code>releases/latest</code> 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。</p>
 <a id="本地未签名-dmg-与第三方说明"></a>
 <h2 id="本地-preview-dmg-与第三方说明">本地 Preview DMG 与第三方说明</h2>
 <p>没有 Developer ID 时仍可在本机构建 DMG，便于保存和检查。Preview 仍必须有完整的 bundle 级 ad-hoc 签名：<code>Info.plist</code> 要进入签名，<code>Contents/Resources</code> 要被封签。它不同于 Developer ID，也不证明 Gatekeeper 首装或公证通过；构建本身不会发布下载或激活 updater。不要使用 <code>--no-sign</code>；统一入口在 App 资源组装完成后签名，再生成 DMG。</p>
@@ -122,7 +122,7 @@ node scripts/app-release.mjs build \
 node scripts/app-release.mjs prepare \
   --record candidate-packages/app-release-input.json \
   --out candidate-packages/app-prepared</code></pre>
-<p><code>build</code> 校验当前 clean Git revision 与声明相同、previous_version 与当前 source App version 相同，固定 Tauri target、<code>app</code>／<code>dmg</code>、<code>createUpdaterArtifacts</code>、公钥与 feed，并传递同一版本给 frontend。Tauri 更新签名秘密使用 Tauri 已支持的本地 secret／environment 机制；不写在输入记录、命令行、源码、前端或公开 manifest 中。这个命令可能调用本机签名工具，只在对应的构建／签名授权下运行。</p>
+<p><code>build</code> 校验当前 clean Git revision 与声明相同，source App version 必须等于 <code>version</code> 或 <code>previous_version</code>：既接受已经提交版本更新的源码，也接受从上一版本源码显式覆盖版本。它固定 Tauri target、<code>app</code>／<code>dmg</code>、<code>createUpdaterArtifacts</code>、公钥与 feed，并通过 <code>LINTEL_APP_VERSION</code> 将同一目标版本传给 frontend，避免 App 信息与 native bundle 版本不同。Tauri 更新签名秘密使用 Tauri 已支持的本地 secret／environment 机制；不写在输入记录、命令行、源码、前端或公开 manifest 中。这个命令可能调用本机签名工具，只在对应的构建／签名授权下运行。</p>
 <p><code>prepare</code> 实际校验 <code>.app.tar.gz</code> 的有限路径、条目类型／容量、Bundle ID、Info.plist 版本、<code>lintel-desktop</code> executable 的 Mach-O 架构、Minisign artifact／trusted-comment 签名与精确版本，再计算用于上传字节核对的 SHA-256。不执行 archive 或 DMG。DMG 的字节核对不证明能安装，source_revision 是声明而非源码认证；Apple Developer ID／公证仍标 unverified。输出有：</p>
 <ul><li><code>release.json</code>：公开候选记录、平台、首次下载资料与字节证据；没有本机路径。</li><li><code>updates/preview.json</code> 或 <code>updates/stable.json</code>：该通道的静态 Tauri feed 候选。</li><li>configure 的 <code>tauri-release.json</code>：可审阅的构建 override；正式构建建议用上面的 build 入口确保 frontend/native 版本一致。</li></ul>
 <p>更新签名保障 updater 接受的包与版本；Apple Developer ID code signing 与 notarization 是 macOS 安装信任的另一层，不由更新签名代替。正式非开发者分发须独立完成 <a href="https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution">Apple notarization</a>，不绕过 Gatekeeper。</p>
@@ -160,7 +160,7 @@ python3 scripts/prepare-candidate.py verify \
   --ci-results ../lintel-ci/results.json \
   --ci-evidence ../lintel-ci/evidence \
   --out ../lintel-candidate-verified.json</code></pre>
-<p><code>build</code> 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。<code>verify</code> 重新读取实际 tar member bytes，不信任包内自报 checksum；核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout）。它不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。</p>
+<p><code>build</code> 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。<code>verify</code> 重新读取实际 tar member bytes，不信任包内自报 checksum；同时要求 CLI／runner 可执行、归档权限安全，以及 <code>SHA256SUMS</code> 完整对应实际文件。它核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout），不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。</p>
 <p>这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。<code>c7680f0</code> 已实际完成 fresh clone／fresh target 的三平台 CLI（macOS arm64、Linux x86_64／arm64 musl）及 macOS App／DMG 构建，依赖下载缓存复用，并非全空缓存构建。最终候选的完整 source SHA、matrix 与 full CI 状态由<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>按准确 SHA 记录。后续 proof-only 文档提交不改变已构建候选的 source revision。App 安装、干净 Mac 信任与 Release 验收仍未完成。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 <code>main</code> 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。</p>
       </article>
       <!--/email_off-->

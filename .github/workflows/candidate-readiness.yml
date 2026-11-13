@@ -1,0 +1,137 @@
+name: candidate-readiness
+
+# Unpublished packages and acceptance evidence only. Existing verify.yml owns
+# canonical full product CI; this workflow does not replace or infer that gate.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["codex/release-readiness-20261114"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-readiness-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: fresh candidate (macOS arm64)
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rust-docs
+          targets: aarch64-apple-darwin,x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+      - name: Prepare explicit cross compiler prerequisites
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          cargo install cargo-zigbuild --version 0.23.4 --locked
+          python3 -m pip install --disable-pip-version-check ziglang==0.16.0
+          python3 -c 'import pathlib,ziglang; print(pathlib.Path(ziglang.__file__).parent)' >> "$GITHUB_PATH"
+      - name: Construct exact-source CLI matrix and App DMG
+        env:
+          CARGO_BUILD_JOBS: "3"
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare-candidate.py build --revision "$GITHUB_SHA" \
+            --out "$RUNNER_TEMP/lintel-candidate" --app
+      - name: Download digest-pinned previous public macOS CLI
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 300 --proto '=https' --proto-redir '=https' \
+            'https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz' \
+            --output "$RUNNER_TEMP/previous-cli.tar.gz"
+      - name: Native final-package and public-version upgrade acceptance
+        run: |
+          set -euo pipefail
+          python3 scripts/accept-cli-candidate.py \
+            --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
+            --revision "$GITHUB_SHA" --target macos-arm64 \
+            --previous-archive "$RUNNER_TEMP/previous-cli.tar.gz" \
+            --previous-sha256 83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1 \
+            --out "$RUNNER_TEMP/lintel-candidate/native-macos-arm64.json"
+      - name: Inspect installed-copy trust without granting exceptions
+        run: |
+          set -euo pipefail
+          python3 scripts/accept-macos-candidate.py \
+            --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
+            --revision "$GITHUB_SHA" \
+            --out "$RUNNER_TEMP/lintel-candidate/native-app.json"
+      - name: Upload only finite packages and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lintel-unpublished-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/lintel-candidate/build-receipt.json
+            ${{ runner.temp }}/lintel-candidate/packages/*.tar.gz
+            ${{ runner.temp }}/lintel-candidate/packages/candidates-*.json
+            ${{ runner.temp }}/lintel-candidate/app/*.dmg
+            ${{ runner.temp }}/lintel-candidate/native-*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: final package (${{ matrix.target }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+            previous_sha: 5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+            previous_sha: 299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: lintel-unpublished-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/lintel-candidate
+      - name: Download digest-pinned previous public CLI
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 300 --proto '=https' --proto-redir '=https' \
+            "https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-${TARGET}.tar.gz" \
+            --output "$RUNNER_TEMP/previous-cli.tar.gz"
+      - name: Native final-package and public-version upgrade acceptance
+        env:
+          TARGET: ${{ matrix.target }}
+          PREVIOUS_SHA: ${{ matrix.previous_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/accept-cli-candidate.py \
+            --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
+            --revision "$GITHUB_SHA" --target "$TARGET" \
+            --previous-archive "$RUNNER_TEMP/previous-cli.tar.gz" \
+            --previous-sha256 "$PREVIOUS_SHA" \
+            --out "$RUNNER_TEMP/native-${TARGET}.json"
+      - name: Upload native runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-cli-acceptance-${{ matrix.target }}-${{ github.sha }}
+          path: ${{ runner.temp }}/native-${{ matrix.target }}.json
+          if-no-files-found: error
+          retention-days: 14

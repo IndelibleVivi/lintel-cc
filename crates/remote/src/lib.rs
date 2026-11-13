@@ -188,8 +188,24 @@ fn alias_words(line: &str) -> Option<Vec<String>> {
     Some(words)
 }
 fn list_aliases(path: &Path) -> Result<Value> {
-    let raw = match File::open(path) {
+    // SSH config may legitimately be a symlink. Preserve that behavior while
+    // refusing pipes/devices through the opened descriptor, without waiting.
+    let raw = match OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+    {
         Ok(file) => {
+            if !file
+                .metadata()
+                .map_err(|_| failure("config_unreadable", "无法检查 SSH alias 文件"))?
+                .is_file()
+            {
+                return Err(failure(
+                    "config_unreadable",
+                    "SSH alias 文件不是普通文件；未读取或执行配置",
+                ));
+            }
             let mut raw = Vec::new();
             file.take(MAX_JSON as u64 + 1)
                 .read_to_end(&mut raw)
@@ -868,12 +884,19 @@ fn save(path: &Path, value: &Value) -> Result<()> {
 }
 fn load(path: &Path) -> Result<Value> {
     let mut bytes = Vec::new();
-    OpenOptions::new()
+    let file = OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)
-        .map_err(storage)?
-        .take(MAX_JSON as u64 + 1)
+        .map_err(storage)?;
+    let metadata = file.metadata().map_err(storage)?;
+    if !metadata.is_file() || metadata.len() > MAX_JSON as u64 {
+        return Err(failure(
+            "local_record_invalid",
+            "本地记录类型或容量不受支持；未重发操作",
+        ));
+    }
+    file.take(MAX_JSON as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(storage)?;
     if bytes.len() > MAX_JSON {
@@ -884,6 +907,24 @@ fn load(path: &Path) -> Result<Value> {
     }
     serde_json::from_slice(&bytes)
         .map_err(|_| failure("local_record_invalid", "本地记录损坏；未重发操作"))
+}
+
+// Inventory is observation, never evidence that an unreadable original did not
+// exist. Keep finite identifiers and reason codes; no raw paths or record bytes.
+fn inventory_error(
+    kind: &'static str,
+    alias: Option<&str>,
+    id: Option<&str>,
+    code: &'static str,
+) -> Value {
+    let id = id.filter(|value| match kind {
+        "installation" => value.strip_prefix("install-").is_some_and(|suffix| {
+            suffix.len() == 24 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        }),
+        _ => lintel_operations::valid_uuid(value),
+    });
+    json!({"kind":kind,"alias":alias.filter(|value| valid_alias(value).is_ok()),
+        "id":id,"code":code})
 }
 // These runner operations may cross the JSON request transport. Execution and
 // interactive launch retain their separate controller operations and safeguards.
@@ -1122,6 +1163,7 @@ impl Controller {
             exact_operation_fields(&payload)?;
             let hosts = self.hosts()?;
             let mut tasks = Vec::new();
+            let mut record_errors = Vec::new();
             let task_root = self.state.join("tasks");
             if task_root.exists() {
                 for host in fs::read_dir(&task_root).map_err(storage)? {
@@ -1136,7 +1178,10 @@ impl Controller {
                         .into_string()
                         .ok()
                         .filter(|name| valid_alias(name).is_ok());
-                    let Some(alias) = alias else { continue };
+                    let Some(alias) = alias else {
+                        record_errors.push(inventory_error("task", None, None, "invalid_alias"));
+                        continue;
+                    };
                     for item in fs::read_dir(host.path()).map_err(storage)? {
                         let path = item.map_err(storage)?.path();
                         if path.extension().is_some_and(|v| v == "json") {
@@ -1144,12 +1189,27 @@ impl Controller {
                                 .file_stem()
                                 .and_then(|v| v.to_str())
                                 .ok_or_else(|| failure("local_record_invalid", "任务记录标识无效"))
-                                .and_then(|stem| valid_id(stem))
+                                .and_then(|stem| valid_core_id(stem))
                             else {
+                                record_errors.push(inventory_error(
+                                    "task",
+                                    Some(&alias),
+                                    None,
+                                    "invalid_id",
+                                ));
                                 continue;
                             };
-                            let Ok(mut record) = self.checked_record(&path, plan_id) else {
-                                continue;
+                            let mut record = match self.checked_record(&path, plan_id) {
+                                Ok(record) => record,
+                                Err(error) => {
+                                    record_errors.push(inventory_error(
+                                        "task",
+                                        Some(&alias),
+                                        Some(plan_id),
+                                        error.code,
+                                    ));
+                                    continue;
+                                }
                             };
                             record["alias"] = json!(alias);
                             tasks.push(record);
@@ -1157,10 +1217,10 @@ impl Controller {
                     }
                 }
             }
-            let installs = self.install_inventory()?;
-            let launches = self.launch_inventory(None)?;
+            let installs = self.install_inventory(&mut record_errors)?;
+            let launches = self.launch_inventory(None, &mut record_errors)?;
             return Ok(
-                json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks,"installations":installs,"launches":launches}}),
+                json!({"ok":true,"data":{"hosts":hosts,"tasks":tasks,"installations":installs,"launches":launches,"records_complete":record_errors.is_empty(),"record_errors":record_errors}}),
             );
         }
         let alias = valid_alias(field(&payload, "alias")?)?;
@@ -1257,7 +1317,11 @@ impl Controller {
                 }
                 // Inventory is local metadata. Explicit queries use the original
                 // pinned runner; listing never fans out SSH requests.
-                Ok(json!({"ok":true,"data":{"launches":self.launch_inventory(Some(alias))?}}))
+                let mut errors = Vec::new();
+                let launches = self.launch_inventory(Some(alias), &mut errors)?;
+                Ok(
+                    json!({"ok":true,"data":{"launches":launches,"records_complete":errors.is_empty(),"record_errors":errors}}),
+                )
             }
             "prepare_runner" | "install_runner" | "query_install" => {
                 self.install_dispatch(alias, &payload)
@@ -1465,6 +1529,115 @@ mod tests {
     }
     const APPROVAL: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const RECEIPT: &str = r#"printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","plan_id":"00000000-0000-4000-8000-000000000002","status":"completed"}}'"#;
+
+    #[test]
+    fn fifo_records_and_aliases_do_not_wait_for_a_writer() {
+        use std::os::unix::ffi::OsStrExt;
+        for aliases in [false, true] {
+            let temp = tempfile::tempdir().unwrap();
+            let path = temp.path().join("synthetic-fifo");
+            let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+            assert_eq!(unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) }, 0);
+            let worker_path = path.clone();
+            let (tx, rx) = std::sync::mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let result = if aliases {
+                    list_aliases(&worker_path)
+                } else {
+                    load(&worker_path)
+                };
+                tx.send(result).unwrap();
+            });
+            let immediate = rx.recv_timeout(Duration::from_secs(2));
+            // Release a regressed blocking reader before asserting, so the
+            // regression fails finitely instead of hanging the test process.
+            if immediate.is_err() {
+                let mut rescue = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .custom_flags(libc::O_NONBLOCK)
+                    .open(&path)
+                    .unwrap();
+                rescue.write_all(b"{}\n").unwrap();
+                drop(rescue);
+                let _ = rx.recv_timeout(Duration::from_secs(2));
+            }
+            worker.join().unwrap();
+            assert!(
+                immediate.is_ok(),
+                "FIFO read waited for a writer (aliases={aliases})"
+            );
+            let error = immediate.unwrap().unwrap_err();
+            assert_eq!(
+                error.code,
+                if aliases {
+                    "config_unreadable"
+                } else {
+                    "local_record_invalid"
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn remote_inventory_reports_bad_originals_without_hiding_healthy_tasks() {
+        let (_temp, controller) = fixture(RECEIPT);
+        let healthy = "00000000-0000-4000-8000-000000000002";
+        let corrupt = "00000000-0000-4000-8000-000000000003";
+        let (healthy_path, held) = controller.record("synthetic-host", healthy).unwrap();
+        save(
+            &healthy_path,
+            &json!({"plan_id":healthy,"lookup_id":healthy,"status":"submission_unknown"}),
+        )
+        .unwrap();
+        drop(held);
+        let corrupt_path = healthy_path.with_file_name(format!("{corrupt}.json"));
+        fs::write(&corrupt_path, b"broken SYNTHETIC_SECRET").unwrap();
+        let invalid_path = healthy_path.with_file_name("SYNTHETIC_SECRET.json");
+        fs::write(&invalid_path, b"{}").unwrap();
+        let before = fs::read(&corrupt_path).unwrap();
+        let response = controller.dispatch(json!({"op":"hosts"})).unwrap();
+        assert_eq!(response["data"]["tasks"].as_array().unwrap().len(), 1);
+        assert_eq!(response["data"]["tasks"][0]["plan_id"], healthy);
+        assert_eq!(response["data"]["records_complete"], false);
+        let errors = response["data"]["record_errors"].as_array().unwrap();
+        assert!(errors
+            .iter()
+            .any(|error| error["kind"] == "task" && error["id"] == corrupt));
+        assert!(errors
+            .iter()
+            .any(|error| error["kind"] == "task" && error["id"].is_null()));
+        assert!(!response.to_string().contains("SYNTHETIC_SECRET"));
+        assert_eq!(fs::read(&corrupt_path).unwrap(), before);
+    }
+
+    #[test]
+    fn launch_inventory_exposes_unreadable_original_in_both_entrypoints() {
+        let (_temp, controller) = fixture(RECEIPT);
+        let healthy = "00000000-0000-4000-8000-000000000002";
+        let corrupt = "00000000-0000-4000-8000-000000000003";
+        let root = controller.state.join("launches/synthetic-host");
+        private_dir(&root).unwrap();
+        save(&root.join(format!("{healthy}.json")), &json!({"request_id":healthy,"alias":"synthetic-host","runner_digest":null,"status":"planned","attempted":false})).unwrap();
+        let corrupt_path = root.join(format!("{corrupt}.json"));
+        fs::write(&corrupt_path, b"broken SYNTHETIC_SECRET").unwrap();
+        for request in [
+            json!({"op":"hosts"}),
+            json!({"op":"launches","alias":"synthetic-host"}),
+        ] {
+            let response = controller.dispatch(request).unwrap();
+            assert_eq!(response["data"]["launches"].as_array().unwrap().len(), 1);
+            assert_eq!(response["data"]["launches"][0]["request_id"], healthy);
+            assert_eq!(response["data"]["records_complete"], false);
+            assert!(response["data"]["record_errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error["kind"] == "launch" && error["id"] == corrupt));
+            assert!(!response.to_string().contains("SYNTHETIC_SECRET"));
+        }
+        assert_eq!(fs::read(&corrupt_path).unwrap(), b"broken SYNTHETIC_SECRET");
+    }
 
     #[test]
     fn static_aliases_do_not_execute_config_or_expose_contents() {
@@ -2265,7 +2438,7 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
         assert_eq!(removed["data"]["removed"], true);
         assert_eq!(
             controller.dispatch(json!({"op":"hosts"})).unwrap()["data"],
-            json!({"hosts":[],"tasks":[],"installations":[],"launches":[]})
+            json!({"hosts":[],"tasks":[],"installations":[],"launches":[],"records_complete":true,"record_errors":[]})
         );
         assert_eq!(
             controller

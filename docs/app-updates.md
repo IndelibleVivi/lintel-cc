@@ -39,7 +39,7 @@
 
 取消操作等待不会提前释放仍在运行的 blocking core 检查；通道停止等待被取消时，未结束的原通道仍挡住安装，后续显式停止继续核对同一任务。
 
-SemVer 只按 precedence 比较：`0.1.0-preview.1` 低于 `0.1.0`，`+build` 不提高优先级，相同版本不能作为升级。下一次 preview 可使用高于当前版本的 `0.2.0-preview.1`。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub `releases/latest` 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。
+SemVer 只按 precedence 比较：`0.1.0-preview.1` 低于 `0.1.0`，`+build` 不提高优先级，相同版本不能作为升级。本轮候选使用数值版本 `0.2.0`，发行定位保持 Preview：当前 Tauri 将版本直接写入 macOS plist，而 Apple 要求这些版本字段使用数值格式。preview 与 stable feed 分开，stable 不接收 prerelease；不使用 GitHub `releases/latest` 作为 preview 选择。旧的、未带 updater／公钥的已安装 App 需要手动升级一次。
 
 <a id="本地未签名-dmg-与第三方说明"></a>
 
@@ -142,7 +142,7 @@ node scripts/app-release.mjs prepare \
   --out candidate-packages/app-prepared
 ```
 
-`build` 校验当前 clean Git revision 与声明相同、previous_version 与当前 source App version 相同，固定 Tauri target、`app`／`dmg`、`createUpdaterArtifacts`、公钥与 feed，并传递同一版本给 frontend。Tauri 更新签名秘密使用 Tauri 已支持的本地 secret／environment 机制；不写在输入记录、命令行、源码、前端或公开 manifest 中。这个命令可能调用本机签名工具，只在对应的构建／签名授权下运行。
+`build` 校验当前 clean Git revision 与声明相同，source App version 必须等于 `version` 或 `previous_version`：既接受已经提交版本更新的源码，也接受从上一版本源码显式覆盖版本。它固定 Tauri target、`app`／`dmg`、`createUpdaterArtifacts`、公钥与 feed，并通过 `LINTEL_APP_VERSION` 将同一目标版本传给 frontend，避免 App 信息与 native bundle 版本不同。Tauri 更新签名秘密使用 Tauri 已支持的本地 secret／environment 机制；不写在输入记录、命令行、源码、前端或公开 manifest 中。这个命令可能调用本机签名工具，只在对应的构建／签名授权下运行。
 
 `prepare` 实际校验 `.app.tar.gz` 的有限路径、条目类型／容量、Bundle ID、Info.plist 版本、`lintel-desktop` executable 的 Mach-O 架构、Minisign artifact／trusted-comment 签名与精确版本，再计算用于上传字节核对的 SHA-256。不执行 archive 或 DMG。DMG 的字节核对不证明能安装，source_revision 是声明而非源码认证；Apple Developer ID／公证仍标 unverified。输出有：
 
@@ -208,6 +208,6 @@ python3 scripts/prepare-candidate.py verify \
   --out ../lintel-candidate-verified.json
 ```
 
-`build` 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。`verify` 重新读取实际 tar member bytes，不信任包内自报 checksum；核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout）。它不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。
+`build` 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。`verify` 重新读取实际 tar member bytes，不信任包内自报 checksum；同时要求 CLI／runner 可执行、归档权限安全，以及 `SHA256SUMS` 完整对应实际文件。它核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout），不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。
 
 这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。`c7680f0` 已实际完成 fresh clone／fresh target 的三平台 CLI（macOS arm64、Linux x86_64／arm64 musl）及 macOS App／DMG 构建，依赖下载缓存复用，并非全空缓存构建。最终候选的完整 source SHA、matrix 与 full CI 状态由[当前状态](current-state.md)按准确 SHA 记录。后续 proof-only 文档提交不改变已构建候选的 source revision。App 安装、干净 Mac 信任与 Release 验收仍未完成。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 `main` 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。

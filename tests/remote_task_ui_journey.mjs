@@ -22,6 +22,10 @@ const launchId='55555555-5555-4555-8555-555555555555';
 const launches=[{alias,request_id:launchId,status:'launch_attempt',mode:'interactive',runner_digest:'c'.repeat(64),binding_resolution:'original_launch_record'}];
 const executionContext={product:'Lintel',version:'0.1.0',protocol:1,platform:'macos',architecture:'aarch64',user:{uid:1000,euid:1000,home:'/synthetic/home'},state:{source:'LINTEL_STATE_DIR',path:'/synthetic/state',exists:true},config_home:{path:'/synthetic/home/.claude',exists:false},executable:'/synthetic/bin/lintel',initialized:false};
 const calls=[],receipts=[],tasks=[],installations=[];
+let recordErrors=[
+  {kind:'installation',alias,id:'install-666666666666666666666666',code:'local_record_invalid'},
+  {kind:'task',alias:null,id:null,code:'local_state_unavailable'},
+];
 const installation={install_id:'synthetic-install',alias,probe:{os:'Linux',architecture:'x86_64',uid:'1000'},bundle:{version:'0.1.0',target:'x86_64-unknown-linux-musl',bytes:1024,sha256:'b'.repeat(64)},destination:'$HOME/.local/share/lintel/runners/'+ 'b'.repeat(64) +'/lintel',approval:'synthetic-install-approval',status:'previewed',effects:['Synthetic frozen approval']};let removed=false,conflict=false;
 let heldDiscover,heldJob,discoverRequested=false,jobRequested=false;
 let pendingAdmission=null,admissionQueried=false;
@@ -32,7 +36,7 @@ async function invoke(command,args){
   if(command==='inspect_cli')return ok({executable:args.executable,version:{version:'0.1.0',protocol:1,platform:'macos',architecture:'aarch64'},context:executionContext,candidate:{status:'unknown'},checked_at:Date.now()});
   if(command==='remote_request'){
     switch(p.op){
-      case 'hosts':return ok({hosts:removed?[{alias:otherAlias}]:[{alias},{alias:otherAlias}],tasks,installations,launches});
+      case 'hosts':return ok({hosts:removed?[{alias:otherAlias}]:[{alias},{alias:otherAlias}],tasks,installations,launches,records_complete:recordErrors.length===0,record_errors:recordErrors});
       case 'aliases':return ok({aliases:[alias,otherAlias],coverage:'Synthetic SSH inventory; no real connection'});
       case 'prepare_runner':return ok({...installation});
       case 'install_runner':
@@ -109,9 +113,32 @@ try{
   const page=await browser.newPage({viewport:{width:1120,height:760}});page.setDefaultTimeout(10000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.exposeFunction('syntheticInvoke',invoke);
-  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args)};});
+  await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN')}catch{};window.__LANG_PRESENT=(cmd)=>cmd==='app_preferred_languages'?['zh-CN']:null;window.isTauri=true;window.__remoteDiscoverResponses=0;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'||command==='app_preferred_languages'?window.__LANG_PRESENT(command,args):window.syntheticInvoke(command,args).then(response=>{if(command==='remote_request'&&args?.payload?.request?.command==='discover')window.__remoteDiscoverResponses++;return response;})};});
   await page.goto(url);await page.getByRole('button',{name:'本机',exact:true}).click();
   const dialog=page.getByRole('dialog');
+  await dialog.getByText('部分远程记录无法读取',{exact:true}).waitFor();
+  await dialog.getByText('当前没有可读取的远程任务；上面的读取问题不表示任务未发生。',{exact:true}).waitFor();
+  assert.equal(await dialog.getByText('还没有从桌面提交的远程任务。连接中断后，可在这里查询原任务。',{exact:true}).count(),0);
+  const recordDetails=dialog.locator('.remote-record-errors summary');
+  await recordDetails.focus();await page.keyboard.press('Enter');
+  await dialog.locator('.remote-record-errors').getByText('install-666666666666666666666666',{exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
+  await page.getByRole('combobox',{name:'界面语言',exact:true}).selectOption('en');
+  await page.locator('.host-switch').click();
+  await dialog.getByText('Some remote records could not be read',{exact:true}).waitFor();
+  await dialog.getByText('No remote tasks could be read. The record errors above do not mean the tasks never happened.',{exact:true}).waitFor();
+  await page.setViewportSize({width:900,height:640});
+  assert.equal(await dialog.evaluate(element=>element.scrollWidth>element.clientWidth),false);
+  if(process.env.LINTEL_REMOTE_TASK_UI_ARTIFACTS){await mkdir(process.env.LINTEL_REMOTE_TASK_UI_ARTIFACTS,{recursive:true});await page.screenshot({path:path.join(process.env.LINTEL_REMOTE_TASK_UI_ARTIFACTS,'remote-record-errors-en.png')});}
+  assert.equal(calls.some(call=>['execute','install_runner','prepare_runner','launch_request'].includes(call.op)),false,'reading incomplete history must not retry any operation');
+  await dialog.getByRole('button',{name:'Close panel',exact:true}).click();
+  await page.getByRole('combobox',{name:'Interface language',exact:true}).selectOption('zh-CN');
+  await page.setViewportSize({width:1120,height:760});
+  await page.locator('.host-switch').click();
+  recordErrors=[];
+  await dialog.getByRole('button',{name:'刷新',exact:true}).click();
+  await dialog.locator('.remote-record-errors').waitFor({state:'detached'});
+  report.checks.push('incomplete remote inventory is visible in both languages; unreadable history is never described as no tasks, keyboard opens exact original IDs, refresh recovers without mutation');
   await dialog.locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'检查并准备运行器',exact:true}).click();
   await dialog.getByRole('button',{name:'批准并安装这个运行器',exact:true}).click();
   await dialog.getByRole('button',{name:'核对这份未确认安装',exact:false}).click();
@@ -210,10 +237,12 @@ try{
   report.checks.push('receipt refresh uses reconnect; manual original-ID lookup uses read-only bounded details without allocating a submission record; late original-job response cannot revive a closed result panel');
 
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
+  const discoverResponsesBefore=await page.evaluate(()=>window.__remoteDiscoverResponses);
   heldDiscover=hold();await dialog.getByRole('button',{name:'查看完整回执与恢复',exact:true}).click();
   await assertWait(()=>discoverRequested);await dialog.getByRole('button',{name:'关闭面板',exact:true}).click();
   heldDiscover.release();heldDiscover=null;
-  await assertWait(()=>calls.filter(c=>c.request?.command==='discover').length>=3);await page.waitForTimeout(100);
+  await page.waitForFunction(previous=>window.__remoteDiscoverResponses>previous,discoverResponsesBefore);
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   assert.equal(await dialog.count(),0);report.checks.push('closing SSH panel during read-only discovery suppresses late full-receipt navigation');
 
   await page.getByRole('button',{name:alias,exact:true}).click();await dialog.getByRole('button',{name:'查询原任务',exact:true}).click();
@@ -262,6 +291,7 @@ try{
   assert.equal(calls.some(c=>['launch_request','resume_request'].includes(c.op)),false);
   assert.equal(calls.filter(c=>c.op==='execute').length,2);
   report.checks.push('removed alias startup metadata opens original pinned-runner query and Agent packet, without reopening a Terminal or submitting again');
+  assert.deepEqual(errors,[],'the complete recovery journey must have no uncaught App errors');
   report.checks.push('removed alias remains query-only; Day/Night 1120/900 layout; wordmark slow blink/reduced motion preserved');report.passed=true;
   console.log('PASS: built App synthetic remote task reopen/query/conflict/separate restore journey');
   async function pageBusy(){return page.getByRole('button',{name:alias,exact:true}).isDisabled();}

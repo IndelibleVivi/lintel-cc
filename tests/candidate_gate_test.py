@@ -12,6 +12,7 @@ import tarfile
 import tempfile
 import unittest
 from unittest import mock
+from cli_candidate_acceptance_test import CliCandidateAcceptanceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("lintel_candidate", ROOT / "scripts/prepare-candidate.py")
@@ -80,11 +81,15 @@ class CandidateGateTests(unittest.TestCase):
             self.receipt["artifacts"].append(artifact)
         self.archive, self.payload["candidate.json"], self.payload["bin/lintel"] = native_archive, native_manifest, native_binary
 
-    def write_archive(self, extra=None):
+    def write_archive(self, extra=None, mode_overrides=None, checksum_override=None):
+        self.payload["SHA256SUMS"] = checksum_override if checksum_override is not None else (
+            "".join(f"{info(data)['sha256']}  {name}\n" for name, data in sorted(self.payload.items()) if name != "SHA256SUMS").encode()
+        )
         with tarfile.open(self.archive, "w:gz") as stream:
             for name, data in self.payload.items():
                 member = tarfile.TarInfo(name)
                 member.size = len(data)
+                member.mode = (mode_overrides or {}).get(name, 0o755 if name == "bin/lintel" or name.endswith("/lintel") else 0o644)
                 stream.addfile(member, io.BytesIO(data))
             if extra:
                 stream.addfile(extra, io.BytesIO(b"x") if extra.size else None)
@@ -94,12 +99,40 @@ class CandidateGateTests(unittest.TestCase):
 
     def refresh_outer_hash(self):
         self.receipt["artifacts"][0]["artifact"] = gate.digest(self.archive)
+        self.receipt["artifacts"][0]["files"]["SHA256SUMS"] = info(self.payload["SHA256SUMS"])
 
     def test_valid_full_ci_and_actual_archive_remain_unauthenticated(self):
         result = self.check()
         self.assertTrue(result["consistency_passed"])
         for key in ["build_origin_authenticated", "ci_origin_authenticated", "release_authorized"]:
             self.assertFalse(result[key])
+
+    def test_native_app_requires_matching_numeric_release_and_build_versions(self):
+        gate.require_app_version({"CFBundleShortVersionString": "0.2.0", "CFBundleVersion": "0.2.0"}, "0.2.0")
+        for expected, build in [("0.2.0-preview.1", "0.2.0-preview.1"), ("0.2.0", "0.1.1"), ("0.2.0", None)]:
+            with self.assertRaisesRegex(ValueError, "version"):
+                gate.require_app_version({"CFBundleShortVersionString": expected, "CFBundleVersion": build}, expected)
+
+    def test_byte_consistent_nonexecutable_or_unsafe_archive_cannot_pass(self):
+        # All file bytes and their checksum declarations still agree with the
+        # receipt. Permission metadata alone makes the documented install fail.
+        for name, mode in [("bin/lintel", 0o644),
+                           ("bin/remote-runners/x86_64-unknown-linux-musl/lintel", 0o644),
+                           ("bin/lintel", 0o4755), ("README.txt", 0o666)]:
+            self.write_archive(mode_overrides={name: mode})
+            self.refresh_outer_hash()
+            with self.assertRaisesRegex(ValueError, "executable mode|permissions"):
+                self.check()
+
+    def test_self_consistent_broken_installation_checksums_are_rejected(self):
+        valid = self.payload["SHA256SUMS"]
+        for broken in [b"synthetic sums\n", valid.replace(valid[:64], b"0" * 64, 1),
+                       valid + valid.splitlines(keepends=True)[0],
+                       b"\n".join(valid.splitlines()[1:]) + b"\n"]:
+            self.write_archive(checksum_override=broken)
+            self.refresh_outer_hash()
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                self.check()
 
     def test_wrong_head_reduced_plan_and_missing_or_skipped_check_rejected(self):
         original_plan = copy.deepcopy(self.plan)
@@ -278,7 +311,7 @@ class CandidateGateTests(unittest.TestCase):
             elif command[:2] == ["node", str(source / "apps/desktop/scripts/build-macos-app.mjs")]:
                 app = output / "app/Lintel.app"
                 write(app, "Contents/MacOS/lintel-desktop", b"synthetic freshly built App")
-                write(app, "Contents/Info.plist", gate.plistlib.dumps({"CFBundleShortVersionString":"0.1.1"}))
+                write(app, "Contents/Info.plist", gate.plistlib.dumps({"CFBundleShortVersionString":"0.1.1", "CFBundleVersion":"0.1.1"}))
                 for folder, prefix in [("runner-bundles", "remote-runners"), ("browser-host-bundle", "browser-host"), ("browser-extension-bundle", "browser-extensions"), ("third-party-notices", "third-party-notices")]:
                     for name in gate.inventory(resources / folder): write(app / "Contents/Resources" / prefix, name, (resources / folder / name).read_bytes())
                 for name in gate.TERMS: write(app / "Contents/Resources/project-licenses", name, (source / name).read_bytes())
@@ -292,9 +325,12 @@ class CandidateGateTests(unittest.TestCase):
                         for name in gate.inventory(directory): data[prefix + "/" + name] = (directory / name).read_bytes()
                     data.update({"project-licenses/"+name: (source / name).read_bytes() for name in gate.TERMS})
                     data.update({"candidate.json": json.dumps({"schema":"lintel.cli-candidate/1", "source_revision":SHA,"version":"0.1.0","target":target,"notices_included":True}).encode(), "README.txt":b"synthetic", "SHA256SUMS":b"synthetic"})
+                    data["SHA256SUMS"] = "".join(f"{info(body)['sha256']}  {name}\n" for name, body in sorted(data.items()) if name != "SHA256SUMS").encode()
                     with tarfile.open(packages / ("synthetic-"+target+".tar.gz"), "w:gz") as tar:
                         for name, body in data.items():
-                            member = tarfile.TarInfo(name); member.size = len(body); tar.addfile(member, io.BytesIO(body))
+                            member = tarfile.TarInfo(name); member.size = len(body)
+                            member.mode = 0o755 if name == "bin/lintel" or name.endswith("/lintel") else 0o644
+                            tar.addfile(member, io.BytesIO(body))
             else: self.fail("unexpected build command " + repr(command))
         with mock.patch.object(gate, "source_export", export), mock.patch.object(gate, "run", tool), mock.patch.object(gate.shutil, "which", return_value="synthetic-existing-tool"), mock.patch.object(gate.sys, "platform", "darwin"), mock.patch.object(gate.platform, "machine", return_value="arm64"), mock.patch.object(gate, "dmg_inventory", side_effect=lambda path, source, app_version, expected_artifact: gate.inventory(output / "app/Lintel.app")):
             receipt = gate.build(ROOT, SHA, output, app=True)

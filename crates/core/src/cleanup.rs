@@ -13,6 +13,40 @@ pub(crate) fn bounded(command: Command) -> Result<(i32, Vec<u8>)> {
     bounded_with_timeout(command, Duration::from_secs(20))
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn writer_has_other_root(environ: &[u8], root: &Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let config: Vec<_> = environ
+        .split(|b| *b == 0)
+        .filter_map(|v| v.strip_prefix(b"CLAUDE_CONFIG_DIR="))
+        .collect();
+    let [raw] = config.as_slice() else {
+        return false;
+    };
+    // This decision concerns the directory a live writer can modify, not the
+    // credential namespace selected by the spelling of CLAUDE_CONFIG_DIR.
+    // An alias, trailing slash or '..' may address this exact root. Unknown,
+    // relative and inaccessible bindings never establish a safe neighbour.
+    let different = |raw: &[u8]| {
+        let path = Path::new(std::ffi::OsStr::from_bytes(raw));
+        path.is_absolute() && path.canonicalize().is_ok_and(|physical| physical != root)
+    };
+    if !different(raw) {
+        return false;
+    }
+    // A current client can write credentials outside its ordinary config
+    // directory. Exclude it only when both destinations are known neighbours.
+    let secure: Vec<_> = environ
+        .split(|b| *b == 0)
+        .filter_map(|v| v.strip_prefix(b"CLAUDE_SECURESTORAGE_CONFIG_DIR="))
+        .collect();
+    match secure.as_slice() {
+        [] => true,
+        [raw] => different(raw),
+        _ => false,
+    }
+}
+
 fn bounded_with_timeout(mut command: Command, deadline: Duration) -> Result<(i32, Vec<u8>)> {
     use std::os::unix::process::CommandExt;
     command
@@ -108,8 +142,10 @@ impl Engine {
         let mut command = Command::new(exe);
         command
             .args(["auth", action])
-            .current_dir(string(e, "root")?)
-            .env("CLAUDE_CONFIG_DIR", string(e, "root")?);
+            .current_dir(string(e, "root")?);
+        let context =
+            crate::keychain::execution_context(&self.home, Path::new(string(e, "root")?))?;
+        crate::keychain::configure_execution(&mut command, &context)?;
         Ok(command)
     }
 
@@ -128,8 +164,13 @@ impl Engine {
                 "此 Claude 版本的认证状态格式无法识别；没有执行注销",
             )
         })?;
+        let root = Path::new(string(&e, "root")?);
+        let config_directory_matches = raw["configDirectory"].as_str().is_some_and(|reported| {
+            let path = Path::new(reported);
+            path.is_absolute() && path.canonicalize().ok().as_deref() == Some(root)
+        });
         if ![0, 1].contains(&code)
-            || raw["configDirectory"] != e["root"]
+            || !config_directory_matches
             || ![
                 "none",
                 "claude.ai",
@@ -213,14 +254,7 @@ impl Engine {
                 if ["claude", "Claude", "claude-code"].contains(&name) {
                     #[cfg(target_os = "linux")]
                     if let Ok(bytes) = fs::read(format!("/proc/{pid}/environ")) {
-                        let bindings: Vec<_> = bytes
-                            .split(|b| *b == 0)
-                            .filter(|v| v.starts_with(b"CLAUDE_CONFIG_DIR="))
-                            .collect();
-                        if bindings.len() == 1
-                            && bindings[0]
-                                != format!("CLAUDE_CONFIG_DIR={}", string(e, "root")?).as_bytes()
-                        {
+                        if writer_has_other_root(&bytes, Path::new(string(e, "root")?)) {
                             continue; // A verified different root is a neighbor, not this writer.
                         }
                     }
@@ -470,6 +504,75 @@ fn remove_quarantined(path: &Path, held: &Path, directory: &Path) -> Result<Quar
 #[cfg(test)]
 mod bounded_tests {
     use super::*;
+    #[test]
+    fn writer_root_aliases_are_not_dismissed_as_neighbors() {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir().unwrap();
+        let base = temp.path().canonicalize().unwrap();
+        let root = base.join("selected");
+        let neighbor = base.join("neighbor");
+        fs::create_dir_all(root.join("child")).unwrap();
+        fs::create_dir_all(&neighbor).unwrap();
+        let alias = base.join("alias");
+        symlink(&root, &alias).unwrap();
+        for spelling in [
+            format!("{}/", root.display()),
+            format!("{}/child/..", root.display()),
+            alias.to_string_lossy().into_owned(),
+            "relative-root".into(),
+            base.join("unreadable-or-missing")
+                .to_string_lossy()
+                .into_owned(),
+            String::new(),
+        ] {
+            assert!(
+                !writer_has_other_root(format!("CLAUDE_CONFIG_DIR={spelling}\0").as_bytes(), &root),
+                "unverified spelling must retain writer: {spelling}"
+            );
+        }
+        assert!(writer_has_other_root(
+            format!("CLAUDE_CONFIG_DIR={}\0", neighbor.display()).as_bytes(),
+            &root
+        ));
+        assert!(!writer_has_other_root(b"PATH=/bin\0", &root));
+        assert!(!writer_has_other_root(
+            format!(
+                "CLAUDE_CONFIG_DIR={}\0CLAUDE_CONFIG_DIR={}\0",
+                root.display(),
+                neighbor.display()
+            )
+            .as_bytes(),
+            &root
+        ));
+        for secure in [
+            root.to_string_lossy().as_ref(),
+            "",
+            "relative",
+            "/missing-storage",
+        ] {
+            assert!(!writer_has_other_root(
+                format!(
+                    "CLAUDE_CONFIG_DIR={}\0CLAUDE_SECURESTORAGE_CONFIG_DIR={secure}\0",
+                    neighbor.display()
+                )
+                .as_bytes(),
+                &root
+            ));
+        }
+        assert!(writer_has_other_root(
+            format!(
+                "CLAUDE_CONFIG_DIR={}\0CLAUDE_SECURESTORAGE_CONFIG_DIR={}\0",
+                neighbor.display(),
+                neighbor.display()
+            )
+            .as_bytes(),
+            &root
+        ));
+        assert!(!writer_has_other_root(
+            format!("CLAUDE_CONFIG_DIR={}\0CLAUDE_SECURESTORAGE_CONFIG_DIR={}\0CLAUDE_SECURESTORAGE_CONFIG_DIR={}\0", neighbor.display(), neighbor.display(), root.display()).as_bytes(),
+            &root
+        ));
+    }
     #[test]
     fn bounded_output_and_exit() {
         let mut c = Command::new("/bin/sh");

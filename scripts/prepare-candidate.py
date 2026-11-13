@@ -141,17 +141,22 @@ def tar_inventory(path, destination=None, expected_artifact=None, metadata=None)
 
 
 def read_tar_members(archive, destination, metadata):
-    result, seen, total = {}, set(), 0
+    result, seen, total, checksums = {}, set(), 0, None
+    executables = {"bin/lintel", *["bin/remote-runners/" + triple + "/lintel" for triple in list(TARGETS.values())[1:]]}
     for member in archive:
         name = safe_name(member.name)
         require(name not in seen, "duplicate archive member")
         seen.add(name)
         require(member.isfile(), "archive links/directories/special objects are not payload members")
+        require(not member.mode & 0o7022 and member.mode & 0o400,
+                "unsafe or unreadable CLI member permissions")
+        require(name not in executables or member.mode & 0o100,
+                "CLI executable has no owner executable mode")
         require(0 <= member.size <= MAX_BYTES, "archive member budget exceeded")
         total += member.size
         require(len(seen) <= MAX_FILES and total <= MAX_BYTES, "archive budget exceeded")
         h, count = hashlib.sha256(), 0
-        capture = metadata is not None and name in ("candidate.json", "bin/remote-runners/manifest.json")
+        capture = name == "SHA256SUMS" or metadata is not None and name in ("candidate.json", "bin/remote-runners/manifest.json")
         require(not capture or member.size < 1024**2, "bounded package manifest required")
         content = bytearray() if capture else None
         output = None
@@ -173,10 +178,24 @@ def read_tar_members(archive, destination, metadata):
             require(count == member.size, "truncated archive body")
         finally:
             if output:
+                os.fchmod(output.fileno(), member.mode & 0o777)
                 output.close()
         result[name] = {"sha256": h.hexdigest(), "bytes": count}
         if content is not None:
-            metadata[name] = unique_json(content)
+            if name == "SHA256SUMS":
+                checksums = content.decode("utf-8")
+            else:
+                metadata[name] = unique_json(content)
+    require(checksums is not None, "missing installation checksum list")
+    declared = {}
+    for line in checksums.splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  (.+)", line)
+        require(match is not None, "invalid installation checksum line")
+        name = safe_name(match[2])
+        require(name not in declared and name != "SHA256SUMS", "duplicate/self-referential installation checksum")
+        declared[name] = match[1]
+    require(declared == {name: item["sha256"] for name, item in result.items() if name != "SHA256SUMS"},
+            "installation checksums differ from actual archive members")
     return result
 
 
@@ -228,7 +247,16 @@ def protected_cli(source, target, cli_runners):
     return result
 
 
-def dmg_inventory(path, source, app_version, expected_artifact):
+def require_app_version(plist, app_version):
+    # Tauri copies its SemVer into these fields verbatim. Apple requires a
+    # numeric release version; use the Preview channel rather than a suffix.
+    require(re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", app_version) is not None,
+            "App version requires three numeric components")
+    require(plist.get("CFBundleShortVersionString") == app_version and plist.get("CFBundleVersion") == app_version,
+            "App release/build versions differ from frozen source")
+
+
+def dmg_inventory(path, source, app_version, expected_artifact, install_copy=None):
     require(sys.platform == "darwin", "DMG subgate requires actual macOS; unverified elsewhere")
     directory = Path(tempfile.mkdtemp(prefix="lintel-candidate-mount-"))
     # Keep large image bytes in TMPDIR, but use macOS's system temporary
@@ -252,10 +280,16 @@ def dmg_inventory(path, source, app_version, expected_artifact):
         require(len(apps) == 1 and apps[0].name == "Lintel.app", "ambiguous DMG App")
         run(["node", source / "apps/desktop/scripts/verify-macos-bundle.mjs", apps[0]], source)
         with (apps[0] / "Contents/Info.plist").open("rb") as stream:
-            require(plistlib.load(stream).get("CFBundleShortVersionString") == app_version, "extracted App version mismatch")
+            require_app_version(plistlib.load(stream), app_version)
         runners = json_read(apps[0] / "Contents/Resources/remote-runners/manifest.json")
         require(len(runners.get("runners", [])) == 2 and all(item.get("version") == app_version for item in runners["runners"]), "App runner projection version mismatch")
-        return inventory(apps[0])
+        files = inventory(apps[0])
+        if install_copy is not None:
+            require(not install_copy.exists() and not install_copy.is_symlink(), "test installation must be absent")
+            shutil.copytree(apps[0], install_copy, symlinks=True)
+            require(inventory(install_copy) == files, "installed copy differs from mounted App")
+            run(["node", source / "apps/desktop/scripts/verify-macos-bundle.mjs", install_copy], source)
+        return files
     finally:
         if attached:
             detached = subprocess.run(["hdiutil", "detach", str(mount)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -385,7 +419,7 @@ def build(repo, revision, output, app=False):
         execute(["node", source / "apps/desktop/scripts/build-macos-app.mjs", "--out", str(app_output), "--bundles", "app,dmg", "--ci"], source / "apps/desktop")
         bundle = app_output / "Lintel.app"
         with (bundle / "Contents/Info.plist").open("rb") as stream:
-            require(plistlib.load(stream).get("CFBundleShortVersionString") == app_version, "App version differs from frozen source")
+            require_app_version(plistlib.load(stream), app_version)
         files = inventory(bundle)
         prefixes = {"runners": "remote-runners", "host": "browser-host", "extensions": "browser-extensions", "notices": "third-party-notices", "terms": "project-licenses"}
         for name, prefix in prefixes.items():

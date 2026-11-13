@@ -1,7 +1,7 @@
 [package]
 license = "SUL-1.0"
 name = "lintel-desktop"
-version = "0.1.1"
+version = "0.2.0"
 description = "Lintel desktop environment control"
 edition = "2021"
 

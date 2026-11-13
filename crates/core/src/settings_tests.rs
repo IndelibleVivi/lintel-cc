@@ -93,6 +93,32 @@ fn published_settings_recover_after_death_before_receipt_save() {
 }
 
 #[test]
+fn settings_rename_with_failed_parent_sync_reports_uncertain_effects() {
+    let (_temp, engine, plan, root) = fixture();
+    let settings = root.join("settings.json");
+    crate::storage::sync_fault::arm_atomic_owner(settings.clone());
+    let response =
+        engine.request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"]}));
+    assert_eq!(response["ok"], true, "{response}");
+    let receipt = &response["data"];
+    // The production rename happened; only the immediately following
+    // durability barrier failed. No completed step can be inferred from it.
+    assert_eq!(load(&settings).unwrap()["env"]["DISABLE_TELEMETRY"], "1");
+    assert_eq!(receipt["status"], "needs_reconciliation");
+    assert_eq!(receipt["settings_write"]["state"], "prepared");
+    assert_eq!(receipt["error"]["phase"], "executing");
+    assert_eq!(receipt["error"]["uncertain_side_effects"], true);
+    let published = snapshot(&settings).unwrap();
+    let queried = engine.request(json!({"command":"job","job_id":plan["id"]}));
+    assert_eq!(queried["data"]["settings_recovery"]["state"], "written");
+    assert_eq!(queried["data"]["error"]["uncertain_side_effects"], true);
+    let repeated =
+        engine.request(json!({"command":"execute","plan_id":plan["id"],"approval":plan["hash"]}));
+    assert_eq!(repeated["data"], queried["data"]);
+    assert_eq!(snapshot(&settings).unwrap(), published);
+}
+
+#[test]
 fn unwritten_intent_cannot_recover_a_later_equal_external_setting() {
     for query_before_external_write in [false, true] {
         let (_temp, engine, plan, root) = fixture();

@@ -22,7 +22,9 @@
 | [WIF reference：profiles](https://platform.claude.com/docs/en/manage-claude/wif-reference#profile-configuration-file) | 目录由 `ANTHROPIC_CONFIG_DIR` 或 macOS/Linux 默认 `~/.config/anthropic` 决定。`configs/<profile>.json` 是配置；`credentials/<profile>.json` 含缓存 token。名称来自 `ANTHROPIC_PROFILE`、`active_config` 或 `default` | Profiles 是跨 Claude Code／SDK／`ant` 的共享来源；元数据观察不授予删除权，也不读取 token 文件 |
 | [Troubleshoot installation and login](https://code.claude.com/docs/en/troubleshoot-install) | Keychain 恢复说明明确：`/logout` 还移除保存的 MCP server 登录和 plugin sensitive values | 当前没有有依据的“仅删除 Claude 登录并保留这些凭据”的官方 logout 参数。Lintel 本轮拒绝自动执行这一扩大范围的动作 |
 
-本轮另静态核对官方 NPM 分发的 [`@anthropic-ai/claude-code` 2.1.101](https://registry.npmjs.org/@anthropic-ai/claude-code/2.1.101) 中的 `cli.js`，未执行该客户端：生产服务名为 `Claude Code-credentials`；设置 `CLAUDE_CONFIG_DIR` 时追加 `-` 与 `SHA256(NFC(configdir))` 的前 8 位小写十六进制；account 使用 `USER`，缺省使用 OS username。该存储容器中的 Claude 登录位于 `claudeAiOauth`，与 MCP／插件字段共存。Lintel 据此限定服务和字段，不复制 vendor 实现代码。默认根同时检查 bare 名与 root hash，自定义根仅检查 hash；当前继承的原始配置路径 canonicalize 后等于目标根时，也检查原始路径的 NFC hash。未知历史别名和不同账号上下文保留未覆盖，不扫描整个 Keychain。2.1.323 仅查询过 registry 元数据，未执行或审阅其 native binary，不能宣称该版本的存储机制已验证。
+原有证据静态核对了官方 NPM 分发 [`@anthropic-ai/claude-code` 2.1.101](https://registry.npmjs.org/@anthropic-ai/claude-code/2.1.101) 的 `cli.js`，未执行客户端。2026-11-14 发行审查另下载并静态检查官方 [`@anthropic-ai/claude-code-darwin-arm64` 2.1.325](https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/2.1.325) 的 native Mach-O 内嵌实现，核对 tarball 的 registry SHA512 integrity。其基础服务仍为 `Claude Code-credentials`，显式配置选择以 NFC 路径的 SHA256 前 8 位小写十六进制形成后缀；未设置默认目录与显式设置同一个默认目录会选择不同服务。还确认了新的 `CLAUDE_SECURESTORAGE_CONFIG_DIR` 优先选择：空值选择默认／bare 服务，非空值决定安全存储目录与服务 hash。静态分发证据是版本限定的实现观察，不是未来版本合同或实际登录试验；完整 URL、SHA256、字节定位与修复证据见[认证安全审查](release-readiness-20261114/auth-security.md)。
+
+Lintel 默认根检查 bare 名与 root hash，自定义根只检查 hash；继承的 `CLAUDE_CONFIG_DIR` 或 `CLAUDE_SECURESTORAGE_CONFIG_DIR` 原始路径确实解析到所选根时，补充该拼写的 NFC hash，不扩展到其他根。启动和显式状态检查保留匹配的绝对原始拼写，普通默认根保留未设置状态；匹配的相对路径及跨根／不可核对的独立安全存储选择在执行前拒绝。新启动、续聊及请求运行检查的清理计划绑定该选择，旧未尝试计划或变化后的选择需重新预览，原尝试仍只查询。2.1.325 还会将不符合 `[A-Za-z0-9._-]+` 的 `USER` 回退到另一个 account，区别于旧实现；Lintel 对无法安全对应的拼写报告未知，不猜测或扫描其他 account。冻结的原 item 身份不改变。未知历史别名、其他 account 与容器未知字段继续保留覆盖边界。
 
 ## 3. 优先级能说明什么
 
@@ -61,6 +63,6 @@ Keychain 的生产实现使用 Security.framework：按有限服务与当前账�
 
 ## 6. 版本与后续证据
 
-2.1.101 静态分发证据支持本次有限服务命名与字段识别，不证明用户已安装的版本、实际登录或所有历史 schema。2.1.323 只有 registry 元数据，不能替代 native binary 审阅。尚无满足保留范围的官方 logout 参数。macOS 原生 API 验收与真实客户端验收独立：前者由独立 `keychain-native-test` 在一次性 GitHub-hosted macOS 账号的临时 Keychain 中验证，不能默认在个人机器执行；后者仍需默认／自定义 root、Keychain 可用／锁定、文件 fallback 并存、不同启动环境及 MCP/plugin 保留的独立证据。`cfg(test)`、临时 HOME 与 `LINTEL_TEST_HOME` 的常规测试只用临时 home 中 `.lintel-test-keychain.json` 注入 store，不接触个人 Keychain。当前 native 验收状态以 [current-state.md](current-state.md) 为准；源码实现、synthetic 通过与真实用户登录是不同事实。
+2.1.101 JavaScript 与 2.1.325 darwin-arm64 native 分发的静态证据支持上述有限识别和目录选择修复；本轮没有执行这两个真实客户端，也没有用它们登录、注销或改动真实 Keychain。先前 2.1.323 只有 registry 元数据的限制仍是历史事实，不能据此跳过后续版本核对。尚无满足保留范围的官方 logout 参数。macOS 原生 API 验收与真实客户端验收独立：前者由独立 `keychain-native-test` 在一次性 GitHub-hosted macOS 账号的临时 Keychain 中验证，不能默认在个人机器执行；后者仍需默认／显式默认／自定义 root、独立安全存储选择、Keychain 可用／锁定、文件 fallback 并存、不同启动环境及 MCP/plugin 保留的独立证据。`cfg(test)`、临时 HOME 与 `LINTEL_TEST_HOME` 的常规测试只用临时 home 中 `.lintel-test-keychain.json` 注入 store，不接触个人 Keychain。fresh-process CLI 回归另使用惰性假客户端、真实 PTY 和 Linux `/proc` 写入者识别，并不据此宣称真实认证已通过。当前 native 验收状态以 [current-state.md](current-state.md) 为准；源码、synthetic、原生 API、真实用户登录分别记录。
 
 本记录不签发 App、CLI、网站或真实用户环境的验收。准确工程验证、提交与发行状态由 [current-state.md](current-state.md) 维护。

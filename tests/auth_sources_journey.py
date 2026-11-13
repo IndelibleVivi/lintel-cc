@@ -7,6 +7,8 @@ Keychain, profile contents, network login or credential is used.
 import json
 import os
 from pathlib import Path
+import pty
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -193,5 +195,136 @@ exit 1
         print('PASS authentication source CLI journey: exact sources, one approval, retained runtime auth, immutable history and no credential copies')
 
 
+def execution_context_journey():
+    """Exercise production process inspection and namespace binding in fresh CLIs."""
+    with tempfile.TemporaryDirectory(prefix='lintel-auth-context-') as tmp:
+        base = Path(tmp).resolve()
+        home, state = base / 'home', base / 'state'
+        root, neighbor = home / '.claude', home / 'neighbor'
+        binary_dir = home / '.local/bin'
+        for path in (root / 'child', neighbor, binary_dir):
+            path.mkdir(parents=True, exist_ok=True)
+        client = binary_dir / 'claude'
+        client.write_text('''#!/bin/sh
+if [ "$#" -eq 0 ]; then
+  printf '%s\\n' "${CLAUDE_CONFIG_DIR-unset}" > "$HOME/launch-context"
+  exit 0
+fi
+[ "$1 $2" = 'auth status' ] || exit 99
+printf 'called\\n' >> "$HOME/status-calls"
+root=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+if [ "${CLAUDE_CONFIG_DIR+x}" != x ]; then
+  printf '{"configDirectory":"%s","authMethod":"claude.ai","loggedIn":true}' "$root"
+  exit 0
+fi
+printf '{"configDirectory":"%s","authMethod":"none","loggedIn":false}' "$root"
+exit 1
+''')
+        client.chmod(0o700)
+        env = {key: value for key, value in os.environ.items()
+               if not key.startswith(('CLAUDE_', 'ANTHROPIC_', 'AWS_', 'GOOGLE_', 'AZURE_'))
+               and key not in ('ZDOTDIR', 'XDG_CONFIG_HOME', 'BASH_ENV', 'ENV')}
+        env.update(HOME=str(home), LINTEL_TEST_HOME=str(home), LINTEL_STATE_DIR=str(state),
+                   PATH=str(binary_dir))
+
+        def request(command, good=True, **fields):
+            result = subprocess.run([str(BINARY), 'request'], env=env,
+                                    input=json.dumps(dict(command=command, **fields)),
+                                    capture_output=True, text=True, timeout=60)
+            response = json.loads(result.stdout)
+            assert response['ok'] is good, (command, response, result.stderr)
+            return response['data'] if good else response['error']
+
+        def interactive(args):
+            master, slave = pty.openpty()
+            try:
+                result = subprocess.run([str(BINARY), *args], env=env,
+                                        stdin=slave, stdout=slave, stderr=subprocess.PIPE,
+                                        timeout=60)
+                os.close(slave)
+                slave = None
+                output = bytearray()
+                while True:
+                    try:
+                        chunk = os.read(master, 4096)
+                    except OSError:
+                        break  # PTYs report EIO after the child closes its end.
+                    if not chunk:
+                        break
+                    output.extend(chunk)
+                return result.returncode, output.decode(), result.stderr.decode()
+            finally:
+                if slave is not None:
+                    os.close(slave)
+                os.close(master)
+
+        eid = request('register', name='Default authentication context', root=str(root))['id']
+        # The ordinary default root must retain its bare credential namespace.
+        assert request('auth_probe', environment_id=eid)['logged_in'] is True
+        assert interactive(['launch', eid])[0] == 0
+        assert (home / 'launch-context').read_text() == 'unset\n'
+        alias = base / 'root-alias'
+        alias.symlink_to(root, target_is_directory=True)
+        for spelling in (str(root) + '/', str(root / 'child' / '..'), str(alias)):
+            env['CLAUDE_CONFIG_DIR'] = spelling
+            observed = request('auth_probe', environment_id=eid)
+            assert observed['logged_in'] is False
+            assert observed['config_directory'] == str(root)
+            assert interactive(['launch', eid])[0] == 0
+            assert (home / 'launch-context').read_text() == spelling + '\n'
+        env.pop('CLAUDE_CONFIG_DIR')
+        before = (home / 'status-calls').read_bytes()
+        env['CLAUDE_CONFIG_DIR'] = os.path.relpath(root)
+        assert request('auth_probe', good=False, environment_id=eid)['code'] == 'auth_scope_unverified'
+        assert (home / 'status-calls').read_bytes() == before, 'relative namespace was silently rewritten'
+        env.pop('CLAUDE_CONFIG_DIR')
+        env['CLAUDE_SECURESTORAGE_CONFIG_DIR'] = str(neighbor)
+        assert request('auth_probe', good=False, environment_id=eid)['code'] == 'auth_scope_unverified'
+        assert (home / 'status-calls').read_bytes() == before, 'foreign storage selector executed client'
+        env.pop('CLAUDE_SECURESTORAGE_CONFIG_DIR')
+
+        # A changed raw spelling changes the macOS credential service even when
+        # the physical root is identical. Reject before durable launch intent.
+        plan = request('plan_launch', environment_id=eid, project_cwd=str(home), mode='interactive')
+        env['CLAUDE_CONFIG_DIR'] = str(root)
+        code, stdout, stderr = interactive(['launch', 'request', plan['id'], plan['hash']])
+        assert code == 1, (stdout, stderr)
+        assert json.loads(stdout)['error']['code'] == 'stale_auth_context', (stdout, stderr)
+        assert not (state / 'launches' / (plan['id'] + '.json')).exists()
+        env.pop('CLAUDE_CONFIG_DIR')
+
+        if sys.platform.startswith('linux'):
+            # Rust unit builds intentionally bypass host process enumeration.
+            # This native executable copy exercises production /proc + ps and
+            # runs only sleep; no Claude client or credential store is touched.
+            sleeper = base / 'writer' / 'claude'
+            sleeper.parent.mkdir()
+            shutil.copyfile('/bin/sleep', sleeper)
+            sleeper.chmod(0o700)
+            for spelling, secure, blocked in ((str(root) + '/', None, True), (str(alias), None, True),
+                                             (str(root / 'child' / '..'), None, True),
+                                             (str(neighbor), None, False),
+                                             (str(neighbor), str(root), True),
+                                             (str(neighbor), str(alias), True),
+                                             (str(neighbor), '', True),
+                                             (str(neighbor), str(neighbor), False)):
+                child_env = dict(env, CLAUDE_CONFIG_DIR=spelling)
+                if secure is not None:
+                    child_env['CLAUDE_SECURESTORAGE_CONFIG_DIR'] = secure
+                writer = subprocess.Popen([str(sleeper), '30'], env=child_env)
+                try:
+                    assert writer.poll() is None
+                    result = request('plan_cleanup', good=not blocked, environment_id=eid,
+                                     recipe='repair_login', writers_confirmed_stopped=True,
+                                     auth_source_ids=[])
+                    if blocked:
+                        assert result['code'] == 'writers_active', (spelling, result)
+                finally:
+                    writer.terminate()
+                    writer.wait(timeout=5)
+        print('PASS authentication execution context: bare default, exact inherited spelling, stale approval, secure-storage boundary and production writer aliases')
+
+
 if __name__ == '__main__':
     main()
+    execution_context_journey()

@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {newer,validateRecord,buildConfiguration,prepare,prepareManual,verifyArtifact,validatePublicRelease,validateManualRecord,validateManualPublicRelease} from '../scripts/app-release.mjs';
+import {newer,validateRecord,buildConfiguration,releaseBuildEnvironment,prepare,prepareManual,verifyArtifact,validatePublicRelease,validateManualRecord,validateManualPublicRelease} from '../scripts/app-release.mjs';
 import {fixture} from './fixtures/app_update_fixture.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 function record(f){return {schema:'lintel.app-release/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),pubkey:f.pubkey,notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{archive_path:f.archive,signature_path:f.signaturePath,dmg_path:f.dmg,archive_name:'Lintel_0.2.0_aarch64.app.tar.gz',dmg_name:'Lintel_0.2.0_aarch64.dmg'}}};}
@@ -14,6 +14,28 @@ test('strict SemVer and frozen release configuration',()=>{
  assert.equal(newer('0.2.0-preview.2','0.1.0'),true);assert.equal(newer('0.2.0-preview.10','0.2.0-preview.9'),true);
  assert.throws(()=>newer('18446744073709551616.0.0','0.1.0'),/u64/);
  assert.throws(()=>newer('0.2.0-preview.01','0.1.0'));assert.throws(()=>newer('01.2.0','0.1.0'));
+});
+test('release overrides bind frontend/native versions and preserve explicit signing environment',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-release-version-')),r=record(fixture(dir));
+ const signing={APPLE_SIGNING_IDENTITY:'Synthetic identity label',LINTEL_APP_VERSION:'stale',PATH:'/synthetic/tools'};
+ for(const sourceVersion of [r.previous_version,r.version]){
+  const env=releaseBuildEnvironment(r,sourceVersion,signing);
+  assert.equal(env.LINTEL_APP_VERSION,buildConfiguration(r).version);
+  assert.equal(env.LINTEL_REQUIRE_FORMAL_SIGNING,'1');
+  assert.equal(env.APPLE_SIGNING_IDENTITY,signing.APPLE_SIGNING_IDENTITY);
+  assert.equal(env.PATH,signing.PATH);
+ }
+ assert.equal(signing.LINTEL_APP_VERSION,'stale','caller environment is not modified');
+ assert.throws(()=>releaseBuildEnvironment(r,'9.9.9',signing),/source App version/);
+ const prerelease=structuredClone(r);prerelease.version='0.2.0-preview.1';
+ for(const asset of Object.values(prerelease.platforms)){
+  asset.archive_name=asset.archive_name.replace(r.version,prerelease.version);
+  asset.dmg_name=asset.dmg_name.replace(r.version,prerelease.version);
+ }
+ assert.doesNotThrow(()=>validateRecord(prerelease),'SemVer feed records retain prerelease support');
+ assert.throws(()=>releaseBuildEnvironment(prerelease,r.previous_version,signing),/three numeric components/);
+ const buildSource=await readFile(path.join(repo,'scripts/app-release.mjs'),'utf8');
+ assert.match(buildSource,/env:buildEnv/,'canonical process must consume the bound version');
 });
 test('real Ed25519 artifact/comment/version checks on synthetic archive',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'lintel-update-signature-')),f=fixture(dir),r=record(f);
