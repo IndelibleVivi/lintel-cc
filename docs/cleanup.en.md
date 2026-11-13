@@ -8,11 +8,11 @@
 
 `claude setup-token` prints a long-lived OAuth token without saving it. A shell, Claude settings, an IDE, service or CI system may later inject that token. There is no fixed setup-token file to remove. Ordinary login files and Keychain are separate sources. See the [engineering evidence record](credential-provenance-evidence.en.md) for official sources and version conditions.
 
-The authentication list in Cleanup and rebuild reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.
+The authentication list in Clear local login reads necessary content only at bounded, known locations. It does not execute shell startup files, helpers, hooks, MCP or Claude, scan history or the whole disk, or display tokens. Environment and Components lead into the same cleanup workflow.
 
 | Observation | What it establishes | What it does not establish |
 | --- | --- | --- |
-| Identified local source | An exact file, JSON field or supported shell assignment exists | Claude is currently using it, or the token remains valid |
+| Identified local source | An exact file, Keychain login field, JSON field or supported shell assignment exists | Claude is currently using it, or the token remains valid |
 | Observed in the current execution environment | The Lintel App/current runner inherited the variable; an empty value is labeled separately | Which declaration supplied it, whether its value authenticates, or whether other terminals and IDEs have it |
 | Declaration only | A helper, dynamic shell expression or authentication selector is declared | The script ran, returned a valid token, or was selected by this client |
 | Inaccessible or unattributed | Permissions, format, file type, budget or ownership prevents a conclusion | No credential exists, or deletion is safe |
@@ -23,11 +23,11 @@ Stored credentials and credentials in use are distinct facts. Several sources ma
 ## Complete a cleanup in the App
 
 1. Confirm the host, Claude Code environment and configuration directory in the target bar. Check the full path for a custom `CLAUDE_CONFIG_DIR`; project working directory and configuration root are separate.
-2. In Cleanup and rebuild, choose login repair, rebuild or retirement. Refresh sources and inspect their locations, evidence and reasons an item cannot be handled. Select supported sources. Shell and user configuration can affect several environments belonging to this user; review that shared scope.
+2. In Clear local login, choose login repair, rebuild or retirement. Supported saved logins in files and Keychain are suggested by default. Select authentication injections individually or explicitly use the group select/clear controls; shared shell sources are not automatically selected. Expand technical evidence and exact locations as needed. Unsupported items explain why. Review shared effects on other environments belonging to the same user.
 3. Close the related terminals, IDEs and automatic restart sources. Explicitly bound systemd services retain the existing separately approved pause operation. Known writers or an incomplete safety check block execution; the stopped-writers checkbox never overrides them.
-4. Preview one cleanup plan. Review selected sources, exact editing scope, preserved work, unknowns and any preservation needed for rebuilding or retirement. Those two recipes still require at least one work category and an encryption passphrase.
-5. Approve the reviewed plan once. Execution rechecks selected files and their frozen scope. An observed external edit stops subsequent actions instead of being overwritten. Credential editing does not create plaintext or encrypted token-recovery backups.
-6. Read step receipts and the independent check. Selected local sources, current-executor authentication, other contexts and server revocation have separate results. Refresh again as needed; after an uncertain submission, query the original job first.
+4. Preview one cleanup plan. Selected locations are expanded by default. Review exact editing scope, preserved work, unknowns and any preservation needed for rebuilding or retirement. Those two recipes still require at least one work category and an encryption passphrase.
+5. Approve the reviewed plan once. Execution rechecks selected files/Keychain items and their frozen scope. An observed external edit stops subsequent actions instead of being overwritten. Credential editing does not create plaintext or encrypted token-recovery backups.
+6. Start with removed, remaining and unresolved local-source counts, then inspect individual sources and steps. Current-executor status is separate; other contexts and server revocation expand for detail. Rechecking reads the original task without executing again. Preserve and query the original ID after an uncertain submission.
 
 One approval combines only sources this plan can safely handle. Unsupported objects retain explicit explanations and next steps. The plan never silently expands to another machine or account.
 
@@ -44,18 +44,20 @@ When post-cleanup runtime status is explicitly selected, the plan freezes the au
 | Supported standalone literal assignments in known shell startup files | Removes the frozen assignment scope, preserving the rest of the file. Complex syntax and dynamic injection remain with an explicit limitation |
 | Variables already inherited by Lintel/the runner | Observation only; cannot change a parent shell, other processes or permanent environment. Restart the relevant launcher and check again |
 | Project/managed settings, unknown shell syntax, IDEs, services and external profiles | Bounded observations describe candidates and gaps. Rows without safe-edit support cannot be selected |
-| Keychain | No guessed service names or bulk deletion; automatic Keychain cleanup is unavailable in this development |
+| Keychain login in finite macOS services | Removes recognized `/claudeAiOauth` only; preserves `mcpOAuth`, `pluginSecrets` and unknown fields without deleting the item. Locked, denied, unknown-format and oversized items retain explicit limitations |
 | Sessions, instructions, memory, projects, MCP/plugin configuration and unknown credential fields | Preserved; work preservation and import retain their existing content contracts |
 
 This is versioned, field-level recognition. Removing `claudeAiOauth` or `primaryApiKey` does not prove other credential types are absent. Mixed `.claude.json` retains everything except the selected supported field, including MCP and other working state. Rebuilding prepares a new root and imports approved work; retirement disables the old Lintel launch entry. Neither uninstalls Claude or empties the original directory.
 
 Shell support applies a conservative gate to the entire file: multiline syntax, control structures, functions, subshells, heredocs, continuations, pipes or redirection make every assignment in that file observation-only. Ordinary complete single-line `source`, alias and PATH declarations may coexist but are never executed; only standalone literal authentication assignments can be selected. Fish is observation-only. Limits are 1 MiB per JSON file, 256 KiB per shell file, 8 MiB total for the source module, 256 sources and 128 shell mention locations; startup candidate discovery has a separate 16 MiB budget. Exceeding a limit reports incomplete coverage rather than absence.
 
+macOS uses native Security.framework with finite service names and the current user account. Approval privately binds the original persistent reference, account and a per-plan salted digest of the whole payload; these identities never enter public sources or receipts. `SecItemUpdate` updates data only without recreating the item. Credentials transform in memory without temporary secret exports or recovery backups. Each item is limited to 1 MiB and counts toward the source module’s 8 MiB budget. `limits.keychain_scan_complete` describes only those finite service reads; `limits.keychain:"selected_services_only"` never means the entire Keychain was scanned. Default roots check the bare service and root hash; custom roots check hashes only. See the [evidence record](credential-provenance-evidence.en.md) for naming and versions.
+
 ### Why automatic official logout is unavailable
 
 Anthropic's current [Keychain recovery instructions](https://code.claude.com/docs/en/troubleshoot-install) say `/logout` also removes saved MCP logins and plugin sensitive values. CLI `auth logout` has no verified adapter meeting this development's preservation scope. New automatic-logout requests therefore return `official_logout_scope_unsafe` without invoking it. This decision follows official documentation and scope requirements, not a real-client trial in this development.
 
-Review the official account-management procedure and its MCP/plugin reauthorization effects separately when handling Keychain. The local result continues to show this scope as unverified. Lintel does not bypass that limit by deleting a whole Keychain item.
+This limitation concerns official logout’s broader effects; it does not prevent the exact Keychain login-field cleanup above. Unselected services, unknown historical aliases, other accounts and shared profiles retain coverage gaps. Local results never establish server revocation.
 
 ## Inspect, select and approve with the CLI
 
@@ -119,7 +121,7 @@ Only explicit `observe_runtime:true` invokes official `auth status`. It may acce
 | Selected local sources handled | Check exact source rows and completed steps; other rows may still exist |
 | A source reappears, an edit fails or a file cannot be read | Preserve the current file and inspect the original error and location. Identify the writer, then preview again; never automatically delete again |
 | The current executor still inherits authentication variables or can authenticate | Stop old processes, handle remaining sources and restart the actual terminal, IDE or service. Repeatedly deleting an already-handled file does not fix this |
-| Keychain, profiles or another context is unknown | Check its own interface or involve its administrator. The local result does not extend to it |
+| Unselected/inaccessible Keychain, profiles or another context is unknown | Check its own interface or involve its administrator. The local result does not extend to it |
 | Server revocation is unverified | Use the credential provider's normal revocation/rotation mechanism independently. Local removal does not invalidate copies on another machine, in CI or elsewhere |
 
 Editing a shell file does not change existing processes. Removing a variable from Claude settings likewise does not prove a running session has forgotten it. A new check after restarting produces a new observation.
@@ -132,6 +134,6 @@ If submission returns `submission_uncertain`, keep the original plan ID and quer
 
 Rebuilding and retirement retain encrypted work preservation, exact new-root planning, conflict detection and original-job queries. New authentication cleanup does not copy old tokens into plans, logs, receipts or state-recovery backups. Existing historical backups, shell history, sync copies and other machines are not silently swept. After interruption, inspect completed archives, new roots and source steps in the original receipt.
 
-An exact edit moves the original into a private staging directory beside the source, then publishes the edited file without overwriting another writer. The original is moved, not copied as a backup, and is removed after successful readback. Interruption or conflict may retain credential-containing originals/staging, listed with locations and states in `retained_sensitive_material`, preventing local completion. If staging is renamed/replaced and its identity is lost, a `location_unknown` path is only the last known location, not evidence of destruction; Lintel does not scan to follow it. A missing field at its former path does not resolve those materials; inspect the original task. Lintel neither sweeps them automatically nor replays cleanup.
+An exact file edit moves the original into a private staging directory beside the source, then publishes the edited file without overwriting another writer. The original is moved, not copied as a backup, and is removed after successful readback. Interruption or conflict may retain credential-containing originals/staging, listed with locations and states in `retained_sensitive_material`, preventing local completion. If staging is renamed/replaced and its identity is lost, a `location_unknown` path is only the last known location, not evidence of destruction; Lintel does not scan to follow it. A missing field at its former path does not resolve those materials; inspect the original task. Lintel neither sweeps them automatically nor replays cleanup.
 
-Safe editing still requires stopping external writers. Frozen bindings and rechecks reject observed edits but cannot provide an atomic transaction across files against arbitrary uncooperative processes, or prove physical destruction on an SSD, snapshot or server. Actual macOS Keychain and normal-user authentication acceptance remain separate from synthetic tests; see [current state (Chinese)](current-state.md).
+Keychain updating rereads and compares the complete original immediately before updating and fully reads back afterward. It has no native CAS against arbitrary external writers. Changes or uncertain writes retain the original ID for inspection without automatic update retries. Safe editing still requires stopping external writers. Frozen bindings and rechecks reject observed edits but cannot provide an atomic transaction across files against arbitrary uncooperative processes, or prove physical destruction on an SSD, snapshot or server. Actual macOS Keychain and normal-user authentication acceptance remain separate from synthetic tests; see [current state (Chinese)](current-state.md).

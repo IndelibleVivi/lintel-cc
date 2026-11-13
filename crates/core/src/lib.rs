@@ -14,6 +14,7 @@ mod components;
 mod config_control;
 mod context;
 mod jobs;
+mod keychain;
 mod launch;
 #[cfg(test)]
 mod lifecycle_tests;
@@ -479,8 +480,7 @@ impl Engine {
         if kind == "config_edit" {
             warnings[0] =
                 "只修改预览内明确选择的配置来源；静态配置、真实加载与运行效果分别核对。".into();
-        } else if kind == "cleanup"
-            && extra["authentication"]["schema"] == "lintel.auth-cleanup/1"
+        } else if kind == "cleanup" && extra["authentication"]["schema"] == "lintel.auth-cleanup/1"
         {
             warnings[0] = "按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。".into();
         }
@@ -1402,7 +1402,7 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
         let no_selection = v["local_sources"].as_array().is_some_and(Vec::is_empty);
         coverage.push(json!({"scope":"authentication_local_sources","state":if no_selection{"not_requested"}else if local_done{"done"}else{"unverified"},"detail":"按原选择重新读取；未选择或无法检查的来源继续单列"}));
         coverage.push(json!({"scope":"authentication_runtime","state":v["runtime"]["state"],"detail":"仅当前 Lintel 执行器与目标 root；不代表原 Terminal、IDE 或 SSH 会话"}));
-        coverage.push(json!({"scope":"authentication_other_contexts","state":"unverified","detail":"运行中进程、Keychain、共享 profiles 与其他机器需独立核对"}));
+        coverage.push(json!({"scope":"authentication_other_contexts","state":"unverified","detail":"运行中进程、未选择的 Keychain 来源、共享 profiles 与其他机器需独立核对"}));
         coverage.push(json!({"scope":"authentication_server_revocation","state":"unverified","detail":"本机来源移除不会证明服务端 token 已撤销"}));
     }
     if plan["extra"]["network"].is_object() {
@@ -1516,7 +1516,7 @@ fn task_result(plan: &Value, receipt: &Value) -> Value {
 fn public_plan(mut p: Value) -> Result<Value> {
     if p["extra"]["authentication"]["schema"] == "lintel.auth-cleanup/1" {
         let a = &p["extra"]["authentication"];
-        p["authentication"] = json!({"schema":"lintel.auth-cleanup/1","selected_sources":a["sources"],"local_source_count":a["sources"].as_array().map_or(0,Vec::len),"context":a["context"],"runtime_verification_requested":a["runtime_verification_requested"],"boundaries":["selected_local_sources_only","existing_process_environment_unchanged","keychain_and_external_profiles_unverified","server_revocation_unverified","no_credential_backup","official_logout_scope_unsafe"]});
+        p["authentication"] = json!({"schema":"lintel.auth-cleanup/1","selected_sources":a["sources"],"local_source_count":a["sources"].as_array().map_or(0,Vec::len),"context":a["context"],"runtime_verification_requested":a["runtime_verification_requested"],"boundaries":["selected_local_sources_only","existing_process_environment_unchanged","unselected_keychain_and_external_profiles_unverified","server_revocation_unverified","no_credential_backup","official_logout_scope_unsafe"]});
     }
     if p["extra"]["lightweight_changes"].is_object() {
         p["lightweight_changes"] = p["extra"]["lightweight_changes"].clone();

@@ -3,7 +3,7 @@
 //! Inventory describes candidates, not Claude's effective precedence. The only
 //! mutable sources are exact known fields and complete literal shell assignments.
 //! This module reads/transforms; cleanup.rs owns approval, publication and jobs.
-use crate::{components::startup, err, storage, Result};
+use crate::{components::startup, err, keychain, storage, Result};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -122,6 +122,9 @@ fn parent_identity(path: &Path) -> Result<Value> {
 }
 
 pub(crate) fn check_parent(group: &Value) -> Result<()> {
+    if group["storage"] == "keychain" {
+        return Ok(());
+    }
     let path = Path::new(
         group["path"]
             .as_str()
@@ -238,9 +241,11 @@ struct Scan {
     sources: Vec<Value>,
     candidates: BTreeMap<String, Candidate>,
     files: BTreeMap<PathBuf, FileRead>,
+    keychains: BTreeMap<String, (String, keychain::Item)>,
     seen: BTreeSet<PathBuf>,
     remaining: u64,
     complete: bool,
+    keychain_complete: bool,
 }
 
 impl Scan {
@@ -249,9 +254,11 @@ impl Scan {
             sources: vec![],
             candidates: BTreeMap::new(),
             files: BTreeMap::new(),
+            keychains: BTreeMap::new(),
             seen: BTreeSet::new(),
             remaining: TOTAL_BYTES,
             complete: true,
+            keychain_complete: true,
         }
     }
 
@@ -268,6 +275,86 @@ impl Scan {
             item["default_selected"] = json!(false);
         }
         self.sources.push(item);
+    }
+
+    fn keychain(&mut self, home: &Path, root: &Path) {
+        for service in keychain::services(home, root) {
+            let result = keychain::read(home, &service);
+            let mut item = source(
+                "keychain",
+                "Keychain",
+                None,
+                "/claudeAiOauth",
+                "selected_root",
+                "unknown",
+                "unknown",
+                false,
+                "keychain_unavailable",
+            );
+            item["id"] = json!(source_id("keychain", Some(root), &service));
+            item["service"] = json!(service);
+            match result {
+                Ok(None) => {
+                    item["evidence"] = json!("not_found");
+                    item["presence"] = json!("absent");
+                    item["reason"] = json!("not_found");
+                }
+                Ok(Some(read)) if read.bytes.len() as u64 <= FILE_BYTES.min(self.remaining) => {
+                    self.remaining -= read.bytes.len() as u64;
+                    match storage::parse(&read.bytes).filter_object() {
+                        Ok(doc) => {
+                            item["evidence"] = json!("confirmed_present");
+                            item["presence"] = json!(if doc.get("claudeAiOauth").is_some() {
+                                "present"
+                            } else {
+                                "absent"
+                            });
+                            item["reason"] = json!("not_found");
+                            if let Some(value) = doc.get("claudeAiOauth") {
+                                let recognized = value.is_object()
+                                    && ["accessToken", "refreshToken"]
+                                        .iter()
+                                        .any(|key| value[*key].is_string());
+                                item["kind"] = json!("keychain_field");
+                                item["name"] = json!("claudeAiOauth");
+                                item["removable"] = json!(recognized);
+                                item["default_selected"] = json!(recognized);
+                                item["reason"] = json!(if recognized {
+                                    "known_claude_login_field"
+                                } else {
+                                    "unrecognized_format"
+                                });
+                                if recognized {
+                                    if self.sources.len() < MAX_SOURCES {
+                                        self.keychains.insert(
+                                            item["id"].as_str().unwrap().to_owned(),
+                                            (service.clone(), read),
+                                        );
+                                        self.sources.push(item);
+                                    } else {
+                                        self.keychain_complete = false;
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            item["reason"] = json!("keychain_invalid_format");
+                            self.keychain_complete = false;
+                        }
+                    }
+                }
+                Ok(Some(_)) => {
+                    item["reason"] = json!("keychain_too_large");
+                    self.keychain_complete = false;
+                }
+                Err(error) => {
+                    item["reason"] = json!(error.code);
+                    self.keychain_complete = false;
+                }
+            }
+            self.push(item, None);
+        }
     }
 
     fn read_file(&mut self, path: &Path, kind: &str, scope: &str, limit: u64) -> Option<FileRead> {
@@ -1041,20 +1128,7 @@ fn scan(
             );
         }
     }
-    scan.push(
-        source(
-            "keychain",
-            "Keychain",
-            None,
-            "claude_config_directory",
-            "selected_root",
-            "unknown",
-            "unknown",
-            false,
-            "keychain_uninspected",
-        ),
-        None,
-    );
+    scan.keychain(home, root);
     scan.push(
         source(
             "external_context",
@@ -1081,7 +1155,7 @@ fn scan(
         "limits":{"file_bytes":FILE_BYTES,"shell_file_bytes":SHELL_BYTES,"total_bytes":TOTAL_BYTES,
             "startup_candidate_bytes":16*1024*1024,"max_sources":MAX_SOURCES,
             "scanned_files":scan.seen.len(),"bounded_scan_complete":scan.complete,
-            "coverage_complete":false,"keychain":"not_inspected","other_contexts":"not_inspected",
+            "coverage_complete":false,"keychain_scan_complete":scan.keychain_complete,"keychain":"selected_services_only","other_contexts":"not_inspected",
             "server_revocation":"not_checked"}});
     Ok((scan, view))
 }
@@ -1106,9 +1180,22 @@ pub(crate) fn freeze(
     let mut seen = BTreeSet::new();
     let mut groups = BTreeMap::<PathBuf, Value>::new();
     let mut selected = vec![];
+    let mut keychain_groups = vec![];
     for source_id in source_ids {
         if !seen.insert(source_id) {
             return Err(err("invalid_auth_selection", "认证来源选择重复"));
+        }
+        if let Some((service, item)) = scan.keychains.get(source_id) {
+            keychain_groups.push(json!({"storage":"keychain","home":home,"service":service,"identity":item.identity,
+                "snapshot":keychain_digest(&item.bytes, nonce),"source_ids":[source_id],"locators":[{"pointer":"/claudeAiOauth"}],"kind":"json"}));
+            selected.push(
+                scan.sources
+                    .iter()
+                    .find(|s| s["id"] == *source_id)
+                    .unwrap()
+                    .clone(),
+            );
+            continue;
         }
         let candidate = scan.candidates.get(source_id).ok_or_else(|| {
             err(
@@ -1141,9 +1228,9 @@ pub(crate) fn freeze(
                 .clone(),
         );
     }
-    Ok(
-        json!({"schema":FROZEN_SCHEMA,"groups":groups.into_values().collect::<Vec<_>>(),"sources":selected}),
-    )
+    let mut groups = groups.into_values().collect::<Vec<_>>();
+    groups.extend(keychain_groups);
+    Ok(json!({"schema":FROZEN_SCHEMA,"groups":groups,"sources":selected}))
 }
 
 pub(crate) fn check(groups: &Value, nonce: &str) -> Result<()> {
@@ -1151,6 +1238,10 @@ pub(crate) fn check(groups: &Value, nonce: &str) -> Result<()> {
         .as_array()
         .ok_or_else(|| err("invalid_auth_selection", "认证来源冻结清单不完整"))?;
     for group in groups {
+        if group["storage"] == "keychain" {
+            keychain_original(group, nonce)?;
+            continue;
+        }
         check_parent(group)?;
         let path = group["path"]
             .as_str()
@@ -1184,34 +1275,7 @@ pub(crate) fn replacement(group: &Value, nonce: &str) -> Result<Vec<u8>> {
         .as_array()
         .ok_or_else(|| err("invalid_auth_selection", "认证来源缺少冻结位置"))?;
     match group["kind"].as_str() {
-        Some("json") => {
-            let mut doc = storage::parse(&read.bytes).filter_object()?;
-            for locator in locators {
-                let pointer = locator["pointer"]
-                    .as_str()
-                    .ok_or_else(|| err("invalid_auth_selection", "缺少认证字段位置"))?;
-                if let Some(name) = pointer
-                    .strip_prefix("/env/")
-                    .filter(|name| REMOVABLE_NAMES.contains(name))
-                {
-                    let env = doc["env"]
-                        .as_object_mut()
-                        .ok_or_else(|| err("stale_auth_source", "认证字段结构改变"))?;
-                    if env.remove(name).is_none() {
-                        return Err(err("stale_auth_source", "认证字段已改变"));
-                    }
-                } else if ["/claudeAiOauth", "/primaryApiKey", "/apiKeyHelper"].contains(&pointer) {
-                    if doc.as_object_mut().unwrap().remove(&pointer[1..]).is_none() {
-                        return Err(err("stale_auth_source", "认证字段已改变"));
-                    }
-                } else {
-                    return Err(err("invalid_auth_selection", "不支持的认证字段位置"));
-                }
-            }
-            let mut bytes = serde_json::to_vec_pretty(&doc)?;
-            bytes.push(b'\n');
-            Ok(bytes)
-        }
+        Some("json") => json_replacement(&read.bytes, locators, false),
         Some("shell") => {
             let text = std::str::from_utf8(&read.bytes)
                 .map_err(|_| err("stale_auth_source", "Shell 来源格式改变"))?;
@@ -1240,6 +1304,103 @@ pub(crate) fn replacement(group: &Value, nonce: &str) -> Result<Vec<u8>> {
                 .collect())
         }
         _ => Err(err("invalid_auth_selection", "不支持的认证来源编辑类型")),
+    }
+}
+
+fn json_replacement(bytes: &[u8], locators: &[Value], keychain_only: bool) -> Result<Vec<u8>> {
+    let mut doc = storage::parse(bytes).filter_object()?;
+    for locator in locators {
+        let pointer = locator["pointer"]
+            .as_str()
+            .ok_or_else(|| err("invalid_auth_selection", "缺少认证字段位置"))?;
+        if keychain_only && pointer != "/claudeAiOauth" {
+            return Err(err(
+                "invalid_auth_selection",
+                "Keychain 只支持 Claude 登录字段",
+            ));
+        }
+        if let Some(name) = pointer
+            .strip_prefix("/env/")
+            .filter(|name| REMOVABLE_NAMES.contains(name))
+        {
+            let env = doc["env"]
+                .as_object_mut()
+                .ok_or_else(|| err("stale_auth_source", "认证字段结构改变"))?;
+            if env.remove(name).is_none() {
+                return Err(err("stale_auth_source", "认证字段已改变"));
+            }
+        } else if ["/claudeAiOauth", "/primaryApiKey", "/apiKeyHelper"].contains(&pointer) {
+            if doc.as_object_mut().unwrap().remove(&pointer[1..]).is_none() {
+                return Err(err("stale_auth_source", "认证字段已改变"));
+            }
+        } else {
+            return Err(err("invalid_auth_selection", "不支持的认证字段位置"));
+        }
+    }
+    if keychain_only {
+        return Ok(serde_json::to_vec(&doc)?);
+    }
+    let mut bytes = serde_json::to_vec_pretty(&doc)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+fn keychain_digest(bytes: &[u8], nonce: &str) -> String {
+    let mut content = b"lintel.auth-keychain/1\0".to_vec();
+    content.extend_from_slice(nonce.as_bytes());
+    content.push(0);
+    content.extend_from_slice(bytes);
+    storage::digest(&content)
+}
+
+pub(crate) fn keychain_original(group: &Value, nonce: &str) -> Result<keychain::Item> {
+    let home = Path::new(crate::string(group, "home")?);
+    let item = keychain::read_bound(home, crate::string(group, "service")?, &group["identity"])?
+        .ok_or_else(|| err("stale_auth_source", "原 Keychain 项目已消失，请重新预览"))?;
+    if keychain_digest(&item.bytes, nonce) != group["snapshot"].as_str().unwrap_or("") {
+        return Err(err(
+            "stale_auth_source",
+            "Keychain 容器在预览后变化，请重新预览",
+        ));
+    }
+    Ok(item)
+}
+
+pub(crate) fn keychain_replacement(group: &Value, item: &keychain::Item) -> Result<Vec<u8>> {
+    let locators = group["locators"]
+        .as_array()
+        .ok_or_else(|| err("invalid_auth_selection", "缺少 Keychain 字段位置"))?;
+    json_replacement(&item.bytes, locators, true)
+}
+
+pub(crate) fn source_state_bound(source: &Value, group: &Value) -> Result<String> {
+    if source["kind"] != "keychain_field" {
+        return source_state(source);
+    }
+    let home = Path::new(crate::string(group, "home")?);
+    let service = crate::string(group, "service")?;
+    // Fresh service observation detects credentials recreated by a status command,
+    // even when the original item was replaced. An absent field in another item
+    // does not prove the approved original was edited.
+    let fresh = keychain::read(home, service)?;
+    if let Some(ref item) = fresh {
+        let doc = storage::parse(&item.bytes).filter_object()?;
+        if doc.get("claudeAiOauth").is_some() {
+            return Ok("still_present".into());
+        }
+    }
+    match keychain::read_bound(home, service, &group["identity"]) {
+        Ok(Some(item)) => {
+            let doc = storage::parse(&item.bytes).filter_object()?;
+            Ok(if doc.get("claudeAiOauth").is_some() {
+                "still_present"
+            } else {
+                "removed"
+            }
+            .into())
+        }
+        Ok(None) if fresh.is_none() => Ok("removed".into()),
+        _ => Ok("unknown".into()),
     }
 }
 

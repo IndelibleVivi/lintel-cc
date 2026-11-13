@@ -155,17 +155,19 @@ flowchart TD
 
 `cleanup_inspect` 保留精确状态文件元数据与写入者观察。新的 `auth_inventory(environment_id, project_cwd?)` 由 `auth_sources.rs` 有界读取已知位置，区分已确认本地来源、当前执行器环境观察、仅声明、无法检查及其他上下文；它不运行 Claude、shell 初始化、helper、hooks 或 MCP，不读取历史记录，不返回 token、helper 正文或稳定凭据指纹。`presence` 与空／非空值状态不证明实际使用来源。
 
-`plan_cleanup` 的 `repair_login`／`reset_client`／`retire` 继续使用同一计划、批准与原任务 authority，要求 `writers_confirmed_stopped:true`；新增 `auth_source_ids`、可选 `project_cwd` 和默认关闭的 `verify_auth_status`。选择来自同一环境清单的可编辑来源 ID，不能把路径或秘密当作来源 ID。旧 raw caller 省略选择时只默认处理可精确识别的目标本地字段：`.credentials.json` 中的 `claudeAiOauth`，以及目标客户端状态中的 `primaryApiKey`。默认 root 的状态是 home 下 `.claude.json`，自定义 root 使用其内部 `.claude.json`。明确选择时还可移除受支持的用户 settings 认证字段／helper 和简单 shell 赋值；未知格式、其他字段、MCP／插件和工作资料保留，不再整删混合存储。
+`plan_cleanup` 的 `repair_login`／`reset_client`／`retire` 继续使用同一计划、批准与原任务 authority，要求 `writers_confirmed_stopped:true`；新增 `auth_source_ids`、可选 `project_cwd` 和默认关闭的 `verify_auth_status`。选择来自同一环境清单的可编辑来源 ID，不能把路径或秘密当作来源 ID。旧 raw caller 省略选择时只默认处理可精确识别的目标本地字段：`.credentials.json` 中的 `claudeAiOauth`，目标客户端状态中的 `primaryApiKey`，以及受支持 Keychain 项中的 `/claudeAiOauth`。默认 root 的状态是 home 下 `.claude.json`，自定义 root 使用其内部 `.claude.json`。明确选择时还可移除受支持的用户 settings 认证字段／helper 和简单 shell 赋值；未知格式、其他字段、MCP／插件和工作资料保留，不再整删混合存储。
 
-私有 `extra.authentication` 使用 `lintel.auth-cleanup/1`，冻结来源 ID、准确定位、文件／父目录身份和每计划加盐的内容摘要；不保存原始字节或账户身份。接受前、保全后及编辑边界再次核对，选中来源改变返回 `stale_auth_source`。要求运行状态检查时另冻结 executable 并复查，不能通过重新 discover 把旧批准指向另一程序。缺少新绑定或要求官方注销的未执行旧计划返回 `stale_auth_plan`；已接受原任务仍优先按原 ID 查询，不重放。预览后出现但未被选中的来源不会被顺带删除，重新检查应报告它仍存在。
+私有 `extra.authentication` 使用 `lintel.auth-cleanup/1`，冻结来源 ID、准确定位、文件／父目录身份和每计划加盐的内容摘要；不保存原始凭据字节；Keychain persistent reference／账号仅留在私有绑定，公开投影不返回身份。接受前、保全后及编辑边界再次核对，选中来源改变返回 `stale_auth_source`。要求运行状态检查时另冻结 executable 并复查，不能通过重新 discover 把旧批准指向另一程序。缺少新绑定或要求官方注销的未执行旧计划返回 `stale_auth_plan`；已接受原任务仍优先按原 ID 查询，不重放。预览后出现但未被选中的来源不会被顺带删除，重新检查应报告它仍存在。
 
-当前官方文档明确记载 `/logout` 还会移除保存的 MCP 登录和插件敏感值。CLI `auth logout` 尚无已验证、能满足本轮保留范围的适配，所以新 `official_logout:true` 请求返回 `official_logout_scope_unsafe`，不调用命令。这个决定来自文档与范围约束，不是本轮真实 CLI／Keychain 实跑结论；不猜测 Keychain 服务名，也不以整文件删除绕过。Keychain、共享 profiles 和服务端撤销继续单列未知。
+当前官方文档明确记载 `/logout` 还会移除保存的 MCP 登录和插件敏感值。CLI `auth logout` 尚无已验证、能满足本轮保留范围的适配，所以新 `official_logout:true` 请求返回 `official_logout_scope_unsafe`，不调用命令。这个决定来自文档与范围约束，不是本轮真实 CLI／Keychain 实跑结论；精确 Keychain 字段清理是独立的有限支持，不能据此推定未选服务、其他账号、共享 profiles 或服务端撤销已覆盖。
+
+`keychain.rs`／`keychain/macos.rs` 使用 Security.framework 查询有限服务与当前账号；命名依据是静态核对的 Claude Code 2.1.101，不执行客户端探测版本。默认根检查 bare 服务与 root hash，自定义根检查 hash；继承的原始 `CLAUDE_CONFIG_DIR` 解析到目标根时也核对其 hash。批准冻结原项身份及整份 payload 摘要，内存 JSON 转换只移除 `/claudeAiOauth`，保留 `mcpOAuth`、`pluginSecrets` 和未知字段。`SecItemUpdate` 只改 data，不删除／重建 item，不导出秘密到临时文件。每项 1 MiB，计入 8 MiB 来源预算；`limits.keychain_scan_complete` 独立于文件扫描，`limits.keychain:"selected_services_only"` 保留有限范围。更新前紧邻比较、更新后完整读回；无外部 writer CAS 或跨来源原子性，变化／不确定保留原 ID，不重试更新。生产原生 API 与真实客户端验收另行记录，不能由 synthetic fixture 通过推定。
 
 执行顺序为：接受前核对 →（reset／retire）工作加密归档 →（reset）按冻结落点创建新根并迁入 → 再次复查写入者与冻结来源 → 精确认证编辑 →（retire）停用入口 → 独立复查。新认证计划不生成 `lintel.state/1` 或 token 恢复备份。工作包仍按原任务 `archive_digest` 重读，替换返回 `stale_archive` 并在创建／迁入／编辑前停止。后续失败保留已完成归档、新根和步骤。`reactivate_environment` 只恢复登记资格，不恢复已删凭据。
 
 已识别 Claude 进程仍运行时拒绝；不会全局杀进程，也不能识别所有 wrapper。Linux 的明确绑定 systemd unit 需通过独立暂停计划，清理前再读回 owned hold、inactive、MainPID 与空 cgroup；手工 `stopped` 声明不能代替证据。其他写入者独立处理，见[服务指南](services.md)。共享文件只修改冻结的支持范围；复杂 shell 整文件只报告声明，不执行内容来判断归属。
 
-精确编辑在有界内存生成替代内容，将原文件移动到同目录旁私有暂存，再不覆盖地发布替代文件并读回；成功后删除暂存原件。它不对持有开放描述符的外部 writer 建立 OS 级 CAS。冲突或中断可能保留含凭据材料，`retained_sensitive_material` 列出状态和位置；暂存目录被改名／替换而身份失联时为 `location_unknown`，路径仅是最后已知位置，不通过扫描追踪。此类未确认残留阻止本地完成判断，原任务查询不会重放修改或自动扫除。
+文件精确编辑在有界内存生成替代内容，将原文件移动到同目录旁私有暂存，再不覆盖地发布替代文件并读回；成功后删除暂存原件。它不对持有开放描述符的外部 writer 建立 OS 级 CAS。冲突或中断可能保留含凭据材料，`retained_sensitive_material` 列出状态和位置；暂存目录被改名／替换而身份失联时为 `location_unknown`，路径仅是最后已知位置，不通过扫描追踪。此类未确认残留阻止本地完成判断，原任务查询不会重放修改或自动扫除。
 
 `auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读并可关联原任务，不改写旧回执；默认 `observe_runtime:false` 不启动客户端。显式选择时运行当前执行器／root 的 `auth status`，随后再读取最终文件状态，以观察 status／helper 可能重新生成的凭据。旧 `auth_probe` 继续是单独显式入口，验证 `configDirectory` 与有限认证类别，只返回脱敏状态及 `identity_observed`，不返回邮箱或原始输出；该命令可能访问认证设施、执行 helper 或联网。真实 Claude／Keychain 仍需独立验收。
 

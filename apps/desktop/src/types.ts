@@ -120,7 +120,7 @@ export interface Receipt {
 export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; auth_probe_available?:boolean;auth_inventory_available?:boolean;coverage: string }
 // Sanitized locations and evidence, never credential values or helper bodies.
 export interface AuthenticationSource {
-  id:string;kind:string;name?:string;path?:string|null;locator?:string|null;
+  id:string;kind:string;name?:string;path?:string|null;locator?:string|null;service?:string;
   evidence:'confirmed_present'|'observed_context'|'declared'|'inaccessible'|'unknown'|'not_found'|string;
   presence:'present'|'absent'|'unknown'|string;scope:string;removable:boolean;default_selected?:boolean;
   value_state?:'empty'|'nonempty'|'non_string'|'not_set'|string;
@@ -142,7 +142,7 @@ export interface AuthenticationPlan {
 }
 export interface AuthenticationVerification {
   schema:string;checked_at:string;environment_id?:string;original_job_id?:string|null;
-  local_sources:{id:string;kind:string;path?:string|null;locator?:string|null;state:'removed'|'still_present'|'changed'|'unknown'|'not_selected'|string;detail?:string}[];
+  local_sources:{id:string;kind:string;path?:string|null;locator?:string|null;service?:string;state:'removed'|'still_present'|'changed'|'unknown'|'not_selected'|string;detail?:string}[];
   inventory:AuthenticationInventory;
   runtime:{state:'not_requested'|'observed'|'unavailable'|string;observation?:AuthenticationObservation;error_code?:string};
   other_contexts:string;server_revocation:string;

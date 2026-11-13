@@ -387,6 +387,11 @@ fn parent_replacement_is_rejected_but_same_inode_quarantine_is_comparable() {
 #[test]
 fn salted_freezes_empty_selection_and_missing_files_have_precise_semantics() {
     let (_temp, home, root) = fixture();
+    fs::write(
+        home.join(".lintel-test-keychain.json"),
+        json!({"schema":"lintel.test-keychain/1","items":{}}).to_string(),
+    )
+    .unwrap();
     let report = view(&home, &root);
     assert_eq!(report["limits"]["bounded_scan_complete"], true);
     let empty = freeze(&home, &root, None, &[], "nonce").unwrap();
@@ -473,4 +478,142 @@ fn a_variable_name_mentioned_as_text_is_not_an_observed_assignment() {
     let item = source_named(&view(&home, &root), "shell_assignment", "ANTHROPIC_API_KEY");
     assert_eq!(item["evidence"], "declared");
     assert_eq!(item["removable"], false);
+}
+
+fn seed_keychain(home: &Path, root: &Path, data: Value) -> String {
+    let service = keychain::services(home, root).last().unwrap().clone();
+    fs::write(home.join(".lintel-test-keychain.json"), json!({"schema":"lintel.test-keychain/1","items":{&service:{"id":"synthetic-original-item","data":data}}}).to_string()).unwrap();
+    service
+}
+
+#[test]
+fn keychain_default_and_custom_services_freeze_exact_container_without_exporting_secrets() {
+    for custom in [false, true] {
+        let (_temp, home, default) = fixture();
+        let root = if custom { home.join("custom") } else { default };
+        fs::create_dir_all(&root).unwrap();
+        let before = json!({"claudeAiOauth":{"accessToken":MARKER},"mcpOAuth":{"server":"secret-mcp"},"pluginSecrets":{"x":"secret-plugin"},"unknown":{"future":[1,2,3]}});
+        let service = seed_keychain(&home, &root, before.clone());
+        let inventory = view(&home, &root);
+        let source = source_named(&inventory, "keychain_field", "claudeAiOauth");
+        assert_eq!(source["default_selected"], true);
+        assert_eq!(source["service"], service);
+        assert!(source.get("path").is_none());
+        assert!(source.get("identity").is_none());
+        let frozen = freeze(
+            &home,
+            &root,
+            None,
+            &selected(&inventory, &["keychain_field"]),
+            "nonce",
+        )
+        .unwrap();
+        for secret in [MARKER, "secret-mcp", "secret-plugin"] {
+            assert!(!inventory.to_string().contains(secret));
+            assert!(!frozen.to_string().contains(secret));
+        }
+        let group = &frozen["groups"][0];
+        check(&frozen["groups"], "nonce").unwrap();
+        let original = keychain_original(group, "nonce").unwrap();
+        let replacement = keychain_replacement(group, &original).unwrap();
+        let mut expected = before;
+        expected.as_object_mut().unwrap().remove("claudeAiOauth");
+        assert_eq!(
+            serde_json::from_slice::<Value>(&replacement).unwrap(),
+            expected
+        );
+        keychain::replace(&home, &service, &original, &replacement).unwrap();
+        assert_eq!(source_state_bound(&source, group).unwrap(), "removed");
+    }
+}
+
+#[test]
+fn keychain_external_oauth_neighbor_or_item_changes_reject_original_approval() {
+    for change in ["oauth", "mcp", "identity"] {
+        let (_temp, home, root) = fixture();
+        let service = seed_keychain(
+            &home,
+            &root,
+            json!({"claudeAiOauth":{"accessToken":MARKER},"mcpOAuth":{"keep":"before"}}),
+        );
+        let inventory = view(&home, &root);
+        let frozen = freeze(
+            &home,
+            &root,
+            None,
+            &selected(&inventory, &["keychain_field"]),
+            "nonce",
+        )
+        .unwrap();
+        let path = home.join(".lintel-test-keychain.json");
+        let mut fixture: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        match change {
+            "oauth" => {
+                fixture["items"][&service]["data"]["claudeAiOauth"]["accessToken"] =
+                    json!("new-oauth")
+            }
+            "mcp" => fixture["items"][&service]["data"]["mcpOAuth"]["keep"] = json!("new-mcp"),
+            _ => fixture["items"][&service]["id"] = json!("replacement-item"),
+        }
+        fs::write(path, fixture.to_string()).unwrap();
+        assert!(check(&frozen["groups"], "nonce").is_err(), "{change}");
+        assert!(keychain_original(&frozen["groups"][0], "nonce").is_err());
+    }
+}
+
+#[test]
+fn keychain_locked_denied_and_unrecognized_containers_are_unknown_not_absent() {
+    let (_temp, home, root) = fixture();
+    for code in ["keychain_locked", "keychain_access_denied"] {
+        fs::write(
+            home.join(".lintel-test-keychain.json"),
+            json!({"schema":"lintel.test-keychain/1","items":{},"error":code}).to_string(),
+        )
+        .unwrap();
+        let inventory = view(&home, &root);
+        let source = source_named(&inventory, "keychain", "Keychain");
+        assert_eq!(source["presence"], "unknown");
+        assert_eq!(source["reason"], code);
+        assert!(selected(&inventory, &["keychain_field"]).is_empty());
+    }
+    seed_keychain(
+        &home,
+        &root,
+        json!({"claudeAiOauth":"not-recognized","mcpOAuth":{}}),
+    );
+    let source = source_named(&view(&home, &root), "keychain_field", "claudeAiOauth");
+    assert_eq!(source["removable"], false);
+}
+
+#[test]
+fn keychain_verification_distinguishes_replacement_item_from_absent_login_field() {
+    let (_temp, home, root) = fixture();
+    let service = seed_keychain(
+        &home,
+        &root,
+        json!({"claudeAiOauth":{"accessToken":MARKER},"mcpOAuth":{}}),
+    );
+    let inventory = view(&home, &root);
+    let frozen = freeze(
+        &home,
+        &root,
+        None,
+        &selected(&inventory, &["keychain_field"]),
+        "nonce",
+    )
+    .unwrap();
+    let source = &frozen["sources"][0];
+    let group = &frozen["groups"][0];
+    let path = home.join(".lintel-test-keychain.json");
+    let mut fixture: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    fixture["items"][&service]["id"] = json!("new-item");
+    fixture["items"][&service]["data"]
+        .as_object_mut()
+        .unwrap()
+        .remove("claudeAiOauth");
+    fs::write(&path, fixture.to_string()).unwrap();
+    assert_eq!(source_state_bound(source, group).unwrap(), "unknown");
+    fixture["items"][&service]["data"]["claudeAiOauth"] = json!({"accessToken":"new-token"});
+    fs::write(&path, fixture.to_string()).unwrap();
+    assert_eq!(source_state_bound(source, group).unwrap(), "still_present");
 }

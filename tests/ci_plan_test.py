@@ -162,6 +162,13 @@ class ProfileTests(unittest.TestCase):
                                  ("auth-sources-ui", "browser")):
                 self.assertEqual([job.id for job in selected.jobs if check in job.checks], [owner])
 
+    def test_native_keychain_check_is_required_only_on_disposable_macos_ci(self):
+        for name in ("core", "full"):
+            selected = ci_plan.PROFILES[name]
+            self.assertEqual([job.id for job in selected.jobs if "keychain-native-test" in job.checks], ["native"])
+        self.assertIn("keychain-native-test", ci_plan.checks_for_platform(ci_plan.NATIVE_CHECKS, ci_plan.MACOS))
+        self.assertNotIn("keychain-native-test", ci_plan.checks_for_platform(ci_plan.NATIVE_CHECKS, ci_plan.LINUX))
+
     def test_core_profile_has_heavy_and_vm(self):
         profile, _ = ci_plan.plan_for_event("push", ["crates/core/src/lib.rs"])
         self.assertEqual(profile.name, "core")
@@ -681,19 +688,20 @@ class WorkflowContractTests(unittest.TestCase):
     def _triggers(self):
         return self.doc.get(True) or self.doc.get("on")
 
-    def test_frontend_planner_output_is_consumed_per_platform(self):
+    def test_platform_scoped_planner_outputs_are_consumed_per_platform(self):
         plan = ci_plan.build_plan("push", base=None, head=None, changed_paths=["apps/desktop/scripts/build-macos-app.mjs"])
         outputs = plan.to_github_outputs()
-        selected = json.loads(outputs["frontend_checks_by_platform"])
-        self.assertNotIn("macos-bundle-signature-test", selected[ci_plan.LINUX].split(","))
-        self.assertIn("macos-bundle-signature-test", selected[ci_plan.MACOS].split(","))
-        self.assertNotIn("frontend_checks", outputs)
-        self.assertEqual(set(selected), set(plan.job("frontend").platforms))
-        forwarded = self.doc["jobs"]["plan"]["outputs"]["frontend_checks_by_platform"]
-        self.assertIn("steps.compute.outputs.frontend_checks_by_platform", forwarded)
-        frontend = self.doc["jobs"]["frontend"]
-        runs = "\n".join(step.get("run", "") for step in frontend["steps"])
-        self.assertIn("fromJSON(needs.plan.outputs.frontend_checks_by_platform)[matrix.os]", runs)
+        for job, macos_check in (("frontend", "macos-bundle-signature-test"), ("native", "keychain-native-test")):
+            key = f"{job}_checks_by_platform"
+            selected = json.loads(outputs[key])
+            self.assertNotIn(macos_check, selected[ci_plan.LINUX].split(","))
+            self.assertIn(macos_check, selected[ci_plan.MACOS].split(","))
+            self.assertNotIn(f"{job}_checks", outputs)
+            self.assertEqual(set(selected), set(plan.job(job).platforms))
+            forwarded = self.doc["jobs"]["plan"]["outputs"][key]
+            self.assertIn(f"steps.compute.outputs.{key}", forwarded)
+            runs = "\n".join(step.get("run", "") for step in self.doc["jobs"][job]["steps"])
+            self.assertIn(f"fromJSON(needs.plan.outputs.{key})[matrix.os]", runs)
 
     def test_native_mirror_transform_on_temporary_fixtures(self):
         step = next(s for s in self.doc["jobs"]["native"]["steps"]

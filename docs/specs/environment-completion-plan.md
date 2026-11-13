@@ -8,7 +8,7 @@
 
 | 工作线 | 当前基础 | 下一份可验收交付 | 前置条件与边界 |
 | --- | --- | --- | --- |
-| 认证与恢复可靠性 | 原任务只查询；有界来源清单、精确字段／简单 shell 编辑与独立复查已接通；自动注销返回 `official_logout_scope_unsafe` | 先建立能保全 MCP／插件的版本化 Keychain 归属适配，再独立验收真实登录、不同 root 与凭据更新 | 当前证据为 synthetic Core／CLI／built-App Chromium 和 disposable VM；真实账号操作需要单独授权，CLI 状态不能证明 Keychain token 世代 |
+| 认证与恢复可靠性 | 原任务只查询；有界来源清单、精确字段／简单 shell 编辑与独立复查已接通；有限 Keychain 原 item 字段适配与文件共用一次批准，保留 MCP／插件；自动注销返回 `official_logout_scope_unsafe` | 独立验收临时 Keychain 的真实平台 API，再验收真实客户端登录、不同 root 与凭据更新；准确进度见 current-state | synthetic Core／CLI／built-App Chromium、平台 API 与真实账号是不同证据；真实账号操作需要单独授权，CLI 状态不能证明 Keychain token 世代 |
 | 关联组件与处理范围 | 同一主机／环境的有限组件清单、原记录与只查询原 ID 的入口已接通源码 | 补已支持组件的真实 runtime 证据；再增加有限 IDE／Desktop adapter 与更多来源 | 从现有 inspection/receipt 投影；探针失败显示访问受限或未知；不另建通用 workflow 平台 |
 | 工作保全与完整退场 | instructions/memory/sessions；精确文件清理；加密包与逐文件核对；容量预检与精确原件选择 | 流式大文件路线已接通；随后建立其他用户资产合同，再开放独立完整退场配方 | 保住全部选定内容及资产分类先于扩展删除；不修改现有 retire 的含义；包兼容与原任务恢复独立验收 |
 | 新环境正确继续工作 | 独立 root/cwd、冻结 launch/resume、参考与明确激活分开 | 有限启动来源、认证位置和待完成步骤已接通；实际加载与真实登录／启动另行验收 | root 改变不会消除项目或 managed settings；静态配置、实际加载和 OS 强约束分别证明 |

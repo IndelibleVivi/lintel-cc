@@ -63,7 +63,7 @@ pub const HELP: &str = concat!(
   "  lintel remote launch query ALIAS ID          Query original runner; no Terminal\n",
   "  lintel remote launch list ALIAS              Local original-launch metadata; no SSH\n",
   "  lintel remote control [--bundles PATH]       Shared finite SSH/installation; JSON stdin\n",
-  "  lintel auth inventory --environment ID      Bounded source inventory; no values or CLI execution\n",
+  "  lintel auth inventory --environment ID      Bounded file/Keychain sources; no values or CLI execution\n",
   "  lintel auth verify --environment ID [--job ID] [--observe-runtime]\n",
   "  lintel auth cleanup plan --environment ID --recipe repair_login --writers-confirmed-stopped [--auth-source ID ...]\n",
   "  lintel call OPERATION                       Core requests via JSON stdin; interactive sessions use launch ID\n\n",

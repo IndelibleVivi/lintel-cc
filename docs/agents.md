@@ -107,7 +107,7 @@ Named execute 与有限远端新提交的 `approval` 必须是原计划返回的
 
 ### 认证来源与清理（11-13 开发源码）
 
-公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。`auth_inventory(environment_id, project_cwd?)` 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读，默认 `observe_runtime:false`。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，Keychain／共享 profiles／动态注入保留未知范围。
+公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。`auth_inventory(environment_id, project_cwd?)` 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读，默认 `observe_runtime:false`。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，未选／无法检查的 Keychain、共享 profiles 与动态注入保留未知范围。
 
 ```sh
 lintel auth inventory --environment <environment-id> --project-cwd /synthetic/project --json
@@ -118,6 +118,8 @@ lintel auth verify --environment <environment-id> --job <original-job-id> --json
 ```
 
 `--auth-source` 可重复，映射 `plan_cleanup.auth_source_ids`；仍由同一清理 engine 冻结、批准和执行。`--verify-auth-status`／独立 verify 的 `--observe-runtime` 才请求官方状态；普通 inventory 不执行 shell、helper 或 Claude。完整字段和原始 `call` 示例见[认证清理指南](cleanup.md)。未选择支持来源不会扩大为任意文件删除。
+
+`keychain.rs`／`keychain/macos.rs` 使用 Security.framework 查询有限服务与当前账号；命名依据是静态核对的 Claude Code 2.1.101，不执行客户端探测版本。默认根检查 bare 服务与 root hash，自定义根检查 hash；继承的原始 `CLAUDE_CONFIG_DIR` 解析到目标根时也核对其 hash。批准冻结原项身份及整份 payload 摘要，内存 JSON 转换只移除 `/claudeAiOauth`，保留 `mcpOAuth`、`pluginSecrets` 和未知字段。`SecItemUpdate` 只改 data，不删除／重建 item，不导出秘密到临时文件。每项 1 MiB，计入 8 MiB 来源预算；`limits.keychain_scan_complete` 独立于文件扫描，`limits.keychain:"selected_services_only"` 保留有限范围。更新前紧邻比较、更新后完整读回；无外部 writer CAS 或跨来源原子性，变化／不确定保留原 ID，不重试更新。生产原生 API 与真实客户端验收另行记录，不能由 synthetic fixture 通过推定。
 
 新清理只编辑已识别 `claudeAiOauth`／`primaryApiKey`、所选用户 settings 认证字段／helper 及受支持的简单 shell 赋值，保留其他字段、MCP／插件与工作。认证清理不备份旧 token；中断编辑可能保留原文件的私有暂存，结果以 `retained_sensitive_material` 明确列出而不报完成。当前官方 logout 还删除 MCP 登录／插件敏感值，所以 `official_logout:true` 返回 `official_logout_scope_unsafe`，不运行命令。旧已接受任务继续 query-only；旧未执行计划缺新绑定须重新预览。旧 raw caller 省略新字段时，新计划仅默认选择可精确识别的目标本地登录字段，这是一项明确安全收紧。
 

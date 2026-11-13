@@ -24,6 +24,10 @@ python3 tests/verify.py --checks desktop-build,auth-sources-ui --require-passed
 
 `auth-sources-render-test` checks bilingual source/plan/result markup without a browser. `auth-sources-ui` runs the built App against temporary-root Core with a real headless browser and explicitly modeled invoke/SSH boundaries. It covers shared-source selection, one approval, independent verification, host response isolation and bounded layouts. Neither SSR nor headless Chromium establishes macOS WebKit, personal Keychain or real account acceptance. All four checks are explicit; the implicit default group is unchanged. CI owns the core/CLI checks in native, SSR in frontend and browser interaction in browser. Official authentication facts and unverified version boundaries are recorded in [credential provenance evidence](credential-provenance-evidence.en.md).
 
+Keychain source tests use an explicitly synthetic store in the temporary home; missing or denied synthetic data never falls through to the personal account. They cover file + Keychain in one approval, default/custom service mapping, MCP/plugin/unknown field preservation, stale payload or item identity, locked/denied results, uncertain update without replay, and fresh verification after a new login. The built-App journey also exercises those real Core fixtures, saved-login defaults, explicit injection group selection, visible access recovery and result summaries.
+
+`keychain-native-test` is a separate, explicit native check in the existing CI native owner. It invokes `cargo test -p lintel-core keychain_native_engine_journey --locked -- --ignored` **only on a disposable GitHub-hosted macOS account**. The fixture creates its own temporary Keychain, restricts every native query/update to that database, exercises real Security.framework through the Engine for default/custom roots and deletes its own database. It verifies persistent identity, adjacent fields, readback, stale approval rejection and original-ID no-replay. Creating a legacy Keychain may affect its account's search list, so this fixture must never be run in a personal or self-hosted account. The canonical entrypoint skips such hosts, and `--require-passed` rejects that skip. Linux CI does not select this check. The implicit default group stays unchanged. Passing this API fixture does not establish real Claude account/ACL behavior or acceptance of a different client version.
+
 ```sh
 python3 tests/verify.py --list          # show every check and its requirements
 python3 tests/verify.py                 # run all default (synthetic) checks
@@ -74,6 +78,7 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 | `desktop-rust-test` | rust | `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` (standalone Tauri crate, excluded from the workspace) |
 | `native-host-rust-test` | rust | `cargo test --manifest-path extensions/browser/native-host/Cargo.toml` (standalone crate) |
 | `runner-build` | rust | `cargo build -p lintel-runner` |
+| `keychain-native-test` | independent, explicit-only | real temporary-Keychain Engine journey; disposable GitHub-hosted macOS account only; never personal/self-hosted |
 | `js-engine-test` | js | `node --test extensions/browser/tests/engine.test.mjs` (no dependencies) |
 | `site-game-test` | js | `node --test tests/site_game.test.mjs` (shared connected silhouette, tap/hold-release jumps, normal/high reachable stars, collision/cancellation, four obstacle families, generated pacing and 320px visible-input clearance/landing at 30/60/144fps, no dependencies) |
 | `home-greetings-test` | js | original time-of-day pools, date/time/rare priorities and local once-per-date persistence |
