@@ -89,6 +89,8 @@ jobs:
             ${{ runner.temp }}/lintel-candidate/native-*.json
             ${{ runner.temp }}/lintel-candidate/window-observation/observation.json
             ${{ runner.temp }}/lintel-candidate/window-observation/lintel-window.png
+            ${{ runner.temp }}/lintel-candidate/window-observation/interactions/*.json
+            ${{ runner.temp }}/lintel-candidate/window-observation/interactions/*.png
           if-no-files-found: error
           retention-days: 14
 

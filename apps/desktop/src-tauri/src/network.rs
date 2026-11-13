@@ -458,11 +458,15 @@ mod tests {
     use super::*;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
-        net::TcpStream,
+        net::{TcpListener, TcpStream},
         time::{timeout, Duration},
     };
 
     const ENVIRONMENT: &str = "00000000-0000-4000-8000-000000000001";
+
+    async fn channel_owner(state: &NetworkState, id: &str) -> std::sync::Weak<Proxy> {
+        Arc::downgrade(&state.channels.lock().await.get(id).unwrap().proxy)
+    }
 
     #[tokio::test]
     async fn cancelled_stop_keeps_unfinished_channel_visible_to_updater() {
@@ -494,6 +498,7 @@ mod tests {
                 events: Arc::new(Mutex::new(VecDeque::new())),
             },
         );
+        let original_proxy = channel_owner(&state, ENVIRONMENT).await;
         let owner = state.clone();
         let request = tokio::spawn(async move {
             owner
@@ -512,6 +517,14 @@ mod tests {
             state.has_active_channels().await,
             "unfinished shutdown blocks installation"
         );
+        assert!(original_proxy.upgrade().is_some());
+        let replacement = state
+            .dispatch(
+                json!({"op":"start","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(replacement["error"]["code"], "channel_exists");
         let _ = finish.send(());
         let result = state
             .dispatch(
@@ -521,6 +534,10 @@ mod tests {
             .await;
         assert_eq!(result["ok"], true, "{result}");
         assert!(!state.has_active_channels().await);
+        assert!(
+            original_proxy.upgrade().is_none(),
+            "completed stop drops the original listener even after IPC cancellation"
+        );
     }
 
     #[tokio::test]
@@ -824,6 +841,7 @@ mod tests {
             .await;
         assert_eq!(started["ok"], true);
         assert_eq!(started["data"]["direct_connections_enforced"], false);
+        let original_proxy = channel_owner(&state, ENVIRONMENT).await;
         let active_config = &started["data"]["active_config"];
         assert_eq!(
             active_config,
@@ -896,7 +914,13 @@ mod tests {
         assert_eq!(stopped["ok"], true);
         assert_eq!(stopped["data"]["running"], false);
         assert_eq!(stopped["data"]["active_config"], Value::Null);
-        assert!(TcpStream::connect(address).await.is_err());
+        // A bare connect to a released ephemeral address can reach another
+        // listener or even self-connect. Verify this exact listener's owner is
+        // gone before stop returns; retaining any serving/Channel Arc fails.
+        assert!(
+            original_proxy.upgrade().is_none(),
+            "stop must release the original listener before acknowledging completion"
+        );
         let status = state
             .dispatch(
                 json!({"op":"status","environment_id":ENVIRONMENT}),
@@ -912,6 +936,112 @@ mod tests {
             )
             .await;
         assert_eq!(unavailable["error"]["code"], "channel_missing");
+    }
+
+    #[tokio::test]
+    async fn stop_closes_owned_listener_and_live_tunnel_before_return() {
+        let state = NetworkState::default();
+        let origin = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let destination = origin.local_addr().unwrap();
+        let started = state
+            .dispatch(
+                json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"allow"}}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(started["ok"], true, "{started}");
+        let original_proxy = channel_owner(&state, ENVIRONMENT).await;
+        let completed_events = state
+            .channels
+            .lock()
+            .await
+            .get(ENVIRONMENT)
+            .unwrap()
+            .events
+            .clone();
+        let mut client = TcpStream::connect(started["data"]["address"].as_str().unwrap())
+            .await
+            .unwrap();
+        client
+            .write_all(
+                format!("CONNECT {destination} HTTP/1.1\r\nHost: {destination}\r\n\r\n").as_bytes(),
+            )
+            .await
+            .unwrap();
+        let (mut remote, _) = timeout(Duration::from_secs(5), origin.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut head = [0; 39];
+        timeout(Duration::from_secs(5), client.read_exact(&mut head))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&head, b"HTTP/1.1 200 Connection Established\r\n\r\n");
+        client.write_all(b"c").await.unwrap();
+        let mut byte = [0];
+        timeout(Duration::from_secs(5), remote.read_exact(&mut byte))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&byte, b"c");
+        remote.write_all(b"r").await.unwrap();
+        timeout(Duration::from_secs(5), client.read_exact(&mut byte))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&byte, b"r");
+
+        let stopped = timeout(
+            Duration::from_secs(5),
+            state.dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(stopped["ok"], true, "{stopped}");
+        assert!(original_proxy.upgrade().is_none());
+        assert!(!state.has_active_channels().await);
+        // The handler has emitted its final event and released both sockets,
+        // rather than merely accepting a request to stop later.
+        let events = completed_events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].outcome, "proxy_stopped");
+        drop(events);
+        assert_eq!(
+            timeout(Duration::from_secs(5), client.read(&mut byte))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            timeout(Duration::from_secs(5), remote.read(&mut byte))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        let replacement = state
+            .dispatch(
+                json!({"op":"start","environment_id":ENVIRONMENT,"config":{"default_action":"deny"}}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(replacement["ok"], true, "{replacement}");
+        assert_ne!(
+            replacement["data"]["channel_binding"],
+            started["data"]["channel_binding"]
+        );
+        let stopped = state
+            .dispatch(
+                json!({"op":"stop","environment_id":ENVIRONMENT}),
+                synthetic_core,
+            )
+            .await;
+        assert_eq!(stopped["ok"], true, "{stopped}");
     }
 
     #[tokio::test]

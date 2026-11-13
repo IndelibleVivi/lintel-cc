@@ -9,6 +9,7 @@ Faye 先读最终 Release Decision Brief。维护者从本文的证据矩阵和�
 | 材料 | 负责的问题 |
 | --- | --- |
 | [基线与证据](baseline-and-evidence.md) | PR #4–#7、公开包、线上网站、既有 CI 与外部机制的真实状态 |
+| [依赖安全](dependency-security.md) | 当前锁定图、实际 shipped 路径、TLS 修补及不适用告警的依据 |
 | [认证安全](auth-security.md) | 认证 namespace、Keychain 精确字段、Linux writers、实际 Claude 分发、旧批准兼容 |
 | [执行与恢复](execution-recovery.md) | 原 ID、损坏记录、路径／管道替换、发布不确定、远端安装去重 |
 | [产品验收](product-acceptance.md) | 六类任务、新用户、多环境、返回用户、界面与 native 证据边界 |
@@ -21,7 +22,7 @@ Faye 先读最终 Release Decision Brief。维护者从本文的证据矩阵和�
 
 Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 Core，实际动作有计划、准确批准、持久任务与回执；工作资料可以独立离线读取；发生不确定结果后继续沿原 ID 核对。它没有通过删全目录、重提任务或把所有结果标成绿色来简化流程。
 
-本轮最严重的已确认问题集中于**选择对象与恢复信息**：默认认证目录被显式变量改成另一凭据命名空间；Linux writer 的字符串比较漏掉同一物理目标；远端损坏记录被当作不存在；设置已经改写后的不确定性被低估。发行检查也存在自洽但不可用的包能通过的问题。它们均有具体修复和反例；详细触发条件与源码位置见下表及专项报告。
+本轮最严重的已确认问题集中于**选择对象与恢复信息**：默认认证目录被显式变量改成另一凭据命名空间；Linux writer 的字符串比较漏掉同一物理目标；远端损坏记录被当作不存在；设置已经改写后的不确定性被低估。发行检查也存在自洽但不可用的包能通过的问题。后续依赖审查还确认了 HTTPS 上游代理和探测使用的信任根包含已被撤销信任的证书链，需要限定范围的安全补丁更新。详细触发条件、修复和可区分的证据见下表及专项报告。
 
 当前适合推进 0.2.0 Preview。普通用户的一般 macOS App 分发还要跨过真实首装信任、最后 native 交互及资产授权三道明确边界。未来网络约束、浏览器商店分发、更多系统支持和容量退休策略是后续演进，不用来无限延期一个范围明确的 CLI Preview。
 
@@ -41,6 +42,8 @@ Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 C
 | RE-01/02 包自洽却不可用 | 二进制 mode 0644、unsafe modes 或坏 SHA256SUMS，旧 gate 仍 true | `prepare-candidate.py::read_tar_members` 检查执行权限、安全模式与完整内部映射；其他 receipt 保持一致的 before/after 反例 |
 | RE-03/04 App 版本投影 | release override 未传 Vite；预发行字符串直接落入数字 plist | formal build 显式 `LINTEL_APP_VERSION`；数字 0.2.0 + Preview channel；实际 DMG 两字段一致；不破坏旧 SemVer 比较 |
 | CI 系统包前提 | 固定 Azure 镜像重写遇到 hosted image 变化，原完整 CI 在产品测试前失败 | 保留原 image 官方仓库，有限重试/超时、update 失败不 install；实际后续 Ubuntu 原生／VM 路径已运行 |
+| DEP-01 失信 TLS 根与已公告依赖 | HTTPS upstream proxy 与主动 TLS probe 使用受影响的根及验证器；简单单包更新另会破坏旧 xattr size query | 精确锁定 TLS、Tokio、rustix 与配套 xattr；真实 TLS 回归、8192 字节扩展属性及大 name-list 红／绿对照；见依赖安全报告 |
+| ER-08 停止检查误认端口身份 | 已关闭监听后，同端口可被其他监听器或 outgoing self-connect 使用；数字端口连接不能识别原代理 | 生产 shutdown 路径无需修改；直接断言原 owner 释放、真实双向 tunnel 在 stop 返回前结束，取消后原 channel 保留；旧 macOS 具体原因不猜测 |
 | QA 采集前提 | macOS 最后 PTY slave 关闭丢失输出；argv-only child 早退遇空 stdin 写入 EPIPE | 保留 slave 到 nonblocking drain；无 stdin 合同不建 pipe，JSON transport 验退出码/信号/信封；不放宽产品断言，须新 native CI 通过 |
 
 ### 没有被“修掉”的可靠设计
@@ -51,7 +54,7 @@ Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 C
 - 加密归档和迁入采用 no-replace publication，独立 state 能检验密文原文；归档不默认激活会话或修改凭据。
 - browser 通过原生 API 和真实 startup generation 完成两阶段清理；不把 worker 重启当浏览器重启，不重放 uncertain ID。
 - SSH 使用有限 transport、严格主机配置、原 runner 绑定；systemd 只使用已有资格，不 sudo、不启用 linger、不改生产登录策略。
-- helper 不自动运行，认证原始 status 只在内存中解析，输出保留有限来源/范围；状态 schema 不认识时说明不可核对。
+- 来源 inventory 不运行 helper；另行选择的官方 status 可能调用客户端配置的 helper 或重新生成凭据，随后再做最终本地读回。原始 status 只在内存中解析，输出保留有限来源/范围；状态 schema 不认识时说明不可核对。
 
 这些保护有明确边界：停止其他 writer 仍是运行条件，Keychain API 不提供跨任意写入者的 payload CAS；路径选择冻结不是整个后续进程的 OS sandbox；Terminal 异步交接只报告 `launch_requested`；systemd/setsid/reboot 能力分开。报告保留这些实际条件，不扩大“完成”的含义。
 
@@ -72,6 +75,8 @@ Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 C
 第一套候选 [run 43520398419](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43520398419) 成功，source `e573ce228e15ee6cb03c2705baf70a8bab1a8c75`。真实构建为 Rust 1.100.0、cargo-zigbuild 0.23.4、Zig 0.16.0、Node 22.23.4，fresh clone/fresh target/locked dependencies。GitHub artifact ZIP 为 42,564,088 bytes，SHA-256 `720f659b3ad1f1f36e6139a1923ebdcf3a93fbd63f96076845ca631a30f4045f`。该初始记录保留为历史，不替代最终修正提交的 receipt。
 
 ### 最终验收收口
+
+第二套 `da7ebd2024384ea2019719f63dabef3d9db6cd32` 的两平台 browser 19/19、三平台 CLI 及实际 WebKit 可见窗口通过；native rust 的数字端口断言失败。真正的候选 gate 拒绝了该 incomplete source，没有用其他绿灯代替。该套包还早于 TLS 安全更新，保留为中间证据，不用于本次发行。
 
 待最后固定提交执行后填入：source/tree、PR、verify push run 与 canonical check 数、candidate run、Mac gate result、三 CLI/native reports、DMG/window observation、artifact 摘要。任何失败、取消、未选择与不支持均独立记载；不得把下一次通过覆盖掉初始失败的根因。
 

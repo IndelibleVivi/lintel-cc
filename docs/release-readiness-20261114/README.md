@@ -6,6 +6,7 @@ Status: independent audit and candidate hardening in progress. Baseline: `73f34e
 
 The target is a usable, reviewable release candidate, with independent decisions for macOS App, macOS CLI and Linux CLI. Full SPEC remains the long-term target; release gates cover the capabilities actually offered by the next Preview.
 
+- Dependency security: exact locked versions, actual target/feature reachability, compatible security patches and caller-level regressions.
 - Authentication and Keychain: exact source attribution, preservation, concurrent changes, independent verification, actual client compatibility evidence.
 - Execution and recovery: approved identity, original job ownership, bounded reads, restart and incomplete history.
 - Distribution: clean source, real candidate bytes, executable modes, internal checksums, notices, versions, native installation/upgrade evidence and trust.

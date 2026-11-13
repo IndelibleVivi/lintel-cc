@@ -25,6 +25,7 @@ Lintel helps you choose a Claude Code environment, manage outbound settings, pre
 - Improve Chinese/English, Day/Night, small windows, complete labels, cleanup entry points, archive results and keyboard focus. Errors and partial results explain the next useful action.
 - Align the App and CLI product version at 0.2.0 while retaining the Preview channel. Packages keep project terms separate from third-party notices.
 - Check architecture, actual executable permissions, complete internal checksums, resources, native version metadata and final DMG contents at candidate admission.
+- Update the TLS roots and certificate-verification dependencies used by HTTPS upstream proxying and probes to reject distrusted certificate chains.
 
 ## Supported scope and installation choices
 
@@ -34,7 +35,7 @@ Automatic updates are not configured. Upgrade by manual download and a separate 
 
 If the approved release remains an ad-hoc App Preview, its notes must explicitly state that it has no Developer ID signature or Apple notarization and that macOS may block first launch. After checking the source, the user decides whether to use Apple's per-App exception procedure. Lintel does not disable Gatekeeper or automatically remove quarantine. General distribution for ordinary users should first complete signing, notarization and real download/first-install acceptance.
 
-Results cover selected, recognized sources and supported operations. Unknown providers/helpers, other processes, other devices and server state remain separate observations. Lintel does not run an unknown helper, sweep all Keychain accounts or promise account unblocking or complete removal of server-side associations.
+Results cover selected, recognized sources and supported operations. Unknown providers/helpers, other processes, other devices and server state remain separate observations. Source inventory does not run a helper. A separately selected official status command may invoke the client's configured helper and recreate credentials; final local readback follows that command. Lintel does not sweep all Keychain accounts or promise account unblocking or complete removal of server-side associations.
 
 ## Upgrading and recovering from a problem
 
