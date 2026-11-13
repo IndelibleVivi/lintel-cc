@@ -55,13 +55,24 @@ try{
   for(const [width,height,theme,button] of [[1120,800,'day','浅色 Day'],[900,640,'night','深色 Night']]){await page.setViewportSize({width,height});await page.getByRole('button',{name:button,exact:true}).click();await page.waitForFunction(expected=>document.documentElement.dataset.theme===expected,theme==='day'?'light':'dark');await page.evaluate(()=>Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect.getComputedTiming().iterations)).map(a=>a.finished.catch(()=>{}))));await page.screenshot({path:path.join(fixture,`work-${theme}.png`),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Work page horizontal overflow');await page.locator('main').evaluate(el=>el.scrollTop=el.scrollHeight);await page.screenshot({path:path.join(fixture,`work-${theme}-actions.png`)});await page.locator('main').evaluate(el=>el.scrollTop=0);}
   const carried=path.join(home,'carried.age');await page.getByLabel('另存加密包的完整路径（可选）').fill(carried);
   await page.getByRole('button',{name:'预览保全计划',exact:true}).focus();await page.keyboard.press('Enter');await dialog.getByRole('heading',{name:'仅加密归档所选工作内容',exact:true}).waitFor();
-  assert.equal(await dialog.locator('.plan-steps .action-description').count(),1);await approve();
+  assert.equal(await dialog.locator('.plan-steps .action-description').count(),1);
+  await dialog.getByRole('region',{name:'批准中的原件范围',exact:true}).waitFor();
+  assert.ok((await dialog.locator('.preserve-column').innerText()).length>0,'archive review retains the frozen preservation scope');
+  assert.equal(await dialog.getByRole('heading',{name:/^配置字段/}).count(),0,'archive-only review has no irrelevant empty configuration diff');
+  assert.equal((await dialog.innerText()).includes('本次不修改配置字段'),false);
+  await page.evaluate(()=>Promise.all(document.getAnimations({subtree:true}).filter(animation=>Number.isFinite(animation.effect.getComputedTiming().iterations)).map(animation=>animation.finished.catch(()=>{}))));
+  await page.screenshot({path:path.join(fixture,'archive-only-preview.png')});
+  await approve();
+  await dialog.getByRole('button',{name:'查看工作归档',exact:true}).waitFor();
+  assert.equal(await dialog.getByRole('button',{name:'打开 Claude',exact:true}).count(),0,'archive-only result offers reading, not a client launch');
+  assert.equal((await dialog.innerText()).includes('此任务没有可用配置恢复动作'),false,'archive-only result omits irrelevant configuration restoration advice');
+  await page.screenshot({path:path.join(fixture,'archive-only-result.png')});
   assert.equal((await data({command:'discover'})).environments.length,inventory.environments.length);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);assert.equal(await readFile(path.join(root,'.credentials.json'),'utf8'),'SYNTHETIC_CREDENTIAL');
   await dialog.getByRole('button',{name:'查看工作归档',exact:true}).click();await reader.getByLabel('归档口令',{exact:true}).fill(password);await reader.getByRole('button',{name:'解锁并查看',exact:true}).click();await reader.getByRole('button',{name:/CLAUDE.md/}).click();await reader.locator('.session-reader').getByText('# Synthetic instructions',{exact:false}).waitFor();
   await page.getByRole('button',{name:'工作保全',exact:true}).click();assert.ok(!(await page.evaluate(()=>JSON.stringify(localStorage))).includes(password));
   report.checks.push('Keyboard task help → archive-only plan/approve → real package/read; no new root, settings/auth unchanged; secret absent from storage');
   await page.getByLabel(/保全并准备新环境/).check();await page.getByLabel('新环境名称（可选）').fill('Synthetic continuation');await page.getByRole('button',{name:'预览保全计划',exact:true}).click();
-  await dialog.locator('.plan-steps .action-description').first().waitFor();assert.equal(await dialog.locator('.plan-steps .action-description').count(),3);await approve();await dialog.getByText(/工作保全已完成/).waitFor();
+  await dialog.locator('.plan-steps .action-description').first().waitFor();assert.equal(await dialog.locator('.plan-steps .action-description').count(),3);assert.equal(await dialog.getByRole('heading',{name:/^配置字段/}).count(),1,'non-archive plans retain explicit configuration feedback');await approve();await dialog.getByText(/工作保全已完成/).waitFor();
   await dialog.getByRole('button',{name:'为新环境选择保护方案',exact:true}).click();await page.getByRole('heading',{name:'保护方案',exact:true}).waitFor();assert.notEqual(await page.getByLabel('当前环境',{exact:true}).inputValue(),source.id);assert.deepEqual(await readFile(path.join(root,'settings.json')),sourceBytes);
   report.checks.push('Preserve → completed outcome → new environment policy; old root/login untouched');
   // Metadata pages and real exact selection, with an excluded transcript over this runner's actual limit.

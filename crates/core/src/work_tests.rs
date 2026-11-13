@@ -67,6 +67,25 @@ fn archive_only_does_not_create_or_change_environment() {
     assert_eq!(p["kind"], "archive");
     assert_eq!(p["outcome"], "archive_only");
     assert_eq!(p["file_count"], 3);
+    assert_eq!(
+        p["warnings"],
+        json!([]),
+        "archive-only does not change configuration or require a Claude client"
+    );
+    let policy = ok(
+        &engine,
+        json!({"command":"plan_policy","environment_id":e["id"],"preset":"reduce","keep_remote_control":false}),
+    );
+    assert!(
+        policy["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|warning| warning
+                .as_str()
+                .is_some_and(|text| text.contains("user settings"))),
+        "configuration plans retain their scope warning"
+    );
     let j = ok(
         &engine,
         json!({"command":"execute","plan_id":p["id"],"approval":p["hash"],"archive_passphrase":PASS}),

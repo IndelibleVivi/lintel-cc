@@ -39,12 +39,12 @@ export default function PlanReview({ plan }: { plan: Plan }) {
       {manifest.package && <details className="import-package"><summary>{t('planReview.checkPackage')}</summary><dl><div><dt>{t('planReview.format')}</dt><dd>{manifest.package.format}</dd></div><div><dt>{t('planReview.generator')}</dt><dd>{manifest.package.generator ?? t('planReview.notDeclared')}</dd></div><div><dt>{t('planReview.packageSha')}</dt><dd><code>{manifest.package.sha256}</code></dd></div></dl></details>}
     </section>}
     <div className="plan-columns">
-      <section><h4>{t(plan.authentication?'cleanup.authOtherFields':'planReview.configFields')} <span>{t('planReview.changeCount',{count:plan.changes.length})}</span></h4>
+      {!(plan.kind==='archive'&&plan.changes.length===0)&&<section><h4>{t(plan.authentication?'cleanup.authOtherFields':'planReview.configFields')} <span>{t('planReview.changeCount',{count:plan.changes.length})}</span></h4>
         {plan.changes.length ? <div className="change-list">{plan.changes.map((change, index) => <div className="change" key={`${change.key}-${index}`}>
           <strong>{p(change.label)}</strong><div className="change-values"><code>{change.masked && change.before_present!==false ? '••••••' : change.before ?? t('planReview.notSet')}</code><Icon name="arrow" size={13}/><code>{change.masked && (change.after_present===true || change.after!==null) ? '••••••' : change.after ?? t('planReview.removeItem')}</code></div>
           <details><summary>{t('planReview.viewSource')}</summary><code className="full-path">{change.key}</code><code className="full-path">{change.path}</code></details>
         </div>)}</div> : <p className="muted">{t(plan.authentication?'cleanup.authExactFieldsAbove':manifest ? 'planReview.onlyFiles' : 'planReview.noFieldChanges')}</p>}
-      </section>
+      </section>}
       <section className="preserve-column"><h4>{t('planReview.willKeep')}</h4><ul className="keep-list">{plan.preserves.map((item, index) => <li key={index}>{p(item)}</li>)}</ul></section>
     </div>
   </>;

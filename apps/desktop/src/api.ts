@@ -24,9 +24,9 @@ export type RequestDiagnostic = {
   alias?: string; install_id?: string;
 };
 export class RequestError extends Error {
-  constructor(public code: string, message: string, public diagnostic?: RequestDiagnostic) { super(message); }
+  constructor(public code: string, message: string, public diagnostic?: RequestDiagnostic, public reason?: string) { super(message); }
 }
-export type Envelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string; diagnostic?: RequestDiagnostic } };
+export type Envelope<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string; diagnostic?: RequestDiagnostic; reason?: string } };
 async function send<C extends keyof Api>(command: C, fields: Api[C]['request']): Promise<Api[C]['response']> {
   const payload = { command, ...fields };
   let envelope: Envelope<Api[C]['response']>;
@@ -39,7 +39,7 @@ async function send<C extends keyof Api>(command: C, fields: Api[C]['request']):
   } else {
     throw new RequestError('NATIVE_REQUIRED', tr('api.nativeRequired'));
   }
-  if (!envelope.ok) throw new RequestError(envelope.error.code, envelope.error.message, envelope.error.diagnostic);
+  if (!envelope.ok) throw new RequestError(envelope.error.code, envelope.error.message, envelope.error.diagnostic, envelope.error.reason);
   return envelope.data;
 }
 
@@ -101,7 +101,7 @@ export function requester(alias: string | null): typeof request {
         : fields;
       const payload = command === 'execute' || command === 'launch' || command === 'launch_request' || command === 'resume_request' || command === 'launch_query' || command === 'launches' ? { op:command, alias, ...remoteFields } : { op:'request', alias, request:{command,...remoteFields} };
       const envelope = await invoke<Envelope<Api[C]['response']>>('remote_request', {payload});
-      if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message,envelope.error.diagnostic);
+      if (!envelope.ok) throw new RequestError(envelope.error.code,envelope.error.message,envelope.error.diagnostic,envelope.error.reason);
       return envelope.data;
     });
     remoteQueue = result.catch(() => undefined);

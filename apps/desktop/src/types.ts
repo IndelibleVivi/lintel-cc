@@ -69,6 +69,7 @@ export interface WorkInventory {
   reason?:string|null;unobserved?:string|null;
 }
 export interface Plan {
+  kind?: string;
   authentication?: AuthenticationPlan;
   network?: NetworkPlan;
   lightweight_changes?:{status:string;changes:unknown[]};

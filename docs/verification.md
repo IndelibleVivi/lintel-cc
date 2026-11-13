@@ -44,6 +44,16 @@ executed check fails. `deferred` and `skipped` checks never count as passes.
 
 The table below lists the equivalent raw commands; [开发与文档](../README.md#开发与文档) points to this entrypoint.
 
+## 新版 App 和 CLI 使用测试收尾
+
+2026-11-13 的 QA 将真实 macOS WebKit 与 built-App Chromium 分开。原生 debug QA bundle 使用独立 App identifier、合成 HOME／state 与 inert Claude，只通过正常控件完成三份原件的归档批准、错误口令、Quit／重开、重新解锁、指令／记忆／会话结构化与 raw 阅读，以及五项文件／测试 Keychain／注入来源的同计划清理和独立复查。原件及邻接字段逐项读回，只有一个归档 job 和一个清理 job；认证 receipt 的 legacy status 与所选 task_result 仍分开，未将本地移除声称为服务端撤销。个人账号和真实 Keychain 未参与。
+
+`baseline-ui` 新增不存在目录的真实业务拒绝、原诊断展开、中英切换不重提、无 reason 时不猜路径、取消／修改／重试登记。CLI `request` 的 exit 1 合法 error envelope 在此测试 transport 中投影为 native 业务拒绝；崩溃、伪成功和 stdin 错误仍拒绝。该 journey 在开始键盘检查前观察目的页面标题已实际收到导航焦点，并 trial-check 按钮可操作，保留两套主题的真实 Shift+Tab／Tab 与可见焦点断言，无固定 sleep。
+
+`work-ui` 验证只归档预览保留冻结原件／保留范围／实际步骤，隐藏空配置区；真实 `archive_only` 结果不提供客户端启动／配置恢复空话，仍可进入资料阅读。非 archive 的配置反馈有独立正常案例。Core 工作组 25/25 通过，包含 archive-only 不含无关 warning、策略计划仍保留配置范围提示；新增 warning 断言修复前失败、修复后通过。本机 fresh runner 的 work-ui、auth-sources-ui、i18n 两项及 journey-agent-cli 均通过，baseline 焦点边界修正后单独 strict 通过。修复后归档专属展示尚未形成完整 native 目视验收；后半程 QA 窗口不可见，不能把 AX 或 Chromium 当成补齐的截图证据。
+
+这些是未发布源码的合成使用证据；不代表 Release、安装、其他架构实际 runtime、个人认证、生产远端或干净 Mac 首装验收。
+
 ## 客户端控制增强
 
 `python3 tests/verify.py --checks journey-client-control --require-passed` 通过真实 CLI 子进程、独立合成 HOME/state 和两个配置根核对有限清单、默认遮蔽身份、同环境快照及双环境对照；也实际执行加密配置编辑、原任务的所选字段恢复、一次批准的配置＋身份＋残留合成操作，以及独立 `lintel.residue/1` 原路径恢复。它验证后续无关字段保留、身份重置不注销、未选原件不变、目标环境绑定、原 ID 不重放及口令不进入持久回执。观察阶段不运行 inert Claude、不产生 mutation job；后续 mutation 阶段只改合成原件。

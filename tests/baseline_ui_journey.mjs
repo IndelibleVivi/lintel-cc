@@ -19,7 +19,7 @@ const inert=path.join(versions,'2.1.283');await writeFile(inert,'#!/bin/sh\nexit
 const {symlink}=await import('node:fs/promises');await symlink(inert,path.join(home,'.local/bin/claude'));const {chmod}=await import('node:fs/promises');await chmod(inert,0o700);
 const actor={...process.env,HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:path.join(home,'.local/bin')};
 const runner=process.env.LINTEL_FIXTURE_RUNNER||path.join(repo,'target/debug/lintel'),calls=[],copied=[],resources=[];
-let queue=Promise.resolve(),clipboardFail=false,launchFailure=false,legacyStartup=false;
+let queue=Promise.resolve(),clipboardFail=false,launchFailure=false,legacyStartup=false,registrationFailure=null;
 function processCall(args,payload,env=actor,executable=runner){return new Promise((resolve,reject)=>{
  const child=spawn(executable,args,{env,stdio:['pipe','pipe','pipe']});let out='',err='',inputError;
  const timeout=setTimeout(()=>{child.kill();reject(new Error('core timeout'))},55000);
@@ -31,6 +31,14 @@ function processCall(args,payload,env=actor,executable=runner){return new Promis
  child.once('error',error=>{clearTimeout(timeout);reject(error)});
  child.once('close',(code,signal)=>{clearTimeout(timeout);try{
   assert.ok(!out.includes(password)&&!err.includes(password));
+  // The native request bridge returns a structured core rejection normally.
+  // CLI request uses exit 1 for that same error envelope; preserve it so GUI
+  // error handling sees code/reason, while crashes and success-looking failed
+  // children still reject (the lifecycle checks below cover those cases).
+  if(code===1&&!signal&&!inputError&&args[0]==='request'){
+   let failure;try{failure=JSON.parse(out)}catch{}
+   if(failure?.ok===false&&typeof failure.error?.code==='string'&&typeof failure.error?.message==='string'){resolve(failure);return;}
+  }
   if(code!==0 || signal)throw new Error(`core exited ${code ?? signal}: ${err}`);
   if(inputError)throw new Error(`core stdin failed: ${inputError.code}`);
   try{resolve(JSON.parse(out))}catch{throw new Error('invalid envelope: '+err)}
@@ -60,7 +68,9 @@ try{
   }
   if(command==='remote_request')return {ok:true,data:{hosts:[],tasks:[],installations:[]}};
   assert.equal(command,'request');if(args.payload.command==='launch_request'&&launchFailure){calls.push(args.payload);return {ok:false,error:{code:'synthetic_connection_lost',message:'合成启动回复丢失；这里没有执行 Terminal launcher'}}}
+  if(args.payload.command==='register'&&registrationFailure){calls.push(args.payload);return {ok:false,error:registrationFailure};}
   const response=await core(args.payload);
+  if(args.payload.command==='register'&&!response.ok)report.registrationError=response.error;
   if(legacyStartup && args.payload.command==='plan_launch' && response.ok)delete response.data.launch_request.startup;
   return response;
  });
@@ -133,12 +143,68 @@ try{
  await writeFile(path.join(root,positionPath),positionLines.join(''));
  await writeFile(path.join(root,'CLAUDE.md'),'# Synthetic instructions\n');await writeFile(path.join(root,'projects/synthetic/session.jsonl'),raw);await writeFile(path.join(root,'projects/synthetic/memory/MEMORY.md'),'Synthetic reference memory\n');
  const original=await readFile(path.join(root,'projects/synthetic/session.jsonl'));
- const source=await data({command:'register',root,name:'同名环境 / 同名环境 A very long mixed English 中文工作名称'});
+ // Registration failures have no mutation task to reconcile. Exercise real
+ // ENOENT, locale changes while the form stays open, cancellation, and retry.
+ await page.locator('.language-switch select').first().selectOption('system');
+ const addExisting=page.locator('.sidebar-environments').getByRole('button',{name:'添加现有环境',exact:true});
+ await addExisting.click();
+ const registration=page.getByRole('dialog');
+ const registrationName='同名环境 / 同名环境 A very long mixed English 中文工作名称';
+ const absentRoot=path.join(home,'missing registration directory');
+ await registration.getByLabel('环境名称',{exact:true}).fill(registrationName);
+ await registration.getByLabel(/^配置目录完整路径/).fill(absentRoot);
+ const jobsBeforeRegister=(await data({command:'jobs'})).jobs.length;
+ await registration.getByRole('button',{name:'添加环境',exact:true}).click();
+ const registerAlert=registration.getByRole('alert');
+ await registerAlert.waitFor();
+ await registerAlert.getByText('添加环境时找不到所需文件或目录。请检查配置目录的完整路径，确认目录已存在后重试。',{exact:true}).waitFor();
+ assert.equal((await data({command:'jobs'})).jobs.length,jobsBeforeRegister,'failed registration creates no task');
+ assert.equal((await data({command:'discover'})).environments.some(item=>item.root===absentRoot),false);
+ assert.equal((await registerAlert.locator('.notice').innerText()).includes('原任务'),false);
+ await registerAlert.getByText('查看原始诊断',{exact:true}).click();
+ assert.ok((await registerAlert.innerText()).includes('io_error'));
+ assert.ok((await registerAlert.innerText()).includes('not_found'));
+ await page.screenshot({path:path.join(fixture,'register-missing-zh.png')});
+ const registerCalls=calls.filter(call=>call.command==='register').length;
+ // Model the OS/native language response, rather than changing dialog DOM.
+ await page.evaluate(()=>{window.__LANG_PRESENT=cmd=>cmd==='app_preferred_languages'?['en-US']:null;window.dispatchEvent(new Event('languagechange'));});
+ await registerAlert.getByText('A required file or directory could not be found while adding the environment. Check the full config directory path, confirm the directory exists, and try again.',{exact:true}).waitFor();
+ assert.equal(await registration.getByLabel(/^Full path to the config directory/).inputValue(),absentRoot);
+ assert.ok((await registerAlert.innerText()).includes('文件操作未完成：对象不存在；保留原任务核对'),'original diagnostic is preserved as data');
+ assert.equal(calls.filter(call=>call.command==='register').length,registerCalls,'language switch does not resubmit');
+ await page.screenshot({path:path.join(fixture,'register-missing-en.png')});
+ await page.evaluate(()=>{window.__LANG_PRESENT=cmd=>cmd==='app_preferred_languages'?['zh-CN']:null;window.dispatchEvent(new Event('languagechange'));});
+ await registration.getByLabel('环境名称',{exact:true}).waitFor();
+ await registration.getByRole('button',{name:'取消',exact:true}).click();
+ await addExisting.click();
+ assert.equal(await registration.getByRole('alert').count(),0,'cancellation clears registration error');
+ assert.equal(await registration.getByLabel('环境名称',{exact:true}).inputValue(),'');
+ await registration.getByLabel('环境名称',{exact:true}).fill(registrationName);
+ await registration.getByLabel(/^配置目录完整路径/).fill(absentRoot);
+ registrationFailure={code:'io_error',message:'SYNTHETIC_OPAQUE_REGISTRATION_DIAGNOSTIC'};
+ await registration.getByRole('button',{name:'添加环境',exact:true}).click();
+ await registerAlert.getByText('未能完成环境登记。请核对名称和配置目录，并查看诊断后重试。',{exact:true}).waitFor();
+ assert.equal((await registerAlert.innerText()).includes('找不到'),false,'unstructured io_error does not infer a missing path');
+ await registerAlert.getByText('查看原始诊断',{exact:true}).click();
+ assert.ok((await registerAlert.innerText()).includes(registrationFailure.message));
+ registrationFailure=null;
+ await registration.getByLabel(/^配置目录完整路径/).fill(root);
+ assert.equal(await registration.getByRole('alert').count(),0,'editing the path clears stale error before retry');
+ await registration.getByRole('button',{name:'添加环境',exact:true}).click();
+ await registration.waitFor({state:'hidden'});
+ const source=(await data({command:'discover'})).environments.find(item=>item.root===root);
+ assert.ok(source,'retry with existing directory registers the real environment');
+ assert.equal(source.name,registrationName);
+ report.checks.push('registration: real missing path uses contextual bilingual guidance; raw reason/code stays reachable; locale switch never resubmits; opaque errors make no missing-path claim; cancel/edit/retry recover without a mutation job');
  const secondRoot=path.join(home,'another root with same display name');await mkdir(secondRoot);
  const second=await data({command:'register',root:secondRoot,name:source.name});await page.reload();await page.getByLabel('当前环境').selectOption(source.id);
  await page.locator('.sidebar nav').getByRole('button',{name:'保护方案',exact:true}).click();
  const dock=page.locator('.workspace-actions .action-bar');
- await dock.getByRole('button',{name:'预览变更',exact:true}).waitFor();
+ // Navigation hands focus to the destination heading on its next frame.
+ // Seeing the dock is earlier than that handoff; starting a keyboard journey
+ // there races the pending navigation focus and tests the wrong initial state.
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('main h1,main h2'));
+ await dock.getByRole('button',{name:'预览变更',exact:true}).click({trial:true});
  // Filled primary actions must expose keyboard focus in both palettes. A later
  // decorative shadow must not erase the only focus indicator.
  for(const theme of ['light','dark']) {
