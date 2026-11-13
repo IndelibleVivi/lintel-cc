@@ -2603,4 +2603,7 @@ export const zhCN: Catalog = {
   "cleanup.authKeychainNoLogin": "未发现此环境对应的 Keychain 登录字段。",
   "cleanup.authKeychainFormat": "登录存储格式无法识别。本次保留原项，可刷新重查；文件来源仍可独立处理。",
   "cleanup.authKeychainLarge": "登录存储超过安全读取范围。本次保留原项；文件来源仍可独立处理。",
+  "app.registerMissingSource": "添加环境时找不到所需文件或目录。请检查配置目录的完整路径，确认目录已存在后重试。",
+  "app.registerFailed": "未能完成环境登记。请核对名称和配置目录，并查看诊断后重试。",
+  "app.registerDiagnostics": "查看原始诊断",
 };

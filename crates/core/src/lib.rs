@@ -476,7 +476,14 @@ impl Engine {
         let snap = auth_cleanup::settings_binding(&settings_path, &extra)?;
         let rm = fs::metadata(&root)?;
         use std::os::unix::fs::MetadataExt;
-        let mut warnings = self.warnings(e);
+        // Archive-only preserves the source environment and never launches a
+        // client or edits configuration. Configuration/OS-isolation caveats
+        // would describe a different operation in this approval.
+        let mut warnings = if kind == "archive" {
+            vec![]
+        } else {
+            self.warnings(e)
+        };
         if kind == "config_edit" {
             warnings[0] =
                 "只修改预览内明确选择的配置来源；静态配置、真实加载与运行效果分别核对。".into();

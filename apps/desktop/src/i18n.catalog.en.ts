@@ -2603,4 +2603,7 @@ export const en: Catalog = {
   "cleanup.authKeychainNoLogin": "No Keychain login field was found for this environment.",
   "cleanup.authKeychainFormat": "Login storage has an unrecognized format. The original item is preserved; refresh to recheck. File sources remain available.",
   "cleanup.authKeychainLarge": "Login storage exceeds the safe read limit. The original item is preserved; file sources remain available.",
+  "app.registerMissingSource": "A required file or directory could not be found while adding the environment. Check the full config directory path, confirm the directory exists, and try again.",
+  "app.registerFailed": "Environment registration could not be completed. Check the name and config directory, review the diagnostic, and try again.",
+  "app.registerDiagnostics": "View original diagnostic",
 };
