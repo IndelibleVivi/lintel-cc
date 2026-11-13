@@ -261,10 +261,31 @@ them. Cargo caches cover the root `target` plus the standalone
 `apps/desktop/src-tauri/target` and `extensions/browser/native-host/target`;
 only the official signed Ubuntu base image is cached for the VM and every run
 still re-verifies its gpgv signature and checksums. Caches never replace the
-source rebuild/test. Ordinary pushes and PRs cancel a superseded run on the same
-ref; scheduled and manually dispatched runs get their own run-scoped group and
-are never cancelled or queued behind one another. Permissions stay
-`contents: read`.
+source rebuild/test. Only a newer run of the same PR cancels unfinished PR
+verification: its concurrency group includes the workflow, event and PR number.
+Every non-PR run (including each branch push, schedule and manual dispatch) has
+an independent run-ID group. This protects both running and pending push
+evidence: disabling running cancellation alone would still allow a third push
+to replace a second pending push. Standalone branch pushes stay enabled before
+a PR exists; push and PR runs remain separate because they test the pushed head
+and the PR merge checkout respectively. Weekly complete acceptance and all
+finite profiles/platforms stay unchanged. Permissions stay `contents: read`.
+The grouping policy follows [GitHub's concurrency semantics](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
+The 2026-10-26 [weekly full run](https://github.com/IndelibleVivi/lintel-cc/actions/runs/40295960891)
+completed 14 jobs in about 1,230 seconds wall time (5,360 seconds summed job execution).
+The native Linux/macOS cache restores took about 26/29 seconds for about
+1,022/794 MiB, while heavy work checks took about 1,175/1,024 seconds and the VM
+check about 1,049 seconds. These observations do not identify cache transfer as
+the main runtime cost. The existing five Cargo cache groups retain their
+OS/architecture/toolchain and manifest/lock keys and independent standalone
+targets. [rust-cache](https://github.com/Swatinem/rust-cache) supports explicit
+workspace/target mappings and filters unused dependencies, workspace outputs
+(by default) and incremental artifacts. That can reduce archive size, but it
+also changes build reuse; the observed restore times alone do not establish a
+net gain. No filtered-cache migration or measured speedup is claimed. Canceling
+obsolete PR runs saves only their remaining work; a single unchanged run still
+executes its complete selected checks.
 
 ### Strict CI: skip is never a pass
 
@@ -813,7 +834,7 @@ clean `ddfcd438990bb4b9af4b2720dac6e3af77c0d78c` 的 [GitHub CI 39252988511](htt
 
 ## 打包与恢复的验证边界
 
-Desktop build/signature 脚本及随包项目许可文件选择 core profile；15 篇 paired 网站指南源选择 site profile，controller test 与 `site-routes.mjs` 比对完整集合。`macos-bundle-signature-test` 在 macOS frontend job 执行，Linux 不选中。后续 push 不再取消同 ref 正在运行的验证；GitHub 仍可能替换 pending run，docs-only aggregate 也不能证明前一产品 revision 或代替准确候选的发行 gate。
+Desktop build/signature 脚本及随包项目许可文件选择 core profile；15 篇 paired 网站指南源选择 site profile，controller test 与 `site-routes.mjs` 比对完整集合。`macos-bundle-signature-test` 在 macOS frontend job 执行，Linux 不选中。后续 push 使用各自 run ID，不会因同组竞争取消先前正在运行或 pending 的 push；只有同一 PR 的新运行会替换旧 PR 运行。docs-only aggregate 不能证明前一产品 revision 或代替准确候选的发行 gate。
 
 Frontend 的实际执行清单由 planner 输出 `frontend_checks_by_platform`，workflow 按 matrix 平台读取，与 aggregate 的过滤规则一致；旧的未过滤 frontend 输出已移除。回归覆盖 planner 输出、workflow 转接及消费表达式，避免仅检查证据模型而漏掉实际接线。带 PyYAML 的 controller 77 项与 `verify.py --self-test` 全部通过，没有将 YAML 分支 skip 计为验收。
 
