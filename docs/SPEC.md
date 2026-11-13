@@ -563,9 +563,11 @@ macOS Keychain 与文件 fallback、Linux credential file、独立 profile 与�
 
 `auth_inventory` 在明确主机、环境、可选项目 cwd 下执行有界只读检查。分别表达：已识别本地来源、执行器环境观察、声明存在但生效未知、无法检查／归属不明、其他运行上下文。它不执行 shell 初始化、credential helper、hooks 或 Claude，不读取所有 shell history，不扫描整块磁盘，也不把值、原文或稳定凭据指纹放入公共结果。
 
-`setup-token` 只输出 token，保存位置由后来注入方式决定。[S03] 检查覆盖已支持的认证文件、Keychain 未知范围、已知 shell／settings 声明、进程变量及共享 profiles 的有限元数据；当前执行器不能代表所有 Terminal／IDE／SSH 环境。Profiles 配置与凭据文件分离，也可能由其他 Anthropic 工具共同使用。[S34] 项目声明和受管声明、环境实际观察与客户端状态必须分别标记。[S05][S35]
+`setup-token` 只输出 token，保存位置由后来注入方式决定。[S03] 检查覆盖已支持的认证文件、有限已识别服务的 Keychain 字段、已知 shell／settings 声明、进程变量及共享 profiles 的有限元数据；未选择、未知或无法读取的 Keychain 范围单独保留。当前执行器不能代表所有 Terminal／IDE／SSH 环境。Profiles 配置与凭据文件分离，也可能由其他 Anthropic 工具共同使用。[S34] 项目声明和受管声明、环境实际观察与客户端状态必须分别标记。[S05][S35]
 
 `plan_cleanup` 沿原有修复／重建／退役配方新增 `auth_source_ids`、`project_cwd` 与默认关闭的 `verify_auth_status`，不另建执行引擎。可清理来源须有受支持的准确位置与语法、冻结文件身份、私有带盐内容绑定及执行时复查。Shell 只精确编辑可证明范围，复杂或动态语法不得通过运行来猜其效果。认证 JSON 仅移除已支持的字段；保留未知、MCP 和插件字段。所有新计划均受此规则约束，旧 raw caller 省略新增字段也不得回到整文件删除。未带新绑定的旧未执行计划重新预览。
+
+Keychain 适配只处理已静态确认的有限 service/account 和可识别 `/claudeAiOauth`，通过平台 API 更新原 item 的 data，不删除／重建整个 item。私有 persistent reference 与完整 payload 加盐绑定用于批准核对；秘密只在内存变换，更新后按原身份完整读回。锁定、拒绝访问、格式变化与更新不确定均保持准确结果；不自动重放，也不承诺外部 writer CAS 或跨来源原子性。普通 synthetic 测试不得进入个人 Keychain，原生测试使用一次性 hosted macOS 账号的独立临时库。
 
 认证清理不生成含旧 token 的恢复备份；编辑在有界内存计算，原文件暂时移动到同目录旁的私有位置，再以不覆盖方式发布替代文件。成功读回后删除原件；中断或冲突留下的含凭据原件／暂存通过 `retained_sensitive_material` 明确报告，不能判为本地清理完成。工作加密保全及原任务查询继续保留，新计划不以备份秘密为实现中断恢复的默认方法。中断／冲突核对原 ID 与现存文件，不自动重放或覆盖后来的登录。已经存在的历史备份不在新清理范围内。
 

@@ -6,6 +6,32 @@ Source head: `9a7ae90eaad76c52e500f557b42da4e91aac607c`.
 Main merge: `57b23c41a59d81952f676b24c2695c09cf1e880a`.
 Baseline: `77be003`. No release, installation or deployment is implied.
 
+## Keychain and usability follow-up (current source)
+
+The earlier PR/CI observations below describe the prior finite-file increment.
+The current follow-up integrates finite macOS Security.framework reads and
+data-only updates for recognized `/claudeAiOauth`, preserving MCP/plugin/unknown
+fields and item identity. It uses the same inventory, plan, approval and original
+job path; no additional mutation endpoint or automatic official logout. Private
+persistent-reference/account and salted whole-payload binding, immediate
+pre-update comparison and full readback retain uncertainty without update
+retries; this is not external-writer CAS or cross-source atomicity.
+
+The App now leads with Clear local login, suggests supported saved file/Keychain
+logins, requires explicit injection selection and exposes grouped select/clear.
+Source details expand progressively, approval locations expand by default, and
+results lead with removed/remaining/unresolved counts while retaining the four
+coverage scopes and original-ID read-only rechecks. Three recipes and six tasks
+remain.
+
+Naming evidence is static official NPM Claude Code 2.1.101 (`cli.js`), including
+NFC config-dir hashes; 2.1.323 registry metadata is not native binary acceptance.
+Synthetic homes use injected stores only. Native temporary-Keychain acceptance
+belongs to a disposable hosted macOS account and is independent of real-client
+or personal-account acceptance. Exact checks and status belong to
+[current-state](../current-state.md); the earlier green CI below does not certify
+this follow-up. No release, installation, updater or site activation is implied.
+
 ## Outcome
 
 Develop the existing local/SSH environment manager with a finite authentication
@@ -95,8 +121,8 @@ synthetic/disposable-host results, not native WebKit or real credentials.
 
 PR integration status and current source/release boundaries live in
 [current-state](../current-state.md); use that entry instead of rerunning
-superseded intermediate CI investigations. The next product increment is an attributed, version-bound
-Keychain/profile adapter only when it can preserve MCP/plugin credentials,
-followed by separate native acceptance. Do not infer universal erasure or
+superseded intermediate CI investigations. The current follow-up implements the finite Keychain adapter described above;
+separate native API and real-client acceptance remain distinct next gates.
+Shared profiles and unknown account contexts are still outside automatic edits. Do not infer universal erasure or
 server revocation from this local source work. No App release, updater
 activation or website deployment is part of this change.

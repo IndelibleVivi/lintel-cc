@@ -43,7 +43,7 @@ jobs:
       control_enabled: ${{ steps.compute.outputs.control_enabled }}
       frontend_checks_by_platform: ${{ steps.compute.outputs.frontend_checks_by_platform }}
       frontend_enabled: ${{ steps.compute.outputs.frontend_enabled }}
-      native_checks: ${{ steps.compute.outputs.native_checks }}
+      native_checks_by_platform: ${{ steps.compute.outputs.native_checks_by_platform }}
       native_enabled: ${{ steps.compute.outputs.native_enabled }}
       heavy_checks: ${{ steps.compute.outputs.heavy_checks }}
       heavy_enabled: ${{ steps.compute.outputs.heavy_enabled }}
@@ -233,7 +233,7 @@ jobs:
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python3 tests/verify.py --require-passed \
-            --checks '${{ needs.plan.outputs.native_checks }}' \
+            --checks '${{ fromJSON(needs.plan.outputs.native_checks_by_platform)[matrix.os] }}' \
             --json "$EVIDENCE_DIR/native-${{ matrix.os }}.json"
       - name: Upload evidence
         if: always()

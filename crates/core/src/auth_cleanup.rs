@@ -166,7 +166,7 @@ impl Engine {
             .flatten()
             .enumerate()
         {
-            actions.push(json!({"id":format!("auth_edit_{index}"),"label":format!("精确移除所选认证声明：{}",group["path"].as_str().unwrap_or("")),"reversible":false,"source_ids":group["source_ids"],"locators":group["locators"],"credential_backup":false}));
+            actions.push(json!({"id":format!("auth_edit_{index}"),"label":format!("精确移除所选认证声明：{}",group["path"].as_str().or_else(||group["service"].as_str()).unwrap_or("")),"reversible":false,"source_ids":group["source_ids"],"locators":group["locators"],"credential_backup":false}));
         }
         if recipe == "retire" {
             actions.push(json!({"id":"retire","label":"停用此环境的启动入口；保留原工作目录","reversible":true}));
@@ -301,7 +301,7 @@ impl Engine {
         } else {
             "unverified"
         });
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"auth_verify","label":"认证来源复查","status":if local_done{"completed"}else{"unverified"},"message":"只核对原选择；其他进程、Keychain、共享 profile 和服务端撤销保留各自覆盖状态。"}));
+        j["steps"].as_array_mut().unwrap().push(json!({"id":"auth_verify","label":"认证来源复查","status":if local_done{"completed"}else{"unverified"},"message":"只核对原选择；其他进程、未选择的 Keychain 来源、共享 profile 和服务端撤销保留各自覆盖状态。"}));
         save(journal, j)?;
         result?;
         if !local_done {
@@ -385,8 +385,8 @@ impl Engine {
             let group = a.and_then(|a|a["groups"].as_array()).and_then(|groups|groups.iter().find(|group|group["source_ids"].as_array().is_some_and(|ids|ids.contains(&source["id"]))));
             let state = if group.is_none_or(|group|auth_sources::check_parent(group).is_err()) {
                 "unknown".into()
-            } else { auth_sources::source_state(source).unwrap_or_else(|_| "unknown".into()) };
-            json!({"id":source["id"],"kind":source["kind"],"path":source["path"],"locator":source["locator"],"state":state})
+            } else { auth_sources::source_state_bound(source, group.unwrap()).unwrap_or_else(|_| "unknown".into()) };
+            json!({"id":source["id"],"kind":source["kind"],"path":source["path"],"service":source["service"],"locator":source["locator"],"state":state})
         }).collect();
         let mut retained = vec![];
         for step in j
@@ -460,6 +460,29 @@ fn edit_source(
     j: &mut Value,
     journal: &Path,
 ) -> Result<()> {
+    if group["storage"] == "keychain" {
+        j["steps"].as_array_mut().unwrap().push(json!({"id":format!("auth_edit_{index}"),"label":group["service"],"status":"executing","message":"精确移除 Keychain 的 Claude 登录字段；其余字段保留。","source_ids":group["source_ids"],"auth_edit_phase":"intent"}));
+        save(journal, j)?;
+        let original = auth_sources::keychain_original(group, nonce)?;
+        let replacement = auth_sources::keychain_replacement(group, &original)?;
+        let updated = crate::keychain::replace(
+            Path::new(string(group, "home")?),
+            string(group, "service")?,
+            &original,
+            &replacement,
+        )?;
+        if updated.bytes != replacement {
+            return Err(err(
+                "keychain_write_uncertain",
+                "Keychain 更新读回不一致；保留原任务，不重试",
+            ));
+        }
+        let step = j["steps"].as_array_mut().unwrap().last_mut().unwrap();
+        step["auth_edit_phase"] = json!("completed");
+        step["status"] = json!("completed");
+        step["message"] = json!("已读回精确修改；未导出凭据或创建备份。");
+        return save(journal, j);
+    }
     let path = Path::new(string(group, "path")?);
     let replacement = auth_sources::replacement(group, nonce)?;
     let directory = path

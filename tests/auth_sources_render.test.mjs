@@ -102,3 +102,35 @@ test('an unavailable post-cleanup inventory stays unknown instead of crashing or
   assert.equal(html.includes(catalogs[locale]['cleanup.authNoneObserved']),false);
  }
 });
+
+
+test('exact Keychain login is selectable with its service while secret and container stay independent',()=>{
+ for(const locale of ['en','zh-CN']){
+  const login={id:'auth-keychain-login',kind:'keychain_field',name:'claudeAiOauth',locator:'/claudeAiOauth',service:'Claude Code-credentials-synthetic',scope:'selected_root',presence:'present',evidence:'confirmed_present',removable:true,default_selected:true,value:secret};
+  const html=render(AuthenticationInventoryView,{inventory:{...inventory,sources:[login,sources[4]]},selected:[login.id],onToggle(){}},locale);
+  assert.ok(html.includes(catalogs[locale]['cleanup.authSavedClaude']));
+  assert.ok(html.includes(login.service));assert.ok(html.includes('/claudeAiOauth'));
+  assert.equal((html.match(/type="checkbox"/g)||[]).length,1);
+  assert.equal((html.match(/checked=""/g)||[]).length,1);
+  assert.equal(html.includes(secret),false);
+  assert.ok(html.includes(catalogs[locale]['cleanup.authContextCount'].replace('{count}','1')));
+  const plan=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[login]}},locale);
+  assert.ok(plan.includes(login.service));assert.equal(plan.includes(secret),false);
+  assert.ok(plan.includes('authentication-source-details" open=""'),'frozen locations start expanded at approval');
+  const result=render(AuthenticationResult,{receipt:{...receipt,auth_verification:{...report,local_sources:[{...login,state:'removed'}]}}},locale);
+  assert.ok(result.includes(login.service));
+ }
+});
+
+test('Keychain failures retain an actionable unknown state rather than an absent or signed-out claim',()=>{
+ const reasons={keychain_locked:'authKeychainLocked',keychain_access_denied:'authKeychainDenied',keychain_unavailable:'authKeychainUnavailable',keychain_unsupported:'authKeychainUnsupported',keychain_synthetic_unavailable:'authKeychainSynthetic',keychain_invalid_format:'authKeychainFormat',keychain_too_large:'authKeychainLarge'};
+ for(const locale of ['en','zh-CN'])for(const [reason,key] of Object.entries(reasons)){
+  const source={id:'auth-keychain-unavailable',kind:'keychain',name:'claudeAiOauth',locator:'/claudeAiOauth',service:'Claude Code-credentials-synthetic',scope:'selected_root',presence:'unknown',evidence:'inaccessible',removable:false,reason};
+  const html=render(AuthenticationInventoryView,{inventory:{...inventory,sources:[source]},selected:[],onToggle(){}},locale);
+  assert.ok(html.includes(catalogs[locale]['cleanup.'+key]));
+  assert.ok(html.includes('authentication-keychain-state'));
+  assert.equal((html.match(/type="checkbox"/g)||[]).length,0);
+  assert.equal(html.includes(catalogs[locale]['cleanup.authNoneObserved']),false);
+  assert.equal(html.includes('authentication-absent'),false);
+ }
+});

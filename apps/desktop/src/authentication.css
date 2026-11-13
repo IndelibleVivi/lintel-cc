@@ -33,3 +33,34 @@
 .authentication-recheck button{white-space:normal;text-align:left}
 .authentication-component>button{margin:8px 0}
 @media(max-width:960px){.authentication-coverage{grid-template-columns:1fr}.authentication-source{padding:12px}.authentication-result{padding:13px}}
+.authentication-group{margin:20px 0}
+.authentication-group h3{font-family:var(--font-serif,serif);font-size:18px;font-weight:500;margin-bottom:5px}
+.authentication-source-details{margin-top:9px}
+.authentication-source-details>summary,.authentication-context>summary,.authentication-secondary-coverage>summary,.authentication-process>summary,.authentication-project>summary,.authentication-runtime-details>summary{cursor:pointer;font-size:13px;color:var(--muted);line-height:1.7}
+.authentication-source-details[open]>summary{margin-bottom:8px}
+.authentication-context{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
+.authentication-project{margin-bottom:16px}
+.authentication-project .field{margin-top:12px}
+.authentication-process{margin:18px 0}
+.authentication-process .rebuild-split{margin-top:14px}
+.authentication-runtime-details>button{margin-top:14px}
+.authentication-secondary-coverage{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px}
+.authentication-secondary-coverage .authentication-coverage>section:first-child{grid-column:auto}
+.authentication-outcome{display:flex;gap:8px 18px;flex-wrap:wrap;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)}
+.authentication-outcome strong{font-size:17px;color:var(--text)}
+.authentication-outcome span{font-size:13px}
+.authentication-source input[type=checkbox]{flex-shrink:0;cursor:pointer}
+.authentication-source-details summary:focus-visible,.authentication-context summary:focus-visible,.authentication-secondary-coverage summary:focus-visible,.authentication-process summary:focus-visible,.authentication-project summary:focus-visible,.authentication-runtime-details summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.authentication-coverage>section:nth-child(2){grid-column:1/-1}
+.authentication-secondary-coverage .authentication-coverage>section:nth-child(2){grid-column:auto}
+.authentication-runtime-scope{margin-top:7px}
+.authentication-runtime-scope>summary{font-size:12px;color:var(--muted);cursor:pointer}
+.recipe-grid.authentication-recipes{grid-template-columns:repeat(3,minmax(0,1fr))}
+.authentication-recipes .recipe{min-width:0}
+.authentication-recipes .recipe strong{overflow-wrap:anywhere}
+.authentication-project{margin-top:18px}
+@media(max-width:760px){.recipe-grid.authentication-recipes{grid-template-columns:1fr}}
+.authentication-group-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.authentication-keychain-state{color:var(--muted);line-height:1.7}
+.authentication-local-results>summary{cursor:pointer;font-size:13px;font-weight:550;color:var(--text)}
+.authentication-local-results[open]>summary{margin-bottom:8px}

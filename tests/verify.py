@@ -114,6 +114,11 @@ CHECKS: List[Check] = [
            *(CARGO or "cargo", "build", "-p", "lintel-runner"), tools=("cargo",)),
     _check("auth-sources-core-test", "authentication inventory, exact cleanup, race/interruption and final-readback regression tests", "rust",
            *(CARGO or "cargo", "test", "-p", "lintel-core", "auth_", "--locked"), tools=("cargo",), explicit_only=True),
+    _check("keychain-native-test", "real Security.framework field update through the Engine in a disposable macOS Keychain", "independent",
+           *(CARGO or "cargo", "test", "-p", "lintel-core", "keychain_native_engine_journey", "--locked", "--", "--ignored"),
+           tools=("cargo",), independent=True, explicit_only=True,
+           requires="disposable GitHub-hosted macOS account; never run in a personal or self-hosted account",
+           reason="creates and deletes its own synthetic Keychain in a disposable hosted-runner account"),
     _check("js-engine-test", "browser engine JS unit tests (node:test, no deps)", "js",
            *(NODE or "node", "--test", "extensions/browser/tests/engine.test.mjs"), tools=("node",)),
     _check("site-game-test", "shared Clawd silhouette, whole-body pose, jump, varied reachable stars, collision and pause physics (node:test, no deps)", "js",
@@ -368,6 +373,10 @@ def run_check(check: Check, args: argparse.Namespace) -> Dict[str, object]:
         return finish(DEFER, check.reason)
     if check.id == "macos-bundle-signature-test" and platform.system() != "Darwin":
         return finish(SKIP, "unsupported host; requires macOS codesign and Xcode Command Line Tools")
+    if check.id == "keychain-native-test" and (
+            platform.system() != "Darwin" or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"):
+        return finish(SKIP, "requires a disposable GitHub-hosted macOS account; personal and self-hosted accounts are excluded")
     if check.id == "cli-candidate" and _cli_package_binary(platform.system(), platform.machine()) is None:
         return finish(SKIP, f"unsupported host {platform.system()}/{platform.machine()}; requires macOS arm64 or Linux x86_64/aarch64")
     if not check.cwd.is_dir():
@@ -491,6 +500,8 @@ def run_self_test(require_passed: bool = False) -> int:
     default_ids = {check.id for check in select(ns())}
     expect({"journey-cli", "journey-policy"} <= default_ids, "default group includes journey checks")
     expect("browser-smoke" not in default_ids, "default group excludes independent checks")
+    expect("keychain-native-test" not in default_ids,
+           "default group never creates a native Keychain")
     expect("i18n-test" not in default_ids and "i18n-coverage-test" not in default_ids,
            "default group excludes explicit-only i18n checks (unchanged canonical default)")
     every = {check.id for check in select(ns(all=True))}
@@ -528,6 +539,13 @@ def run_self_test(require_passed: bool = False) -> int:
                "opted-in independent check skips (not passes) when prerequisites are missing")
 
         from unittest.mock import patch
+        keychain_check = next(c for c in CHECKS if c.id == "keychain-native-test")
+        for system, hosted in (("Darwin", ""), ("Darwin", "self-hosted"), ("Linux", "github-hosted")):
+            with patch.object(platform, "system", return_value=system), \
+                    patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": hosted}), \
+                    patch(__name__ + ".run", side_effect=AssertionError("native Keychain fixture launched outside disposable macOS CI")):
+                expect(run_check(keychain_check, opted_in)["status"] == SKIP,
+                       f"native Keychain fixture skips {system}/{hosted or 'personal'} without invoking cargo")
         with patch.object(platform, "system", return_value="Linux"), \
                 patch(__name__ + ".run", side_effect=AssertionError("macOS fixture launched on Linux")):
             signature_check = next(c for c in CHECKS if c.id == "macos-bundle-signature-test")

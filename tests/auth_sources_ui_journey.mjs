@@ -2,6 +2,7 @@
 // Claude status are inert adapters; this is not native WebKit or live auth proof.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {chmod,mkdir,mkdtemp,readFile,realpath,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,13 +13,17 @@ const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE||path.
 const fixture=await realpath(await mkdtemp(path.join(os.tmpdir(),'lintel-auth-sources-ui-'))),runner=path.join(repo,'target/debug/lintel');
 const artifacts=process.env.LINTEL_AUTH_SOURCES_UI_ARTIFACT_DIR||fixture;
 await mkdir(artifacts,{recursive:true});
-const aliases=['synthetic-auth-A','synthetic-auth-B'],cores=new Map(),calls=[],errors=[];
-const secrets=['SYNTHETIC_OAUTH_DO_NOT_PUBLISH','SYNTHETIC_API_DO_NOT_PUBLISH','SYNTHETIC_SETUP_DO_NOT_PUBLISH','SYNTHETIC_MCP_DO_NOT_PUBLISH'];
+const aliases=['synthetic-auth-A','synthetic-auth-B'],cores=new Map(),calls=[],responses=[],errors=[];
+const secrets=['SYNTHETIC_OAUTH_DO_NOT_PUBLISH','SYNTHETIC_API_DO_NOT_PUBLISH','SYNTHETIC_SETUP_DO_NOT_PUBLISH','SYNTHETIC_MCP_DO_NOT_PUBLISH','SYNTHETIC_KEYCHAIN_ONLY','SYNTHETIC_KEEP_MCP','SYNTHETIC_KEEP_PLUGIN'];
 let held=null,requested=false;
 function raw(actor,args,payload){return new Promise((resolve,reject)=>{const child=spawn(runner,args,{env:actor,stdio:['pipe','pipe','pipe']});let out='',err='';child.stdout.on('data',data=>out+=data);child.stderr.on('data',data=>err+=data);child.once('error',reject);child.once('close',()=>{try{resolve(JSON.parse(out));}catch{reject(new Error(err+out));}});child.stdin.end(payload?JSON.stringify(payload):'');});}
 for(const [index,alias] of [null,...aliases].entries()){
  const home=path.join(fixture,'home-'+index),state=path.join(fixture,'state-'+index),root=path.join(home,index===0?'.claude':'custom Claude '+index),bin=path.join(home,'.local/bin');
  await mkdir(root,{recursive:true});await mkdir(bin,{recursive:true});
+ const service='Claude Code-credentials'+(index===0?'':'-'+createHash('sha256').update(root.normalize('NFC')).digest('hex').slice(0,8));
+ const keychainPath=path.join(home,'.lintel-test-keychain.json');
+ const keychain={schema:'lintel.test-keychain/1',items:{[service]:{id:'synthetic-item-'+index,data:{claudeAiOauth:{accessToken:secrets[4]},mcpOAuth:{keep:secrets[5]},pluginSecrets:{keep:secrets[6]},unknown:{keep:true}}}}};
+ await writeFile(keychainPath,JSON.stringify(keychain));
  await writeFile(path.join(root,'.credentials.json'),JSON.stringify({claudeAiOauth:{accessToken:secrets[0],refreshToken:secrets[0]},mcpOAuth:{synthetic:secrets[3]}}));
  await writeFile(path.join(root,'settings.json'),JSON.stringify({env:{ANTHROPIC_API_KEY:secrets[1],KEEP_ME:'yes'},apiKeyHelper:'printf '+secrets[1],mcpServers:{preserve:{command:'inert'}}}));
  await writeFile(path.join(home,'.zshrc'),`# Synthetic startup only\nexport CLAUDE_CODE_OAUTH_TOKEN='${secrets[2]}'\nexport KEEP_ME='unchanged'\n`);
@@ -29,16 +34,16 @@ for(const [index,alias] of [null,...aliases].entries()){
  // Deliberate allowlist: no actual process credential or HOME reaches fixtures.
  const actor={HOME:home,LINTEL_TEST_HOME:home,LINTEL_STATE_DIR:state,PATH:bin,USER:'synthetic',CLAUDE_CODE_OAUTH_TOKEN:'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'};
  const registered=await raw(actor,['env','register','--name',alias||'Synthetic local authentication','--root',root]);assert.ok(registered.ok,registered.error?.message);
- cores.set(alias,{actor,root,home,state,environment:registered.data});
+ cores.set(alias,{actor,root,home,state,service,keychainPath,keychain,environment:registered.data});
 }
 const queues=new Map();
 async function core(alias,payload){calls.push({alias,payload});if(alias===aliases[0]&&payload.command==='auth_inventory'&&held){requested=true;await held.promise;}
- const actor=cores.get(alias).actor;const work=(queues.get(alias)||Promise.resolve()).then(()=>raw(actor,['request'],payload));queues.set(alias,work.catch(()=>{}));return work;}
+ const actor=cores.get(alias).actor;const work=(queues.get(alias)||Promise.resolve()).then(()=>raw(actor,['request'],payload));queues.set(alias,work.catch(()=>{}));const result=await work;responses.push(result);return result;}
 const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/vite.js'),'preview','--host','127.0.0.1','--port','0','--strictPort'],{cwd:desktop,stdio:['ignore','pipe','pipe']});
 const report={fixture,runtime:'built App + real synthetic core; inert Claude status and modeled SSH/invoke; not native WebKit',checks:[],passed:false};let browser,page;
 try{
  const url=await new Promise((resolve,reject)=>{let out='';const timer=setTimeout(()=>reject(new Error('preview startup timeout')),15000);preview.once('error',reject);for(const stream of [preview.stdout,preview.stderr])stream.on('data',data=>{out+=stripVTControlCharacters(data.toString());const match=out.match(/http:\/\/127\.0\.0\.1:\d+\//);if(match){clearTimeout(timer);resolve(match[0]);}});});
- browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{})});page=await browser.newPage({viewport:{width:1120,height:820}});page.setDefaultTimeout(20000);page.on('pageerror',error=>errors.push(error.message));
+ browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{})});page=await browser.newPage({viewport:{width:1120,height:820},reducedMotion:'reduce'});page.setDefaultTimeout(20000);page.on('pageerror',error=>errors.push(error.message));
  await page.exposeFunction('syntheticInvoke',async(command,args)=>{
   if(command==='request')return core(null,args.payload);
   if(command==='remote_request'){
@@ -74,12 +79,34 @@ try{
  assert.equal(calls.some(call=>call.payload.command==='auth_probe'),false);report.checks.push('environment components require explicit bounded source read and never start Claude automatically');
  await page.getByRole('button',{name:'清理与重建',exact:true}).click();
  let inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field] input').waitFor();
- assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),1);
+ assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),2);
+ for(const [width,height,theme] of [[1120,820,'light'],[1120,820,'dark'],[900,720,'light'],[900,720,'dark']]){
+  await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await page.getByRole('heading',{name:'清理本机登录',exact:true}).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:path.join(artifacts,`auth-start-zh-${theme}-${width}.png`),animations:'disabled'});
+  await inventory.locator('.authentication-group').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  await page.screenshot({path:path.join(artifacts,`auth-saved-zh-${theme}-${width}.png`),animations:'disabled'});
+  await assertInScrollViewport(inventory.locator('[data-auth-kind=keychain_field]'),'default selected exact Keychain login');
+ }
+
+ assert.equal(await inventory.locator('[data-auth-kind=keychain_field] input:checked').count(),1);
  assert.equal(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count(),0);
  assert.equal(await inventory.locator('[data-auth-kind=process_env] input').count(),0);
  assert.equal(await page.getByRole('checkbox',{name:'同时请求官方注销',exact:true}).count(),0);
- await inventory.getByRole('button',{name:'选择可精确移除的来源',exact:true}).click();
- assert.ok(await inventory.locator('input[type=checkbox]:checked').count()>=4);
+ // Restoring recommendations never silently opts into shared startup edits.
+ await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
+ assert.equal(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count(),0);
+ const selectInjection=inventory.getByRole('button',{name:'选择本组',exact:true});
+ await selectInjection.focus();assert.equal(await selectInjection.evaluate(element=>element===document.activeElement),true);
+ await page.keyboard.press('Enter');
+ assert.ok(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count()>0);
+ await inventory.getByRole('button',{name:'清空本组',exact:true}).click();
+ assert.equal(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count(),0);
+ assert.equal(await inventory.locator('[data-auth-kind=credential_field] input:checked').count(),1);
+ await selectInjection.click();
+ for(const detail of await inventory.locator('.authentication-source-details,.authentication-context').all())await detail.evaluate(element=>element.open=true);
+ assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),await inventory.locator('input[type=checkbox]').count(),'explicit injection group selection includes every removable source alongside both saved logins');
  assert.ok((await inventory.innerText()).includes('此主机用户共享'));
  await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).check();
  await page.getByRole('checkbox',{name:'清理后显式检查此执行上下文的认证',exact:false}).check();
@@ -92,7 +119,10 @@ try{
  await page.getByRole('button',{name:'Preview this plan',exact:true}).click();
  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Confirm this plan',exact:true}).waitFor();
  const planCall=calls.findLast(call=>call.payload.command==='plan_cleanup');assert.equal(planCall.payload.auth_source_ids.length,chosen);assert.equal(planCall.payload.official_logout,false);assert.equal(planCall.payload.verify_auth_status,true);
- await dialog.getByRole('region',{name:'Authentication sources selected for exact removal',exact:true}).waitFor();
+ const frozenSources=dialog.getByRole('region',{name:'Authentication sources selected for exact removal',exact:true});
+ await frozenSources.waitFor();
+ assert.equal(await frozenSources.locator('[data-auth-kind=keychain_field]').count(),1);
+ assert.equal(await frozenSources.locator('[data-auth-kind=credential_field]').count(),1);
  const planText=await dialog.innerText();
  assert.ok(planText.includes('Remove exactly the local authentication sources selected in this preview. Presence does not prove a source is in use; other execution contexts and server revocation still need separate verification.'));
  assert.ok(planText.includes('A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'));
@@ -106,6 +136,13 @@ try{
  await verification.getByText('Authentication is still available · Injected OAuth token',{exact:true}).waitFor();
  assert.equal(calls.filter(call=>call.payload.command==='execute').length,1);
  const root=cores.get(null).root;
+ const keychainData=JSON.parse(await readFile(cores.get(null).keychainPath,'utf8')).items[cores.get(null).service].data;
+ assert.deepEqual(keychainData,{mcpOAuth:{keep:secrets[5]},pluginSecrets:{keep:secrets[6]},unknown:{keep:true}});
+ assert.equal(await verification.locator('.authentication-verified-sources li').count(),chosen);
+ assert.ok((await verification.textContent()).includes(cores.get(null).service));
+ assert.ok(planText.includes(cores.get(null).service));
+ for(const secret of secrets){assert.equal(planText.includes(secret),false);assert.equal(JSON.stringify(responses).includes(secret),false);}
+ report.checks.push('exact Keychain login and file login share the same single approval/execution; Keychain MCP, plugin and unknown fields are retained');
  assert.deepEqual(JSON.parse(await readFile(path.join(root,'.credentials.json'),'utf8')),{mcpOAuth:{synthetic:secrets[3]}});
  assert.deepEqual(JSON.parse(await readFile(path.join(root,'settings.json'),'utf8')),{env:{KEEP_ME:'yes'},mcpServers:{preserve:{command:'inert'}}});
  assert.equal(await readFile(path.join(cores.get(null).home,'.zshrc'),'utf8'),"# Synthetic startup only\nexport KEEP_ME='unchanged'\n");
@@ -121,22 +158,31 @@ try{
  const storage=await page.evaluate(()=>JSON.stringify(localStorage));for(const id of planCall.payload.auth_source_ids)assert.equal(storage.includes(id),false);
  report.checks.push('explicit selection, one exact plan and execution; bilingual switch preserves choices; no credential values or source IDs persisted; MCP/work and neighboring shell fields retained');
  report.checks.push('fresh post-cleanup sources and still-authenticated runner are separate; static/runtime recheck retains original receipt and never executes again');
+ await verification.locator('.authentication-secondary-coverage').evaluate(element=>element.open=true);
  const coverage=verification.locator('.authentication-coverage > section');assert.equal(await coverage.count(),4);
- for(const [width,height,theme] of [[1120,820,'light'],[900,720,'dark']]){
+ for(const [width,height,theme] of [[1120,820,'light'],[1120,820,'dark'],[900,720,'light'],[900,720,'dark']]){
   await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+  await verification.locator('.authentication-local-results').evaluate(element=>element.open=false);
+  await verification.evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+  await page.screenshot({path:path.join(artifacts,`auth-result-summary-en-${theme}-${width}.png`),animations:'disabled'});
+  await verification.locator('.authentication-local-results').evaluate(element=>element.open=true);
   await coverage.nth(0).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await verification.evaluate(element=>element.scrollWidth>element.clientWidth),false);
   await page.screenshot({path:path.join(artifacts,`auth-result-en-${theme}-${width}.png`),animations:'disabled'});
-  await assertInScrollViewport(coverage.nth(0),'selected local source results');
+  for(const row of await verification.locator('.authentication-verified-sources li').all()){
+   await row.evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));
+   await assertInScrollViewport(row,'each selected local source result');
+  }
   // Actual viewport captures at successive scroll positions; the fixed footer
   // must not hide the still-active runner or either unresolved coverage layer.
   await coverage.nth(1).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   await page.screenshot({path:path.join(artifacts,`auth-result-context-en-${theme}-${width}.png`),animations:'disabled'});
   await assertInScrollViewport(coverage.nth(1),'current runner result and restart guidance');
-  if(width>960)await assertInScrollViewport(coverage.nth(2),'other contexts remain unknown');
-  await coverage.nth(width>960?3:2).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+
+  await coverage.nth(2).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   await page.screenshot({path:path.join(artifacts,`auth-result-unverified-en-${theme}-${width}.png`),animations:'disabled'});
-  if(width<=960)await assertInScrollViewport(coverage.nth(2),'other contexts remain unknown');
+  await assertInScrollViewport(coverage.nth(2),'other contexts remain unknown');
+  await coverage.nth(3).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   await assertInScrollViewport(coverage.nth(3),'server revocation remains unverified');
  }
  await dialog.getByRole('button',{name:'Close panel',exact:true}).click();await page.getByRole('combobox',{name:'Interface language',exact:true}).selectOption('zh-CN');
@@ -149,10 +195,37 @@ try{
  // request continuation and React rendering to run before inspecting B.
  await page.waitForFunction(({alias,previous})=>(window.__authInventoryResponses[alias]||0)>previous,{alias:aliases[0],previous:completedA});
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ for(const detail of await inventory.locator('.authentication-source-details').all())await detail.evaluate(element=>element.open=true);
  const finalText=await inventory.innerText();assert.ok(finalText.includes(cores.get(aliases[1]).root));assert.equal(finalText.includes(cores.get(aliases[0]).root),false);
- assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),1);assert.equal(await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).isChecked(),false);
+ assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),2);assert.equal(await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).isChecked(),false);
+ // A denied or locked read stays unknown and can recover through the same refresh action.
+ const actorB=cores.get(aliases[1]);
+ for(const reason of ['keychain_locked','keychain_access_denied']){
+  await writeFile(actorB.keychainPath,JSON.stringify({...actorB.keychain,error:reason}));
+  await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();
+  const keychainRow=inventory.locator('[data-auth-reason='+reason+']');
+  await keychainRow.locator('.authentication-keychain-state').waitFor();
+  assert.equal(await keychainRow.locator('input[type=checkbox]').count(),0);
+  assert.equal(await inventory.locator('[data-auth-kind=credential_field] input:checked').count(),1);
+  await keychainRow.evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));
+  await page.screenshot({path:path.join(artifacts,`auth-${reason}-zh-dark-900.png`),animations:'disabled'});
+  await writeFile(actorB.keychainPath,JSON.stringify(actorB.keychain));
+  await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();
+  const restoredKeychain=inventory.locator('[data-auth-kind=keychain_field]');
+  await restoredKeychain.locator('input[type=checkbox]').waitFor();
+  await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
+  assert.equal(await restoredKeychain.locator('input:checked').count(),1);
+ }
+ assert.equal(calls.filter(call=>call.payload.command==='execute').length,1);
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,1);
+ for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH']){
+  assert.equal(JSON.stringify(responses).includes(secret),false);
+  assert.equal((await page.evaluate(()=>JSON.stringify(localStorage))).includes(secret),false);
+ }
+ report.checks.push('locked/denied Keychain remains unknown without a checkbox; refreshing after access recovery restores exact selectable source without another plan or execution');
+ for(const detail of await inventory.locator('.authentication-source-details').all())await detail.evaluate(element=>element.open=true);
  const sourceCard=inventory.locator('[data-auth-kind=credential_field]').first();
- await inventory.locator('.authentication-inventory > .small-print').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
+ await inventory.locator('.authentication-group').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
  await page.screenshot({path:path.join(artifacts,'auth-inventory-zh-dark-900.png'),animations:'disabled'});
  await assertInScrollViewport(sourceCard,'actual source card in the selected host inventory');
  for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'])assert.equal((await page.locator('body').innerText()).includes(secret),false);

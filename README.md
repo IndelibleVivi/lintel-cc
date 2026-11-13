@@ -12,7 +12,7 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 
 当前 `main` 的六项可靠性修复与有界记录改动尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。`c7680f0` 已完成 fresh clone／fresh target 的三平台 CLI 与 macOS App／DMG 本地构建（复用依赖下载缓存）。候选源码与 full CI 的准确状态见[当前状态](docs/current-state.md)；构建不代表已安装 App、通过干净 Mac 信任验收或创建 Release。
 
-**11-13 开发版：认证来源与清理后复查。** App／CLI 可查看有限认证来源、选择能安全处理的精确字段或 shell 赋值，并沿同一计划批准、执行、重新检查；结果分别说明本地来源、当前执行环境、其他上下文与服务端撤销。`setup-token` 没有固定保存文件，Keychain 与共享 profiles 的未知范围继续可见。当前官方 logout 还会影响 MCP／插件凭据，因此开发版拒绝自动注销，不以整文件删除替代。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App。
+**11-13 开发版：清理本机登录与独立复查。** App／CLI 可选择精确登录字段、认证注入和 shell 赋值，沿同一计划批准、执行、重新检查。macOS 开发源码已接入有限 Keychain 服务中的 Claude 登录字段清理，保留 MCP／插件与其他字段；原生 API 与真实客户端验收仍独立。App 默认建议可处理的已保存登录，认证注入按需选择，结果优先显示本地移除、仍存在与待核对数量。`setup-token` 没有固定保存文件；共享 profiles、其他上下文与服务端撤销仍单列。官方 logout 范围过宽，仍拒绝自动调用。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App 或 0.1.0 CLI。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 

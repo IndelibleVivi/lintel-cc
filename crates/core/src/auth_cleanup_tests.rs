@@ -686,3 +686,133 @@ fn auth_runtime_missing_executable_cannot_follow_discovery_when_rechecking_origi
     assert_eq!(current["runtime"]["state"], "observed");
     assert!(root.join("status-executed").exists());
 }
+
+fn seed_cleanup_keychain(engine: &Engine, root: &Path) -> String {
+    let service = crate::keychain::services(&engine.home, root)
+        .last()
+        .unwrap()
+        .clone();
+    save(&engine.home.join(".lintel-test-keychain.json"), &json!({"schema":"lintel.test-keychain/1","items":{&service:{"id":"synthetic-cleanup-item","data":{"claudeAiOauth":{"accessToken":TOKEN},"mcpOAuth":{"server":OTHER},"pluginSecrets":{"keep":"SYNTHETIC_PLUGIN"},"future":{"keep":[1,2]}}}}})).unwrap();
+    service
+}
+
+#[test]
+fn one_approval_cleans_file_and_keychain_preserving_all_container_neighbors() {
+    for default in [true, false] {
+        let (_temp, engine, e, root) = fixture(default);
+        seed(&root);
+        let service = seed_cleanup_keychain(&engine, &root);
+        let p = plan(&engine, &e, None);
+        assert_eq!(
+            p["authentication"]["selected_sources"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(!p.to_string().contains("synthetic-cleanup-item"));
+        let job = execute(&engine, &p);
+        assert_eq!(job["local_cleanup"], "completed", "{job}");
+        let data = load(&engine.home.join(".lintel-test-keychain.json")).unwrap()["items"]
+            [&service]["data"]
+            .clone();
+        assert_eq!(
+            data,
+            json!({"mcpOAuth":{"server":OTHER},"pluginSecrets":{"keep":"SYNTHETIC_PLUGIN"},"future":{"keep":[1,2]}})
+        );
+        assert!(load(&root.join(".credentials.json"))
+            .unwrap()
+            .get("claudeAiOauth")
+            .is_none());
+        assert_no_secret_files(&engine.state);
+    }
+}
+
+#[test]
+fn keychain_update_uncertainty_keeps_original_job_without_replay() {
+    let (_temp, engine, e, root) = fixture(false);
+    let service = seed_cleanup_keychain(&engine, &root);
+    let path = engine.home.join(".lintel-test-keychain.json");
+    let mut data = load(&path).unwrap();
+    data["after_write_error"] = json!("keychain_write_uncertain");
+    save(&path, &data).unwrap();
+    let p = plan(&engine, &e, None);
+    let job = execute(&engine, &p);
+    assert_eq!(job["local_cleanup"], "unverified", "{job}");
+    assert_eq!(job["error"]["code"], "keychain_write_uncertain", "{job}");
+    let mut after = load(&path).unwrap();
+    assert!(after["items"][&service]["data"]
+        .get("claudeAiOauth")
+        .is_none());
+    after.as_object_mut().unwrap().remove("after_write_error");
+    after["items"][&service]["data"]["claudeAiOauth"] =
+        json!({"accessToken":"recreated-after-uncertainty"});
+    save(&path, &after).unwrap();
+    let replay = execute(&engine, &p);
+    assert_eq!(replay["id"], job["id"]);
+    assert_eq!(load(&path).unwrap(), after);
+    assert_no_secret_files(&engine.state);
+}
+
+#[test]
+fn keychain_status_recreation_is_seen_by_independent_job_readback() {
+    let (_temp, mut engine, mut e, root) = fixture(false);
+    let service = seed_cleanup_keychain(&engine, &root);
+    let fixture_path = engine.home.join(".lintel-test-keychain.json");
+    let mut recreated = load(&fixture_path).unwrap();
+    recreated["items"][&service]["data"]["claudeAiOauth"] =
+        json!({"accessToken":"SYNTHETIC_REFRESH_DURING_STATUS"});
+    let recreation_source = root.join("status-recreates-keychain.json");
+    save(&recreation_source, &recreated).unwrap();
+    let exe = engine.home.join(".local/bin/claude");
+    fs::create_dir_all(exe.parent().unwrap()).unwrap();
+    fs::write(&exe, format!("#!/bin/sh\n[ \"$1 $2\" = 'auth status' ] || exit 9\n/bin/cp '{}' '{}'\nprintf '{{\"configDirectory\":\"%s\",\"authMethod\":\"oauth_token\",\"loggedIn\":true}}' \"$CLAUDE_CONFIG_DIR\"\n", recreation_source.display(), fixture_path.display())).unwrap();
+    fs::set_permissions(&exe, fs::Permissions::from_mode(0o700)).unwrap();
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    e["executable"] = json!(exe);
+    save(&engine.state.join("inventory.json"), &json!([e.clone()])).unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"verify_auth_status":true}),
+    );
+    let job = execute(&engine, &p);
+    assert_eq!(job["auth_verification"]["runtime"]["state"], "observed");
+    assert_eq!(
+        job["auth_verification"]["local_sources"][0]["state"],
+        "still_present"
+    );
+    assert_eq!(job["local_cleanup"], "unverified");
+    assert_eq!(job["error"]["code"], "auth_cleanup_unverified");
+    let fresh = ok(
+        &engine,
+        json!({"command":"auth_verify","environment_id":e["id"],"job_id":job["id"]}),
+    );
+    assert_eq!(fresh["local_sources"][0]["state"], "still_present");
+    assert!(!fresh
+        .to_string()
+        .contains("SYNTHETIC_REFRESH_DURING_STATUS"));
+    assert_no_secret_files(&engine.state);
+}
+
+#[test]
+fn stale_keychain_neighbor_rejects_approval_before_any_selected_file_edit() {
+    let (_temp, engine, e, root) = fixture(false);
+    seed(&root);
+    let original_file = fs::read(root.join(".credentials.json")).unwrap();
+    let service = seed_cleanup_keychain(&engine, &root);
+    let p = plan(&engine, &e, None);
+    let path = engine.home.join(".lintel-test-keychain.json");
+    let mut external = load(&path).unwrap();
+    external["items"][&service]["data"]["mcpOAuth"]["server"] = json!("outside-edit");
+    save(&path, &external).unwrap();
+    let response =
+        engine.request(json!({"command":"execute","plan_id":p["id"],"approval":p["hash"]}));
+    assert_eq!(response["ok"], false, "{response}");
+    assert_eq!(response["error"]["code"], "stale_auth_source", "{response}");
+    assert_eq!(
+        fs::read(root.join(".credentials.json")).unwrap(),
+        original_file
+    );
+    assert_eq!(load(&path).unwrap(), external);
+    assert!(!engine.path("jobs", p["id"].as_str().unwrap()).exists());
+}

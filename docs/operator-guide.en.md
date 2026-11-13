@@ -233,7 +233,7 @@ This section describes the November 13, 2026 development source; the published A
 
 | Recipe | Actual scope | Remaining checks |
 | --- | --- | --- |
-| Repair local login | Select supported login fields, user-settings declarations and simple shell assignments | Current executor, Keychain, other contexts and server revocation separately |
+| Repair local login | Select supported login fields, user-settings declarations and simple shell assignments | Current executor, unselected Keychain, other contexts and server revocation separately |
 | Clean and rebuild | Preserve encrypted work, create/import into a new root, then handle approved authentication sources | Launch/login/browser and independent scopes |
 | Retire | Preserve work, handle selected sources, disable the Lintel launch entry; keep original directory | Other launchers separately; deleted credentials cannot be automatically restored |
 
@@ -241,7 +241,9 @@ This section describes the November 13, 2026 development source; the published A
 
 The list distinguishes identified local sources, variables observed in the App/runner environment, declarations, inaccessible/unattributed sources and other uncovered contexts. Presence is separate from use. `setup-token` prints a token without saving it; a shell, settings file, IDE, service or CI system determines its later injection point. Expand each row for location, shared effects and limitations.
 
-New authentication cleanup edits supported fields or assignments, preserving unrelated configuration, MCP/plugins and work. `.credentials.json` recognition is limited to `claudeAiOauth`, and the target `.claude.json` to `primaryApiKey`; all other fields remain intact. Dynamic shell syntax, helper-backed storage, Keychain and shared profiles are never guessed deletion targets. The inventory executes no helper/shell and returns no tokens. Official runtime status is a separate explicit action.
+Clear local login retains the repair/rebuild/retire recipes and six task entries. Supported saved login fields in files and Keychain are suggested by default; injections support individual selection or explicit group select/clear, with no automatic selection of shared shell sources. Technical evidence and paths expand progressively; approval locations are expanded by default. Results lead with removed, remaining and unresolved counts, list the current executor separately, and expand other-context/server details. Rechecking the original ID reads without executing again. Keychain cleanup removes only recognized `/claudeAiOauth` in finite services, preserving MCP/plugin/unknown fields and item identity without whole-item deletion or secret exports. Locked, denied, unknown-format and oversized sources explain their limits; complete finite-service reads never establish whole-machine or whole-Keychain cleanup. See [current state](current-state.md) for native API/real-client acceptance.
+
+New authentication cleanup edits supported fields or assignments, preserving unrelated configuration, MCP/plugins and work. `.credentials.json` recognition is limited to `claudeAiOauth`, and the target `.claude.json` to `primaryApiKey`; all other fields remain intact. Dynamic shell syntax, helper-backed storage, unattributed Keychain and shared profiles are never guessed deletion targets. The inventory executes no helper/shell and returns no tokens. Official runtime status is a separate explicit action.
 
 1. Confirm host, environment and full root; default and custom `CLAUDE_CONFIG_DIR` targets are distinct.
 2. Close target terminals/IDE/restarters; systemd requires §5.3 independent pause.
@@ -251,7 +253,7 @@ New authentication cleanup edits supported fields or assignments, preserving unr
 6. Read steps and fresh observations: selected local sources, authentication remaining in this executor, uncovered contexts and server revocation. A handled file and remaining authentication can coexist; do not automatically delete again.
 7. Browser login separately §2.3; normal official new-root login by user.
 
-**Official logout limitation:** Current Anthropic documentation says `/logout` also removes saved MCP logins and plugin sensitive values; see the [evidence record](credential-provenance-evidence.en.md). To preserve that material, this development refuses automatic logout with `official_logout_scope_unsafe`. It does not substitute whole-file or guessed Keychain deletion. Review the official procedure and reauthorization effects separately before handling Keychain. Lintel continues to show this scope as unverified.
+**Official logout limitation:** Current Anthropic documentation says `/logout` also removes saved MCP logins and plugin sensitive values; see the [evidence record](credential-provenance-evidence.en.md). To preserve that material, this development refuses automatic logout with `official_logout_scope_unsafe`. It does not substitute whole-file or guessed Keychain deletion. Recognized Keychain login fields use the same exact cleanup path; the official-logout limitation does not forbid that capability. Unselected services and other accounts still require separate checks.
 
 **Secret handling:** New authentication edits create no old-token recovery backup and store no before/after content, helper body or variable value in public plans, logs or receipts. Necessary conflict bindings remain private. The original file temporarily moves into a private directory and is removed after successful readback. Interruption or conflict may leave credential-containing originals/staging; `retained_sensitive_material` explicitly reports them and prevents a completion claim. Historical backups are not silently swept; approved work still uses its separate encrypted archive.
 

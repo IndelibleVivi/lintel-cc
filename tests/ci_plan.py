@@ -219,7 +219,7 @@ NATIVE_CHECKS: Tuple[str, ...] = (
     "shared-remote-journey", "journey-network", "journey-agent-cli",
     "journey-product-baseline", "journey-agent-adapters", "journey-components",
     "journey-cli", "journey-submission", "journey-execution-admission",
-    "journey-launch", "journey-policy", "journey-client-control", "journey-auth-sources", "auth-sources-core-test",
+    "journey-launch", "journey-policy", "journey-client-control", "journey-auth-sources", "auth-sources-core-test", "keychain-native-test",
 )
 HEAVY_CHECKS: Tuple[str, ...] = (
     "journey-portable-work", "journey-work-preservation", "journey-large-work",
@@ -567,8 +567,8 @@ class Plan:
         }
         for job in self.jobs:
             key = job.id.replace("-", "_")
-            if job.id == "frontend":
-                outputs["frontend_checks_by_platform"] = json.dumps({
+            if job.id in ("frontend", "native"):
+                outputs[key + "_checks_by_platform"] = json.dumps({
                     platform: ",".join(checks_for_platform(job.checks, platform))
                     for platform in job.platforms
                 }, separators=(",", ":"))
@@ -782,6 +782,7 @@ PLATFORM_SYSTEM: Dict[str, str] = {MACOS: "Darwin", LINUX: "Linux"}
 # job is scheduled for.
 PLATFORM_ONLY_CHECKS: Dict[str, Tuple[str, ...]] = {
     "macos-bundle-signature-test": (MACOS,),
+    "keychain-native-test": (MACOS,),
     "linux-ssh-runtime": (LINUX,),
     "linux-vm-runtime": (LINUX,),
 }
