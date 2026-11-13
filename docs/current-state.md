@@ -4,16 +4,20 @@
 
 本轮源码把 macOS Keychain 与认证文件接入同一份清理预览、一次批准及原任务复查；公开 App 0.1.1／CLI 0.1.0 尚不包含本轮能力。没有安装、发行或官网部署。[操作指南](cleanup.md)／[English](cleanup.en.md)及[机制证据](credential-provenance-evidence.md)维护准确使用范围。
 
+[PR #5](https://github.com/IndelibleVivi/lintel-cc/pull/5) 已合并；产品 source head 为 `07d3322ee937b6a43307c79c55a7b90fb4bef4d0`，main merge 为 `0422cba5f9d5ef76e64d6819be20848bcb045c26`。后续证据说明提交不替换产品 source SHA。
+
 | 范围 | 当前事实 |
 | --- | --- |
 | Keychain | Security.framework 对已确认有限 service/account 的原 item 做 data-only 更新，只移除 `/claudeAiOauth`，保留 MCP／plugin／未知字段及 item identity；不整删 item、不扫全库、不导出秘密备份。默认服务与 config-dir NFC hash 来源见机制证据；不是硬版本白名单 |
 | 批准与恢复 | 文件和 Keychain 共用原 Engine。冻结私有 item identity 与完整 payload 加盐绑定，更新前核对、更新后完整读回；不确定保留原 ID 查询，不自动重试。没有外部 writer CAS 或跨来源原子性 |
 | 易用性 | “清理本机登录”主流程默认建议已保存的文件／Keychain 登录；注入来源显式逐项或组选，位置与依据渐进展开。结果先显示移除／仍存在／待核对和复查，locked／denied 可见并可刷新恢复 |
 | 本机证据 | auth Core 47/47、runner／desktop build、SSR＋i18n 23、built-App synthetic Core journey 与 NFC 纯函数检查通过；完整 workspace 有限并发复跑通过。文件＋Keychain＋所选注入同计划／一次执行；邻接数据保留、原 ID 不重放、主机隔离及秘密不进入公共结果均已检查 |
-| 原生证据 | source `088e4a14fb6bbaaa99310fea363ca2c0577a4872` 的 [CI 43415394655](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43415394655) 中，独立 `keychain-native-test` 真实通过（1 testcase），两平台 native checks 全通过。临时库验证默认／custom root、保留字段与 item identity、旧批准拒绝及原 ID 不重放；个人 Keychain 未参与。普通 synthetic 检查不访问个人 Keychain，Linux 不选择此项 |
+| 完整 CI | 最终 source 的 [CI 43417193490](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43417193490) 14/14 jobs success；12 份 canonical reports 同属 clean merge checkout `d0dc6d634eb417d31d6f29c94a97da9f2b036336`，120 次按平台计的选中 check 执行全 passed；下载读回并独立复跑 production aggregate 通过。该 checkout 与 source／main merge 的完整 tree 相同 |
+| 原生证据 | macOS native 19/19、Linux 18/18；两平台 auth 专项各 47/47。独立 `keychain-native-test` 真实通过（1 testcase），临时库验证默认／custom root、保留字段与 item identity、旧批准拒绝及原 ID 不重放；个人 Keychain 未参与。普通 synthetic 检查不访问个人 Keychain，Linux 不选择此项 |
+| App／保全／远端 | browser 两平台各 19/19，frontend 分别 macOS 15/15／Linux 14/14；heavy 各 6/6、CLI candidate 各 1/1、Linux loopback SSH 1/1。VM 首次 `submission_uncertain` 后同 ID 查询 20 次、只 submit 一次，实际接收前 `job_not_found` 后取得回执，无重放；真实 reboot 核对与服务恢复通过。CLI candidate 的内部正式输入 smoke 仍未提供正式包，不能据此升级为正式发行验收 |
 | 独立边界 | 真实 Claude 版本／个人账号／ACL、native WebKit、生产 SSH 及其他架构实际 runtime 未验收。官方 logout 仍因 MCP／plugin 范围不符返回 `official_logout_scope_unsafe`；本地移除不等于服务端撤销 |
 
-下节 PR #4 的 full CI 是此前认证基线，不覆盖本次 Keychain 与界面接续。首批新 CI 的两个既有 UI journeys 未适配新文案／收起的文件区；已保留原断言并通过普通控件修复，本机两项 canonical 检查通过。新最终 source 的 full CI 结果尚待收口，原生 API 的通过不能代替整批 CI。
+首批 CI 的两个既有 UI journeys 未适配新文案／收起的文件区；最终 source 保留全部原断言、通过普通控件进入功能，两平台检查均通过。本机首次 workspace 的 remote fixture deadline 失败在串行诊断及有限并发完整复跑中通过，生产与 fixture timeout 均未改。下节 PR #4 的 CI 保留为此前认证基线，不能替代本节新证据。
 
 ## 2026-11-13：认证来源基线（PR #4）
 

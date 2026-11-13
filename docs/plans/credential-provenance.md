@@ -1,10 +1,11 @@
 # Credential provenance and verified cleanup
 
 Status: source-complete, exact-source full CI verified and merged via
-[PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4), 2026-11-13.
-Source head: `9a7ae90eaad76c52e500f557b42da4e91aac607c`.
-Main merge: `57b23c41a59d81952f676b24c2695c09cf1e880a`.
-Baseline: `77be003`. No release, installation or deployment is implied.
+[PR #5](https://github.com/IndelibleVivi/lintel-cc/pull/5), 2026-11-13.
+Source head: `07d3322ee937b6a43307c79c55a7b90fb4bef4d0`.
+Main merge: `0422cba5f9d5ef76e64d6819be20848bcb045c26`.
+Follow-up baseline: `b36f9aa`. Earlier finite-file PR #4 observations remain below.
+No release, installation or deployment is implied.
 
 ## Keychain and usability follow-up (current source)
 
@@ -122,7 +123,7 @@ synthetic/disposable-host results, not native WebKit or real credentials.
 PR integration status and current source/release boundaries live in
 [current-state](../current-state.md); use that entry instead of rerunning
 superseded intermediate CI investigations. The current follow-up implements the finite Keychain adapter described above;
-separate native API and real-client acceptance remain distinct next gates.
+temporary-Keychain native API acceptance is verified, while real-client acceptance remains a separate next gate.
 Shared profiles and unknown account contexts are still outside automatic edits. Do not infer universal erasure or
 server revocation from this local source work. No App release, updater
 activation or website deployment is part of this change.
