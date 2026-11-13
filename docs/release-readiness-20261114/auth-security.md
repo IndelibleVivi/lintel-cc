@@ -146,3 +146,51 @@ python3 tests/auth_sources_journey.py target/debug/lintel
 代码集中在 `auth_sources.rs`、`auth_cleanup.rs`、`cleanup.rs`、`keychain.rs`、native account派生、`launch.rs` 和两个现有启动入口。新增测试直接位于各模块、`auth_cleanup_tests.rs`、`baseline_tests.rs` 与已有 canonical CLI journey。维护的用户／工程文档为 `cleanup.md/.en.md` 和 `credential-provenance-evidence.md/.en.md`。
 
 后续更新外部 Claude版本时，先重新核对有限存储命名、账户选择与状态schema，再增加已确认的分支；未知选择应该保留无法核对，不应通过扫描所有Keychain账户或删除整个容器来获得表面完整率。查原任务、保留非目标资料、把本地结果与实际认证／撤销分开，这些现有产品选择应继续保留。
+
+## 7. 固定提交终审与升级行为
+
+本节重新审阅的最终源提交是 `e573ce228e15ee6cb03c2705baf70a8bab1a8c75`，对应 [draft PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。这是源码终审锚点；PR/CI 后续状态、发布资产和实际安装结果以总交付记录为准。终审复用了前述测试，没有再次运行完整 suite，也没有取得真实账号或 Gatekeeper 验收。
+
+### 准确源码位置
+
+下列行号均指向 `e573ce2`：
+
+| 位置 | 对应保证 |
+| --- | --- |
+| `crates/core/src/keychain.rs:34`、`:43`、`:92` | 建立和重查有限认证目录描述；匹配相对选择拒绝、默认未设置、绝对原拼写和独立安全存储边界 |
+| `crates/core/src/keychain.rs:102`、`:128` | 直接 Command 与 macOS shell 使用相同设置／移除规则，正确引用路径中的引号 |
+| `crates/core/src/keychain.rs:155`、`:180` | 有限 service 补充与不兼容 account 选择保守拒绝 |
+| `crates/core/src/keychain/macos.rs:197`、`:315`、`:356` | 当前 account 派生；原生 read 和只改 data 的 update；已冻结 identity 不按新 USER 重新猜测 |
+| `crates/core/src/cleanup.rs:17`、`:220` | 生产 Linux writer 只有配置与独立安全存储目标均在别处才排除 |
+| `crates/core/src/cleanup.rs:127`、`:158`、`:168` | 显式状态调用共享目录选择；报告的绝对路径必须解析回所选根 |
+| `crates/core/src/auth_cleanup.rs:131`、`:217` | runtime status 预览才需要目录绑定；执行前核对程序与该绑定 |
+| `crates/core/src/auth_cleanup.rs:331`、`:365`、`:381` | 原任务独立复查、runtime 限制单独呈现、最终本地重新读取 |
+| `crates/core/src/launch.rs:466`、`:515`、`:565`、`:622` | 启动预览绑定、原记录优先查询、首次接收前与最终入口重查 |
+| `crates/core/src/launch.rs:711`、`:731`、`:780`、`:831`、`:882`、`:934`、`:961` | resume 同样绑定，并在解密、复制和启动窗口重复重查 |
+| `crates/core/src/lib.rs:111`、`:850`、`:1244`、`:1842` | Core direct TTY、普通启动描述、native Terminal 与公共窄 helper |
+| `apps/runner/src/main.rs:119`、`:136` | 普通 CLI 和 TUI 的共享 `launch_command`，没有遗漏的无条件配置目录覆盖 |
+| `apps/runner/src/submission.rs:273`、`apps/runner/src/supervisor.rs:259` | 后台 worker 从私有 stdin 取得原环境；systemd manager 的 `env_clear` 不会悄悄丢掉目录选择或把凭据放入 argv／D-Bus 属性 |
+
+### 旧批准与已有工作的兼容矩阵
+
+| 旧对象 | 升级后的行为 | 用户需要做什么 |
+| --- | --- | --- |
+| 未尝试的旧有限 launch/resume，缺少目录绑定 | `stale_auth_context`，在 durable intent、private resume copy 和客户端启动前拒绝 | 新建预览；不要把旧 hash 当成新批准 |
+| 已有 launch/resume 原始记录 | 按原 ID 查询，先于新目录／程序检查；不会再次打开 Terminal 或要求重新执行原会话 | 回到原记录看最后已知结果 |
+| 已有精确来源绑定、未请求 runtime status 的旧清理计划 | 继续按原来源／文件／Keychain／停写前提判断；不因缺少一个不会使用的 runtime 描述而整体失效 | 正常审阅；来源变化时才重新预览 |
+| 请求 runtime status、但缺少新目录绑定的未尝试清理计划 | `stale_auth_context`，在接收和清理前拒绝 | 重新预览含状态检查的计划 |
+| 已接受或完成的清理任务 | 原回执及 ID 保留；通用 execute 的原 hash／计划完整性校验仍存在，随后返回原任务，不重放 | 使用 job 查询；不要把错误 hash 的 execute 当查询 API |
+| 原任务曾请求 runtime status，现有目录选择变化或旧绑定缺失 | 独立 `auth_verify` 仍读取本地来源；runtime 单列 `unavailable` / `stale_auth_context`，不修改历史回执 | 可继续核对本地结果；需要当前报告时另发明确的新检查 |
+| 原任务没有逐来源认证 schema | 带 job 的新式认证复查返回 `legacy_auth_coverage`；原回执仍能查询 | 不带 job ID 检查当前来源；不据此重放旧清理 |
+
+终审没有发现遗漏的自动客户端执行入口或新增的发行阻断缺陷。目录描述是**执行入口的选择绑定**，不是以 OS 文件描述符固定整个后续客户端世界：macOS `open -a Terminal` 为异步交接，回执准确使用 `launch_requested`。交接之后的路径／可执行文件／别名替换、接收 Terminal 的其他认证变量和外部客户端实际加载结果仍不能被这个回执证明；不要在 Release notes 中将它升级为“已认证”“已启动成功并验证来源”或隔离保证。
+
+认证分项没有新增必须交给 Faye 的签名或账户决定。固定候选的 CI、临时 Keychain 和受控惰性客户端验收可继续由工程自动执行。只有另行选择真实联网登录／撤销验收时，才需要专用测试账户及其授权；不能为了填满证据表使用个人凭据。`stale_auth_context` 的下一步是重新预览，`auth_scope_unverified` 的下一步是核对原启动入口的目录选择，Keychain locked/denied 的下一步是针对相应系统入口复查；这些都不应引导用户重复执行已接受的清理任务。
+
+### 首次当前提交 native CI 的真实结果与 harness 修正
+
+对 `e573ce2` 的 [run 43520398332](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43520398332)，native macOS job `132213004331` 的 canonical evidence 为 **18 passed / 1 failed**，不能以其他绿色 job 代替该结果。`auth-sources-core-test` 的 49 项通过，独立 `keychain-native-test` 也实际通过；失败是新 `journey-auth-sources` 的 PTY 输出捕获，原有精确清理 journey 已先通过。
+
+失败发生在测试将已捕获 stdout 解析为 JSON 时，尚未进入预期 `stale_auth_context` 断言。测试 helper 在读取 master 前先关闭最后一个 slave FD，依赖了 Linux 在 hangup 后仍保留输出的行为。Apple 的 [XNU `ptsclose`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty_dev.c#L325) 调用 `ttyclose`；后者会[清空读写队列](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty.c#L376)。因此修正测试为：子进程退出后保留父进程的 slave，以非阻塞方式读尽 master，再在 finally 关闭两端。预期错误码和“无 durable intent”断言保留，并增加缺失输出的明确诊断；没有改动产品实现来迁就测试。
+
+修正后的 Linux 两段 journey 均通过。macOS 对修正提交的再次 canonical 运行仍必须单独确认，首次失败证据不被覆盖。完整 job log、canonical report 摘取、SHA256 与上述 Apple source blob 身份保存在交付 evidence 的 `current-ci/push-43520398332/auth-pty-diagnosis.json` 和同目录 `native-job-132213004331.log`。这次实际执行将临时 Keychain API 证据补齐到了该提交，但没有进行个人账号登录、正式安装或 Gatekeeper 验收。

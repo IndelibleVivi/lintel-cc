@@ -104,8 +104,8 @@ First choose the exact source revision, a strictly higher new version, channel, 
 ```json
 {
   "schema": "lintel.app-release/1",
-  "version": "0.2.0-preview.1",
-  "previous_version": "0.1.0",
+  "version": "0.2.0",
+  "previous_version": "0.1.1",
   "channel": "preview",
   "source_revision": "<40-character-source-commit>",
   "pubkey": "<base64-encoded-public-key-file-content>",
@@ -116,8 +116,8 @@ First choose the exact source revision, a strictly higher new version, channel, 
       "archive_path": "/path/to/Lintel.app.tar.gz",
       "signature_path": "/path/to/Lintel.app.tar.gz.sig",
       "dmg_path": "/path/to/Lintel.dmg",
-      "archive_name": "Lintel_0.2.0-preview.1_aarch64.app.tar.gz",
-      "dmg_name": "Lintel_0.2.0-preview.1_aarch64.dmg"
+      "archive_name": "Lintel_0.2.0_aarch64.app.tar.gz",
+      "dmg_name": "Lintel_0.2.0_aarch64.dmg"
     }
   }
 }

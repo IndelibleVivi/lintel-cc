@@ -4,6 +4,7 @@
 The fake Claude only implements inert auth status. No real CLI, helper,
 Keychain, profile contents, network login or credential is used.
 """
+import errno
 import json
 import os
 from pathlib import Path
@@ -241,14 +242,21 @@ exit 1
                 result = subprocess.run([str(BINARY), *args], env=env,
                                         stdin=slave, stdout=slave, stderr=subprocess.PIPE,
                                         timeout=60)
-                os.close(slave)
-                slave = None
+                # Keep our slave open until pending output has been drained.
+                # A last-slave close can discard unread PTY output on macOS;
+                # Linux retaining it after hangup is not a portable contract.
+                # The child has exited, so no future output can arrive.
+                os.set_blocking(master, False)
                 output = bytearray()
                 while True:
                     try:
                         chunk = os.read(master, 4096)
-                    except OSError:
-                        break  # PTYs report EIO after the child closes its end.
+                    except BlockingIOError:
+                        break
+                    except OSError as error:
+                        if error.errno != errno.EIO:
+                            raise
+                        break
                     if not chunk:
                         break
                     output.extend(chunk)
@@ -289,6 +297,7 @@ exit 1
         env['CLAUDE_CONFIG_DIR'] = str(root)
         code, stdout, stderr = interactive(['launch', 'request', plan['id'], plan['hash']])
         assert code == 1, (stdout, stderr)
+        assert stdout.strip(), ('missing PTY response', code, stdout, stderr)
         assert json.loads(stdout)['error']['code'] == 'stale_auth_context', (stdout, stderr)
         assert not (state / 'launches' / (plan['id'] + '.json')).exists()
         env.pop('CLAUDE_CONFIG_DIR')

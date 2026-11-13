@@ -12,7 +12,22 @@ const fixture=await realpath(await mkdtemp(path.join(os.tmpdir(),'lintel-compone
 const calls=[],consoleErrors=[],aliases=['synthetic-component-A','synthetic-component-B'];
 const original='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const cores=new Map();let held=null,requested=false;
-function raw(actor,args,payload){return new Promise((resolve,reject)=>{const child=spawn(runner,args,{env:actor,stdio:['pipe','pipe','pipe']});let out='',err='';child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);child.once('error',reject);child.once('close',()=>{try{resolve(JSON.parse(out))}catch{reject(new Error(err+out))}});child.stdin.end(payload?JSON.stringify(payload):'');});}
+function raw(actor,args,payload){return new Promise((resolve,reject)=>{
+ // Argument-only commands can exit before Node flushes even an empty string.
+ // They have no stdin contract; only JSON requests need a writable pipe.
+ const hasPayload=payload!==undefined;
+ const child=spawn(runner,args,{env:actor,stdio:[hasPayload?'pipe':'ignore','pipe','pipe']});
+ let out='',err='',inputError=null;
+ child.stdout.on('data',d=>out+=d);child.stderr.on('data',d=>err+=d);
+ child.stdin?.once('error',error=>{inputError=error});child.once('error',reject);
+ child.once('close',(code,signal)=>{try{
+  if(inputError)throw new Error('Synthetic core stdin failed: '+inputError.code);
+  const result=JSON.parse(out);
+  if(signal||typeof result?.ok!=='boolean'||code!==(result.ok?0:1))throw new Error('Synthetic core exit/envelope mismatch: '+JSON.stringify({code,signal,ok:result?.ok}));
+  resolve(result);
+ }catch(error){reject(new Error(error.message+'\n'+err+out))}});
+ if(hasPayload)child.stdin.end(JSON.stringify(payload));
+});}
 for(const [index,alias] of [null,...aliases].entries()){
  const home=path.join(fixture,'home-'+index),state=path.join(fixture,'state-'+index),root=path.join(home,'config 关联环境 '+index),project=path.join(home,'project 来源');
  await mkdir(root,{recursive:true});await mkdir(path.join(project,'.claude'),{recursive:true});

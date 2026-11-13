@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from unittest import mock
 from cli_candidate_acceptance_test import CliCandidateAcceptanceTests
+from candidate_ci_collection_test import CandidateCiCollectionTests
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("lintel_candidate", ROOT / "scripts/prepare-candidate.py")

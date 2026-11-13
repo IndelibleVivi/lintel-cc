@@ -139,6 +139,8 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  assert.equal(pack('plain').status,0);const plain=await readFile(path.join(dir,'plain/index.html'),'utf8');assert.match(plain,/没有正式 Release/);
  const plainBuild=JSON.parse(await readFile(path.join(dir,'plain/site-build.json')));
  assert.equal(plainBuild.files.length,67);
+ assert.deepEqual(plainBuild.app_release_versions,[],'Known public CLI links must not invent an App release');
+ assert.equal(plainBuild.files.some(file=>file.path==='app-downloads.json'||file.path.startsWith('updates/')),false,'Without verified App records there is no App download metadata or updater feed');
  assert.deepEqual(await readFile(path.join(dir,'plain/assets/favicon.png')),await readFile(path.join(repo,'apps/desktop/src-tauri/icons/128x128.png')),'payload preserves the canonical raster identity export');
  assert.equal(plainBuild.locales.length,42);
  assert.equal(plainBuild.files.filter(file=>file.path==='index.html'||file.path.endsWith('/index.html')).length,42);
@@ -156,10 +158,33 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  for(const name of ['download/index.html','en/download/index.html','releases/index.html','en/releases/index.html','guide/start-here/index.html','en/guide/start-here/index.html','guide/operator-guide/index.html','en/guide/operator-guide/index.html','guide/cleanup/index.html','en/guide/cleanup/index.html']){
   assert.ok(plainBuild.files.some(file=>file.path===name),`plain payload includes ${name}`);
  }
- const plainDownload=await readFile(path.join(dir,'plain/download/index.html'),'utf8');
- assert.match(plainDownload,/data-download-app="unavailable"/);
- assert.doesNotMatch(plainDownload,/releases\/download\/v|\b[a-f0-9]{64}\b/);
- assert.match(plainDownload,/0\.1\.0 Preview/);
+ // These finite CLI assets are already public and independently checked. They
+ // do not relax the App projection gate or authorize any new candidate URL.
+ const cliPrefix='https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/';
+ const publicCli=[
+  ['macos-arm64','83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1'],
+  ['linux-x86_64','5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6'],
+  ['linux-aarch64','299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3'],
+ ];
+ for(const [pageName,language] of [['download/index.html','zh-CN'],['en/download/index.html','en']]){
+  const plainDownload=await readFile(path.join(dir,'plain',pageName),'utf8');
+  assert.match(plainDownload,/data-download-app="unavailable"/);
+  assert.doesNotMatch(plainDownload,/data-download-app="verified"|data-release-version=/,'No App release is projected without a verified record');
+  assert.equal(plainDownload.includes(outputs.release.source_revision),false,'Prepared synthetic App provenance must not appear');
+  const cliSection=plainDownload.match(/<section\b[^>]*\bdata-download-cli="0\.1\.0"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cliSection,'Only the explicitly scoped public CLI section may carry fixed public assets');
+  assert.match(cliSection,/0\.1\.0 Preview/);
+  assert.match(cliSection,language==='en'?/0\.2\.0 has not been publicly released/:/0\.2\.0 尚未公开发布/);
+  const allowedUrls=[
+   ...publicCli.map(([target])=>`${cliPrefix}lintel-cli-0.1.0-candidate-fcae6cb1efb5-${target}.tar.gz`),
+   `${cliPrefix}INSTALL.${language}.md`,`${cliPrefix}SHA256SUMS`,
+  ];
+  assert.deepEqual([...cliSection.matchAll(/href="([^"]*\/releases\/download\/[^"\s]+)"/g)].map(match=>match[1]),allowedUrls,'Only the three known public CLI packages and matching versioned instructions/checksums are allowed');
+  assert.deepEqual(cliSection.match(/\b[a-f0-9]{64}\b/g),publicCli.map(([,digest])=>digest),'Only the independently checked public CLI digests are allowed');
+  const withoutKnownCli=[...allowedUrls,...publicCli.map(([,digest])=>digest)].reduce((html,value)=>html.replaceAll(value,''),cliSection);
+  assert.doesNotMatch(withoutKnownCli,/releases\/download\/v|\b[a-f0-9]{64}\b/,'The fixed CLI section must not admit any additional release URLs or digests');
+  assert.doesNotMatch(plainDownload.replace(cliSection,''),/releases\/download\/v|\b[a-f0-9]{64}\b/,'The original no-invented-App-assets gate still applies outside the fixed public CLI section');
+ }
  const plainArticle=await readFile(path.join(dir,'plain/guide/operator-guide/index.html'),'utf8');
  assert.match(plainArticle,/Lintel 操作指南/);
  assert.match(plainArticle,/data-guide-document="operator-guide"/);

@@ -90,8 +90,8 @@ npm run desktop:build:macos-preview -- \
 <p>先选择精确 source revision、严格升序的新版本、通道、架构与已审阅的 <strong>公开</strong>更新公钥。例如下列是字段示例，不能作为真实发行数据：</p>
 <pre class="guide-code" data-language="json"><code>{
   &quot;schema&quot;: &quot;lintel.app-release/1&quot;,
-  &quot;version&quot;: &quot;0.2.0-preview.1&quot;,
-  &quot;previous_version&quot;: &quot;0.1.0&quot;,
+  &quot;version&quot;: &quot;0.2.0&quot;,
+  &quot;previous_version&quot;: &quot;0.1.1&quot;,
   &quot;channel&quot;: &quot;preview&quot;,
   &quot;source_revision&quot;: &quot;&lt;40-character-source-commit&gt;&quot;,
   &quot;pubkey&quot;: &quot;&lt;base64-encoded-public-key-file-content&gt;&quot;,
@@ -102,8 +102,8 @@ npm run desktop:build:macos-preview -- \
       &quot;archive_path&quot;: &quot;/path/to/Lintel.app.tar.gz&quot;,
       &quot;signature_path&quot;: &quot;/path/to/Lintel.app.tar.gz.sig&quot;,
       &quot;dmg_path&quot;: &quot;/path/to/Lintel.dmg&quot;,
-      &quot;archive_name&quot;: &quot;Lintel_0.2.0-preview.1_aarch64.app.tar.gz&quot;,
-      &quot;dmg_name&quot;: &quot;Lintel_0.2.0-preview.1_aarch64.dmg&quot;
+      &quot;archive_name&quot;: &quot;Lintel_0.2.0_aarch64.app.tar.gz&quot;,
+      &quot;dmg_name&quot;: &quot;Lintel_0.2.0_aarch64.dmg&quot;
     }
   }
 }</code></pre>

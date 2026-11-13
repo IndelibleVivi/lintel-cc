@@ -69,6 +69,13 @@ jobs:
             --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
             --revision "$GITHUB_SHA" \
             --out "$RUNNER_TEMP/lintel-candidate/native-app.json"
+      - name: Observe native window and existing accessibility permission
+        continue-on-error: true
+        run: |
+          python3 scripts/observe-macos-candidate.py \
+            --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
+            --revision "$GITHUB_SHA" --probe-revision "$GITHUB_SHA" \
+            --out "$RUNNER_TEMP/lintel-candidate/window-observation"
       - name: Upload only finite packages and evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,6 +87,46 @@ jobs:
             ${{ runner.temp }}/lintel-candidate/packages/candidates-*.json
             ${{ runner.temp }}/lintel-candidate/app/*.dmg
             ${{ runner.temp }}/lintel-candidate/native-*.json
+            ${{ runner.temp }}/lintel-candidate/window-observation/observation.json
+            ${{ runner.temp }}/lintel-candidate/window-observation/lintel-window.png
+          if-no-files-found: error
+          retention-days: 14
+
+  gate:
+    name: exact-source canonical CI and final DMG gate
+    needs: [build, linux]
+    runs-on: macos-15
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: lintel-unpublished-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/lintel-candidate
+      - name: Read exact-head canonical CI and run production candidate verifier
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HOST: github.com
+        run: |
+          python3 scripts/collect-candidate-ci.py \
+            --receipt "$RUNNER_TEMP/lintel-candidate/build-receipt.json" \
+            --revision "$GITHUB_SHA" --wait-seconds 2400 \
+            --out "$RUNNER_TEMP/lintel-candidate-gate"
+      - name: Retain canonical CI metadata and actual gate result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lintel-candidate-gate-${{ github.sha }}
+          path: ${{ runner.temp }}/lintel-candidate-gate
           if-no-files-found: error
           retention-days: 14
 

@@ -10,6 +10,23 @@ The default macOS App distribution is still **ad-hoc signed, manually downloaded
 
 This lane reviewed `scripts/prepare-candidate.py`, `scripts/package-cli.mjs`, `scripts/app-release.mjs`, `scripts/inspect-app-archive.py`, the desktop build/resource/signature entries, packaging tests, updater configuration, current-state/verification/app-updates documentation, project licence boundaries and the relevant CI build paths. The initial inspected source was `73f34ed06b5d630d2a36910baf88ff5713aede66`. The final source SHA and actual workflow outcomes belong to the coordinator's exact-revision evidence record; this document does not relabel an earlier successful run as verification of later edits.
 
+### Preliminary exact-source native result
+
+[Candidate run 43520398419](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43520398419) completed successfully against **`e573ce228e15ee6cb03c2705baf70a8bab1a8c75`**. It produced a fresh App/DMG and all three CLI archives; each platform's actual final CLI archive passed native execution and the real public 0.1.0 upgrade/archive experiment. Linux aarch64 ran on an aarch64 Linux host, not an emulator. The earlier local debug timeout is retained as a distinct unsuccessful experiment; the actual optimized archives passed without requiring the acceptance limit to be relaxed.
+
+| Preliminary final artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| macOS arm64 CLI | 9,546,898 | `78ad2bb666c2e9ad61f3e6e211242a4868e2162a480e24cb65d5c4e7426650b8` |
+| Linux x86_64 CLI | 9,805,835 | `3fadc7214383918e9c10af30d945275383a6ac52339c15f55c395088a8615fb3` |
+| Linux aarch64 CLI | 9,541,623 | `0cb141913ebe4575a2d6cad6a7fa30cca1c259819c3b693c3b7076061278a259` |
+| macOS arm64 DMG | 13,756,590 | `592989724b31cfc09397bfb4081a05c9b84b031da76721230dd0328a06865a42` |
+
+The candidate ZIP is GitHub artifact **14083043095**, 42,564,088 bytes, SHA-256 `720f659b3ad1f1f36e6139a1923ebdcf3a93fbd63f96076845ca631a30f4045f`. Linux runtime report artifacts are 14083151594 (x86_64) and 14084205040 (aarch64). All three ZIPs were downloaded through the connector and checked against GitHub's authenticated artifact metadata digests. The downloaded CLI archives were independently re-read locally, checking actual bytes, executable modes and internal sums against the build receipt. Full job logs, raw run/job/artifact metadata, exact ZIPs and extracted reports are retained under the audit's `evidence/candidate-ci` directory.
+
+The actual DMG App copy contained **64 files / 39,919,470 bytes**, passed strict bundle verification, and reported both plist versions as 0.2.0. Its signature is **ad-hoc**. Direct native launch remained alive after five seconds. Gatekeeper assessment **rejected it (exit 3)**, stapler reported **no ticket (exit 65)**, and the extracted copy had no quarantine attribute. These observations support the limited Preview build/runtime conclusion; they do not establish ordinary first-download trust. The macOS CLI also ran from an unquarantined extracted package: its browser-download/Gatekeeper acceptance remains separate from native CLI functionality.
+
+**This is a preliminary candidate, not the final fully admitted release candidate.** The separate exact-head canonical full CI encountered Mac PTY-test and Linux component-test harness failures. The coordinator is fixing those concrete causes and rebuilding once at a new frozen SHA. Neither this successful package workflow nor its three native results overrides the failed full-CI condition at `e573ce2`.
+
 ## Confirmed defects and fixes
 
 ### RE-01 — A consistent CLI archive could be impossible to execute
@@ -70,9 +87,11 @@ Packages include the project terms separately from third-party notices. Rust not
 
 `.github/workflows/candidate-readiness.yml` runs on the audit branch or an explicit workflow dispatch. It has read-only repository permissions and uploads only finite **unpublished** packages and evidence. It does not create a release, sign with production keys, deploy a website, activate an updater or change any account.
 
-The macOS arm64 job runs the existing canonical builder against `$GITHUB_SHA`. Prerequisites are Rust 1.100.0 with all three targets and rust-docs, Node 22, Python 3.12, cargo-zigbuild 0.23.4 and Zig 0.16.0. The Zig pair is the one recorded in `docs/current-state.md` for the earlier real runner build, and matches the existing canonical candidate preflight and native-runtime notice assumptions. Dependencies remain lockfile controlled. The job uploads the receipt, three CLI archives/index, DMG and native reports for 14 days. Preserve the accepted package and workflow provenance beyond that retention before any future publication decision.
+The macOS arm64 job runs the existing canonical builder against `$GITHUB_SHA`. Prerequisites are Rust 1.100.0 with all three targets and rust-docs, Node 22, Python 3.12, cargo-zigbuild 0.23.4 and Zig 0.16.0. The Zig pair is the one recorded in `docs/current-state.md` for the earlier real runner build, and matches the existing canonical candidate preflight and native-runtime notice assumptions. Dependencies remain lockfile controlled. The job uploads the receipt, three CLI archives/index, DMG, native reports and any finite optional window evidence for 14 days. Preserve the accepted package and workflow provenance beyond that retention before any future publication decision.
 
 The Linux jobs consume the exact uploaded archives on `ubuntu-24.04` and `ubuntu-24.04-arm`. They do not rebuild or repackage them. The arm job is a native CPU check, distinct from cross-compilation. The full product CI remains the separate `verify.yml` workflow; this acceptance workflow does not assert its success.
+
+A mandatory final `gate` job on native macOS waits up to 40 minutes for the **same-SHA push** canonical verification run. `scripts/collect-candidate-ci.py` reads authenticated GitHub metadata using the official `gh` client, rejects wrong-head/PR/ambiguous/missing/failed runs, and checks each actual matrix sibling's name, run, SHA and successful conclusion. It obtains `ci-plan` and finite evidence artifacts using `gh run download`; it does not hand-forward authentication headers through redirects. It then invokes the actual production `prepare-candidate.py verify` from a clean checkout of the candidate SHA, including native DMG readback. The gate does not relabel a reduced plan, synthesize missing successes or weaken the canonical check set. Raw run/job/artifact metadata, actual grouped results, downloaded reports, final gate result and a separate API provenance observation are uploaded. Existing consistency-gate origin flags remain unchanged; the authenticated API observation is retained separately.
 
 ### CLI acceptance
 
@@ -98,16 +117,18 @@ They use `https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/li
 
 It directly launches the installed native executable in a synthetic HOME, observes five seconds of process liveness, and terminates only that spawned process. The report explicitly marks the visible window as unobserved and ordinary download installation as unaccepted. A live process is not proof that a WebKit screen rendered, a user completed a task, VoiceOver worked, LaunchServices accepted the App, or Gatekeeper accepted a newly downloaded file. A dead process fails this check even if its signature passed.
 
+The final workflow also runs `scripts/observe-macos-candidate.py` with the tiny `scripts/macos-window-observer.swift` helper as a **separate optional observation**. It checks the same exact DMG/copy, observes public CoreGraphics window metadata filtered to the spawned PID, records existing screen-capture authorization through `CGPreflightScreenCaptureAccess`, and uses read-only AX queries only when already trusted. It requests no permissions, changes no privacy settings and modifies no candidate bundle. After a render allowance it refreshes window ownership; only an existing authorized Lintel window may be captured. The report distinguishes a visible normal window, a captured selected window, absent authorization, unavailable GUI session and early exit. It always records that no normal control operation or product task was performed. Only this supplemental observation can continue on error; package/runtime/full-CI gates remain mandatory. This procedure was prepared after the preliminary run above and its actual outcome belongs to the final run.
+
 ## Evidence boundaries and remaining release conditions
 
 | Layer | Evidence and treatment |
 | --- | --- |
 | Source | Actual baseline reviewed; release scripts and regressions changed; numeric 0.2.0 metadata prepared. |
-| Synthetic release tests | Candidate/acceptance regression suite passes 23 tests; baseline false-positive reproductions retained. App release tests include frontend/native version binding; generated-site tests require regenerated paired docs. |
+| Synthetic release tests | Candidate/acceptance/CI-collection regression suite passes 25 tests; baseline false-positive reproductions retained. Collector tests reject cross-head, PR, missing, duplicate, skipped, cancelled and failed matrix evidence. App release tests include frontend/native version binding; generated-site tests require regenerated paired docs. |
 | Local native runtime | Linux x86_64 debug runner built. The synthetic receipt/package trial used the actual previous public executable and current debug executable. It reached current-binary old-state queries, but a later encrypted-archive request exceeded its 180-second timeout; it did not pass the complete acceptance procedure. No measured cause is assigned. This trial is not RC provenance; the optimized final archives must resolve the remaining acceptance result. |
 | Canonical full CI | Coordinator owns the exact run/plan/results/evidence aggregation. An earlier PR7 full success is valuable baseline evidence but cannot certify this branch. |
-| Final package/native | New exact-source workflow and three native acceptance procedures are prepared. Use the reports from the selected commit; a workflow file alone is not a passing result. |
-| Installed App | Temporary DMG copy, strict signature and process result are narrower than a Finder/Applications install and actual GUI use. |
+| Final package/native | Preliminary e573ce2 actual final archives passed all three native old-public-version upgrade consumers. A follow-up source requires its own final run, full-CI binding and production candidate gate. |
+| Installed App | Preliminary final DMG copy passed strict signature and process checks; Gatekeeper rejected it and no stapled ticket existed. Optional native window observation is prepared for the follow-up. These are narrower than a Finder/Applications install and normal task use. |
 | Published/deployed | No new release, feed or site deployment authorized or performed. The coordinator records observed public downloads/site separately. |
 
 For **CLI Preview**, require the final exact-source artifact native reports on all claimed architectures, the exact-head full canonical CI, retained notices/terms, and truthful manual installation instructions. An individual platform may remain experimental or be held if its runtime report fails; another platform's success cannot stand in for it.
@@ -134,7 +155,11 @@ On each target's native OS/CPU, consume the same receipt/artifacts and the pinne
 python3 scripts/accept-cli-candidate.py --receipt ../lintel-candidate/build-receipt.json --revision <same-SHA> --target <platform> --previous-archive ../previous-cli.tar.gz --previous-sha256 <pinned-platform-digest> --out ../native-cli.json
 ```
 
-The workflow already performs these build/native steps except the separate exact-head full-CI aggregation. Candidate and acceptance output paths must be absent. Failure means inspect the existing original report/log and correct the specific cause; do not relabel, edit reports to pass, retry a completed state-changing task, or overwrite a previously identified package.
+The final workflow performs these build/native steps and the exact-head full-CI production gate. Candidate and acceptance output paths must be absent. Failure means inspect the existing original report/log and correct the specific cause; do not relabel, edit reports to pass, retry a completed state-changing task, or overwrite a previously identified package. For a controlled manual run with authenticated read-only `gh` access, the same collector is executable directly:
+
+```sh
+python3 scripts/collect-candidate-ci.py --receipt ../lintel-candidate/build-receipt.json --revision <same-SHA> --out ../lintel-candidate-ci-gate --wait-seconds 2400
+```
 
 For local regressions:
 
@@ -153,3 +178,4 @@ App-updates documentation changes require the repository's normal bilingual site
 - [Tauri macOS signing](https://v2.tauri.app/distribute/sign/macos/): local ad-hoc signing versus Developer ID distribution.
 - [Tauri updater](https://v2.tauri.app/plugin/updater/) and [CLI changelog](https://v2.tauri.app/release/%40tauri-apps/cli/all-versions/): signed updater artifacts and authenticated version handling.
 - [GitHub-hosted runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) and [runner images](https://github.com/actions/runner-images/blob/main/README.md): native macOS arm64 and Linux arm64 labels. A changing runner image still needs the actual recorded run; its label alone is not evidence of a passing package.
+- [Apple window metadata API](https://developer.apple.com/documentation/coregraphics/cgwindowlistcopywindowinfo%28_%3A_%3A%29), [AX trust query](https://developer.apple.com/documentation/applicationservices/1460720-axisprocesstrusted) and [Apple DTS clarification of screen-capture preflight](https://developer.apple.com/forums/thread/839069?answerId=898801022): the optional native observer queries existing permission and does not infer it from missing window names.
