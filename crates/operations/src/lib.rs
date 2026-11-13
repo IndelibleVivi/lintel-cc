@@ -293,8 +293,19 @@ fn is_reference_instructions(relative: &Path) -> bool {
 fn property(name: &str) -> Value {
     match name {
         "query" => json!({"type":"string","maxLength":256}),
-        "filter" => choice(&["all","attention","archives","network"]),
-        "section" => choice(&["header","receipt","steps","warnings","coverage","task_result","result_coverage","next_actions","next_steps","error"]),
+        "filter" => choice(&["all", "attention", "archives", "network"]),
+        "section" => choice(&[
+            "header",
+            "receipt",
+            "steps",
+            "warnings",
+            "coverage",
+            "task_result",
+            "result_coverage",
+            "next_actions",
+            "next_steps",
+            "error",
+        ]),
         "approval" => plan_hash_schema(),
         "environment_id"
         | "plan_id"
@@ -316,6 +327,8 @@ fn property(name: &str) -> Value {
         "keep_remote_control"
         | "writers_confirmed_stopped"
         | "official_logout"
+        | "verify_auth_status"
+        | "observe_runtime"
         | "reveal"
         | "archive_only"
         | "lightweight"
@@ -331,6 +344,9 @@ fn property(name: &str) -> Value {
         // whole-category behavior. Non-empty unique canonical relative paths;
         // string-level limits are enforced here, category and on-disk identity
         // by the core. The validator additionally bounds encoded bytes to 512 KiB.
+        "auth_source_ids" => {
+            json!({"type":"array","maxItems":128,"uniqueItems":true,"items":{"type":"string","pattern":"^auth-[a-f0-9]{24}$","minLength":29,"maxLength":29}})
+        }
         "selected_keys" | "selected_changes" => {
             json!({"type":"array","minItems":1,"maxItems":4096,"uniqueItems":true,"items":text()})
         }
@@ -481,6 +497,8 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
         "drift" => (&["environment_id"], &["lightweight"]),
         "residue_archive_inspect" => (&["archive_passphrase"], &["job_id","archive_path"]),
         "plan_residue_restore" => (&["environment_id","selected_paths","archive_passphrase"], &["job_id","archive_path"]),
+        "auth_inventory" => (&["environment_id"], &["project_cwd"]),
+        "auth_verify" => (&["environment_id"], &["job_id", "observe_runtime"]),
         "cleanup_inspect"
         | "auth_probe"
         | "reactivate_environment"
@@ -526,7 +544,7 @@ fn fields(command: &str) -> Option<(&'static [&'static str], &'static [&'static 
                 "writers_confirmed_stopped",
                 "official_logout",
             ],
-            &["categories", "activate", "residue_paths", "archive_before_clear", "archive_only", "extra_roots", "delete_work"],
+            &["categories", "activate", "residue_paths", "archive_before_clear", "archive_only", "extra_roots", "delete_work", "auth_source_ids", "project_cwd", "verify_auth_status"],
         ),
         "plan_launch" => (
             &["environment_id", "project_cwd", "mode"],
@@ -599,6 +617,8 @@ pub const COMMANDS: &[&str] = &[
     "plan_preserve",
     "cleanup_inspect",
     "auth_probe",
+    "auth_inventory",
+    "auth_verify",
     "plan_cleanup",
     "plan_identity_reset",
     "reactivate_environment",
@@ -666,12 +686,16 @@ pub fn schema(command: &str) -> Option<Value> {
         properties.insert("selected_paths".into(), property("residue_paths"));
     }
     if command == "jobs_page" {
-        let mut environment=property("environment_id");
-        environment["description"]=json!("目标环境记录与此主机共享网络记录；其他环境及无关 host-only 记录不匹配");
-        properties.insert("environment_id".into(),environment);
+        let mut environment = property("environment_id");
+        environment["description"] =
+            json!("目标环境记录与此主机共享网络记录；其他环境及无关 host-only 记录不匹配");
+        properties.insert("environment_id".into(), environment);
     }
     if matches!(command, "jobs_page" | "job_detail_page") {
-        properties.insert("limit".into(), json!({"type":"integer","minimum":1,"maximum":100}));
+        properties.insert(
+            "limit".into(),
+            json!({"type":"integer","minimum":1,"maximum":100}),
+        );
     }
     let mut required = required.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     required.insert(0, "command".into());
@@ -793,6 +817,15 @@ fn check_property(value: &Value, schema: &Value) -> bool {
                         && s.bytes()
                             .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
                 })
+            } else if pattern == "^auth-[a-f0-9]{24}$" {
+                value.as_str().is_some_and(|s| {
+                    s.strip_prefix("auth-").is_some_and(|suffix| {
+                        suffix.len() == 24
+                            && suffix
+                                .bytes()
+                                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                    })
+                })
             } else {
                 value.as_str().is_some()
             }
@@ -891,11 +924,12 @@ pub fn validate(request: &Value) -> Result<(), String> {
             }
         }
     }
-    if matches!(command, "work_inventory" | "residue_inventory" | "jobs_page" | "job_detail_page")
-        && request["offset"].as_u64().is_some_and(|offset| {
-            offset > 9007199254740991 || (offset > 0 && request.get("expected_digest").is_none())
-        })
-    {
+    if matches!(
+        command,
+        "work_inventory" | "residue_inventory" | "jobs_page" | "job_detail_page"
+    ) && request["offset"].as_u64().is_some_and(|offset| {
+        offset > 9007199254740991 || (offset > 0 && request.get("expected_digest").is_none())
+    }) {
         return Err("后续 metadata 页需要原清单摘要和有限 offset".into());
     }
     if let Some(branches) = s["oneOf"].as_array() {
@@ -987,6 +1021,14 @@ pub fn validate(request: &Value) -> Result<(), String> {
     {
         return Err("清理运行残留需要明确的非空原件列表，且不执行注销".into());
     }
+    if command == "plan_cleanup"
+        && request["recipe"] == "clear_residue"
+        && ["auth_source_ids", "project_cwd", "verify_auth_status"]
+            .iter()
+            .any(|key| request.get(key).is_some())
+    {
+        return Err("认证来源选项仅用于登录修复、重建或退役；运行残留配方不执行认证操作".into());
+    }
     // Activation is only meaningful for the instruction position this round.
     // memory/sessions cannot be registered as active native sessions; asking to
     // do so is an explicit unsupported request, not a silent drop.
@@ -1037,6 +1079,10 @@ pub fn describe(command: &str) -> Option<Value> {
         "plan_launch" | "plan_resume" => "read_target_for_frozen_launch",
         "create_environment" => "create_config_root",
         "launch" => "start_target_process",
+        "auth_inventory" => "read_bounded_authentication_source_candidates_without_values",
+        "auth_verify" => {
+            "reread_selected_authentication_sources_and_optional_explicit_status_process"
+        }
         "auth_probe" => "official_auth_status_process",
         "archive_read" | "session_read" => "read_work_text",
         "archive_inspect" | "plan_import" => "read_encrypted_work",
@@ -1053,6 +1099,9 @@ pub fn describe(command: &str) -> Option<Value> {
         "jobs_page" | "job_detail_page" => "read_journal_without_reconciliation_or_record_writes",
         "launch_query" | "launches" => "read_launch_records_only",
         "inspect_components" => "read_original_records_without_reconciliation",
+        "auth_inventory" | "auth_verify" => {
+            "readonly_sources_and_original_records_no_receipt_rewrite"
+        }
         "work_preflight" => "readonly_metadata_scan_no_state_written",
         "work_inventory" => "readonly_metadata_scan_no_state_written",
         "residue_inventory" => "readonly_metadata_scan_no_state_written",
@@ -1093,7 +1142,7 @@ pub fn describe(command: &str) -> Option<Value> {
         "platforms":if command.contains("service") {vec!["linux"]} else if matches!(command,"plan_network_ipv6" | "plan_network_restore") {vec!["macos"]} else {vec!["macos","linux"]},
         "target_conditions":if command.contains("service") {vec!["exact_root_bound_systemd_unit","user_manager_or_current_root"]} else if command.contains("network") {vec!["explicit_host_shared_network_scope","probe_targets_visible_before_request"]} else {vec!["explicit_registered_environment_or_original_task_where_required"]},
         "applicability":{"status":"not_evaluated","reason":"静态描述不检查个人环境；运行相应 inspect 取得目标事实"},
-        "effects":{"target":target,"lintel_state":state,"external":match command {"network_probe" | "plan_network_ipv6" | "plan_network_restore"=>"explicit_ip_echo_requests","auth_probe"=>"official_auth_status_process","launch" | "launch_request" | "resume_request"=>"start_target_process","execute"=>"exact_plan_actions_may_include_official_logout_or_shared_network_change_and_reprobe",_=>"none"}},
+        "effects":{"target":target,"lintel_state":state,"external":match command {"network_probe" | "plan_network_ipv6" | "plan_network_restore"=>"explicit_ip_echo_requests","auth_probe"=>"official_auth_status_process","auth_verify"=>"official_status_process_only_if_observe_runtime_true","launch" | "launch_request" | "resume_request"=>"start_target_process","execute"=>"exact_plan_actions_may_include_auth_status_or_shared_network_change_and_reprobe",_=>"none"}},
         "requires_plan":matches!(command,"execute" | "launch_request" | "resume_request"),"approval":if matches!(command,"execute" | "launch_request" | "resume_request") {"exact_plan_hash_with_existing_user_authority"} else {"operation_specific_explicit_request"},
         "secret_fields":if s["properties"].get("archive_passphrase").is_some() {vec!["archive_passphrase"]} else {vec![]},
         "request_schema":s,
@@ -1706,6 +1755,60 @@ mod tests {
     }
 
     #[test]
+    fn authentication_sources_share_a_finite_value_free_request_contract() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        let source = "auth-0123456789abcdef01234567";
+        for command in ["auth_inventory", "auth_verify"] {
+            assert!(COMMANDS.contains(&command));
+            assert!(validate(&json!({"command":command,"environment_id":id})).is_ok());
+            for bad in [
+                json!({"command":command,"environment_id":"not-a-uuid"}),
+                json!({"command":command,"environment_id":id,"token":"never-accept-values"}),
+                json!({"command":command,"environment_id":id,"source_path":"/arbitrary"}),
+            ] {
+                assert!(validate(&bad).is_err(), "{bad}");
+            }
+            assert_eq!(schema(command).unwrap()["additionalProperties"], false);
+        }
+        assert!(validate(&json!({"command":"auth_inventory","environment_id":id,"project_cwd":"/synthetic/project"})).is_ok());
+        assert!(validate(
+            &json!({"command":"auth_verify","environment_id":id,"job_id":id,"observe_runtime":true})
+        )
+        .is_ok());
+        assert!(validate(
+            &json!({"command":"auth_verify","environment_id":id,"observe_runtime":"true"})
+        )
+        .is_err());
+        let request = json!({"command":"plan_cleanup","environment_id":id,"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"auth_source_ids":[source],"verify_auth_status":true});
+        assert!(validate(&request).is_ok());
+        for selection in [
+            json!(["auth-ABCDEF0123456789abcdef01"]),
+            json!(["/tmp/.zshrc"]),
+            json!([source, source]),
+            json!("all"),
+            json!(vec![source; 129]),
+        ] {
+            let mut invalid = request.clone();
+            invalid["auth_source_ids"] = selection;
+            assert!(validate(&invalid).is_err(), "{invalid}");
+        }
+        let mut empty = request.clone();
+        empty["auth_source_ids"] = json!([]);
+        assert!(validate(&empty).is_ok());
+        let mut residue = request.clone();
+        residue["recipe"] = json!("clear_residue");
+        assert!(validate(&residue).is_err());
+        assert_eq!(
+            describe("auth_inventory").unwrap()["effects"]["external"],
+            "none"
+        );
+        assert_eq!(
+            describe("auth_verify").unwrap()["effects"]["external"],
+            "official_status_process_only_if_observe_runtime_true"
+        );
+    }
+
+    #[test]
     fn identity_reset_requires_the_literal_writer_confirmation() {
         let id = "00000000-0000-4000-8000-000000000001";
         let confirmed = json!({"command":"plan_identity_reset","environment_id":id,"writers_confirmed_stopped":true});
@@ -1846,9 +1949,25 @@ mod history_contract_tests {
     use super::*;
     #[test]
     fn bounded_history_requests_are_strict_and_readonly() {
-        let id="00000000-0000-4000-8000-000000000001";
-        for request in [json!({"command":"jobs_page"}),json!({"command":"jobs_page","filter":"archives","offset":100,"limit":100,"expected_digest":"a".repeat(64)}),json!({"command":"job_detail_page","job_id":id,"section":"steps"})] {validate(&request).unwrap();}
-        for request in [json!({"command":"jobs_page","limit":101}),json!({"command":"jobs_page","filter":"secret"}),json!({"command":"job_detail_page","job_id":id,"section":"private_extra"}),json!({"command":"job_detail_page","job_id":id,"approval":"a".repeat(64)})] {assert!(validate(&request).is_err(),"{request}");}
-        assert!(describe("jobs_page").unwrap().to_string().contains("read_journal_without_reconciliation_or_record_writes"));
+        let id = "00000000-0000-4000-8000-000000000001";
+        for request in [
+            json!({"command":"jobs_page"}),
+            json!({"command":"jobs_page","filter":"archives","offset":100,"limit":100,"expected_digest":"a".repeat(64)}),
+            json!({"command":"job_detail_page","job_id":id,"section":"steps"}),
+        ] {
+            validate(&request).unwrap();
+        }
+        for request in [
+            json!({"command":"jobs_page","limit":101}),
+            json!({"command":"jobs_page","filter":"secret"}),
+            json!({"command":"job_detail_page","job_id":id,"section":"private_extra"}),
+            json!({"command":"job_detail_page","job_id":id,"approval":"a".repeat(64)}),
+        ] {
+            assert!(validate(&request).is_err(), "{request}");
+        }
+        assert!(describe("jobs_page")
+            .unwrap()
+            .to_string()
+            .contains("read_journal_without_reconciliation_or_record_writes"));
     }
 }

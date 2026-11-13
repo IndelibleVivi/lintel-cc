@@ -1,14 +1,14 @@
 # 环境覆盖与使用收尾开发方案
 
-2026-10-07 · 接续开发方案。完整目标仍由 [SPEC](../SPEC.md) 与 [产品基线](product-baseline.md) 定义；本文件标明已接通的工作线及后续实现与验收。后续计划不能作为能力已经交付的说明。当前交付事实见 [current-state](../current-state.md)。
+2026-10-07 · 接续开发方案；认证工作线于 2026-11-13 对齐当前源码。完整目标仍由 [SPEC](../SPEC.md) 与 [产品基线](product-baseline.md) 定义；本文件标明已接通的工作线及后续实现与验收。后续计划不能作为能力已经交付的说明。当前交付事实见 [current-state](../current-state.md)。
 
 ## 本轮范围与接续顺序
 
-已完成首页问候合并、原远端回执主机绑定、参考指令重复保全和官方注销的认证状态绑定；接续增加 core／CLI／App 的有限关联组件清单与元数据容量预检。本轮按项目／会话／原件的精确选择已接通并通过 synthetic core、CLI、有限 SSH transport 和 built App 验证，可明确排除超限文件后保全其余完整原件；分层证据与未验证项见 current-state。本批已接通兼容包格式的流式大文件保全与启动来源核对；当前检查与 source／候选边界见 current-state。更完整的环境覆盖、完整退场、启动收尾及非开发者发行继续保留，未在这轮加入生产操作。
+已完成首页问候合并、原远端回执主机绑定、参考指令重复保全；认证来源、精确清理与四层独立复查现已接入原计划引擎，自动官方注销因 MCP／插件保全边界而拒绝；接续增加 core／CLI／App 的有限关联组件清单与元数据容量预检。本轮按项目／会话／原件的精确选择已接通并通过 synthetic core、CLI、有限 SSH transport 和 built App 验证，可明确排除超限文件后保全其余完整原件；分层证据与未验证项见 current-state。本批已接通兼容包格式的流式大文件保全与启动来源核对；当前检查与 source／候选边界见 current-state。更完整的环境覆盖、完整退场、启动收尾及非开发者发行继续保留，未在这轮加入生产操作。
 
 | 工作线 | 当前基础 | 下一份可验收交付 | 前置条件与边界 |
 | --- | --- | --- | --- |
-| 认证与恢复可靠性 | 原任务只查询；官方注销冻结认证状态，主体缺失时拒绝；参考指令能重复归档 | 独立测试真实 Keychain、文件 fallback、多 root 与同账号凭据更新；准确报告观测来源和未知项 | 本轮只有 synthetic CLI 证据；真实账号操作需要单独授权，CLI 状态不能证明 Keychain token 世代 |
+| 认证与恢复可靠性 | 原任务只查询；有界来源清单、精确字段／简单 shell 编辑与独立复查已接通；自动注销返回 `official_logout_scope_unsafe` | 先建立能保全 MCP／插件的版本化 Keychain 归属适配，再独立验收真实登录、不同 root 与凭据更新 | 当前证据为 synthetic Core／CLI／built-App Chromium 和 disposable VM；真实账号操作需要单独授权，CLI 状态不能证明 Keychain token 世代 |
 | 关联组件与处理范围 | 同一主机／环境的有限组件清单、原记录与只查询原 ID 的入口已接通源码 | 补已支持组件的真实 runtime 证据；再增加有限 IDE／Desktop adapter 与更多来源 | 从现有 inspection/receipt 投影；探针失败显示访问受限或未知；不另建通用 workflow 平台 |
 | 工作保全与完整退场 | instructions/memory/sessions；精确文件清理；加密包与逐文件核对；容量预检与精确原件选择 | 流式大文件路线已接通；随后建立其他用户资产合同，再开放独立完整退场配方 | 保住全部选定内容及资产分类先于扩展删除；不修改现有 retire 的含义；包兼容与原任务恢复独立验收 |
 | 新环境正确继续工作 | 独立 root/cwd、冻结 launch/resume、参考与明确激活分开 | 有限启动来源、认证位置和待完成步骤已接通；实际加载与真实登录／启动另行验收 | root 改变不会消除项目或 managed settings；静态配置、实际加载和 OS 强约束分别证明 |
@@ -55,7 +55,7 @@
 | --- | --- | --- |
 | CLI | PATH 实际选择、其他可核对安装、executable、静态版本及安装来源置信度 | core 静态发现；明确选定 native executable 的有限 CLI inspector |
 | 配置与项目 | config root、project cwd、user/project/local/managed 来源，hooks/MCP 是否可能参与 | core inspection、launch；仅列存在和来源，不执行配置内容 |
-| 认证 | CLI 报告的来源、主体是否可核对、已识别文件、Keychain／目录外共享范围是否未知 | cleanup 的显式 auth probe 与共享来源限制；普通扫描不调用 Claude |
+| 认证 | 已识别本地来源、执行器变量、声明与未知覆盖；Keychain／目录外共享范围独立 | `auth_inventory` 显式有界读取，`auth_verify` 独立复查；runtime status 需另行选择，普通扫描不调用 Claude |
 | IDE／Desktop | 是否支持、已验证版本与存储 owner、关联 root 和后台写入者 | 分别补有限 adapter；没有 adapter 时显示暂不支持，不宣称未发现 |
 | 服务 | 确切 unit、manager、root 绑定、暂停回执、当前 blocker/cgroup 与后续外部编辑 | service 的 inspect／批准 pause/resume；PM2、Docker、cron 仍需独立实现 |
 | 浏览器 | 确切配对 profile、原 clear ID、准备／等待 startup／待批准完成／已完成 | browser 原状态机和原任务；不将 extension worker 重启当浏览器重启 |
@@ -80,7 +80,7 @@
 
 版本适配可以考虑官方 `claude purge PATH --dry-run`，但先冻结明确项目、版本、预览输出与保留范围；重新核对并批准后才能执行，失败或输出不识别不能当清理成功。官方 purge 处理项目本地数据，不能视为卸载或全局认证清理，见 [Claude 目录与项目清理](https://code.claude.com/docs/en/claude-directory)。
 
-全局 shell 的隐私变量和其他工具配置默认保留；若以后支持精确修改，应按字段或可证明的语法边界处理，保留同行其他内容。服务按确切身份和状态处理，不按名称杀全部进程；各用户、Docker volumes、PM2 与 cron 的发现和操作必须有独立支持合同。执行后复查已支持回写来源，所有未知范围保留在结果中。
+全局 shell 的认证声明默认不选；当前只允许明确选择且能冻结完整独立字面量赋值的精确编辑，复杂脚本与其他工具配置保留，不删除共享文件。服务按确切身份和状态处理，不按名称杀全部进程；各用户、Docker volumes、PM2 与 cron 的发现和操作必须有独立支持合同。执行后复查已支持回写来源，所有未知范围保留在结果中。
 
 ## 启动收尾与发行验收
 

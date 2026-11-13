@@ -271,53 +271,65 @@ class PortableWorkJourney(unittest.TestCase):
         self.assertEqual(legacy_receipt["status"], "partially_completed")
 
     def test_reset_client_keeps_preservation_before_destruction(self) -> None:
-        # A fake CLI whose logout fails. preview and receipt order must both keep
-        # every preservation step ahead of logout and the local file removals.
+        # Broad official logout is refused before any side effect. The supported
+        # exact local edit shares the preservation plan and occurs after rebuild.
         script = self.source.home / ".local/bin/claude"
         script.parent.mkdir(parents=True)
         script.write_text(
-            "#!/bin/sh\ncase \"$2\" in\n"
-            " status) printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"; exit 0;;\n"
-            " logout) exit 3;;\nesac\nexit 9\n"
+            '#!/bin/sh\ntouch "$CLAUDE_CONFIG_DIR/unexpected-auth-call"\nexit 3\n'
         )
         script.chmod(0o700)
+        original = b'{"claudeAiOauth":{"accessToken":"SYNTHETIC_LOCAL_LOGIN"},"mcpOAuth":{"keep":"SYNTHETIC_MCP_LOGIN"}}'
+        self.write(".credentials.json", original)
         environment_id = self.source.register(self.root)
         # Discovery and the execution recheck must resolve the same inert CLI.
         # Native-install fallback stays confined to this synthetic HOME.
-        planned = self.source.call(
+        refused = self.source.call(
             "plan_cleanup", environment_id=environment_id, recipe="reset_client",
             writers_confirmed_stopped=True, official_logout=True, categories=["instructions"],
         )
-        self.assertTrue(planned["ok"], json.dumps(planned.get("error"), ensure_ascii=False))
-        plan = planned["data"]
+        self.assertEqual(refused["error"]["code"], "official_logout_scope_unsafe")
+        self.assertEqual((self.root / ".credentials.json").read_bytes(), original)
+        self.assertFalse((self.root / "unexpected-auth-call").exists())
+        self.assertEqual(list((self.source.state / "jobs").iterdir()), [])
+        self.assertEqual(list((self.source.state / "archives").iterdir()), [])
+        plan = self.source.data(
+            "plan_cleanup", environment_id=environment_id, recipe="reset_client",
+            writers_confirmed_stopped=True, official_logout=False, categories=["instructions"],
+        )
         order = [action["id"] for action in plan["actions"]]
         index = {name: order.index(name) for name in order}
         self.assertEqual(order[0], "quiescence")
         self.assertLess(index["archive"], index["rebuild"])
-        self.assertLess(index["rebuild"], index["logout"])
-        self.assertLess(index["logout"], index["credentials"])
+        self.assertLess(index["rebuild"], index["auth_edit_0"])
+        self.assertLess(index["auth_edit_0"], index["auth_verify"])
+        self.assertNotIn("logout", order)
         self.source.approve(plan)
         receipt = self.source.data(
             "execute", plan_id=plan["id"], approval=plan["hash"], archive_passphrase=PASSPHRASE,
         )
-        # Logout failed AFTER the fresh root and migration were produced.
-        self.assertEqual(receipt["status"], "needs_reconciliation")
-        self.assertEqual(receipt["error"]["code"], "logout_failed")
+        self.assertEqual(receipt["status"], "partially_completed")
+        self.assertEqual(receipt["local_cleanup"], "completed")
         self.assertTrue(receipt["archive_path"])
-        self.assertTrue(receipt["state_archive_path"])
+        self.assertIsNone(receipt.get("state_archive_path"))
         self.assertTrue(receipt["new_root"])
         self.assertEqual(
             (Path(receipt["new_root"]) / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n"
         )
         step_ids = [step["id"] for step in receipt["steps"]]
         self.assertLess(step_ids.index("archive"), step_ids.index("create"))
-        self.assertLess(step_ids.index("create"), step_ids.index("logout"))
-        # No destructive removal happened.
+        self.assertLess(step_ids.index("migrate"), step_ids.index("auth_edit_0"))
+        self.assertLess(step_ids.index("auth_edit_0"), step_ids.index("auth_verify"))
+        # Whole mixed stores and the MCP credential survive the exact edit.
         self.assertNotIn("credentials", step_ids)
         self.assertNotIn("client_state", step_ids)
-        self.assertTrue((self.root / ".credentials.json").exists())
+        remaining = json.loads((self.root / ".credentials.json").read_text())
+        self.assertNotIn("claudeAiOauth", remaining)
+        self.assertEqual(remaining["mcpOAuth"]["keep"], "SYNTHETIC_MCP_LOGIN")
+        self.assertFalse((self.root / "unexpected-auth-call").exists())
 
     def test_cleanup_freezes_executable_before_any_auth_recheck(self) -> None:
+        self.write(".credentials.json", b'{"claudeAiOauth":{"accessToken":"SYNTHETIC_FROZEN_EXECUTABLE_LOGIN"}}')
         scripts = []
         markers = []
         for name in ("first", "second"):
@@ -339,21 +351,21 @@ class PortableWorkJourney(unittest.TestCase):
             self.source.data("discover")
             plan = self.source.data(
                 "plan_cleanup", environment_id=environment_id, recipe="repair_login",
-                writers_confirmed_stopped=True, official_logout=True,
+                writers_confirmed_stopped=True, official_logout=False, verify_auth_status=True,
             )
-            calls_before = markers[0].read_bytes()
+            calls_before = markers[0].read_bytes() if markers[0].exists() else b""
             self.source.env["PATH"] = str(scripts[1]) + ":/usr/bin:/bin"
             if discover_after_change:
                 self.source.data("discover")
             self.source.approve(plan)
             rejected = self.source.call("execute", plan_id=plan["id"], approval=plan["hash"])
             self.assertEqual(rejected["error"]["code"], "executable_changed")
-            self.assertEqual(markers[0].read_bytes(), calls_before)
+            self.assertEqual(markers[0].read_bytes() if markers[0].exists() else b"", calls_before)
             self.assertFalse(markers[1].exists(), "replacement executable was probed under an old approval")
             self.assertFalse((self.source.state / "jobs" / (plan["id"] + ".json")).exists())
             self.assertTrue((self.root / ".credentials.json").exists())
 
-    def test_cleanup_rechecks_new_writer_after_preservation_with_or_without_logout(self) -> None:
+    def test_cleanup_rechecks_new_writer_after_preservation_with_or_without_runtime_observation(self) -> None:
         script = self.source.home / ".local/bin/claude"
         script.parent.mkdir(parents=True)
         logout_marker = self.base / "unexpected-logout"
@@ -362,6 +374,8 @@ class PortableWorkJourney(unittest.TestCase):
             "printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"email\":\"synthetic@example.invalid\"}' \"$CLAUDE_CONFIG_DIR\"\n"
         )
         script.chmod(0o700)
+        original = b'{"claudeAiOauth":{"accessToken":"SYNTHETIC_RETAIN_WHEN_WRITER_APPEARS"},"mcpOAuth":{"keep":"SYNTHETIC_MCP_LOGIN"}}'
+        self.write(".credentials.json", original)
         # This inert sleeper has the process name that the production ps check
         # recognizes; its only binding is our disposable root.
         writer_path = self.base / "writer" / "claude"
@@ -376,11 +390,11 @@ class PortableWorkJourney(unittest.TestCase):
         )
         self.assertEqual(compiled.returncode, 0, compiled.stderr)
         environment_id = self.source.register(self.root)
-        for official_logout in (False, True):
-            with self.subTest(official_logout=official_logout):
+        for verify_auth_status in (False, True):
+            with self.subTest(verify_auth_status=verify_auth_status):
                 plan = self.source.data(
                     "plan_cleanup", environment_id=environment_id, recipe="reset_client",
-                    writers_confirmed_stopped=True, official_logout=official_logout,
+                    writers_confirmed_stopped=True, official_logout=False, verify_auth_status=verify_auth_status,
                     categories=["instructions"],
                 )
                 self.source.approve(plan)
@@ -399,12 +413,12 @@ class PortableWorkJourney(unittest.TestCase):
                     journal = self.source.state / "jobs" / (plan["id"] + ".json")
                     deadline = time.monotonic() + 30
                     while time.monotonic() < deadline:
-                        if journal.exists() and json.loads(journal.read_text()).get("state_archive_path"):
+                        if journal.exists() and json.loads(journal.read_text()).get("archive_path"):
                             break
                         self.assertIsNone(process.poll(), "cleanup ended before the preservation checkpoint")
                         time.sleep(0.01)
                     else:
-                        self.fail("state archive checkpoint did not appear")
+                        self.fail("work archive checkpoint did not appear")
                     writer = subprocess.Popen(
                         [str(writer_path), "40"], cwd=self.base,
                         env={**self.source.env, "CLAUDE_CONFIG_DIR": str(self.root)},
@@ -419,14 +433,15 @@ class PortableWorkJourney(unittest.TestCase):
                     self.assertEqual(receipt["error"]["code"], "writers_active")
                     self.assertEqual(receipt["error"]["step_id"], "quiescence")
                     self.assertTrue(Path(receipt["archive_path"]).is_file())
-                    self.assertTrue(Path(receipt["state_archive_path"]).is_file())
+                    self.assertIsNone(receipt.get("state_archive_path"))
                     self.assertEqual((Path(receipt["new_root"]) / "CLAUDE.md").read_bytes(), b"Synthetic instruction only.\n")
-                    self.assertTrue((self.root / ".credentials.json").exists())
+                    self.assertEqual((self.root / ".credentials.json").read_bytes(), original)
                     self.assertFalse(logout_marker.exists())
                     steps = [step["id"] for step in receipt["steps"]]
                     self.assertIn("migrate", steps)
                     self.assertNotIn("credentials", steps)
                     self.assertNotIn("logout", steps)
+                    self.assertFalse(any(step.startswith("auth_edit_") for step in steps))
                 finally:
                     if writer is not None:
                         writer.terminate()

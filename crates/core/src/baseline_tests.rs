@@ -568,7 +568,7 @@ fn legacy_plan_without_frozen_target_is_stale_plan() {
 #[test]
 fn local_cleanup_success_reports_selected_completion_and_coverage() {
     let (_t, engine, e, root) = setup();
-    fs::write(root.join(".credentials.json"), "synthetic").unwrap();
+    save(&root.join(".credentials.json"), &json!({"claudeAiOauth":{"accessToken":"synthetic-selected-login"},"mcpOAuth":{"keep":"synthetic-unselected-login"}})).unwrap();
     let plan = data(
         &engine,
         json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}),
@@ -584,14 +584,24 @@ fn local_cleanup_success_reports_selected_completion_and_coverage() {
     assert!(
         coverage
             .iter()
-            .any(|c| c["scope"] == "official_logout" && c["state"] == "not_requested"),
+            .any(|c| c["scope"] == "authentication_local_sources" && c["state"] == "done"),
         "{receipt}"
     );
     assert!(
         coverage
             .iter()
-            .any(|c| c["scope"] == "server_state" && c["state"] == "not_checked"),
+            .any(|c| c["scope"] == "authentication_server_revocation" && c["state"] == "unverified"),
         "{receipt}"
+    );
+    assert!(coverage
+        .iter()
+        .any(|c| c["scope"] == "authentication_runtime" && c["state"] == "not_requested"));
+    assert!(coverage
+        .iter()
+        .any(|c| c["scope"] == "authentication_other_contexts" && c["state"] == "unverified"));
+    assert_eq!(
+        load(&root.join(".credentials.json")).unwrap(),
+        json!({"mcpOAuth":{"keep":"synthetic-unselected-login"}})
     );
     // Receipt and job query agree on the structured result.
     let queried = data(&engine, json!({"command":"job","job_id":receipt["id"]}));

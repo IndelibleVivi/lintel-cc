@@ -152,7 +152,7 @@ class Guest:
             argv = ["sudo", "-n"] + argv
         return json.loads(self.shell(shlex.join(argv), user=user).stdout)
 
-    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None, expected_error=None, timeout=60):
+    def request(self, case, payload, *, submit=False, barrier=None, user=None, extra_env=None, expected_error=None, allow_errors=(), timeout=60):
         user = user or (ADMIN if case.get("as_root") else TARGET)
         prefix = ["sudo", "-n"] if case.get("as_root") else []
         env = {"HOME": case["home"], "LINTEL_TEST_HOME": case["home"], "LINTEL_STATE_DIR": case["state"]}
@@ -167,14 +167,19 @@ class Guest:
             session_command = shlex.join(prefix + ["python3", PROBE, "session"]) + ' "$XDG_SESSION_ID" ' + shlex.join(["--json", case["session"]])
             command = session_command + " && exec " + command
         result = self.shell(command, user=user, data=json.dumps(payload).encode(), timeout=timeout,
-                            check=not bool(expected_error))
+                            check=not bool(expected_error or allow_errors))
         response = json.loads(result.stdout)
         if expected_error:
             require(result.returncode != 0, "Expected rejection must exit nonzero")
             require(response.get("ok") is False and response.get("error", {}).get("code") == expected_error,
                     f"Expected {expected_error}, got {response}")
             return response
+        if response.get("ok") is False and response.get("error", {}).get("code") in allow_errors:
+            require(result.returncode != 0, "Allowed error must exit nonzero")
+            return response
         require(response.get("ok") is True, f"Canonical runner rejected {payload['command']}: {response}")
+        if allow_errors:
+            require(result.returncode == 0, f"Canonical runner returned success with nonzero exit: {response}")
         return response["data"]
 
     def kept_submission(self, case, payload, *, barrier="stopped"):
@@ -346,6 +351,70 @@ def terminal_receipt(guest, case, timeout=30):
         time.sleep(0.2)
         receipt = guest.request(case, {"command": "job", "plan_id": case["plan"]["id"]})
     return receipt
+
+
+def submit_managed_auth_once(guest, case, evidence, *, extra_env=None, timeout=180):
+    """Observe one original submission, including acceptance after its ACK window.
+
+    TCG can spend longer than the runner's fixed ACK window in safe admission.
+    An uncertain reply permits only bounded queries of that original ID, never
+    a second execute, a new plan, or a relaxed admission/timeout in production.
+    """
+    plan_id = case["plan"]["id"]
+    record = {"original_plan_id": plan_id, "submit_calls": 1, "query_calls": 0,
+              "submitted_once": True, "reexecuted": False, "query_only_after_submit": True}
+    evidence["submission"] = record
+    initial = guest.request(case, {"command": "execute", "plan_id": plan_id,
+                                  "approval": case["plan"]["hash"]}, submit=True,
+                            extra_env=extra_env, allow_errors=("submission_uncertain",), timeout=timeout)
+    execution = None
+
+    def check_receipt(receipt):
+        nonlocal execution
+        require(receipt.get("id") == plan_id and receipt.get("plan_id") == plan_id,
+                f"Managed auth receipt belongs to another original task: {receipt}")
+        current = receipt.get("execution", {})
+        require(current.get("mode") == "system_manager" and current.get("manager") == "system"
+                and current.get("unit") == f"lintel-{plan_id}.service"
+                and current.get("reboot_survival") is False,
+                f"Managed auth task lost its selected execution context: {current}")
+        require(execution is None or current == execution,
+                f"Managed auth execution context changed during query: {current}")
+        execution = current
+        record["execution"] = execution
+
+    accepted = initial.get("ok") is not False
+    if accepted:
+        record["initial_outcome"] = "accepted"
+        require(initial.get("status") == "accepted", f"Unexpected initial auth receipt: {initial}")
+        check_receipt(initial)
+    else:
+        record["initial_outcome"] = "submission_uncertain"
+        record["initial_error"] = initial
+        require(initial.get("error", {}).get("code") == "submission_uncertain"
+                and initial.get("plan_id") == plan_id,
+                f"Submission uncertainty is not bound to the original auth plan: {initial}")
+    evidence["stage"] = "query_original"
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, f"Original managed auth task did not reach a terminal receipt within {timeout}s; query only: {record}")
+        record["query_calls"] += 1
+        receipt = guest.request(case, {"command": "job", "plan_id": plan_id},
+                                allow_errors=("job_not_found",), timeout=min(60, remaining))
+        if receipt.get("ok") is False:
+            record["last_query_error"] = receipt
+            require(not accepted, f"Accepted managed auth journal disappeared: {receipt}")
+        else:
+            check_receipt(receipt)
+            accepted = True
+            record["journal_observed"] = True
+            record["last_receipt_id"] = receipt["id"]
+            record["last_status"] = receipt.get("status")
+            if receipt.get("status") not in ("accepted", "executing", "verifying"):
+                return receipt
+        time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+
 
 def resume_survivor(guest, case, mode):
     """Resume a worker that survived logout. A stopped worker is resumed with
@@ -531,33 +600,51 @@ def journey(guest, process, args, report):
     # route. KillUserProcesses=yes is the strict policy that matters for survival.
     report["supervised"] = [supervised_case(guest, kind, True)
                             for kind in ("system", "user", "setsid")]
-    # The original shell gains a shared profile AFTER an otherwise valid preview.
-    # A manager worker must preserve that presence and refuse official logout
-    # before durable accept. The fake Claude is inert and never makes requests.
+    # Unsafe official logout refuses at preview. For a supported local plan the
+    # manager still has to preserve the caller's private environment: a profile
+    # introduced after preview must appear as an observed, unverified source in
+    # the independent result, without exposing its value. The unknown fixture
+    # credential is outside the empty selection and must remain untouched.
     report["managed_auth_scope"] = {"stage": "prepare"}
     auth = guest.probe("prepare", "supervised-auth-scope")
     auth["as_root"] = True
+    # The auth-only case lives below /tmp, so the existing synthetic startup
+    # boundary can cover home/root/state without using the real PAM user's home.
+    report["managed_auth_scope"]["fixture_root"] = auth["base"]
     report["managed_auth_scope"]["stage"] = "register"
     environment = guest.request(auth, {"command": "register", "name": "Synthetic managed auth scope", "root": auth["root"]})
     report["managed_auth_scope"]["stage"] = "preview"
-    # Unbound cleanup previews inspect every system service; under TCG the
-    # read-only scan exceeded the generic 60s SSH budget. Use the same finite
-    # extended test budget family as the existing real service suite.
+    refused = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
+                                  "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True},
+                            expected_error="official_logout_scope_unsafe")
+    require(guest.probe("auth-scope-evidence") == {"credentials_preserved": True, "logout_called": False,
+                                                 "job_accepted": False, "environment_value_persisted": False},
+            "Unsafe logout preview produced a side effect")
+    # Safe cleanup previews inspect system services; under TCG the bounded
+    # read-only scan can exceed the generic 60s SSH budget.
     preview_started = time.monotonic()
     auth_plan = guest.request(auth, {"command": "plan_cleanup", "environment_id": environment["id"],
-                                     "recipe": "repair_login", "writers_confirmed_stopped": True, "official_logout": True}, timeout=180)
+                                     "recipe": "repair_login", "writers_confirmed_stopped": True,
+                                     "official_logout": False, "auth_source_ids": []}, timeout=180)
     preview_seconds = round(time.monotonic() - preview_started, 3)
     report["managed_auth_scope"]["preview_seconds"] = preview_seconds
     report["managed_auth_scope"]["stage"] = "submit"
-    refused = guest.request(auth, {"command": "execute", "plan_id": auth_plan["id"], "approval": auth_plan["hash"]},
-                            submit=True, extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"},
-                            expected_error="shared_auth_scope")
+    auth["plan"] = auth_plan
+    receipt = submit_managed_auth_once(guest, auth, report["managed_auth_scope"],
+                                      extra_env={"ANTHROPIC_PROFILE": "SYNTHETIC_PRIVATE_SCOPE_MUST_NOT_PERSIST"}, timeout=180)
+    require(receipt["status"] == "partially_completed" and receipt["local_cleanup"] == "completed", str(receipt))
+    profile = next(source for source in receipt["auth_verification"]["inventory"]["sources"]
+                   if source["kind"] == "process_env" and source["name"] == "ANTHROPIC_PROFILE")
+    require(profile["presence"] == "present" and profile["evidence"] == "observed_context"
+            and profile["actual_use"] == "unverified", f"Manager dropped the original profile context: {profile}")
     evidence = guest.probe("auth-scope-evidence")
     require(evidence == {"credentials_preserved": True, "logout_called": False,
-                         "job_accepted": False, "environment_value_persisted": False},
-            f"Managed auth context violated pre-accept/refuse/no-secret-persistence: {evidence}")
-    report["managed_auth_scope"] = {"expected_error": refused["error"]["code"], "preview_seconds": preview_seconds, **evidence,
-                                    "caller_environment_preserved": True, "real_claude_or_network_requests": False}
+                         "job_accepted": True, "environment_value_persisted": False},
+            f"Managed auth context violated source preservation or secret persistence: {evidence}")
+    report["managed_auth_scope"].update({"stage": "verified", "expected_error": refused["error"]["code"], **evidence,
+                                       "receipt_id": receipt["id"], "receipt_plan_id": receipt["plan_id"],
+                                       "receipt_status": receipt["status"], "local_cleanup": receipt["local_cleanup"],
+                                       "caller_environment_preserved": True, "real_claude_or_network_requests": False})
     guest.probe("configure-logind", "no")
     case = prepare_policy(guest, "reboot-interrupt")
     child, ack = guest.kept_submission(case, {"command": "execute", "plan_id": case["plan"]["id"], "approval": case["plan"]["hash"]})

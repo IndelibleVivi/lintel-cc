@@ -124,8 +124,9 @@ test('home schema projects only actual site and localized page facts with safe s
 });
 
 test('route map has exact locale mirrors, metadata and sitemap coverage', async () => {
-  assert.equal(SITE_ROUTES.length,20);
-  assert.equal(GUIDE_ARTICLES.length,15);
+  assert.equal(SITE_ROUTES.length,21);
+  assert.equal(GUIDE_ARTICLES.length,16);
+  assert.equal(GUIDE_ARTICLES.find(article=>article.key==='cleanup')?.doc,'cleanup');
   assert.equal(new Set(SITE_ROUTES.map(route=>route.key)).size,SITE_ROUTES.length);
   assert.equal(new Set(SITE_ROUTES.map(route=>route.path)).size,SITE_ROUTES.length);
   const sitemap=await readFile(new URL('../apps/site/sitemap.xml',import.meta.url),'utf8');
@@ -190,8 +191,8 @@ test('route map has exact locale mirrors, metadata and sitemap coverage', async 
     }
   }
   const sitemapUrls=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match=>match[1]);
-  assert.equal(sitemapUrls.length,40);
-  assert.equal(new Set(sitemapUrls).size,40);
+  assert.equal(sitemapUrls.length,42);
+  assert.equal(new Set(sitemapUrls).size,42);
   for (const block of [...sitemap.matchAll(/<url>(.*?)<\/url>/g)].map(match=>match[1])) {
     const location=/<loc>([^<]+)<\/loc>/.exec(block)?.[1];
     assert.equal((block.match(/<xhtml:link /g)||[]).length,3,`${location} has Chinese, English and default alternates`);

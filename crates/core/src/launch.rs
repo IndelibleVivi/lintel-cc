@@ -130,7 +130,7 @@ impl ResumeSupport {
 
 /// Directory identity for a config root: device, inode, birth time and owner. Frozen at
 /// preview and rechecked at execution so a same-path replacement is stale.
-fn dir_identity(path: &Path) -> Result<Value> {
+pub(crate) fn dir_identity(path: &Path) -> Result<Value> {
     use std::os::unix::fs::MetadataExt;
     let metadata =
         std::fs::metadata(path).map_err(|_| err("root_unreadable", "配置 root 不存在或不可读"))?;
@@ -151,7 +151,7 @@ fn dir_identity(path: &Path) -> Result<Value> {
 /// Executable identity: a regular executable owned by this user or a protected
 /// root installation, with size, mode and nanosecond change timestamps. A same-path, same-version replacement
 /// with different bytes changes the identity, so it is stale before launch.
-fn exec_identity(path: &Path) -> Result<Value> {
+pub(crate) fn exec_identity(path: &Path) -> Result<Value> {
     use std::os::unix::fs::MetadataExt;
     let metadata =
         std::fs::metadata(path).map_err(|_| err("executable_missing", "找不到客户端可执行文件"))?;
@@ -1201,6 +1201,7 @@ mod tests {
 
     #[test]
     fn reference_fields_cannot_carry_body_or_unbounded_values() {
+        use std::os::unix::fs::PermissionsExt;
         for entry in [
             json!({"path":"p","digest":"a".repeat(64),"body":"secret"}),
             json!({"path":"p","digest":"a".repeat(64),"package_digest":"secret"}),
@@ -1216,7 +1217,14 @@ mod tests {
         ] {
             assert!(normalize_input_reference(Some(&json!({"files":[entry]}))).is_err());
         }
-        assert!(exec_identity(Path::new("/usr/bin/true")).is_ok());
+        // Host tool ownership is not a portable fixture (container mounts may
+        // map it to a non-root UID). Exercise the same identity contract using
+        // an owned inert executable without invoking anything on the host.
+        let temporary = tempfile::tempdir().unwrap();
+        let executable = temporary.path().join("synthetic-client");
+        std::fs::write(&executable, b"#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(exec_identity(&executable).is_ok());
     }
     #[test]
     fn resume_format_rejects_unknown_and_accepts_known_declared_version() {

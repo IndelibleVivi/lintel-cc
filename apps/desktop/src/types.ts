@@ -69,6 +69,7 @@ export interface WorkInventory {
   reason?:string|null;unobserved?:string|null;
 }
 export interface Plan {
+  authentication?: AuthenticationPlan;
   network?: NetworkPlan;
   lightweight_changes?:{status:string;changes:unknown[]};
   id: string; hash: string; environment_id: string | null; title: string;
@@ -96,6 +97,7 @@ export interface LaunchRecord {
   request_id:string; status:string; mode?:string; environment_id?:string; root?:string; config_root?:string; project_cwd?:string; executable?:string; recorded_at?:string; created_at?:string; message?:string; observed?:string; private_copy_path?:string; alias?:string; runner_digest?:string|null; binding_resolution?:string; error?:{code:string;message:string};
 }
 export interface Receipt {
+  auth_verification?: AuthenticationVerification;
   network_change?: NetworkChange;
   before_probe?: NetworkProbe;
   after_probe?: NetworkProbe;
@@ -115,7 +117,37 @@ export interface Receipt {
   coverage?: Record<string, unknown>; next_steps?: string[]; task_outcome?: string; outcome?: string;
   local_cleanup?: string; remote_revocation?: string; state_archive_path?: string; new_environment_id?: string; new_root?: string; archive_path?: string; archive_digest?: string;
 }
-export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; coverage: string }
+export interface CleanupInspection { environment_id: string; files: {path: string; category: string; present: boolean}[]; writers: {pid: string; name: string; scope: string}[]; shared_profile_present: boolean; official_logout_available: boolean; auth_probe_available?:boolean;auth_inventory_available?:boolean;coverage: string }
+// Sanitized locations and evidence, never credential values or helper bodies.
+export interface AuthenticationSource {
+  id:string;kind:string;name?:string;path?:string|null;locator?:string|null;
+  evidence:'confirmed_present'|'observed_context'|'declared'|'inaccessible'|'unknown'|'not_found'|string;
+  presence:'present'|'absent'|'unknown'|string;scope:string;removable:boolean;default_selected?:boolean;
+  value_state?:'empty'|'nonempty'|'non_string'|'not_set'|string;
+  reason?:string|null;next_action?:string|null;
+  actual_use?:string;locations?:{line:number}[];
+}
+export interface AuthenticationInventory {
+  schema:'lintel.auth-sources/1';environment_id?:string;root?:string;config_root?:string;checked_at?:string;
+  sources:AuthenticationSource[];context?:Record<string,unknown>;limits?:Record<string,unknown>|string[];
+  error_code?:string;coverage?:string;
+}
+export interface AuthenticationObservation {
+  auth_method:string;logged_in:boolean;identity_observed?:boolean;remote_revocation?:string;
+  config_directory?:string;context_scope?:string;
+}
+export interface AuthenticationPlan {
+  schema:string;selected_sources:AuthenticationSource[];local_source_count:number;
+  context:Record<string,unknown>;runtime_verification_requested:boolean;boundaries:string[];
+}
+export interface AuthenticationVerification {
+  schema:string;checked_at:string;environment_id?:string;original_job_id?:string|null;
+  local_sources:{id:string;kind:string;path?:string|null;locator?:string|null;state:'removed'|'still_present'|'changed'|'unknown'|'not_selected'|string;detail?:string}[];
+  inventory:AuthenticationInventory;
+  runtime:{state:'not_requested'|'observed'|'unavailable'|string;observation?:AuthenticationObservation;error_code?:string};
+  other_contexts:string;server_revocation:string;
+  retained_sensitive_material:{path:string;state:string}[];coverage:string;
+}
 // Bounded read-only local-data / identity observation (core `residue.rs`).
 // Every location comes from a finite known table; `class` decides the category
 // grouping in the App and, with `state`, what an action may do. Nothing outside
@@ -266,8 +298,10 @@ export interface Api {
   service_inspect: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: ServiceInspection };
   plan_service_quiesce: { request: { environment_id: string; manager: ServiceManager; unit: string }; response: Plan };
   plan_service_resume: { request: { job_id: string }; response: Plan };
-  auth_probe: { request: { environment_id: string }; response: { auth_method: string; logged_in: boolean; identity_observed?: boolean; remote_revocation: string } };
-  plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire' | 'clear_residue'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[]; residue_paths?: string[]; archive_before_clear?: boolean;archive_only?:boolean;extra_roots?:string[];delete_work?:boolean; activate?:{instructions:boolean} }; response: Plan };
+  auth_probe: { request: { environment_id: string }; response: AuthenticationObservation };
+  auth_inventory: {request:{environment_id:string;project_cwd?:string};response:AuthenticationInventory};
+  auth_verify: {request:{environment_id:string;job_id?:string;observe_runtime?:boolean};response:AuthenticationVerification};
+  plan_cleanup: { request: { environment_id: string; recipe: 'repair_login' | 'reset_client' | 'retire' | 'clear_residue'; writers_confirmed_stopped: boolean; official_logout: boolean; categories: string[]; auth_source_ids?:string[];project_cwd?:string;verify_auth_status?:boolean;residue_paths?: string[]; archive_before_clear?: boolean;archive_only?:boolean;extra_roots?:string[];delete_work?:boolean; activate?:{instructions:boolean} }; response: Plan };
   reactivate_environment: { request: { environment_id: string }; response: { status: string } };
   archive_inspect: { request: { job_id?: string; archive_path?: string; archive_passphrase: string }; response: ArchiveManifest };
   archive_read: { request: { job_id?: string; archive_path?: string; archive_passphrase: string; path: string }; response: { path: string; text: string; bytes: number; truncated: boolean } };

@@ -202,7 +202,7 @@ Oversize/budget errors refuse complete archiving, retain originals, narrow categ
 
 Each unlock/list/read/import fully authenticates every file/tail even for one selected category/page, then reads finite staging windows. Large pages still cost whole decrypt/time. State needs expanded originals, target cipher/temp disk. Normal errors/exits clean staging; kills may leave private .lintel-work-stage-* without historical sweeping, not durable backup. SSH 60s/2MiB may transport_unknown without corruption; target CLI checks, accepted original query-only. Reader bounds metadata/cipher/scrypt log N≤20, refusing expensive packages without weakening; age KDF still consumes memory. Older readers may reject new capacity; use matching newer version.
 
-State backup is distinct, no automatic mixed-state import or full auth/config/cloud restoration. Its path persists before writing; only step readback completes. Interruptions query/check, never repeat cleanup.
+State backups in historical receipts remain distinct from work archives, with no automatic mixed-state import or full auth/config/cloud restoration. Authentication cleanup in the November 13, 2026 development source no longer creates these credential-containing backups. A historical path may record intent before writing; only step readback proves completion. After interruption, query and inspect the original task without repeating cleanup.
 
 ### 3.5 Build new context from originals
 
@@ -229,31 +229,39 @@ No real login in this development. Official entry/inert argument correctness/rea
 <a id="cleanup"></a>
 ## 4. Login repair, old state and retirement
 
-Choose exact scope. Network errors/failed responses are not automatically bans; local identified-state handling never changes server account status.
+This section describes the November 13, 2026 development source; the published App 0.1.1/CLI 0.1.0 retain their earlier capabilities. See [Authentication sources and cleanup](cleanup.en.md) for the complete scope matrix and CLI examples. Network errors or failed responses are not automatically bans; local cleanup never changes server account status.
 
 | Recipe | Actual scope | Remaining checks |
 | --- | --- | --- |
-| Repair local login | Previewed credential files, optional official logout | Keychain/outside auth/server revocation |
-| Clean and rebuild | Encrypted work/mixed-state backup, exact files, new root/import | Launch/login/browser/independent scopes |
-| Retire | Exact state plus disabled Lintel launch entry, originals retained | Not uninstall/whole-root deletion/deleted-credential recovery |
+| Repair local login | Select supported login fields, user-settings declarations and simple shell assignments | Current executor, Keychain, other contexts and server revocation separately |
+| Clean and rebuild | Preserve encrypted work, create/import into a new root, then handle approved authentication sources | Launch/login/browser and independent scopes |
+| Retire | Preserve work, handle selected sources, disable the Lintel launch entry; keep original directory | Other launchers separately; deleted credentials cannot be automatically restored |
 
-Repair targets .credentials.json; others also previewed .claude.json, differing default/dedicated roots. No whole-machine Claude cleaner.
+### Understand potential authentication sources
 
-Local-scope rows initially show a filename and presence. Expand a row for the full path and confirm the exact target before preview.
+The list distinguishes identified local sources, variables observed in the App/runner environment, declarations, inaccessible/unattributed sources and other uncovered contexts. Presence is separate from use. `setup-token` prints a token without saving it; a shell, settings file, IDE, service or CI system determines its later injection point. Expand each row for location, shared effects and limitations.
 
-1. Confirm host/environment/root, choose recipe.
+New authentication cleanup edits supported fields or assignments, preserving unrelated configuration, MCP/plugins and work. `.credentials.json` recognition is limited to `claudeAiOauth`, and the target `.claude.json` to `primaryApiKey`; all other fields remain intact. Dynamic shell syntax, helper-backed storage, Keychain and shared profiles are never guessed deletion targets. The inventory executes no helper/shell and returns no tokens. Official runtime status is a separate explicit action.
+
+1. Confirm host, environment and full root; default and custom `CLAUDE_CONFIG_DIR` targets are distinct.
 2. Close target terminals/IDE/restarters; systemd requires §5.3 independent pause.
-3. Refresh exact files/existence/writers, confirm stopped. Running/unassignable writers block; checkbox never bypasses checks.
-4. Optional explicit auth inspection runs official command, unlike discovery. Optional official logout may contact server; shared/external/unverifiable sources block.
-5. Rebuild/retire need ≥1 work category/passphrase; empty selection blocks. Repair no archive required. Preview exact handled/retained/irreversible scope then approve.
-6. Read steps/local/server/archive/new-root. Selected local completion can be main success while coverage says logout not requested/server unchecked and raw status remains. Official logged-out is still unverified server token revocation.
+3. Refresh sources, select supported rows and review locations, evidence, shared effects and writers. Confirm writers stopped. Known running or unattributed writers block; the checkbox never overrides checks.
+4. Explicitly request the official CLI status when needed. The normal inventory and default recheck never run Claude. The report represents only this App/runner context, not all terminals or IDEs.
+5. Rebuild/retire still require at least one work category and passphrase; empty selection blocks. Repair needs no work archive. Review exact sources, preservation order, retained items and unknowns, then approve once.
+6. Read steps and fresh observations: selected local sources, authentication remaining in this executor, uncovered contexts and server revocation. A handled file and remaining authentication can coexist; do not automatically delete again.
 7. Browser login separately §2.3; normal official new-root login by user.
 
-Official claude.ai logout needs nonempty email or auth_identity_unverified. You may omit logout/local files only. Private salted full-state digest stores no email/raw output; UI only subject-observable. Before execute/after preservation/prelogout rechecks auth/files: account/organization/any observed field changes stale_auth, credentials/new fallback stale_plan. Completed artifacts stay. Old unattempted bindings need preview, accepted originals query without logout replay. Status consistency is not provenance/Keychain-only same-account token generation; last-check/logout has no complete external-writer atomic guarantee. Real Keychain/fallback/revocation separately accepted.
+**Official logout limitation:** Current Anthropic documentation says `/logout` also removes saved MCP logins and plugin sensitive values; see the [evidence record](credential-provenance-evidence.en.md). To preserve that material, this development refuses automatic logout with `official_logout_scope_unsafe`. It does not substitute whole-file or guessed Keychain deletion. Review the official procedure and reauthorization effects separately before handling Keychain. Lintel continues to show this scope as unverified.
 
-Order: state/work backups → rebuild create/import → chosen logout/verification → exact removals → retirement entry disable. Late logout failure retains archive/root/completed steps/code/phase/recovery and stops deletion. Original query never recreates/logs out. Changed preview objects/program/auth require repreview; uncertain accepted IDs query first. New/reappearing state stays and stops actions. Quarantine paths remain for inspection, never overwrite replacement files to restore.
+**Secret handling:** New authentication edits create no old-token recovery backup and store no before/after content, helper body or variable value in public plans, logs or receipts. Necessary conflict bindings remain private. The original file temporarily moves into a private directory and is removed after successful readback. Interruption or conflict may leave credential-containing originals/staging; `retained_sensitive_material` explicitly reports them and prevents a completion claim. Historical backups are not silently swept; approved work still uses its separate encrypted archive.
+
+Order: work preservation for rebuild/retire → create/import for rebuild → exact authentication edits → disable entry for retirement → independent recheck. A later failure retains completed archives, roots, steps and structured errors. Querying never repeats mutations.
+
+Changed source files or executables require a new preview; uncertain accepted IDs require original-job lookup first. New state stays intact. Old unexecuted cleanup plans without the new binding require a fresh preview; accepted tasks remain query-only. Old raw callers may omit additive fields, but newly generated plans select only recognized target-local login fields by default and no longer delete mixed credential/client-state files wholesale.
 
 Settings restore separately; deleted credentials/browser data no undo. Reactivate restores registry/launch eligibility, not credentials; login again if needed. Paused service independently restores, never on window/cleanup completion. Full Desktop/IDE/macOS-service/other-supervisor discovery/stop is incomplete; independently inspect actual chain.
+
+Removing shell/settings declarations does not clear existing process environments. Restart the actual terminal, IDE or service and check again. Local absence does not revoke copies on another machine or in CI. Independent `auth_verify` defaults to static rereading; explicit runtime status is covered in the [CLI guide](cleanup.en.md#inspect-select-and-approve-with-the-cli).
 
 <a id="remote"></a>
 ## 5. Manage VPS and services from Mac

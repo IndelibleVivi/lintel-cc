@@ -1,0 +1,62 @@
+# Credential provenance: evidence and implementation boundaries
+
+November 13, 2026 · Engineering evidence record · [中文](credential-provenance-evidence.md). This document separates official mechanisms, Lintel's product decisions and missing device evidence. For user operations, see the [cleanup guide](cleanup.en.md). The additions belong to development source and are absent from the published App 0.1.1 and CLI 0.1.0.
+
+## 1. How evidence was obtained
+
+The review used current official Anthropic documentation and the repository's `cleanup.rs`, `components.rs`, `startup.rs`, App cleanup flow and operation contracts. The retrieval date is November 13, 2026. Version numbers below are prerequisites stated by the documents, not versions executed during this review. No real Claude process, login, logout, Keychain operation or model request was used. Development tests use synthetic roots and inert adapters.
+
+Current documents may change and do not specify every historical client. Finite source recognition, observations from the current executor, explicit CLI status and real-client behavior remain separate evidence levels.
+
+## 2. Official sources and decisive facts
+
+| Source | Fact used in this development | Consequence for Lintel |
+| --- | --- | --- |
+| [Authentication](https://code.claude.com/docs/en/authentication#generate-a-long-lived-token) | `setup-token` generates a one-year OAuth token and prints it for later environment injection. The command does not save it | There is no invented setup-token file rule. Inspect later injection locations |
+| [Authentication: credential management](https://code.claude.com/docs/en/authentication#credential-management) | macOS uses Keychain. If writes are rejected, login may use a file fallback. `CLAUDE_CONFIG_DIR` affects both the fallback and Keychain entry selection | Locate default and custom roots separately. File absence does not exclude Keychain; do not guess its item names |
+| [CLI reference](https://code.claude.com/docs/en/cli-reference) | `auth status` returns JSON; exit codes 0/1 mean logged in/out. `configDirectory` requires v2.1.268+. Listed methods are `none`, `claude.ai`, `oauth_token`, `api_key`, `api_key_helper`, `third_party` | Parse a finite schema and require the selected root. Unknown output cannot prove logout. Publish limited status and discard identity fields/raw output |
+| [Environment variables](https://code.claude.com/docs/en/env-vars) | `CLAUDE_CODE_OAUTH_TOKEN` precedes Keychain; refresh token/scopes support automatic login. Removing a settings variable does not unset an existing session's environment. Path values do not expand `~` or `$HOME` | Restart the relevant context after editing declarations. Never execute shell startup to manufacture an effective-environment claim |
+| [Settings reference: env/apiKeyHelper](https://code.claude.com/docs/en/settings-reference) | `env` usually overrides shell values, with Desktop/host-launch exceptions. Project/local settings ignore OAuth injection variables. `apiKeyHelper` is a shell command that can obtain dynamic credentials | Separate a declaration from use. Read-only inventory never executes the helper or returns its body |
+| [Settings files and precedence](https://code.claude.com/docs/en/settings) | User, project, local, managed and one-off `--settings` are distinct inputs. The `/status` settings source list cannot attribute every field | Bounded scans identify candidates. Command arguments, MDM, server-managed policy and unselected projects can still change authentication |
+| [VS Code](https://code.claude.com/docs/en/vs-code) | The extension bundles its own CLI and can inject `claudeCode.environmentVariables`. GUI launches may not inherit shell values. Its `CLAUDE_CONFIG_DIR` must be absolute | The Lintel GUI, Terminal, IDE and SSH runner environments are not interchangeable; one executor cannot establish a machine-wide result |
+| [WIF reference: profiles](https://platform.claude.com/docs/en/manage-claude/wif-reference#profile-configuration-file) | `ANTHROPIC_CONFIG_DIR`, or macOS/Linux default `~/.config/anthropic`, selects the directory. `configs/<profile>.json` holds configuration; `credentials/<profile>.json` holds cached tokens. Names derive from `ANTHROPIC_PROFILE`, `active_config` or `default` | Profiles can be shared by Claude Code, SDKs and `ant`. Metadata observation grants no deletion authority and does not read token files |
+| [Troubleshoot installation and login](https://code.claude.com/docs/en/troubleshoot-install) | The Keychain recovery instructions explicitly say `/logout` also removes saved MCP server logins and plugin sensitive values | No documented official logout parameter was found that limits removal to Claude login while preserving those credentials. This development refuses the broader automatic action |
+
+## 3. What precedence establishes
+
+The ordinary CLI order in [Authentication precedence](https://code.claude.com/docs/en/authentication#authentication-precedence) is: selected cloud provider, `ANTHROPIC_AUTH_TOKEN`, adopted `ANTHROPIC_API_KEY`, `apiKeyHelper`, `CLAUDE_CODE_OAUTH_TOKEN`, profile/federation, ordinary login. Interactive API-key adoption differs from noninteractive behavior, and gateway login has separate precedence. Profile authentication mode, explicit naming, existing login and host surface also affect selection.
+
+Inventory therefore does not implement a simplified ranking that claims to identify the active source. It can report a variable's presence and empty/nonempty value state in Lintel, a helper declaration, or a credential container. `presence` records existence; `value_state` distinguishes empty, nonempty, unset and non-string values. Neither proves valid authentication. Only an explicitly requested official status command produces a client report for that executor, root and time. Even `oauth_token` does not prove a particular shell file supplied the token or that `setup-token` generated it; another OAuth access token can use the same variable.
+
+Helper bodies, variable values, account identities and tokens never enter inventory, previews, ordinary records or logs. Unreadable or malformed sources remain unknown without revealing an excerpt for troubleshooting. Source IDs select structural locations within a host/environment; they are not transferable credential fingerprints.
+
+## 4. Two product decisions
+
+### Precisely edit identified sources
+
+Source selection uses the existing `plan_cleanup`, approval, execution and receipt authority. A supported source needs an exact location, finite syntax, current file identity and content binding. Shared files change only within the frozen scope. Shell command substitution, control structures, functions, dynamic injection, unattributed Keychain objects and shared profiles remain unsupported for automatic removal; no content is executed to fill an evidence gap.
+
+The cited official documents do not define a stable, complete private credential schema. This implementation recognizes `.credentials.json`'s `claudeAiOauth` slot and a string `primaryApiKey` in client state while preserving all other fields. That is finite implementation support, not a complete model of every version, API-key or MCP store. Unrecognized formats report a limitation. Default-root client state is `~/.claude.json`; a custom root uses its own `.claude.json`. Deleting either whole file would expand into unknown data and is not an implementation of selected-source cleanup.
+
+Authentication cleanup creates no token-recovery backup. The replacement is computed in bounded memory; private persistent bindings contain salted digests, locators and identity metadata. The transaction moves the original into private staging beside the source, then publishes a replacement without overwriting another writer. That replacement can contain non-target credentials which must be preserved. Successful readback removes the original; interruption or conflict reports retained originals/staging in `retained_sensitive_material` and prevents a completion claim. If staging is renamed/replaced and identity is lost, `location_unknown` retains only the last known location, without scanning or treating the missing old path as proof of destruction. Public plans and receipts never include before/after content, and non-target secrets do not enter logs or an additional recovery package. Query the original task after interruption; replaying cleanup cannot establish certainty.
+
+### Refuse automatic official logout with broader effects
+
+The user explicitly required preservation of MCP and other work. The documented extra effects of `/logout` conflict with that scope. CLI `auth logout` has no verified adapter meeting the preservation requirements, and this development performed no real-client trial of either entry. A new request for automatic logout returns `official_logout_scope_unsafe`. An old unexecuted plan without the new safety binding, or one requiring logout, returns `stale_auth_plan` and requires a fresh preview. Accepted original jobs remain queryable. The old optional logout path must not be described as a newly verified safe mechanism, and a generic checkbox does not resolve its collateral effects.
+
+Keychain is consequently still unverified, with separate handling required. A user can choose official authentication management after reviewing MCP/plugin reauthorization effects; Lintel does not initiate it or interpret the result as proof of server-side revocation. If Anthropic supplies a scoped mechanism later, integration requires a version binding, attribution and device acceptance first.
+
+## 5. Four independent verification conclusions
+
+1. **Selected local sources:** whether the frozen assignment/JSON field remains at its original location. New writes, unreadable sources and unfinished edits retain their own status.
+2. **Current executor:** whether this App/runner still inherits relevant variables and whether optional official status reports authentication. Lintel cannot rewrite a parent shell or other existing processes.
+3. **Other contexts:** Terminal, IDEs, custom launchers, services, other hosts, CI and administrator injection require separate checks. Absence from this observation is not universal absence.
+4. **Server revocation:** without independent server evidence, this remains unverified. A missing local declaration does not prove token invalidity.
+
+Completed selected local steps and remaining authentication can both be true. Independent `auth_verify` rereads sources instead of copying the cleanup receipt. Only explicit `observe_runtime` runs the official command, before the final local reread so status/helper credential regeneration can be observed; that command is not a purely static observation. Verification errors and uncovered sources must never become a green success claim.
+
+## 6. Versions and further evidence
+
+This review obtained no device evidence establishing an installed Claude version and found no official parameter limiting logout collateral. Issue reports can suggest hypotheses, but without running-version and attribution evidence they cannot establish Keychain deletion rules. Future macOS acceptance must separately cover default/custom roots, accessible/locked Keychain, file fallback coexistence, launch-environment differences and preservation of MCP/plugin login. Linux synthetic success does not establish those outcomes.
+
+This record does not certify an App/CLI release, website deployment or real-user cleanup. [current-state.md](current-state.md) tracks exact engineering checks, commits and release status.

@@ -4,7 +4,7 @@
   "operator-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md",
   "policy-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#protect",
   "work-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#work",
-  "cleanup-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#cleanup",
+  "cleanup-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/cleanup.md",
   "recovery-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/operator-guide.md#recovery",
   "agent-guide": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/agents.md",
   "remote-setup": "https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/remote.md",

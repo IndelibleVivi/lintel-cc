@@ -87,6 +87,8 @@ lintel schema plan_policy
 lintel env list --json
 lintel env inspect &lt;environment-id&gt; --json
 lintel env components &lt;environment-id&gt; --project-cwd /synthetic/project --json
+lintel auth inventory --environment &lt;environment-id&gt; --json
+lintel auth verify --environment &lt;environment-id&gt; --json
 lintel work preflight --environment &lt;environment-id&gt; --categories instructions,memory,sessions --json
 lintel work inventory --environment &lt;environment-id&gt; --categories memory,sessions --json
 lintel work archive plan --environment &lt;environment-id&gt; --categories memory,sessions --path projects/synthetic/memory/MEMORY.md --path projects/synthetic/session.jsonl --json
@@ -101,7 +103,16 @@ lintel capabilities --environment &lt;environment-id&gt;</code></pre>
 <p>外层 <code>remote.execute</code> / <code>remote.reconnect</code> 的 <code>plan_id</code> 与 <code>remote.launch</code> 的 <code>environment_id</code> 也共用这条 UUID 规则，在本地记录或 SSH 前检查。<code>install_id</code> 属于安装 controller 的独立受限标识规则，使用安装预览返回值。</p>
 <p>Named execute 与有限远端新提交的 <code>approval</code> 必须是原计划返回的 64 位 lowercase hex hash。格式错误在初始化 named core 或创建远端任务 intent／调用 SSH 前拒绝，格式合法仍须由 core 核对准确 plan.hash 与当前目标。已有远端任务记录的重复 execute 保持 query-only，不因参数错误删除记录或重发；原 ID 的 reconnect 是明确恢复入口。</p>
 <p>专用真实 TTY <code>lintel launch ID</code> 与 <code>capabilities --environment ID</code> 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 <code>invalid_request</code>，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。</p>
-<p><code>env list</code> 和 <code>discover</code> 可能登记已发现的默认根并保存 inventory；<code>job</code> 查询可能持久标记中断。<code>auth_probe</code> 会显式运行官方认证状态命令，并以 <code>identity_observed</code> 布尔值说明主体是否可核对；官方注销的主体缺失会拒绝预览，认证状态变化会使旧批准失效。未执行旧注销计划缺少绑定时需要新预览，已接受任务仍只查询原 ID。<code>archive_read</code> 返回工作正文。不要把它们都当成无副作用元数据操作。<code>discover</code> 快捷入口与 <code>request</code> JSON discover 返回同一 runner capability 集合。</p>
+<p><code>env list</code> 和 <code>discover</code> 可能登记已发现的默认根并保存 inventory；<code>job</code> 查询可能持久标记中断。<code>auth_inventory</code> 和默认 <code>auth_verify</code> 有界读取认证来源，不运行客户端；显式 <code>auth_probe</code> 或 <code>auth_verify.observe_runtime:true</code> 才执行官方状态命令，并以 <code>identity_observed</code> 布尔值说明主体能否核对。结果属于当前执行器，不能代表其他 Terminal／IDE。<code>archive_read</code> 返回工作正文。不要把它们都当成无副作用元数据操作。<code>discover</code> 快捷入口与 <code>request</code> JSON discover 返回同一 runner capability 集合。</p>
+<h3 id="认证来源与清理11-13-开发源码">认证来源与清理（11-13 开发源码）</h3>
+<p>公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。<code>auth_inventory(environment_id, project_cwd?)</code> 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；<code>auth_verify(environment_id, job_id?, observe_runtime?)</code> 独立重读，默认 <code>observe_runtime:false</code>。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，Keychain／共享 profiles／动态注入保留未知范围。</p>
+<pre class="guide-code" data-language="sh"><code>lintel auth inventory --environment &lt;environment-id&gt; --project-cwd /synthetic/project --json
+lintel auth cleanup plan --environment &lt;environment-id&gt; --recipe repair_login --writers-confirmed-stopped --auth-source &#39;&lt;source-id-from-inventory&gt;&#39;
+lintel plan show &lt;returned-plan-id&gt;
+lintel job submit --plan &lt;returned-plan-id&gt; --approval &lt;returned-plan-hash&gt;
+lintel auth verify --environment &lt;environment-id&gt; --job &lt;original-job-id&gt; --json</code></pre>
+<p><code>--auth-source</code> 可重复，映射 <code>plan_cleanup.auth_source_ids</code>；仍由同一清理 engine 冻结、批准和执行。<code>--verify-auth-status</code>／独立 verify 的 <code>--observe-runtime</code> 才请求官方状态；普通 inventory 不执行 shell、helper 或 Claude。完整字段和原始 <code>call</code> 示例见<a href="/guide/cleanup/">认证清理指南</a>。未选择支持来源不会扩大为任意文件删除。</p>
+<p>新清理只编辑已识别 <code>claudeAiOauth</code>／<code>primaryApiKey</code>、所选用户 settings 认证字段／helper 及受支持的简单 shell 赋值，保留其他字段、MCP／插件与工作。认证清理不备份旧 token；中断编辑可能保留原文件的私有暂存，结果以 <code>retained_sensitive_material</code> 明确列出而不报完成。当前官方 logout 还删除 MCP 登录／插件敏感值，所以 <code>official_logout:true</code> 返回 <code>official_logout_scope_unsafe</code>，不运行命令。旧已接受任务继续 query-only；旧未执行计划缺新绑定须重新预览。旧 raw caller 省略新字段时，新计划仅默认选择可精确识别的目标本地登录字段，这是一项明确安全收紧。</p>
 <p>普通命令 stdout 只有一个 JSON envelope，<code>ok:false</code> 退出非零，诊断走 stderr。专用 <code>launch</code> 是交互进程接管入口，启动失败诊断写 stderr。<code>network serve</code> 是唯一这里明确使用 NDJSON stream 的长期入口。<code>ok:true</code> 说明请求处理成功；任务是否完成由 <code>data.status</code>、steps、coverage 和 error 判断。</p>
 <h2 id="本地清单与脱敏快照">本地清单与脱敏快照</h2>
 <p>当前源码的本地观察入口共用 core；远端先通过目标 runner 的 <code>describe</code>／<code>schema</code> 核对支持，旧 runner 不会因 App 升级自动具备新命令。</p>
@@ -160,8 +171,8 @@ JSON
 lintel call service_inspect &lt;&lt;&#39;JSON&#39;
 {&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;manager&quot;:&quot;user&quot;,&quot;unit&quot;:&quot;example.service&quot;}
 JSON</code></pre>
-<p>先 <code>describe</code> / <code>schema</code>，再从真实 inspection 准备准确计划。清理顺序为状态备份/工作归档 → 新根迁入（reset_client）→ 官方注销（若批准）→ 精确文件处理 → 退役（若选）。没有“全环境 export”“全局杀 Claude”“恢复全部”。service pause/resume 是独立批准任务，不自动改绑新根。</p>
-<p>旧 <code>request</code>、<code>submit</code>、<code>discover</code>、<code>inspect ID</code>、<code>jobs</code>、<code>job ID</code>、<code>launch ID</code>、<code>tui</code> 保留。协议 1 raw core request 保留历史 defaults；named CLI 和有限 SSH 使用明确严格字段，不会静默收紧已有 raw caller。<code>request</code> 的 execute 为前台处理；后台原 ID 回收使用 submit。<code>launch</code> 需要真实 TTY、不接受 prompt，启动的是准确程序和配置根，不能用于后台 mutation。旧 plan_reset/rebuild 及历史“部分完成”回执不改写为新 preservation outcome。</p>
+<p>先 <code>describe</code> / <code>schema</code>，再从真实 inspection 准备准确计划。认证清理顺序为工作加密保全（reset/retire）→ 新根迁入（reset_client）→ 精确认证来源编辑 → 退役（若选）→ 独立复查；不自动注销、不新备份 token、不整删混合凭据／客户端状态。没有“全环境 export”“全局杀 Claude”“恢复全部”。service pause/resume 是独立批准任务，不自动改绑新根；独立 residue／identity 保全遵守各自既有契约。</p>
+<p>旧 <code>request</code>、<code>submit</code>、<code>discover</code>、<code>inspect ID</code>、<code>jobs</code>、<code>job ID</code>、<code>launch ID</code>、<code>tui</code> 保留。协议 1 raw core request 保留未受本节明确认证安全收紧影响的历史 defaults；named CLI 和有限 SSH 使用明确严格字段。<code>request</code> 的 execute 为前台处理；后台原 ID 回收使用 submit。<code>launch</code> 需要真实 TTY、不接受 prompt，启动的是准确程序和配置根，不能用于后台 mutation。旧 plan_reset/rebuild 及历史“部分完成”回执不改写为新 preservation outcome。</p>
 <a id="portable-work"></a>
 <h2 id="秘密-stdin-与-portable-work">秘密 stdin 与 portable work</h2>
 <p>秘密只经一次性 JSON stdin，不进入 argv、shell history、永久 request file、plan 或 receipt。手工使用下面的 Python <code>getpass</code>（从控制终端无回显读取），也可使用已有获准的秘密输入管道；不要启用会打印输入的 shell tracing。</p>

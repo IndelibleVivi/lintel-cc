@@ -12,6 +12,8 @@ Lintel provides a macOS app and a standalone CLI for reviewing configuration and
 
 The six reliability fixes and bounded-history changes on `main` are unreleased. The public App remains 0.1.1 and the independent CLI remains 0.1.0. `c7680f0` completed a local fresh-clone/fresh-target build of all three CLI platforms and the macOS App/DMG, reusing downloaded dependencies. See [current state](docs/current-state.md) for the exact candidate source and full-CI status. Building does not establish App installation, clean-Mac trust acceptance or a Release.
 
+**November 13 development: authentication sources and post-cleanup checks.** App and CLI inspect bounded credential sources, select supported exact fields or shell assignments, and use one existing plan/approval/execution path followed by a fresh check. Results distinguish local sources, the current execution environment, other contexts and server revocation. `setup-token` has no fixed saved file; Keychain and shared-profile gaps remain visible. Because official logout also affects MCP/plugin credentials, the development version refuses automatic logout and does not substitute whole-file deletion. See the [authentication cleanup guide](docs/cleanup.en.md) for behavior and compatibility. This work is not in the public 0.1.1 App.
+
 [First use](docs/start-here.en.md) · [Choose a task](docs/operator-guide.en.md) · [Use with an agent](docs/agents.en.md) · [Architecture](docs/architecture.en.md)
 
 ![The real Lintel macOS app: synthetic environment, English interface](assets/preview/screenshots/native-home.en.jpg)
@@ -24,7 +26,7 @@ A real WebKit capture of the local unsigned candidate, using synthetic data. See
 | --- | --- | --- |
 | Reduce outbound traffic while keeping needed features | Protection presets, individual settings, a controlled proxy and egress tests | [Protection](docs/operator-guide.en.md#protect) |
 | Preserve work or prepare a new environment | Exact selection of instructions, memory and sessions; encrypted archives, independent reading and selective import | [Work preservation](docs/operator-guide.en.md#work) |
-| Repair local login, clean state or retire an environment | A preview of exact file and authentication scope; required preservation before deletion | [Cleanup](docs/operator-guide.en.md#cleanup) |
+| Repair local login, clean state or retire an environment | Bounded authentication inventory, exact selection, one approved plan and independent post-cleanup check; preserve work before rebuilding | [Cleanup](docs/operator-guide.en.md#cleanup) / [Development authentication sources](docs/cleanup.en.md) |
 | Manage one browser profile | Extension/host pairing, profile permissions and site state | [Browser](docs/browser.en.md) |
 | Operate an SSH host from a Mac or CLI | Verify the remote runner, execute on the target host, query the original task after disconnecting | [Remote](docs/remote.en.md) |
 | Retrieve results or restore settings and services | Original task records, drift checks, field-level restore and restoration of explicitly bound systemd services | [Recovery](docs/operator-guide.en.md#recovery) |

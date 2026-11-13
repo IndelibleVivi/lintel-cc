@@ -26,6 +26,7 @@ function invoke(command,args){
     case 'jobs':data={jobs:receipts};break;
     case 'inspect':data={environment,settings:[],assets:[],warnings:[]};break;
     case 'cleanup_inspect':data={environment_id:environment.id,files:[],writers:quiesced?[]:[{pid:123,name:'claude',scope:'not_attributed'}],shared_profile_present:false,official_logout_available:false,coverage:'Synthetic files only'};break;
+    case 'auth_inventory':data={schema:'lintel.auth-sources/1',sources:[{id:'synthetic-auth-source',kind:'credential_field',name:'claudeAiOauth',path:'/synthetic/config/.credentials.json',locator:'/claudeAiOauth',evidence:'confirmed_present',presence:'present',scope:'selected_root',removable:true,default_selected:true,reason:'known_claude_login_field'}],context:{execution:'current_lintel_process',inherited_config_dir:'not_set'},limits:{bounded_scan_complete:true,coverage_complete:false}};break;
     case 'service_inspect':
       assert.equal(p.environment_id,environment.id);assert.equal(p.unit,held.unit);
       data={environment_id:environment.id,manager:p.manager,unit:p.unit,root:environment.root,active_state:quiesced?'inactive':'active',sub_state:quiesced?'dead':'running',unit_file_state:'enabled',restart:'always',main_pid:quiesced?0:123,control_group:'/synthetic.slice/target',triggered_by:['claude-work.timer'],bound:true,quiesced,quiesce_job_id:quiesced?quiesceId:null,hold:quiesced?held.hold:null,limitations:['Synthetic manager; no real host operation']};break;

@@ -356,6 +356,8 @@ jobs:
           LINTEL_DRIFT_UI_REPORT: ${{ runner.temp }}/lintel-verify/drift-ui.json
           LINTEL_BASELINE_UI_REPORT: ${{ runner.temp }}/lintel-verify/baseline-ui.json
           LINTEL_I18N_UI_REPORT: ${{ runner.temp }}/lintel-verify/i18n-ui.json
+          LINTEL_AUTH_SOURCES_UI_REPORT: ${{ runner.temp }}/lintel-verify/auth-sources-ui.json
+          LINTEL_AUTH_SOURCES_UI_ARTIFACT_DIR: ${{ runner.temp }}/lintel-verify/auth-sources-ui
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python3 tests/verify.py --require-passed \
@@ -375,7 +377,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: evidence-browser-${{ matrix.os }}
-          path: ${{ env.EVIDENCE_DIR }}/*.json
+          path: |
+            ${{ env.EVIDENCE_DIR }}/*.json
+            ${{ env.EVIDENCE_DIR }}/auth-sources-ui/*.png
           if-no-files-found: warn
 
   runner:

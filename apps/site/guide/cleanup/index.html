@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="开发版：辨认本机认证来源，预览精确清理，并分别核对本地、运行上下文和撤销状态。">
+  <link rel="canonical" href="https://lintel.page/guide/cleanup/">
+  <link rel="alternate" hreflang="zh-CN" href="https://lintel.page/guide/cleanup/">
+  <link rel="alternate" hreflang="en" href="https://lintel.page/en/guide/cleanup/">
+  <link rel="alternate" hreflang="x-default" href="https://lintel.page/guide/cleanup/">
+  <meta property="og:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta property="og:image:alt" content="Lintel — Claude Code 环境与资料管理器">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="认证来源与清理 · Lintel">
+  <meta name="twitter:description" content="开发版：辨认本机认证来源，预览精确清理，并分别核对本地、运行上下文和撤销状态。">
+  <meta name="twitter:image" content="https://lintel.page/assets/lintel-social-preview.png">
+  <meta name="twitter:image:alt" content="Lintel — Claude Code 环境与资料管理器">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="认证来源与清理 · Lintel">
+  <meta property="og:description" content="开发版：辨认本机认证来源，预览精确清理，并分别核对本地、运行上下文和撤销状态。">
+  <meta property="og:url" content="https://lintel.page/guide/cleanup/">
+  <meta property="og:site_name" content="Lintel">
+  <meta property="og:locale" content="zh_CN">
+  <link rel="icon" type="image/png" sizes="128x128" href="/assets/favicon.png">
+  <link rel="icon" type="image/svg+xml" sizes="any" href="/assets/favicon.svg">
+  <link rel="stylesheet" href="/styles.css?v=20261020-download-wrap-1">
+  <script type="module" src="/site.mjs"></script>
+  <title>认证来源与清理 · Lintel</title>
+</head>
+<body class="route-page guide-article-page">
+  <a class="skip-link" href="#main" data-route-copy="skip">跳到正文</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- lintel-wordmark:start --><svg class="brand-wordmark-svg" data-variant="detached" viewBox="0 0 527.58967 148.2" aria-hidden="true" focusable="false"><path class="wordmark-glyphs" d="m 0,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 Q 11.21,13.49 7.98,12.73 4.94,11.97 2.28,11.97 H 0 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 V 146.3 Z M 91.13987,27.36 q -6.84,0 -11.59,-3.23 -4.56,-3.42 -4.56,-10.45 0,-7.22 4.56,-10.45 4.75,-3.23 11.59,-3.23 6.65,0 11.4,3.23 4.94,3.23 4.94,10.45 0,7.03 -4.94,10.45 -4.75,3.23 -11.4,3.23 z M 61.879868,146.3 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.230002,-0.95 5.320002,-3.61 2.28,-2.66 2.28,-7.98 V 66.12 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.510002,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 44.46 h 44.650002 v 79.42 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z m 62.449872,0 v -10.07 h 0.38 q 6.46,0 10.64,-2.28 4.18,-2.28 4.18,-10.83 V 66.88 q 0,-7.98 -3.8,-10.07 -3.61,-2.28 -9.88,-2.28 h -0.57 V 44.46 h 39.9 l 2.47,13.49 h 0.95 q 3.8,-7.22 8.17,-10.45 4.56,-3.42 9.69,-4.37 5.32,-1.14 11.21,-1.14 14.63,0 22.99,8.74 8.36,8.74 8.36,27.93 v 44.08 q 0,8.74 3.04,11.21 3.23,2.28 9.69,2.28 h 0.57 v 10.07 h -42.18 V 83.79 q 0,-12.35 -3.42,-19 -3.42,-6.65 -11.78,-6.65 -6.27,0 -9.88,4.18 -3.61,3.99 -5.13,10.83 -1.52,6.65 -1.52,14.44 v 36.29 q 0,7.98 3.61,10.26 3.8,2.09 10.07,2.09 h 0.57 v 10.07 z m 164.09996,1.9 q -12.73,0 -20.33,-6.65 -7.6,-6.65 -7.6,-23.37 v -60.8 h -14.25 v -9.69 q 6.08,0 10.83,-2.47 4.94,-2.47 7.79,-5.51 5.89,-6.27 8.74,-18.81 h 15.77 v 23.56 h 24.32 v 12.92 h -24.32 v 58.9 q 0,8.55 2.85,12.54 3.04,3.99 9.69,3.99 3.8,0 7.03,-0.38 3.42,-0.57 6.46,-1.33 v 12.35 q -3.04,1.33 -10.07,3.04 -6.84,1.71 -16.91,1.71 z m 83.92012,0 q -24.13,0 -36.67,-13.68 -12.54,-13.87 -12.54,-38.57 0,-26.79 12.35,-40.28 12.35,-13.68 34.77,-13.68 20.71,0 32.49,11.59 11.97,11.59 11.97,34.2 v 9.69 h -62.32 q 0.57,19 7.03,27.74 6.65,8.74 18.43,8.74 9.88,0 16.72,-4.37 6.84,-4.56 10.07,-11.02 5.13,2.85 5.13,9.31 0,8.17 -9.12,14.25 -9.12,6.08 -28.31,6.08 z m 13.3,-62.89 q 0,-14.63 -3.42,-22.8 -3.42,-8.17 -11.59,-8.17 -7.98,0 -12.73,7.98 -4.75,7.79 -5.13,22.99 z m 35.27987,60.99 v -10.07 h 2.28 q 2.85,0 5.89,-0.76 3.23,-0.95 5.32,-3.61 2.28,-2.66 2.28,-7.98 V 23.56 q 0,-5.13 -2.28,-7.6 -2.28,-2.47 -5.51,-3.23 -3.04,-0.76 -5.7,-0.76 h -2.28 V 1.9 h 44.65 v 121.98 q 0,5.32 2.09,7.98 2.28,2.66 5.51,3.61 3.23,0.76 5.89,0.76 h 2.28 v 10.07 z" fill="currentColor"/><rect class="cursor" x="492.22967" y="136.77999999999997" width="35.36" height="9.52" rx="1.68" fill="var(--brand-accent)"/></svg><!-- lintel-wordmark:end --></a>
+    <nav aria-label="主导航" data-route-attr-aria-label="nav"><a href="/" data-route-copy="product">产品</a><a href="/guide/" aria-current="page" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="/inside/" data-route-copy="inside">设计与实现</a><a href="/releases/" data-route-copy="status">状态</a><a href="https://github.com/IndelibleVivi/lintel-cc">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <div class="site-tools"><nav class="language-links" aria-label="语言 / Language" data-route-attr-aria-label="language"><a href="/guide/cleanup/" lang="zh-CN" hreflang="zh-CN" data-site-route-language="zh" aria-current="page">中文</a><span aria-hidden="true">/</span><a href="/en/guide/cleanup/" lang="en" hreflang="en" data-site-route-language="en">EN</a></nav>
+    <button id="theme-toggle" class="theme-toggle" aria-label="切换到夜色" title="切换到夜色" data-route-attr-aria-label="theme" data-route-attr-title="theme"><span aria-hidden="true">☾</span></button></div>
+  </header>
+  <main id="main">
+    <div class="article-shell wrap">
+      <nav class="article-breadcrumb" aria-label="面包屑"><a href="/guide/" data-route-copy="guideCrumb">指南</a><span aria-hidden="true">/</span><span data-route-copy="articleCrumb">文章</span></nav>
+      <!--email_off-->
+      <article class="guide-body" data-guide-document="cleanup">
+        <h1 id="认证来源清理与独立复查">认证来源、清理与独立复查</h1>
+<p>简体中文 · <a href="/guide/cleanup/">English</a> · <a href="/guide/operator-guide/#cleanup">操作指南</a></p>
+<p><strong>本指南对应 2026-11-13 开发源码，已发布 App 0.1.1／CLI 0.1.0 尚未包含这轮能力。</strong> 它延续 Lintel 的环境、工作保全、重建与原任务查询。具体主机和配置根始终是操作目标。</p>
+<h2 id="先理解这份清单">先理解这份清单</h2>
+<p><code>claude setup-token</code> 生成的长期 OAuth token 只会打印到终端，命令本身不保存它。之后可能由 shell、Claude settings、IDE、服务或 CI 注入，所以没有一个固定的“setup-token 文件”可全部删除。普通登录的文件与 Keychain 又是不同来源。官方机制与版本依据见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/credential-provenance-evidence.md">工程证据记录</a>。</p>
+<p>在“清理与重建”查看认证来源。清单只在有限的已知位置读取必要内容，不运行 shell 初始化、helper、hooks、MCP 或 Claude，不扫描历史记录或整块磁盘，也不展示 token。环境／组件入口指向同一清理流程。</p>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">看到的事实</th><th class="align-left">它能说明什么</th><th class="align-left">不能据此认定什么</th></tr></thead><tbody><tr><td class="align-left">本地来源已识别</td><td class="align-left">精确文件、JSON 字段或受支持的 shell 赋值存在</td><td class="align-left">此来源正在被 Claude 使用，或 token 仍有效</td></tr><tr><td class="align-left">当前执行环境已观察到</td><td class="align-left">Lintel App／当前 runner 进程中存在相应变量；空值另外标明</td><td class="align-left">变量来自哪一行配置、其值可用于认证，或其他 Terminal／IDE 也相同</td></tr><tr><td class="align-left">仅发现声明</td><td class="align-left">配置中出现了 helper、动态 shell 或认证选择项</td><td class="align-left">其脚本已运行、返回了有效 token，或已被该客户端采用</td></tr><tr><td class="align-left">无法检查／无法归属</td><td class="align-left">权限、格式、类型、预算或归属阻止进一步核对</td><td class="align-left">不存在凭据，或可以安全删除</td></tr><tr><td class="align-left">其他上下文未覆盖</td><td class="align-left">其他进程、IDE、服务、主机、CI 或管理员系统可能另有输入</td><td class="align-left">本机这次检查已经覆盖这些地方</td></tr></tbody></table></div>
+<p>存在凭据与正在使用凭据分别表达。多个来源可以同时存在，清单不会凭一个优先级表猜当前登录。需要官方 CLI 的当前报告时，明确选择运行状态检查；它只代表本次执行器和准确配置根。</p>
+<h2 id="在-app-中完成一次清理">在 App 中完成一次清理</h2>
+<ol><li>顶栏确认主机、Claude Code 环境与配置目录。自定义 <code>CLAUDE_CONFIG_DIR</code> 必须核对完整路径；项目工作目录与配置根分别表达。</li><li>在“清理与重建”选择修复登录、清理并重建或退役。刷新来源，展开精确位置、证据与不可处理原因。选择要处理的可清理来源；shell 和用户配置可能影响同一用户的多个环境，必须看其共享范围。</li><li>关闭相关 Terminal、IDE 与自动重启来源。明确绑定的 systemd 服务仍使用原有独立暂停计划。已发现的运行写入者或无法完成安全检查会阻止执行，勾选停止确认不能绕过它们。</li><li>预览同一份清理计划。预览应列出所选来源、精确变更范围、将保留的工作、未知项，以及重建／退役需要的工作保全。重建和退役继续要求至少一个工作类别及加密口令。</li><li>审阅后一次批准。执行前再次核对所选文件和冻结范围；修改中发现外部编辑会停止后续动作，不覆盖它。认证编辑不保存可恢复 token 的明文或密文备份。</li><li>阅读逐步回执与独立复查。所选本地来源处理、当前执行器认证、其他上下文和服务端撤销分别显示。必要时再次刷新检查；已经提交且结果不明时，先查询原任务。</li></ol>
+<p>一次批准只合并这份计划可以安全处理的来源。不能自动处理的对象会留下明确说明和下一步，不会悄悄扩大到其他主机或账户。</p>
+<p>显式选择清理后的运行状态检查时，计划也会冻结认证程序的路径、身份或缺失状态。预览后才安装／发现程序会使旧批准返回 <code>executable_changed</code>，需要重新预览；原计划已选择该检查时，带原任务 ID 的复查也不会自动改用后来出现的程序。不带原任务 ID 的一次新显式检查可以使用当前已发现的程序。</p>
+<h2 id="本轮可处理与保留的范围">本轮可处理与保留的范围</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">来源</th><th class="align-left">开发源码的处理方式</th></tr></thead><tbody><tr><td class="align-left">目标 <code>.credentials.json</code> 中已识别 <code>claudeAiOauth</code></td><td class="align-left">精确移除该登录字段；保留其他字段与文件用途。未知／损坏 schema 不按整个文件删除</td></tr><tr><td class="align-left">目标客户端状态中已识别的 <code>primaryApiKey</code></td><td class="align-left">默认 root 对应 <code>~/.claude.json</code>，自定义 root 对应该 root 的 <code>.claude.json</code>；只移除该字段，其他状态与 MCP 配置保留</td></tr><tr><td class="align-left">目标用户 settings 的已知认证环境变量</td><td class="align-left">按所选字段精确移除；保留其他配置。空值、类型异常和实际生效问题分开显示</td></tr><tr><td class="align-left">用户 settings 中 <code>apiKeyHelper</code></td><td class="align-left">移除该声明；不运行 helper，不删除脚本、密码库或它的外部凭据</td></tr><tr><td class="align-left">已知 shell 启动文件中的受支持独立字面量赋值</td><td class="align-left">精确移除被冻结的赋值范围，保留文件其他内容；复杂语法／动态注入保留并显示限制</td></tr><tr><td class="align-left">Lintel／runner 已继承的变量</td><td class="align-left">只观察，不尝试改写父 shell、其他进程或永久环境；重新启动相关入口后再查</td></tr><tr><td class="align-left">项目／managed 配置、未知 shell、IDE、服务和外部 profiles</td><td class="align-left">按当前实现的有限读取说明候选来源与缺口；未获安全编辑支持的行不可选择</td></tr><tr><td class="align-left">Keychain</td><td class="align-left">不猜服务名、不批量删除；本轮不提供自动 Keychain 清理</td></tr><tr><td class="align-left">会话、指令、记忆、项目、MCP／插件配置和未知凭据字段</td><td class="align-left">保留；工作保全／迁入仍使用原有独立内容契约</td></tr></tbody></table></div>
+<p>来源清理采用字段级、版本化的有限识别。<code>claudeAiOauth</code> 或 <code>primaryApiKey</code> 消失并不证明其他类型凭据已清除。混合 <code>.claude.json</code> 除所选已支持字段外继续保留，不能为了清登录删除其中 MCP 或其他工作状态。重建会准备新 root 并迁入已批准工作；退役停用 Lintel 中的旧启动入口；两者均不等于卸载客户端或清空原目录。</p>
+<p>Shell 支持按整份文件保守判断：已知启动文件中出现多行语法、控制结构、函数、子 shell、heredoc、续行、管道或重定向时，本文件全部只报告声明，不提供编辑。可共存的普通单行 <code>source</code>、alias、PATH 声明不会被执行；仅完整、独立的字面量认证赋值可选择。fish 当前只读观察。JSON 单文件最多 1 MiB，shell 文件最多 256 KiB；来源模块合计最多 8 MiB、256 项来源、128 个 shell 提及位置，启动候选扫描另有最多 16 MiB 的独立预算。超限显示覆盖不完整，不按未发现处理。</p>
+<h3 id="为什么本轮不能勾选自动官方注销">为什么本轮不能勾选自动官方注销</h3>
+<p>Anthropic 的当前 <a href="https://code.claude.com/docs/en/troubleshoot-install">Keychain 恢复说明</a> 指出，<code>/logout</code> 还会移除保存的 MCP 登录和插件敏感值。CLI <code>auth logout</code> 尚无已验证且满足本轮保留范围的适配。因此新自动注销请求返回 <code>official_logout_scope_unsafe</code>，不会执行命令；这项决定来自官方文档与范围要求，不是本轮真实客户端实跑结论。</p>
+<p>如需处理 Keychain，请先独立审阅官方认证管理流程及其 MCP／插件重新授权影响。本地清理结果会继续标明此范围未验证，不用成功色掩盖它。Lintel 也不通过删整个 Keychain 项来绕开这一限制。</p>
+<h2 id="用-cli-查看选择与批准">用 CLI 查看、选择与批准</h2>
+<p>以下 ID 是占位；必须使用当前主机返回的真实环境、来源、计划 ID 与 hash。命令正文没有 token。<code>call</code> 进入与 App 相同的 operation schema 和 core，stdin 中的 JSON 不是另一套清理实现。</p>
+<pre class="guide-code" data-language="sh"><code>lintel describe auth_inventory --json
+lintel schema plan_cleanup
+lintel call auth_inventory &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;project_cwd&quot;:&quot;/synthetic/project&quot;}
+JSON</code></pre>
+<p><code>project_cwd</code> 可省略；提供时必须是当前目标主机上存在的准确目录。它扩充只读来源上下文，不把项目文件默认为可清理目标。</p>
+<p>常用 named CLI 也映射到上述同一操作：</p>
+<pre class="guide-code" data-language="sh"><code>lintel auth inventory --environment &#39;&lt;environment-id&gt;&#39; --json
+lintel auth cleanup plan --environment &#39;&lt;environment-id&gt;&#39; --recipe repair_login \
+  --writers-confirmed-stopped --auth-source &#39;&lt;source-id-from-inventory&gt;&#39; --json
+lintel auth verify --environment &#39;&lt;environment-id&gt;&#39; --job &#39;&lt;original-job-id&gt;&#39; --json</code></pre>
+<p><code>--auth-source</code> 可以重复；可选 <code>--project-cwd</code> 补充项目只读上下文。清理计划的 <code>--verify-auth-status</code> 与独立复查的 <code>--observe-runtime</code> 才请求官方运行状态，默认不启用。以下 raw 示例展示相同字段；选择一种方式生成计划即可。</p>
+<p>从清单选择可处理行的原始 ID，明确创建计划：</p>
+<pre class="guide-code" data-language="sh"><code>lintel call plan_cleanup &lt;&lt;&#39;JSON&#39;
+{
+  &quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,
+  &quot;recipe&quot;:&quot;repair_login&quot;,
+  &quot;writers_confirmed_stopped&quot;:true,
+  &quot;official_logout&quot;:false,
+  &quot;auth_source_ids&quot;:[&quot;&lt;source-id-from-inventory&gt;&quot;],
+  &quot;verify_auth_status&quot;:false
+}
+JSON
+lintel plan show &#39;&lt;returned-plan-id&gt;&#39;
+lintel job submit --plan &#39;&lt;returned-plan-id&gt;&#39; --approval &#39;&lt;returned-plan-hash&gt;&#39;
+lintel job show &#39;&lt;returned-plan-id&gt;&#39;</code></pre>
+<p><code>auth_source_ids</code> 冻结选择；原清单刷新、文件变化或旧计划失效时重新预览。它不是可自由填写的删除路径。<code>verify_auth_status:true</code> 明确请求运行官方状态命令；默认静态复查不运行 Claude。远端使用已有有限 SSH request／submit 与原任务查询，来源 ID 不跨主机混用。</p>
+<p>独立重新检查时可以关联原任务，默认仅重新读取有限来源：</p>
+<pre class="guide-code" data-language="sh"><code>lintel call auth_verify &lt;&lt;&#39;JSON&#39;
+{&quot;environment_id&quot;:&quot;&lt;environment-id&gt;&quot;,&quot;job_id&quot;:&quot;&lt;original-job-id&gt;&quot;,&quot;observe_runtime&quot;:false}
+JSON</code></pre>
+<p>显式选择 <code>observe_runtime:true</code> 才调用官方 <code>auth status</code>。它可能访问客户端认证设施、执行 helper 或联网；结果不暴露原始 token 或账户资料。验证先运行所选状态检查，再做最终文件读回，以观察 status／helper 可能重新生成的凭据。CLI 版本／输出无法确认准确配置根时报告限制，不把退出码、未知格式或网络失败转成“所有认证已清除”。</p>
+<h2 id="看懂清理后的结果">看懂清理后的结果</h2>
+<div class="guide-table-wrap"><table><thead><tr><th class="align-left">结果层次</th><th class="align-left">如何继续</th></tr></thead><tbody><tr><td class="align-left">所选本地来源已处理</td><td class="align-left">核对具体来源和步骤；其他行仍可能存在</td></tr><tr><td class="align-left">来源再次出现、编辑失败或无法读取</td><td class="align-left">保留当前文件，查看原任务错误和位置；查明回写者后重新预览，不自动重删</td></tr><tr><td class="align-left">当前执行器仍带认证变量或仍可认证</td><td class="align-left">在实际使用的 Terminal／IDE／服务中停止旧进程、处理其他来源并重新启动；不要把已处理文件再删一遍</td></tr><tr><td class="align-left">Keychain、profiles 或其他上下文未知</td><td class="align-left">在对应入口独立核对，或让管理员处理；本次本地结果不扩张到它们</td></tr><tr><td class="align-left">服务端撤销未验证</td><td class="align-left">按凭据提供方的正常管理流程独立撤销／更新。删除本机声明不使其他设备、CI 或已复制 token 自动失效</td></tr></tbody></table></div>
+<p>Shell 文件已改不会改变已经运行的进程；Claude settings 中删除变量也不能保证当前 session 立即忘掉它。重新启动后的环境再次检查，才产生新的观察。</p>
+<h2 id="旧计划中断和保全">旧计划、中断和保全</h2>
+<p>未带新认证范围绑定的旧、未执行清理计划需要重新预览。旧已接受任务与回执继续按原 ID 查询，不重放。旧 raw caller 仍可省略新增字段，但新计划只默认选择可精确识别的目标本地登录字段；不再把混合凭据文件或 <code>.claude.json</code> 整体作为登录清理目标。</p>
+<p>提交返回 <code>submission_uncertain</code> 时，保留原计划 ID 并查询原任务。安全检查尚未完成时，查询可能暂时返回 <code>job_not_found</code>；这表示尚无持久接收证据，不能据此再次提交或换一个 ID 执行。等待后继续查询；若始终无法确认结果，保持未知并保留原 ID，不将缺少回执解释为已完成或从未启动。</p>
+<p>重建／退役保持工作加密保全、准确新 root、冲突检测和原任务查询。新认证清理不把旧 token 复制到计划、日志、回执或状态恢复备份；此前已经存在的备份、shell history、同步副本与其他设备不被静默清扫。若原任务中断，先看已完成的工作归档、新 root 与来源步骤，保留原任务证据。</p>
+<p>精确编辑会将原文件移入同目录的私有暂存，再以不覆盖方式发布已移除目标字段的新文件。原文件是移动而非备份复制；成功读回后删除暂存原件。中断或冲突可能留下含凭据的原件或发布暂存，回执及独立复查的 <code>retained_sensitive_material</code> 会列出位置与状态并阻止将本地清理判为完成。暂存目录被改名／替换、身份失联时，<code>location_unknown</code> 的路径只是最后已知位置，不能推断材料已经消失；Lintel 不扫描追踪。不要仅因目标字段已不在原路径就忽略这些材料；按原任务核对，Lintel 不自动扫除或重放。</p>
+<p>安全编辑仍需停止外部写入者。冻结和复查可拒绝已观察到的编辑，但不能对未协作的任意进程提供跨文件原子事务，也不能证明 SSD、快照或服务端的物理销毁。真实 macOS Keychain 与正常用户登录验收独立于 synthetic 测试，准确状态见 <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">current-state.md</a>。</p>
+      </article>
+      <!--/email_off-->
+      <nav class="article-pager" aria-label="指南导航"><a href="/guide/" data-route-copy="allGuides">全部指南</a><a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/cleanup.md" data-route-copy="repositoryOriginal">仓库原文 <span aria-hidden="true">↗</span></a></nav>
+    </div>
+  </main>
+  <footer class="site-footer wrap"><div class="footer-top"><a class="wordmark footer-wordmark" href="/" aria-label="Lintel 首页" data-route-attr-aria-label="home"><!-- site-wordmark --></a><p data-route-copy="footerLine">承住复杂，留出余地。</p></div><div class="footer-bottom"><p><span data-route-copy="footerLegal">独立制作，与 Anthropic 无官方关联。</span><br><span data-route-copy="footerClawd">Clawd 形象属于 Anthropic。</span></p><p data-route-copy="footerDocs">网站正文映射自维护中的 paired 文档。</p><div><a href="/guide/" data-route-copy="guide">指南</a><a href="/download/" data-route-copy="download">下载</a><a href="https://github.com/IndelibleVivi/lintel-cc" data-route-copy="source">源码</a></div></div></footer>
+</body>
+</html>

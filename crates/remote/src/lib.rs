@@ -921,6 +921,8 @@ const REQUEST_COMMANDS: &[&str] = &[
     "env_compare",
     "plan_identity_reset",
     "auth_probe",
+    "auth_inventory",
+    "auth_verify",
     "reactivate_environment",
     "plan_policy",
     "plan_reset",
@@ -1200,9 +1202,14 @@ impl Controller {
             // Removing a display entry cannot erase or strand a durable task.
             let task_id = match op {
                 "reconnect" => payload["plan_id"].as_str(),
-                "request" if (payload["request"]["command"] == "job" || payload["request"]["command"] == "job_detail_page") => payload["request"]["job_id"]
-                    .as_str()
-                    .or_else(|| payload["request"]["plan_id"].as_str()),
+                "request"
+                    if (payload["request"]["command"] == "job"
+                        || payload["request"]["command"] == "job_detail_page") =>
+                {
+                    payload["request"]["job_id"]
+                        .as_str()
+                        .or_else(|| payload["request"]["plan_id"].as_str())
+                }
                 _ => None,
             };
             let existing_query = (op == "query_install"
@@ -1280,7 +1287,9 @@ impl Controller {
                     self.pin_launch_binding(alias, &response, bound.as_ref())?;
                     return Ok(response);
                 }
-                if payload["request"]["command"] == "job" || payload["request"]["command"] == "job_detail_page" {
+                if payload["request"]["command"] == "job"
+                    || payload["request"]["command"] == "job_detail_page"
+                {
                     let id = payload["request"]["job_id"]
                         .as_str()
                         .or_else(|| payload["request"]["plan_id"].as_str())
@@ -1296,7 +1305,12 @@ impl Controller {
                         if payload["request"]["command"] == "job_detail_page" {
                             let mut request = payload["request"].clone();
                             request["job_id"] = record["lookup_id"].clone();
-                            return self.runner_call(alias, &request, false, record.get("runner_digest"));
+                            return self.runner_call(
+                                alias,
+                                &request,
+                                false,
+                                record.get("runner_digest"),
+                            );
                         }
                         return self.query(alias, &path, record);
                     }
@@ -1970,12 +1984,15 @@ printf '%s\n' '{"ok":true,"data":{"id":"00000000-0000-4000-8000-000000000002","p
             json!({"command":"plan_network_ipv6","service_id":"synthetic-set:synthetic-service","mode":"off","probe":{"ipv4_url":"https://echo4.example.invalid/ip","ipv6_url":"https://echo6.example.invalid/ip"}}),
             json!({"command":"plan_network_restore","job_id":"00000000-0000-4000-8000-000000000002","probe":{"ipv4_url":"https://echo4.example.invalid/ip","ipv6_url":"https://echo6.example.invalid/ip"}}),
             json!({"command":"inspect_components","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/synthetic/project"}),
+            json!({"command":"auth_inventory","environment_id":"00000000-0000-4000-8000-000000000001","project_cwd":"/synthetic/project; touch forbidden"}),
+            json!({"command":"auth_verify","environment_id":"00000000-0000-4000-8000-000000000001","job_id":"00000000-0000-4000-8000-000000000002","observe_runtime":true}),
             json!({"command":"work_inventory","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"offset":100,"expected_digest":"a".repeat(64)}),
             json!({"command":"work_preflight","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
             json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
             json!({"command":"plan_preserve","environment_id":"00000000-0000-4000-8000-000000000001","categories":["sessions"],"selected_paths":["projects/demo/session.jsonl"]}),
             json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false}),
             json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"categories":[]}),
+            json!({"command":"plan_cleanup","environment_id":"00000000-0000-4000-8000-000000000001","recipe":"repair_login","writers_confirmed_stopped":true,"official_logout":false,"auth_source_ids":["auth-0123456789abcdef01234567"],"verify_auth_status":true}),
             json!({"command":"plan_show","plan_id":"00000000-0000-4000-8000-000000000002"}),
             json!({"command":"job","plan_id":"00000000-0000-4000-8000-000000000002"}),
             json!({"command":"plan_archive","environment_id":"00000000-0000-4000-8000-000000000001","categories":["memory"],"output_path":"/synthetic/export; touch bad.lintel-work"}),
@@ -2584,21 +2601,34 @@ mod bounded_history_transport_tests {
     use super::*;
     #[test]
     fn detail_uses_original_binding_without_updating_or_creating_task() {
-        let (temp,controller)=super::tests::fixture(r#"cat >/dev/null; printf '%s\n' '{"ok":true,"data":{"job_id":"00000000-0000-4000-8000-000000000002","section":"header","items":[],"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","next_offset":null}}'"#);
-        let id="00000000-0000-4000-8000-000000000002";
-        let (path,held)=controller.record("synthetic-host",id).unwrap();
-        let record=json!({"plan_id":id,"lookup_id":id,"status":"needs_reconciliation","runner_digest":"a".repeat(64)});
-        save(&path,&record).unwrap();drop(held);
-        let before=fs::read(&path).unwrap();
+        let (temp, controller) = super::tests::fixture(
+            r#"cat >/dev/null; printf '%s\n' '{"ok":true,"data":{"job_id":"00000000-0000-4000-8000-000000000002","section":"header","items":[],"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","next_offset":null}}'"#,
+        );
+        let id = "00000000-0000-4000-8000-000000000002";
+        let (path, held) = controller.record("synthetic-host", id).unwrap();
+        let record = json!({"plan_id":id,"lookup_id":id,"status":"needs_reconciliation","runner_digest":"a".repeat(64)});
+        save(&path, &record).unwrap();
+        drop(held);
+        let before = fs::read(&path).unwrap();
         let response=controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"job_detail_page","job_id":id,"section":"header"}})).unwrap();
-        assert_eq!(response["data"]["job_id"],id);assert_eq!(fs::read(&path).unwrap(),before);
-        assert!(fs::read_to_string(temp.path().join("args")).unwrap().contains(&"a".repeat(64)));
+        assert_eq!(response["data"]["job_id"], id);
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert!(fs::read_to_string(temp.path().join("args"))
+            .unwrap()
+            .contains(&"a".repeat(64)));
     }
     #[test]
     fn old_runner_rejection_does_not_fallback_or_create_intent() {
-        let (_temp,controller)=super::tests::fixture(r#"cat >/dev/null; printf '%s\n' '{"ok":false,"error":{"code":"unsupported_command","message":"old synthetic runner"}}'"#);
-        let response=controller.dispatch(json!({"op":"request","alias":"synthetic-host","request":{"command":"jobs_page"}})).unwrap();
-        assert_eq!(response["error"]["code"],"unsupported_command");
-        let tasks=controller.state.join("tasks/synthetic-host");assert!(!tasks.exists());
+        let (_temp, controller) = super::tests::fixture(
+            r#"cat >/dev/null; printf '%s\n' '{"ok":false,"error":{"code":"unsupported_command","message":"old synthetic runner"}}'"#,
+        );
+        let response = controller
+            .dispatch(
+                json!({"op":"request","alias":"synthetic-host","request":{"command":"jobs_page"}}),
+            )
+            .unwrap();
+        assert_eq!(response["error"]["code"], "unsupported_command");
+        let tasks = controller.state.join("tasks/synthetic-host");
+        assert!(!tasks.exists());
     }
 }

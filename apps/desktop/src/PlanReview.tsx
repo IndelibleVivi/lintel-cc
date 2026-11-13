@@ -2,12 +2,14 @@ import type { Plan } from './types';
 import { Icon, formatBytes } from './ui';
 import { useI18n } from './i18n-provider';
 import { present } from './i18n-presentation';
+import { AuthenticationPlanReview } from './AuthenticationSources';
 
 const categoryKeys: Record<string, string> = { instructions: 'category.instructions', memory: 'category.memory', sessions: 'category.sessions' };
 
 function FrozenTargets({plan}:{plan:Plan}) {
   const {t,locale}=useI18n();
   return <>
+    {plan.authentication&&<AuthenticationPlanReview authentication={plan.authentication}/>}
     {plan.configuration&&<section className="frozen-destination"><h4>{t('config.file')}</h4><code>{plan.configuration.path}</code><p>{plan.configuration.scope}</p></section>}
     {plan.residue_selection&&<section className="frozen-destination"><h4>{t('residue.selectedCount',{count:plan.residue_selection.files.length})}</h4><p>{t(plan.residue_selection.archive_before_clear?'planReview.encryptedFirst':'planReview.withoutBackup')}</p><ul>{plan.residue_selection.files.map(file=><li key={file.path}><code>{file.path}</code> · {formatBytes(file.bytes)}</li>)}</ul></section>}
     {plan.identity_reset&&<section className="frozen-destination"><h4>{t('identity.title')}</h4><code>{plan.identity_reset.path}</code><p>{t('planReview.identityFields',{keys:plan.identity_reset.remove_keys.join(', ')})}</p><p>{t('planReview.retainedFields',{keys:plan.identity_reset.retained_keys.join(', ')})}</p><p>{t('residue.combineResetIdentityDetail')}</p><ul>{plan.identity_reset.backup_paths.map(path=><li key={path}><code>{path}</code></li>)}</ul></section>}
@@ -37,11 +39,11 @@ export default function PlanReview({ plan }: { plan: Plan }) {
       {manifest.package && <details className="import-package"><summary>{t('planReview.checkPackage')}</summary><dl><div><dt>{t('planReview.format')}</dt><dd>{manifest.package.format}</dd></div><div><dt>{t('planReview.generator')}</dt><dd>{manifest.package.generator ?? t('planReview.notDeclared')}</dd></div><div><dt>{t('planReview.packageSha')}</dt><dd><code>{manifest.package.sha256}</code></dd></div></dl></details>}
     </section>}
     <div className="plan-columns">
-      <section><h4>{t('planReview.configFields')} <span>{t('planReview.changeCount',{count:plan.changes.length})}</span></h4>
+      <section><h4>{t(plan.authentication?'cleanup.authOtherFields':'planReview.configFields')} <span>{t('planReview.changeCount',{count:plan.changes.length})}</span></h4>
         {plan.changes.length ? <div className="change-list">{plan.changes.map((change, index) => <div className="change" key={`${change.key}-${index}`}>
           <strong>{p(change.label)}</strong><div className="change-values"><code>{change.masked && change.before_present!==false ? '••••••' : change.before ?? t('planReview.notSet')}</code><Icon name="arrow" size={13}/><code>{change.masked && (change.after_present===true || change.after!==null) ? '••••••' : change.after ?? t('planReview.removeItem')}</code></div>
           <details><summary>{t('planReview.viewSource')}</summary><code className="full-path">{change.key}</code><code className="full-path">{change.path}</code></details>
-        </div>)}</div> : <p className="muted">{t(manifest ? 'planReview.onlyFiles' : 'planReview.noFieldChanges')}</p>}
+        </div>)}</div> : <p className="muted">{t(plan.authentication?'cleanup.authExactFieldsAbove':manifest ? 'planReview.onlyFiles' : 'planReview.noFieldChanges')}</p>}
       </section>
       <section className="preserve-column"><h4>{t('planReview.willKeep')}</h4><ul className="keep-list">{plan.preserves.map((item, index) => <li key={index}>{p(item)}</li>)}</ul></section>
     </div>

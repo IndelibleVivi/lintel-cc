@@ -20,6 +20,8 @@ import warnings
 
 ALIAS = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,159}\Z")
+UUID_IDENTIFIER = re.compile(r"[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\Z")
+AUTH_SOURCE_IDENTIFIER = re.compile(r"auth-[a-f0-9]{24}\Z")
 MAX_JSON = 2 * 1024 * 1024
 REMOTE_COMMAND = ("lintel", "request")
 SUBMIT_COMMAND = ("lintel", "submit")
@@ -54,6 +56,8 @@ REQUEST_FIELDS.update({
     'plan_config_restore': {'environment_id': str, 'job_id': str, 'selected_keys': list},
     'plan_identity_reset': {'environment_id': str, 'writers_confirmed_stopped': bool},
     'plan_client_workflow': {'environment_id': str, 'writers_confirmed_stopped': bool},
+    'auth_inventory': {'environment_id': str},
+    'auth_verify': {'environment_id': str},
     'plan_cleanup': {'environment_id': str, 'recipe': str, 'writers_confirmed_stopped': bool, 'official_logout': bool},
     'accept_drift': {'environment_id': str},
 })
@@ -63,7 +67,10 @@ OPTIONAL_FIELDS.update({
     'env_compare': {'project_cwd': str, 'other_project_cwd': str}, 'config_inspect': {'project_cwd': str},
     'plan_config_apply': {'config_path': str}, 'plan_identity_reset': {'identity_backup_paths': list},
     'plan_client_workflow': {'policy': dict, 'residue_paths': list, 'archive_before_clear': bool, 'reset_identity': bool, 'identity_backup_paths': list, 'extra_roots': list, 'delete_work': bool},
-    'plan_cleanup': {'categories': list, 'activate': dict, 'residue_paths': list, 'archive_before_clear': bool, 'archive_only': bool, 'extra_roots': list, 'delete_work': bool},
+    'auth_inventory': {'project_cwd': str},
+    'auth_verify': {'job_id': str, 'observe_runtime': bool},
+    'plan_cleanup': {'categories': list, 'activate': dict, 'residue_paths': list, 'archive_before_clear': bool, 'archive_only': bool, 'extra_roots': list, 'delete_work': bool,
+                     'auth_source_ids': list, 'project_cwd': str, 'verify_auth_status': bool},
     'residue_archive_inspect': {'job_id': str, 'archive_path': str},
     'plan_residue_restore': {'job_id': str, 'archive_path': str},
     'drift': {'lightweight': bool},
@@ -174,6 +181,19 @@ def validate_request(payload: dict) -> dict:
             raise ControllerError("invalid_request", "A request field has the wrong type.")
         if expected is str and (not payload[key] or len(payload[key]) > (1024 * 1024 if key == "document" else 4096)):
             raise ControllerError("invalid_request", "A request field has an invalid length.")
+    auth_fields = {'auth_source_ids', 'project_cwd', 'verify_auth_status'}
+    # New authentication operations follow the canonical finite ID contract.
+    # Do not silently change the syntax admitted by older unrelated requests.
+    if payload['command'] in {'auth_inventory', 'auth_verify'} or (
+            payload['command'] == 'plan_cleanup' and auth_fields.intersection(payload)):
+        for key in ('environment_id', 'job_id'):
+            if key in payload and not UUID_IDENTIFIER.fullmatch(payload[key]):
+                raise ControllerError('invalid_request', 'Use the original environment or job UUID for authentication operations.')
+    if 'auth_source_ids' in payload:
+        sources = payload['auth_source_ids']
+        if (len(sources) > 128 or not all(type(source) is str and AUTH_SOURCE_IDENTIFIER.fullmatch(source) for source in sources)
+                or len(set(sources)) != len(sources)):
+            raise ControllerError('invalid_request', 'Authentication selection must contain at most 128 unique source IDs from the inventory, never values or paths.')
     for key in ('residue_paths', 'identity_backup_paths', 'extra_roots', 'selected_paths'):
         if key in payload and (len(payload[key]) > (8 if key == 'extra_roots' else 1000) or len(set(map(str,payload[key]))) != len(payload[key]) or not all(type(p) is str and p.startswith('/') and len(p)<=4096 and not any(ord(c)<32 for c in p) and '..' not in p.split('/') for p in payload[key])):
             raise ControllerError('invalid_request', 'Explicit paths must be unique, bounded absolute paths.')
@@ -209,6 +229,8 @@ def validate_request(payload: dict) -> dict:
             raise ControllerError('invalid_request', 'Unsupported cleanup recipe.')
         if payload['recipe']=='clear_residue' and (not payload.get('residue_paths') or payload['official_logout']):
             raise ControllerError('invalid_request', 'Residue clear needs exact paths and never logs out.')
+        if payload['recipe']=='clear_residue' and auth_fields.intersection(payload):
+            raise ControllerError('invalid_request', 'Authentication options belong only to login repair, rebuild or retirement.')
     if payload.get("trusted_devices", "unknown") not in {"unknown", "required", "not_required"}:
         raise ControllerError("invalid_request", "The Trusted Devices condition is invalid.")
     if payload["command"] == "plan_policy" and payload["preset"] not in {"preserve", "reduce", "custom"}:

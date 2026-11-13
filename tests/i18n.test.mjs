@@ -7,7 +7,7 @@ import {
 import { zhCN } from '../apps/desktop/src/i18n.catalog.zh-CN.ts';
 import { en } from '../apps/desktop/src/i18n.catalog.en.ts';
 import { homeGreeting, GREETING_DATE_KEY } from '../apps/desktop/src/homeGreetings.ts';
-import { present, PRESENTATION_KEYS } from '../apps/desktop/src/i18n-presentation.ts';
+import { present, presentAction, PRESENTATION_KEYS } from '../apps/desktop/src/i18n-presentation.ts';
 
 const catalogs = { 'zh-CN': zhCN, en };
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
@@ -151,6 +151,29 @@ test('every presentation projection key resolves in both catalogs', () => {
     // The zh catalog holds the original source text for verified projections.
     assert.equal(zhCN[key], source, `zh-CN ${key} should equal the source text`);
   }
+});
+
+test('authentication and inherited core scope warnings have exact bilingual projections without rewriting unknown diagnostics',()=>{
+  const warnings=[
+    ['按预览选择精确移除本地认证来源；来源存在不等于正在使用，其他执行上下文与服务端撤销仍需独立核对。','Remove exactly the local authentication sources selected in this preview. Presence does not prove a source is in use; other execution contexts and server revocation still need separate verification.'],
+    ['这里只检查已登记 root 的 user settings；项目、组织策略、IDE 与已有进程的生效状态尚未确认。','Only user settings in the registered root are checked here; effects from projects, organization policy, IDEs, and existing processes are not yet verified.'],
+    ['独立配置目录不是 OS sandbox；某类 Console 登录位于目录外。','A separate configuration directory is not an OS sandbox; some Console logins are stored outside it.'],
+  ];
+  for(const [raw,english] of warnings){
+    assert.equal(present(raw,'en'),english);
+    assert.equal(present(raw,'zh-CN'),raw);
+    assert.equal(present(raw+' /synthetic/unknown-diagnostic','en'),raw+' /synthetic/unknown-diagnostic');
+  }
+});
+
+test('authentication action presentation keeps the frozen path and unknown labels unchanged',()=>{
+  const pathname='/synthetic/with spaces/用户名/.zshrc';
+  const action={id:'auth_edit_2',label:'精确移除所选认证声明：'+pathname};
+  assert.equal(presentAction(action,'en'),'Remove selected authentication declarations: '+pathname);
+  assert.equal(presentAction(action,'zh-CN'),action.label);
+  assert.equal(presentAction({...action,id:'user-action'},'en'),action.label);
+  assert.equal(presentAction({...action,label:'A future unknown action '+pathname},'en'),'A future unknown action '+pathname);
+  assert.equal(action.label,'精确移除所选认证声明：'+pathname,'the approval object is never changed');
 });
 
 test('presentation covers the real current core display fields and preserves raw identity', () => {

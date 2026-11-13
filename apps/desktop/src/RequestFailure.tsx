@@ -18,6 +18,20 @@ const localGuidanceKeys:Record<string,string>={
   terminal_required:'failure.guidance.terminalRequired',
   stale_archive:'failure.guidance.staleArchive',
   browser_component_unavailable:'failure.guidance.browserComponentUnavailable',
+  stale_auth_plan:'failure.guidance.authStale',
+  stale_auth_source:'failure.guidance.authStale',
+  auth_source_conflict:'failure.guidance.authConflict',
+  auth_quarantine_changed:'failure.guidance.authConflict',
+  auth_cleanup_unverified:'failure.guidance.authUnverified',
+  auth_source_not_removable:'failure.guidance.authUnsupported',
+  auth_source_unreadable:'failure.guidance.authUnreadable',
+  unsafe_auth_source:'failure.guidance.authUnreadable',
+  auth_source_limit:'failure.guidance.authUnreadable',
+  official_logout_scope_unsafe:'failure.guidance.authLogout',
+  legacy_auth_coverage:'failure.guidance.authLegacy',
+  auth_verification_scope:'failure.guidance.authScope',
+  auth_scope_unverified:'failure.guidance.authRuntimeScope',
+  auth_schema_unknown:'failure.guidance.authRuntimeScope',
 };
 // UI-owned transport codes: their message was created in api.ts at the locale
 // active when thrown, so resolve it from the CURRENT catalog at render. A raw

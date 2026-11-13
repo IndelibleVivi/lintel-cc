@@ -532,7 +532,9 @@ DNS 加密与出口约束是不同结果；不能把关闭 53 端口当作所有
 
 ### 11.4 注销与凭据清理
 
-对适配版本优先使用官方 `claude auth logout`；`auth status`/doctor 等命令必须验证自身行为与输出，不在扫描时随意启动交互 agent。[S06] 原生命令可能涉及网络或令牌撤销，这个影响在计划里展示。
+仅当官方机制的作用范围已验证且符合用户批准的保留要求时，才可使用 `claude auth logout`；`auth status`/doctor 等命令必须验证自身行为与输出，不在扫描时随意启动交互 agent。[S06] 原生命令可能涉及网络或令牌撤销，不能将其命名为无副作用的来源扫描。
+
+2026-11-13 官方 Keychain 恢复说明确认 logout 还会移除保存的 MCP 登录和插件敏感值。[S33] 本轮要求保留这些资料，当前又没有经核验的限定 scope 参数，因此新自动 logout 请求返回 `official_logout_scope_unsafe`。尚未执行的旧计划若缺新绑定或要求 logout，则以 `stale_auth_plan` 要求重新预览；已接受任务仍按原 ID 查询。后续恢复官方集成须先证明精确归属、版本与保留边界，不能仅追加一个含糊勾选。
 
 macOS Keychain 与文件 fallback、Linux credential file、独立 profile 与目录外共享认证都进入判定；不以猜测的 Keychain 服务名称批量删除。[S03] 当前账号已封禁或离线时，远端注销未必能完成；本地已清理与服务端撤销未知分别呈现。
 
@@ -556,6 +558,18 @@ macOS Keychain 与文件 fallback、Linux credential file、独立 profile 与�
 快速发现可以分页或截断；破坏性计划的目标枚举不可以隐式截断。每个类别要记录扫描是否穷尽、排除项、权限缺口、异常文件与稳定快照标识。只有“已知目标范围完整”才能承诺该类别清理完整；否则直接定位缺口，让用户修复访问权限或显式缩小并重新批准范围。
 
 浏览器与文件系统分别有自己的覆盖结果，不能用文件清理成功掩盖扩展离线。任务可以部分完成，但摘要必须保留未完成对象。正常登录修复不自动升级成退役整个环境；每次扩张都需要新的差异与授权。
+
+### 11.8 认证来源与独立复查（2026-11-13 增量）
+
+`auth_inventory` 在明确主机、环境、可选项目 cwd 下执行有界只读检查。分别表达：已识别本地来源、执行器环境观察、声明存在但生效未知、无法检查／归属不明、其他运行上下文。它不执行 shell 初始化、credential helper、hooks 或 Claude，不读取所有 shell history，不扫描整块磁盘，也不把值、原文或稳定凭据指纹放入公共结果。
+
+`setup-token` 只输出 token，保存位置由后来注入方式决定。[S03] 检查覆盖已支持的认证文件、Keychain 未知范围、已知 shell／settings 声明、进程变量及共享 profiles 的有限元数据；当前执行器不能代表所有 Terminal／IDE／SSH 环境。Profiles 配置与凭据文件分离，也可能由其他 Anthropic 工具共同使用。[S34] 项目声明和受管声明、环境实际观察与客户端状态必须分别标记。[S05][S35]
+
+`plan_cleanup` 沿原有修复／重建／退役配方新增 `auth_source_ids`、`project_cwd` 与默认关闭的 `verify_auth_status`，不另建执行引擎。可清理来源须有受支持的准确位置与语法、冻结文件身份、私有带盐内容绑定及执行时复查。Shell 只精确编辑可证明范围，复杂或动态语法不得通过运行来猜其效果。认证 JSON 仅移除已支持的字段；保留未知、MCP 和插件字段。所有新计划均受此规则约束，旧 raw caller 省略新增字段也不得回到整文件删除。未带新绑定的旧未执行计划重新预览。
+
+认证清理不生成含旧 token 的恢复备份；编辑在有界内存计算，原文件暂时移动到同目录旁的私有位置，再以不覆盖方式发布替代文件。成功读回后删除原件；中断或冲突留下的含凭据原件／暂存通过 `retained_sensitive_material` 明确报告，不能判为本地清理完成。工作加密保全及原任务查询继续保留，新计划不以备份秘密为实现中断恢复的默认方法。中断／冲突核对原 ID 与现存文件，不自动重放或覆盖后来的登录。已经存在的历史备份不在新清理范围内。
+
+`auth_verify` 必须重新读取当前来源，可关联原 job；默认 `observe_runtime:false` 不启动客户端。显式运行状态检查仍验证客户端输出和准确 root。结果分别给出选中本地来源、当前执行器、其他运行上下文和服务端撤销，验证错误保留未知。设置赋值删除不会改变既有进程环境，[S05] 本地无来源也不证明服务端 token 已撤销。用户指南与完整证据见 [cleanup.md](cleanup.md) 和 [credential-provenance-evidence.md](credential-provenance-evidence.md)。
 
 ---
 
@@ -902,7 +916,7 @@ Mac 正式面向非开发者发布要处理签名、公证、更新与卸载。F
 | A14 `network.diagnose` | 用户授权后测试选定出口/DNS/连通性 | 按探针范围解释，不算封号分 |
 | A15 `network.enforce` | 安装并启用验证过的平台目标约束 | 负例实测、状态监测、独立恢复入口 |
 | A16 `target.quiesce` | 停精确写入者及其恢复来源 | 不影响相邻环境，记录原状态 |
-| A17 `credential.logout` | 调用已支持的官方注销途径 | 本地/服务端结果分列 |
+| A17 `credential.logout` | 仅调用符合已批准保留范围的官方途径；本轮因 MCP／插件副作用拒绝自动注销 | 明确不支持原因，本地/服务端结果分列 |
 | A18 `credential.remove_local` | 移除批准 scope 的本地凭据 | 不扫整机 Keychain，不恢复旧 token |
 | A19 `state.reset` | 处理已识别、批准的客户端状态 | 完整覆盖记录与回写检查 |
 | A20 `work.archive` | 保存选定工作资产与完整性清单 | 原始保留，敏感混合文件隔离 |
@@ -959,3 +973,6 @@ Mac 正式面向非开发者发布要处理签名、公证、更新与卸载。F
 - **[S30]** Mozilla · privacy.network — https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/privacy/network
 - **[S31]** Soundings · Shape — https://github.com/IndelibleVivi/soundings/blob/main/plugins/soundings/skills/shape/SKILL.md
 - **[S32]** Soundings · Search — https://github.com/IndelibleVivi/soundings/blob/main/plugins/soundings/skills/search/SKILL.md
+- **[S33]** Claude Code · Troubleshoot installation and login — https://code.claude.com/docs/en/troubleshoot-install （2026-11-13 核对 logout 的 MCP／插件副作用）
+- **[S34]** Claude Platform · WIF reference — https://platform.claude.com/docs/en/manage-claude/wif-reference （2026-11-13 核对 profile 路径与凭据缓存）
+- **[S35]** Claude Code · All settings — https://code.claude.com/docs/en/settings-reference （2026-11-13 核对 env／apiKeyHelper 与作用域例外）

@@ -368,7 +368,26 @@ fn tui() {
                 if recipe == "rebuild" {
                     json!({"command":"plan_reset","environment_id":id,"recipe":recipe,"categories":categories()})
                 } else {
-                    json!({"command":"plan_cleanup","environment_id":id,"recipe":recipe,"writers_confirmed_stopped":read_line("已停止 Claude、IDE 与服务写入者? 输入 stopped: ")=="stopped","official_logout":read_line("调用此配置根的官方 auth logout（可能联网）? [y/N]: ")=="y","categories":categories()})
+                    let sources = lintel_core::handle_request(
+                        json!({"command":"auth_inventory","environment_id":id}),
+                    );
+                    show(&sources);
+                    if sources["ok"] != true {
+                        continue;
+                    }
+                    println!("只清理所选本机来源；现有进程、Keychain、共享 profile 和服务端撤销需分别核对。官方注销可能同时清除 MCP/插件登录，本计划不调用它。");
+                    let selection = read_line(
+                        "来源 ID（逗号分隔；空=默认本机登录字段；none=不删除认证来源）: ",
+                    );
+                    let mut request = json!({"command":"plan_cleanup","environment_id":id,"recipe":recipe,"writers_confirmed_stopped":read_line("已停止 Claude、IDE 与服务写入者? 输入 stopped: ")=="stopped","official_logout":false,"categories":categories(),"verify_auth_status":read_line("清理后显式运行此执行器的 auth status（可能执行 helper 或联网）? [y/N]: ")=="y"});
+                    if !selection.is_empty() {
+                        request["auth_source_ids"] = if selection == "none" {
+                            json!([])
+                        } else {
+                            json!(selection.split(',').map(str::trim).collect::<Vec<_>>())
+                        };
+                    }
+                    request
                 }
             }
             "9" => {

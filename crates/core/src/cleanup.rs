@@ -1,5 +1,5 @@
 //! Explicit Claude Code cleanup recipes. No Keychain service-name guessing.
-use crate::{archive, err, now, storage::*, string, work, Engine, Result};
+use crate::{err, now, storage::*, string, Engine, Result};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -8,12 +8,6 @@ use std::{
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
-
-fn auth_status_digest(public: &Value, raw: &Value, nonce: &str) -> String {
-    // Canonical JSON detects account/organization/status changes without
-    // retaining their values. A per-plan nonce prevents a public stable ID.
-    digest(&serde_json::to_vec(&json!([nonce, public["logged_in"], raw])).unwrap())
-}
 
 pub(crate) fn bounded(command: Command) -> Result<(i32, Vec<u8>)> {
     bounded_with_timeout(command, Duration::from_secs(20))
@@ -104,6 +98,13 @@ impl Engine {
             )
         })?;
         guard(Path::new(exe))?;
+        guard(Path::new(string(e, "root")?))?;
+        if self.executable().as_deref() != Some(exe) {
+            return Err(err(
+                "executable_changed",
+                "当前启动程序与已登记来源不同；未运行认证命令，请重新检查环境",
+            ));
+        }
         let mut command = Command::new(exe);
         command
             .args(["auth", action])
@@ -142,12 +143,22 @@ impl Engine {
         {
             return Err(err("auth_scope_unverified","认证来源或 configDirectory 无法匹配；需要支持 configDirectory 的 Claude 版本（官方说明为 2.1.268+）"));
         }
+        if (code == 0 && raw["authMethod"] == "none")
+            || raw
+                .get("loggedIn")
+                .is_some_and(|value| value.as_bool() != Some(code == 0))
+        {
+            return Err(err(
+                "auth_schema_unknown",
+                "认证状态与命令退出结果不一致；未将矛盾状态视为已登录或已退出",
+            ));
+        }
         let identity_observed = code == 0
             && raw["authMethod"] == "claude.ai"
             && raw["email"]
                 .as_str()
                 .is_some_and(|email| !email.trim().is_empty());
-        let public = json!({"environment_id":e["id"],"config_directory":e["root"],"auth_method":raw["authMethod"],"logged_in":code==0,"identity_observed":identity_observed,"checked_at":now(),"remote_revocation":"unverified"});
+        let public = json!({"environment_id":e["id"],"config_directory":e["root"],"auth_method":raw["authMethod"],"logged_in":code==0,"identity_observed":identity_observed,"checked_at":now(),"remote_revocation":"unverified","context_scope":"lintel_runner_selected_root","cwd":e["root"],"other_contexts":"unverified"});
         Ok((public, raw))
     }
 
@@ -163,15 +174,6 @@ impl Engine {
             paths.push((global, "client_state"));
         }
         Ok(paths)
-    }
-
-    fn cleanup_files(&self, e: &Value, recipe: &str) -> Result<Vec<Value>> {
-        self.cleanup_paths(e, recipe)?
-            .into_iter()
-            .map(|(path, category)| {
-                Ok(json!({"path":path,"category":category,"snapshot":snapshot(&path)?}))
-            })
-            .collect()
     }
 
     pub(crate) fn known_writers(&self, e: &Value) -> Result<Vec<Value>> {
@@ -258,169 +260,24 @@ impl Engine {
         let services = self.check_cleanup_services(&e);
         let profiles = self.home.join(".config/anthropic");
         Ok(
-            json!({"environment_id":e["id"],"files":visible,"writers":self.known_writers(&e)?,"services":services.as_ref().map(|v|json!(v)).unwrap_or_else(|error|json!({"code":error.code,"message":error.message})),"shared_profile_present":profiles.exists(),"official_logout_available":e["executable"].is_string(),"coverage":"Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理"}),
+            json!({"environment_id":e["id"],"files":visible,"writers":self.known_writers(&e)?,"services":services.as_ref().map(|v|json!(v)).unwrap_or_else(|error|json!({"code":error.code,"message":error.message})),"shared_profile_present":profiles.exists(),"official_logout_available":false,"auth_probe_available":e["executable"].is_string(),"official_logout_limitation":"official_logout_scope_unsafe","auth_inventory_available":true,"coverage":"Claude Code 已识别的凭据文件与混合客户端状态；浏览器、Desktop、IDE 与目录外 profile 需独立处理"}),
         )
     }
 
     pub(crate) fn plan_cleanup(&self, r: &Value) -> Result<Value> {
-        let recipe = string(r, "recipe")?;
-        // The local-data/identity recipes own their own freeze/projection; they
-        // never read settings and never include logout, so they branch before
-        // the shared client-state recipe below.
-        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
-            return self.plan_clear_residue(r);
+        match string(r, "recipe")? {
+            crate::client_data::CLEAR_RESIDUE_RECIPE => self.plan_clear_residue(r),
+            crate::client_data::IDENTITY_RESET_RECIPE => self.plan_identity_reset(r),
+            _ => self.plan_auth_cleanup(r),
         }
-        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
-            return self.plan_identity_reset(r);
-        }
-        let e = self.env(r)?;
-        self.block_managed(&e)?;
-        if !["repair_login", "reset_client", "retire"].contains(&recipe) {
-            return Err(err("unsupported_recipe", "未知清理配方"));
-        }
-        if r["writers_confirmed_stopped"] != true {
-            return Err(err(
-                "writers_confirmation_required",
-                "先关闭目标终端、IDE 与自动重启来源，再预览清理",
-            ));
-        }
-        let logout = r["official_logout"].as_bool().unwrap_or(false);
-        // Known shared authentication already forbids this operation. Reject it
-        // before any slower process/service reads or external auth command.
-        if logout {
-            self.check_auth_scope()?;
-        }
-        if !self.known_writers(&e)?.is_empty() {
-            return Err(err("writers_active","仍检测到 Claude 进程且无法确认所属 root；请核对并关闭目标写入者，Lintel 不会全局杀进程"));
-        }
-        let services = self.check_cleanup_services(&e)?;
-        let (auth, auth_binding) = if logout {
-            let (a, raw) = self.auth_observation(r)?;
-            if a["auth_method"] != "claude.ai" && a["auth_method"] != "none" {
-                return Err(err(
-                    "auth_source_external",
-                    "当前认证来自 key、helper、token 或第三方来源；不会把这些来源当成本地登录删除",
-                ));
-            }
-            if a["logged_in"] == true && a["identity_observed"] != true {
-                return Err(err("auth_identity_unverified", "CLI 没有提供可核对的登录主体；不能冻结官方注销对象。可仅处理预览内的本地文件，或核对客户端后重新预览"));
-            }
-            let nonce = crate::id();
-            let binding = json!({"schema":"lintel.auth-status/1","nonce":nonce,"status_digest":auth_status_digest(&a, &raw, &nonce)});
-            (a, binding)
-        } else {
-            (Value::Null, Value::Null)
-        };
-        let categories = if recipe == "repair_login" {
-            vec![]
-        } else {
-            work::categories(r)?
-        };
-        let manifest = work::manifest(Path::new(string(&e, "root")?), &categories)?;
-        let files = self.cleanup_files(&e, recipe)?;
-        let mut actions = vec![
-            json!({"id":"quiescence","label":"复查目标已停止写入；不关闭其他环境","reversible":false}),
-        ];
-        if recipe != "repair_login" {
-            actions.push(
-                json!({"id":"state_backup","label":"先加密备份混合客户端状态","reversible":false}),
-            );
-            actions.push(json!({"id":"archive","label":"加密归档所选工作内容","reversible":false}));
-        }
-        // Canonical reset order, preserved end to end: state backup + work
-        // archive first, then the fresh root + migration, then official logout
-        // (which may contact the server), then the approved local file removals,
-        // then retirement. No destructive action moves ahead of preservation.
-        if recipe == "reset_client" {
-            actions.push(
-                json!({"id":"rebuild","label":"建立新环境并迁入选中的工作内容（在任何删除之前）","reversible":false}),
-            );
-        }
-        if logout {
-            actions.push(json!({"id":"logout","label":"调用官方 auth logout（可能联系服务端），再核验登录状态","reversible":false}));
-        }
-        for f in &files {
-            if !f["snapshot"].is_null() {
-                actions.push(json!({"id":f["category"],"label":format!("移除已预览文件：{}",f["path"].as_str().unwrap()),"reversible":false}));
-            }
-        }
-        if recipe == "retire" {
-            actions.push(json!({"id":"retire","label":"从可启动环境中退役；保留原工作目录","reversible":true}));
-        }
-        // reset_client creates a fresh root: freeze its planned identity and the
-        // import mapping now, in the same approved plan.
-        let activation = work::activation(r, &categories);
-        let frozen_target = if recipe == "reset_client" {
-            work::freeze_new_target(&self.state, &manifest, activation["instructions"] == true)?
-        } else {
-            Value::Null
-        };
-        self.plan(&e,"cleanup",match recipe{"repair_login"=>"修复目标登录","reset_client"=>"清理并重建客户端",_=>"退役此环境"},json!([]),vec!["所有原始工作内容与项目文件","settings、hooks、MCP 与插件文件（不自动激活到新环境）","其他环境、浏览器与目录外认证"],json!(actions),json!({"recipe":recipe,"services":services,"official_logout":logout,"auth":auth,"auth_binding":auth_binding,"files":files,"categories":categories,"manifest":manifest,"archive_passphrase_required":recipe!="repair_login","executable":e["executable"],"frozen_target":frozen_target,"work_purpose":work::purposes(&categories),"activate":activation}))
-    }
-
-    fn check_auth_scope(&self) -> Result<()> {
-        if self.home.join(".config/anthropic").exists()
-            || std::env::var_os("ANTHROPIC_CONFIG_DIR").is_some()
-            || std::env::var_os("ANTHROPIC_PROFILE").is_some()
-        {
-            return Err(err(
-                "shared_auth_scope",
-                "发现目录外 Anthropic profile；无法独立核验共享注销范围，不自动注销该来源",
-            ));
-        }
-        Ok(())
     }
 
     pub(crate) fn check_cleanup(&self, e: &Value, p: &Value, r: &Value) -> Result<()> {
-        let recipe = string(&p["extra"], "recipe")?;
-        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
-            return self.check_residue_clear(p, r);
+        match string(&p["extra"], "recipe")? {
+            crate::client_data::CLEAR_RESIDUE_RECIPE => self.check_residue_clear(p, r),
+            crate::client_data::IDENTITY_RESET_RECIPE => self.check_identity_reset(p, r),
+            _ => self.check_auth_cleanup(e, p, r),
         }
-        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
-            return self.check_identity_reset(p, r);
-        }
-        if p["extra"]["official_logout"] == true {
-            self.check_auth_scope()?;
-        }
-        if json!(self.check_cleanup_services(e)?) != p["extra"]["services"] {
-            return Err(err(
-                "stale_service_plan",
-                "预览后 service hold 证据变化；未开始清理",
-            ));
-        }
-        if !self.known_writers(&e)?.is_empty() {
-            return Err(err(
-                "writers_active",
-                "预览后出现 Claude 写入进程；未开始清理",
-            ));
-        }
-        if p["extra"]["files"] != json!(self.cleanup_files(e, string(&p["extra"], "recipe")?)?) {
-            return Err(err("stale_plan", "预览后目标状态文件改变，请重新预览"));
-        }
-        if p["extra"]["archive_passphrase_required"] == true {
-            work::check_passphrase(r)?;
-        }
-        if p["extra"]["official_logout"] == true {
-            if p["extra"]["executable"] != e["executable"]
-                || self.executable().as_deref() != e["executable"].as_str()
-            {
-                return Err(err("executable_changed", "Claude 启动来源改变，请重新检查"));
-            }
-            let binding = &p["extra"]["auth_binding"];
-            let nonce = binding["nonce"].as_str().filter(|_| binding["schema"] == "lintel.auth-status/1")
-                .ok_or_else(|| err("stale_auth", "这份未执行计划没有认证主体绑定；请重新预览官方注销，原任务 ID 仍只用于查询"))?;
-            let (auth, raw) = self.auth_observation(&json!({"environment_id":e["id"]}))?;
-            if auth["auth_method"] != p["extra"]["auth"]["auth_method"]
-                || auth["logged_in"] != p["extra"]["auth"]["logged_in"]
-                || binding["status_digest"] != auth_status_digest(&auth, &raw, nonce)
-            {
-                return Err(err(
-                    "stale_auth",
-                    "预览后认证主体或状态改变；未注销新的登录，请重新核对并预览",
-                ));
-            }
-        }
-        Ok(())
     }
 
     pub(crate) fn cleanup(
@@ -431,145 +288,11 @@ impl Engine {
         j: &mut Value,
         journal: &Path,
     ) -> Result<()> {
-        let recipe = string(&p["extra"], "recipe")?;
-        // Exact residue clearing and the identity reset are their own finite
-        // steps; neither archives work content, creates a new root, or logs out.
-        if recipe == crate::client_data::CLEAR_RESIDUE_RECIPE {
-            return self.clear_residue(e, p, r, j, journal);
+        match string(&p["extra"], "recipe")? {
+            crate::client_data::CLEAR_RESIDUE_RECIPE => self.clear_residue(e, p, r, j, journal),
+            crate::client_data::IDENTITY_RESET_RECIPE => self.identity_reset(e, p, r, j, journal),
+            _ => self.execute_auth_cleanup(e, p, r, j, journal),
         }
-        if recipe == crate::client_data::IDENTITY_RESET_RECIPE {
-            return self.identity_reset(e, p, r, j, journal);
-        }
-        let files = p["extra"]["files"].as_array().unwrap();
-        // Step 1: write the encrypted state backup for the mixed client-state
-        // files. This is a prerequisite for reset_client/retire and is always
-        // produced before logout or any removal. The work-content archive (with
-        // its own receipt field) is written later, still before any deletion.
-        if recipe != "repair_login" {
-            let mut state = vec![];
-            for f in files
-                .iter()
-                .filter(|f| f["category"] == "client_state" && !f["snapshot"].is_null())
-            {
-                state.push(json!({"path":f["path"],"data":read(Path::new(string(f,"path")?),8*1024*1024)?}));
-            }
-            let bytes = archive::seal(
-                &json!({"schema":"lintel.state/1","files":state}),
-                work::check_passphrase(r)?,
-            )?;
-            let backup = self
-                .state
-                .join("archives")
-                .join(format!("{}-state.age", string(j, "id")?));
-            j["steps"].as_array_mut().unwrap().push(json!({"id":"state_backup","label":"混合客户端状态备份","status":"executing","message":"正在写入加密状态备份；尚未注销或删除旧文件。"}));
-            j["state_archive_path"] = json!(backup);
-            save(journal, j)?;
-            atomic_new(&backup, &bytes, 0o600)?;
-            if read(&backup, 64 * 1024 * 1024)? != bytes {
-                return Err(err("archive_readback_failed", "状态备份未能读回，未清理"));
-            }
-            *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"state_backup","label":"混合客户端状态备份","status":"completed","message":"加密状态备份已写入并读回；独立于可迁入的工作包。"});
-            save(journal, j)?;
-        }
-        // Step 2: independently archive the selected work content. Never destructive.
-        if recipe != "repair_login" {
-            self.archive_work(e, p, r, j, journal)?;
-        }
-        // Step 3: for reset_client, create the new root and migrate the selected
-        // work that step 2 already archived. The canonical reset order keeps all
-        // preservation (state backup, work archive, fresh root + migration) ahead
-        // of every destructive action (logout and file removal).
-        if recipe == "reset_client" {
-            self.migrate_to_new_root(e, p, r, j, journal)?;
-        }
-        // Preservation can take time. Recheck both recipes at the common first
-        // destructive boundary, including local-only cleanup without logout.
-        j["steps"].as_array_mut().unwrap().push(json!({"id":"quiescence","label":"破坏性操作前复查","status":"executing","message":"复查写入进程、service hold 与冻结文件；失败时保留已完成工作产物。"}));
-        save(journal, j)?;
-        self.check_cleanup(e, p, r)?;
-        j["steps"].as_array_mut().unwrap().last_mut().unwrap()["status"] = json!("completed");
-        save(journal, j)?;
-        // Step 4: official logout (may contact the server), rechecked against the
-        // approved scope. A failure here stops the run with the archives and the
-        // prepared new root retained, and no approved local file deleted.
-        if p["extra"]["official_logout"] == true {
-            j["steps"].as_array_mut().unwrap().push(json!({"id":"logout","label":"官方注销","status":"executing","message":"命令结果不确定时不会自动重跑。"}));
-            save(journal, j)?;
-            let (code, _) = bounded(self.auth_command(e, "logout")?)?;
-            if code != 0 {
-                return Err(err(
-                    "logout_failed",
-                    "官方注销未成功；后续本地删除未执行，已完成归档保留",
-                ));
-            }
-            let auth = self.auth_probe(&json!({"environment_id":e["id"]}))?;
-            if auth["logged_in"] != false {
-                return Err(err(
-                    "logout_unverified",
-                    "官方命令返回后仍存在认证来源；未继续删除",
-                ));
-            }
-            *j["steps"].as_array_mut().unwrap().last_mut().unwrap() = json!({"id":"logout","label":"官方注销与读回","status":"completed","message":"CLI 报告已退出登录；服务端 token 撤销未独立验证。"});
-            save(journal, j)?;
-        }
-        // Step 5: remove exactly the frozen local files, each rechecked.
-        for f in files {
-            let path = Path::new(string(f, "path")?);
-            let current = snapshot(path)?;
-            if current.is_null() {
-                continue;
-            }
-            if current != f["snapshot"] {
-                return Err(err(
-                    "cleanup_conflict",
-                    "处理期间文件发生变化，保留新状态；未自动重复清理",
-                ));
-            }
-            j["steps"].as_array_mut().unwrap().push(json!({"id":f["category"],"label":f["path"],"status":"executing","message":"仅处理预览冻结的文件。"}));
-            let quarantine = path.parent().unwrap().join(format!(
-                ".lintel-quarantine-{}-{}",
-                string(j, "id")?,
-                string(f, "category")?
-            ));
-            j["steps"].as_array_mut().unwrap().last_mut().unwrap()["quarantine_path"] =
-                json!(quarantine);
-            save(journal, j)?;
-            quarantine_remove(path, &f["snapshot"], &quarantine)?;
-            if path.exists() {
-                return Err(err(
-                    "state_reappeared",
-                    "清理后检测到状态重新出现，需要核对写入来源",
-                ));
-            }
-            j["steps"].as_array_mut().unwrap().last_mut().unwrap()["status"] = json!("completed");
-            save(journal, j)?;
-        }
-        // Step 6: retire the environment registration (retain recipe only).
-        if recipe == "retire" {
-            let mut all = self.inventory()?;
-            for entry in &mut all {
-                if entry["id"] == e["id"] {
-                    entry["status"] = json!("retired");
-                }
-            }
-            save(&self.state.join("inventory.json"), &json!(all))?;
-            j["steps"].as_array_mut().unwrap().push(json!({"id":"retire","label":"环境已退役","status":"completed","message":"环境停止作为启动目标；原始工作文件仍保留。"}));
-        }
-        let verified = p["extra"]["official_logout"] == true;
-        j["status"] = json!(if verified {
-            "completed"
-        } else {
-            "partially_completed"
-        });
-        j["local_cleanup"] = json!("completed");
-        j["remote_revocation"] = json!("unverified");
-        if !verified {
-            j["warnings"].as_array_mut().unwrap().push(json!(
-                "已处理预览内的本地文件；未执行官方注销，Keychain 与目录外认证状态未知。"
-            ));
-        }
-        j["warnings"].as_array_mut().unwrap().push(json!("此结果仅覆盖预览列出的 Claude Code 状态；浏览器、Desktop/IDE、外部 supervisor 与目录外 profile 不在本次范围内。"));
-        Ok(())
     }
 }
 

@@ -6,6 +6,7 @@ import {Icon,Notice} from './ui';
 import RequestFailure,{asError} from './RequestFailure';
 import {useI18n} from './i18n-provider';
 import {present} from './i18n-presentation';
+import {ComponentAuthentication} from './AuthenticationSources';
 
 const stateKeys:Record<string,string>={observed:'component.state.observed',not_found:'component.state.notFound',unknown:'component.state.unknown',unsupported:'component.state.unsupported',separate_module:'component.state.separateModule',access_limited:'component.state.accessLimited',observed_directory:'component.state.observedDirectory',unsupported_type:'component.state.unsupportedType'};
 const entryKeys:Record<string,string>={policy:'component.entry.policy',cleanup:'component.entry.cleanup',browser:'component.entry.browser',service:'component.entry.service',launch:'component.entry.launch'};
@@ -34,11 +35,11 @@ export default function ComponentPanel({send=request,environment,onEntry,onJob}:
     {report&&<>
       <p className="small-print">{formatDateTime(report.checked_at)} · {t('component.configRoot')} <code>{report.root}</code>{report.project_cwd&&<> · {t('component.project')} <code>{report.project_cwd}</code></>}</p>
       <div className="component-list">{report.items.map(item=><section className="component-row" key={item.id} data-component={item.id}>
-        <div className="component-heading"><h3>{item.title}</h3><span className="component-state">{stateName(item.state)}</span></div>
-        <p>{item.detail}</p><p className="small-print">{t('component.scopeLine',{scope:item.scope,source:item.source})}</p>
+        <div className="component-heading"><h3>{presentText(item.title)}</h3><span className="component-state">{stateName(item.state)}</span></div>
+        <p>{presentText(item.detail)}</p><p className="small-print">{t('component.scopeLine',{scope:presentText(item.scope),source:item.source})}</p>
         {item.id==='cli'&&<div className="fact-row"><span>{t('component.currentChoice')}</span><code>{item.facts.selected_executable??t('component.notLocated')}</code></div>}
         {item.facts.sources&&<details><summary>{t('component.viewSources')}</summary><ul className="component-sources">{item.facts.sources.map((source)=><li key={source.scope+source.path}><strong>{source.scope}</strong> · {stateName(source.state)}<code>{source.path}</code>{source.content_state==='unknown'&&<span>{t('component.contentUnknown')}</span>}{source.hooks_declared&&<span>{t('component.hooksDeclared')}</span>}{source.mcp_declared&&<span>{t('component.mcpDeclared')}</span>}</li>)}</ul></details>}
-        {item.id==='authentication'&&<p className="small-print">{t('component.authFiles',{credential:stateName(item.facts.credential_file?.state??'unknown'),shared:stateName(item.facts.shared_profile?.state??'unknown')})}</p>}
+        {item.id==='authentication'&&<><p className="small-print">{t('component.authFiles',{credential:stateName(item.facts.credential_file?.state??'unknown'),shared:stateName(item.facts.shared_profile?.state??'unknown')})}</p><ComponentAuthentication key={JSON.stringify([report.environment_id,report.root,report.project_cwd])} send={send} environmentId={report.environment_id} project={report.project_cwd??''}/></>}
         {item.facts.services?.map((service)=><div className="component-service" key={service.manager+service.unit}><code>{service.manager} / {service.unit}</code><p>{service.state==='observed'&&service.current?t('component.serviceObserved',{state:service.current.active_state,quiesced:service.current.quiesced?t('component.quiesceValid'):t('component.quiesceUnconfirmed')}):t('component.serviceUnverifiable')} · {t('component.originalRecord',{status:service.recorded_status})}</p><button onClick={()=>onJob(service.original_job_id)}>{t('component.checkOriginalService')}</button></div>)}
         {item.facts.services_truncated&&<p className="small-print">{t('component.servicesTruncated')}</p>}
         {item.next_action!=='none'&&entryKeys[item.next_action]&&<button className="text-button" onClick={()=>onEntry(item.next_action)}>{t(entryKeys[item.next_action])}<Icon name="arrow" size={14}/></button>}

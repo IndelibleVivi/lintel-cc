@@ -179,21 +179,33 @@ esac
     fake.chmod(0o700)
     auth_root = home / "auth-cc"
     auth_root.mkdir()
-    (auth_root / ".credentials.json").write_text('{"synthetic":"preserved"}')
+    (auth_root / ".credentials.json").write_text('{"claudeAiOauth":{"accessToken":"SYNTHETIC_PIPE_SELECTED_LOGIN"},"mcpOAuth":{"synthetic":"preserved"}}')
     environment = default_call("request", dict(command="register", name="Synthetic pipe auth context", root=str(auth_root)))
+    refused = subprocess.run([str(binary), "request"], input=json.dumps(dict(command="plan_cleanup", environment_id=environment["id"], recipe="repair_login",
+                             writers_confirmed_stopped=True, official_logout=True)), text=True, capture_output=True, env=env, timeout=45)
+    assert json.loads(refused.stdout)["error"]["code"] == "official_logout_scope_unsafe", refused.stdout
     auth_plan = default_call("request", dict(command="plan_cleanup", environment_id=environment["id"], recipe="repair_login",
-                                            writers_confirmed_stopped=True, official_logout=True))
+                                            writers_confirmed_stopped=True, official_logout=False))
     # Simulate a manager's stripped environment while the private input frame
-    # carries the original caller's changed auth scope. No real Claude is used.
+    # carries the original caller's changed auth scope. The supported local edit
+    # must report this additional source without persisting its value. No Claude
+    # status/helper/logout is requested or executed.
     original_env = dict(env, ANTHROPIC_PROFILE="SYNTHETIC_PIPE_PRIVATE_SCOPE")
     header = json.dumps([(list(os.fsencode(k)),list(os.fsencode(v))) for k,v in original_env.items()])
     response = subprocess.run([str(binary), "__worker", "--exec-context", json.dumps({"mode":"setsid","unit":None})],
         input=header + "\n" + json.dumps(dict(command="execute", plan_id=auth_plan["id"], approval=auth_plan["hash"])),
         capture_output=True, text=True, env=env, timeout=45)
-    refused = json.loads(response.stdout)
-    assert refused["error"]["code"] == "shared_auth_scope", refused
-    assert (auth_root / ".credentials.json").read_text() == '{"synthetic":"preserved"}'
+    accepted = json.loads(response.stdout)
+    assert accepted["ok"] and accepted["data"]["status"] == "accepted", accepted
+    receipt = default_call("request", dict(command="job", plan_id=auth_plan["id"]))
+    assert receipt["status"] == "partially_completed" and receipt["local_cleanup"] == "completed", receipt
+    assert json.loads((auth_root / ".credentials.json").read_text()) == {"mcpOAuth": {"synthetic": "preserved"}}
+    profile = next(source for source in receipt["auth_verification"]["inventory"]["sources"]
+                   if source["kind"] == "process_env" and source["name"] == "ANTHROPIC_PROFILE")
+    assert profile["presence"] == "present" and profile["evidence"] == "observed_context", profile
+    assert profile["actual_use"] == "unverified", profile
     assert not (auth_root / "unexpected-logout").exists()
-    assert not (default_state / "jobs" / f'{auth_plan["id"]}.json').exists()
+    assert (default_state / "jobs" / f'{auth_plan["id"]}.json').exists()
     assert all("SYNTHETIC_PIPE_PRIVATE_SCOPE" not in path.read_text() for path in default_state.rglob("*.json"))
-    print("PASS: trusted execution facts/default state/wrong cgroup; private worker environment restores auth checks before accept without persisting values")
+    assert all("SYNTHETIC_PIPE_SELECTED_LOGIN" not in path.read_text() for path in default_state.rglob("*.json"))
+    print("PASS: trusted execution facts/default state/wrong cgroup; unsafe logout refused; private worker environment reaches independent auth coverage without persisting values")
