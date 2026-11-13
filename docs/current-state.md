@@ -4,9 +4,12 @@
 
 本轮在 Keychain 接续源码上测试并修正三处操作语境：登记不存在目录时提供可重试的说明并保留原始诊断；只归档工作时不再展示配置检查／OS 隔离的通用提示和空配置 diff；归档完成页保留阅读入口，移除不适用的启动客户端及配置恢复空话。其他配置计划的必要提示、旧回执及原任务查询语义保留。公开 App 0.1.1／CLI 0.1.0 未更新，没有安装、Release 或部署。
 
+[PR #6](https://github.com/IndelibleVivi/lintel-cc/pull/6) 已合并。产品 source 为 `a563cd7901af3630a610067ed2043bf5de99430e`，main merge 为 `cad1a90e74849014f7eb7e1b5a075811de7b0938`，两者 tree 相同；后续证据说明提交不替换产品 source SHA。
+
 | 证据层 | 已观察事实与边界 |
 | --- | --- |
 | Core／CLI | 本机工作保全单元组 25/25 通过；归档 warning 回归先失败、修复后通过，并验证策略计划保留原提示。真实 CLI 的 help/schema/context、环境登记、认证错误／精确选择、加密包读取与原 ID 等待旅程通过；未发现确认的 CLI 产品缺陷 |
+| 跨平台 CI | [CI 43429347861](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43429347861) 的 core profile 完整矩阵 14/14 jobs success；最终 production aggregate 读取 12 份 canonical evidence，确认每个选中的 job／check 均通过，包含两平台 GUI／Core／CLI／大包、Linux OpenSSH 与 disposable VM |
 | built App | 新 runner 下 work-ui、auth-sources-ui、i18n-test、i18n-coverage-test、journey-agent-cli 通过。baseline-ui 的导航下一帧焦点竞态经可控 frame 观察定位，修正测试的完成边界后 strict 复跑通过，保留真实键盘及日夜焦点断言；没有修改产品导航语义 |
 | 原生 macOS | 独立 QA bundle、合成 HOME/state 的真实 WebKit 完成精确三文件归档、错误口令反馈、Quit 后重开与重新解锁、三份原文及会话结构／raw 文本读取；中文选择保留。修复后 bundle 观察到登记缺失对象的准确提示。文件、测试 Keychain 与注入合计五项来源同预览一次批准、独立复查，MCP／plugin／未知字段、item identity 及工作原文保留，无额外清理 job |
 | 验收限制 | native QA 的 Keychain 使用合成 adapter，不代表个人 Keychain／真实账号。修复后归档专属展示以 built-App Chromium 和 Core 回归验证；后半程 QA 窗口不可见，未扩大原生目视证据。其他架构、真实 Claude／生产 SSH／首装信任与正式发行仍独立 |

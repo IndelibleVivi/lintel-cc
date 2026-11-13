@@ -52,6 +52,8 @@ The table below lists the equivalent raw commands; [开发与文档](../README.m
 
 `work-ui` 验证只归档预览保留冻结原件／保留范围／实际步骤，隐藏空配置区；真实 `archive_only` 结果不提供客户端启动／配置恢复空话，仍可进入资料阅读。非 archive 的配置反馈有独立正常案例。Core 工作组 25/25 通过，包含 archive-only 不含无关 warning、策略计划仍保留配置范围提示；新增 warning 断言修复前失败、修复后通过。本机 fresh runner 的 work-ui、auth-sources-ui、i18n 两项及 journey-agent-cli 均通过，baseline 焦点边界修正后单独 strict 通过。修复后归档专属展示尚未形成完整 native 目视验收；后半程 QA 窗口不可见，不能把 AX 或 Chromium 当成补齐的截图证据。
 
+产品 source `a563cd7901af3630a610067ed2043bf5de99430e` 的 [CI 43429347861](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43429347861) 已完成：core profile 的 14 个 jobs 全部 success，production aggregate 下载读取 12 份 canonical evidence 并确认全部选中检查通过。CI 使用 clean PR merge checkout `65f76f9da74f596446e5091ba78d52e600cac759`；合并后的 main `cad1a90e74849014f7eb7e1b5a075811de7b0938` 与产品 source 的 tree 已本地比对相同。
+
 这些是未发布源码的合成使用证据；不代表 Release、安装、其他架构实际 runtime、个人认证、生产远端或干净 Mac 首装验收。
 
 ## 客户端控制增强
