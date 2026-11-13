@@ -14,22 +14,22 @@
 | 兼容与恢复 | 旧 accepted 原 ID 保持 query-only。未执行旧计划缺新绑定须重预览；旧 raw caller 可省略新增字段，但新计划仅默认选择精确可识别的目标本地登录字段 |
 | 平台边界 | 开发与测试只用 synthetic roots／inert adapters。macOS Keychain、实际 Terminal/IDE 登录、其他架构与生产 SSH 的真实行为仍需独立验收；历史 CI／native 通过不覆盖本轮 |
 
-原 PR 验证基线为 `dcb280693970c3d89ce2b2dd5a2c3a4be97dcb4f`，基于 main `77be0034df4d174d24203dedcb05e3f65f0f4688`；[PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4) 记录集成状态。源码、验证和发行分开：下列证据不代表已安装 App 或公开下载已更新。
+认证实现 source head 为 `9a7ae90eaad76c52e500f557b42da4e91aac607c`，基于原 main `77be0034df4d174d24203dedcb05e3f65f0f4688`；[PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4) 已合并到 main，merge commit 为 `57b23c41a59d81952f676b24c2695c09cf1e880a`。后续证据说明提交不替换产品 source SHA。源码、验证和发行分开：下列证据不代表已安装 App 或公开下载已更新。
 
 | 层次 | 最终证据与边界 |
 | --- | --- |
-| 原 PR 基线完整 CI | [CI 43376396653](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43376396653) 的 14 个 jobs 全部 success；12 份 canonical reports 均绑定 clean merge checkout `ccd5c6bd9645d6ee7bafc9f43e3581f104216a05`，119 次选中检查执行全部 passed；接续审查已下载读回报告并复跑 production aggregate，通过 |
-| Core／CLI | 两平台 native 各 18/18 checks，认证专项各 37/37 testcase；同一批 testcase 的跨平台执行不合计成不同测试。精确字段、共享文件保留、外部改写、中断暂存、原 ID 查询、状态命令重建凭据与无秘密持久化均有 synthetic 证据 |
+| 完整 CI | [CI 43386040362](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43386040362) 的 14 个 jobs 全部 success；12 份 canonical reports 均绑定 clean merge checkout `3390d4e15a6f58a373f5a4b145a09532874a0478`，119 次选中检查执行全部 passed；接续审查已下载读回报告并复跑 production aggregate，通过 |
+| Core／CLI | 两平台 native 各 18/18 checks，认证专项各 39/39 testcase；同一批 testcase 的跨平台执行不合计成不同测试。精确字段、共享文件保留、外部改写、中断暂存、原 ID 查询、状态命令重建凭据与无秘密持久化均有 synthetic 证据 |
 | 前端／浏览器 | Ubuntu frontend 14/14、macOS 15/15；browser 各 19/19。built App 通过真实 Chromium 与 synthetic Core 验证来源选择、单次批准、四层结果、独立复查、主机迟到响应及接收不确定期间不重提；不等于 native WebKit／真实 Keychain 验收 |
 | 工作／CLI 包／SSH | 两平台 heavy 各 6/6、CLI candidate 各 1/1，Ubuntu loopback OpenSSH 1/1。CLI candidate 内部的 `real_input_smoke` 缺正式输入而 skipped；不能扩大为完整正式发行包 gate |
-| Linux VM | disposable guest 全旅程通过；认证场景只提交一次、查询同一原 ID 14 次，保留 manager／调用环境、未知凭据且不持久化私有变量；真实 reboot 后核对与服务恢复通过。本次首次 ACK 是 `accepted`，不是迟到接收实证；`submission_uncertain`／接收前 `job_not_found` 由控制测试和两平台浏览器回归覆盖 |
-| 当前 Mac 接续 | 原 PR 基线在本机 fresh 通过 8 个 canonical checks（认证 core、CLI、SSR、i18n、SSH、desktop build／built-App UI）。接续审查发现并修复 runtime 执行器缺失→发现后跳过冻结的问题：两条新回归修复前均失败、修复后均通过；修复后 workspace、认证 core 39/39、CLI 与 built-App UI 四项 canonical checks 通过，最新提交的完整 CI 状态仍须按 PR 当前 head 核对 |
+| Linux VM | disposable guest 全旅程通过；认证场景只提交一次、查询同一原 ID 24 次，保留 manager／调用环境、未知凭据且不持久化私有变量；真实 reboot 后核对与服务恢复通过。本次首次提交实际返回 `submission_uncertain`，查询曾得到接收前 `job_not_found`，随后同一原 ID 取得回执；这是本次 guest 的实际恢复证据，控制测试和两平台浏览器回归也继续覆盖该分支 |
+| 当前 Mac 接续 | 原 PR 基线在本机 fresh 通过 8 个 canonical checks（认证 core、CLI、SSR、i18n、SSH、desktop build／built-App UI）。接续审查发现并修复 runtime 执行器缺失→发现后跳过冻结的问题：两条新回归修复前均失败、修复后均通过；修复后 workspace、认证 core 39/39、CLI 与 built-App UI 四项 canonical checks 通过；上表完整 CI 验证同一修复提交 |
 | 网站源投影 | 21 logical routes／16 paired guides／42 locale URLs，生成和语言路由检查属于源码证据；线上仍为下文 10-21 的 40 页部署 |
 | 独立未验收 | native macOS WebKit、真实 Claude 版本／账号／Keychain、生产 SSH 和其他架构实际 runtime。没有新 Release、App 安装、updater 激活或官网部署 |
 
 接续修订统一复查状态程序的登记路径、当前发现值及冻结身份，缺失状态同样属于批准绑定；原批准与带原 ID 的复查不会采用后来出现的程序，新的显式当前状态观察保持可用。所有检查只用 synthetic HOME/state、惰性客户端和 bundled Chromium。
 
-原 PR 前轮失败均已在上述基线 revision 收口：新增指南后的精确 payload 数量、认证专用 VM fixture 的临时目录／symlink 边界，以及慢 guest 超过既有 40 秒 ACK 窗口后只查询原 ID 的 harness。生产 timeout、安全检查和 no-replay 规则没有放宽。下方 `c7680f0` 构建／CI 仅属于 10-24 候选，不作为本轮认证改动的验收。
+认证开发期间的前轮失败均已在最终 source 收口：新增指南后的精确 payload 数量、认证专用 VM fixture 的临时目录／symlink 边界，以及慢 guest 超过既有 40 秒 ACK 窗口后只查询原 ID 的 harness。生产 timeout、安全检查和 no-replay 规则没有放宽。下方 `c7680f0` 构建／CI 仅属于 10-24 候选，不作为本轮认证改动的验收。
 
 ## 2026-10-24：未发布的恢复闭环与有界历史
 

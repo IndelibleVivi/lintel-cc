@@ -1,8 +1,10 @@
 # Credential provenance and verified cleanup
 
-Status: source-complete; baseline full CI verified, integration fix awaiting its own exact-head CI, 2026-11-13. Base: `77be003` on main.
-Branch: `codex/credential-provenance`. Exact committed revision and hosted checks
-are recorded by the pull request; no release or deployment is implied.
+Status: source-complete, exact-source full CI verified and merged via
+[PR #4](https://github.com/IndelibleVivi/lintel-cc/pull/4), 2026-11-13.
+Source head: `9a7ae90eaad76c52e500f557b42da4e91aac607c`.
+Main merge: `57b23c41a59d81952f676b24c2695c09cf1e880a`.
+Baseline: `77be003`. No release, installation or deployment is implied.
 
 ## Outcome
 
@@ -46,7 +48,7 @@ mutation checks use synthetic homes and inert clients only.
 ## Acceptance evidence
 
 Verified through the repository entrypoint: `cargo-workspace-test`,
-`auth-sources-core-test` (37 selected tests), `journey-auth-sources`,
+`auth-sources-core-test` (39 selected tests), `journey-auth-sources`,
 `journey-client-control`, `shared-remote-journey`, `journey-portable-work`,
 `journey-cli`, `journey-submission`, `python-ssh-test` (17 tests), desktop
 typecheck/build, both i18n checks and `auth-sources-render-test` (six SSR tests).
@@ -65,30 +67,29 @@ bindings, parent identity before readback, consistent status parsing and final
 local readback after optional status. Synthetic boundaries are checked before
 credential reads.
 
-The original verified PR baseline is `dcb280693970c3d89ce2b2dd5a2c3a4be97dcb4f`.
-[Full CI 43376396653](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43376396653)
-passed all 14 jobs. The 12 downloaded canonical reports bind the same clean
-merge checkout `ccd5c6bd9645d6ee7bafc9f43e3581f104216a05`; all 119 selected
-check executions passed, and the production aggregate was independently rerun.
-Both platforms passed the focused 37-test authentication suite and all 19
-browser checks. A subsequent macOS arm64 run passed eight targeted canonical
-checks on the source head, including the built-App authentication journey.
-This is Chromium with synthetic Core, not native WebKit or real credentials.
-
-Earlier runs exposed an outdated website payload count, the auth-only VM
-fixture's temporary-root boundary, and a harness assumption that admission
-always acknowledges within the production 40-second window. Those failures
-were fixed without weakening production timeouts, safety checks or no-replay.
-The final VM report records one submission and 14 original-ID queries, with
-`initial_outcome: accepted`, followed by real reboot reconciliation and service
-restoration. It does not claim late acceptance after an uncertain ACK in that
-run; controller regressions and both browser journeys cover that branch.
+[Full CI 43386040362](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43386040362)
+passed all 14 jobs on the final source. All 12 downloaded canonical reports
+bind clean merge checkout `3390d4e15a6f58a373f5a4b145a09532874a0478`;
+all 119 selected check executions passed, and the production aggregate was
+independently rerun. Both platforms passed the focused 39-test authentication
+suite and all 19 browser checks. Local macOS checks also passed the complete
+Cargo workspace, authentication CLI and built-App Chromium journeys.
 
 The integration review found and repaired a missing-executable approval gap:
 absence is now frozen alongside path and identity, both before acceptance and
 when rechecking an original task. Two synthetic regressions failed before the
 fix and passed after it; a new explicit observation without an original job ID
-remains available. The corrected source needs its own exact-head CI evidence.
+remains available. Bilingual guidance and its generated mirrors describe this
+boundary.
+
+Earlier runs exposed an outdated website payload count, the auth-only VM
+fixture's temporary-root boundary, and an assumption that admission always
+acknowledges within the production 40-second window. The final VM actually
+returned `submission_uncertain`, observed preaccept `job_not_found`, then
+obtained the original receipt through 24 queries after exactly one submission.
+Real reboot reconciliation and service restoration also passed. Production
+timeouts, safety checks and no-replay rules were not relaxed. These are
+synthetic/disposable-host results, not native WebKit or real credentials.
 
 ## Continue here
 
