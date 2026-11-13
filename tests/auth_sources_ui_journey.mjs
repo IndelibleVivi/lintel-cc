@@ -50,7 +50,21 @@ try{
   }
   throw new Error('unexpected synthetic invoke '+command);
  });
- await page.addInitScript(()=>{try{localStorage.setItem('lintel.language','zh-CN');}catch{}window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>command==='app_set_language'?null:command==='app_preferred_languages'?['zh-CN']:window.syntheticInvoke(command,args)};});
+ await page.addInitScript(()=>{
+  try{localStorage.setItem('lintel.language','zh-CN');}catch{}
+  window.isTauri=true;window.__authInventoryResponses={};
+  window.__TAURI_INTERNALS__={invoke:(command,args)=>{
+   if(command==='app_set_language')return null;
+   if(command==='app_preferred_languages')return ['zh-CN'];
+   return window.syntheticInvoke(command,args).then(response=>{
+    const payload=args?.payload;
+    if(command==='remote_request'&&payload?.op==='request'&&payload.request.command==='auth_inventory'){
+     window.__authInventoryResponses[payload.alias]=(window.__authInventoryResponses[payload.alias]||0)+1;
+    }
+    return response;
+   });
+  }};
+ });
  await page.goto(url);
  // Environment / Components only reads credential declarations after a click.
  await page.getByRole('button',{name:'环境详情',exact:true}).click();await page.getByRole('tab',{name:'关联组件',exact:true}).click();
@@ -106,8 +120,13 @@ try{
  await dialog.getByRole('button',{name:'Close panel',exact:true}).click();await page.getByRole('combobox',{name:'Interface language',exact:true}).selectOption('zh-CN');
  async function selectHost(alias){await page.locator('.host-switch').click();await page.getByRole('dialog').locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'连接并管理',exact:true}).click();await page.locator('.host-switch').getByText(alias,{exact:true}).waitFor();await page.getByRole('button',{name:'清理与重建',exact:true}).click();}
  await selectHost(aliases[0]);inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field]').waitFor();
+ const completedA=await page.evaluate(alias=>window.__authInventoryResponses[alias]||0,aliases[0]);
  held={};held.promise=new Promise(resolve=>held.release=resolve);await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();await wait(()=>requested);
- await selectHost(aliases[1]);await inventory.locator('[data-auth-kind=credential_field]').waitFor();held.release();held=null;await page.waitForTimeout(100);
+ await selectHost(aliases[1]);await inventory.locator('[data-auth-kind=credential_field]').waitFor();held.release();held=null;
+ // Observe the actual A response delivered into the page, then allow the
+ // request continuation and React rendering to run before inspecting B.
+ await page.waitForFunction(({alias,previous})=>(window.__authInventoryResponses[alias]||0)>previous,{alias:aliases[0],previous:completedA});
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  const finalText=await inventory.innerText();assert.ok(finalText.includes(cores.get(aliases[1]).root));assert.equal(finalText.includes(cores.get(aliases[0]).root),false);
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),1);assert.equal(await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).isChecked(),false);
  await page.screenshot({path:path.join(artifacts,'auth-inventory-zh-dark-900.png')});

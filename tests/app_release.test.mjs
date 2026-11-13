@@ -115,14 +115,14 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  const pack=(out,extra=[])=>spawnSync(process.execPath,[path.join(repo,'scripts/prepare-site.mjs'),'--media-dir',media,'--out',path.join(dir,out),...extra],{cwd:repo,encoding:'utf8'});
  assert.equal(pack('plain').status,0);const plain=await readFile(path.join(dir,'plain/index.html'),'utf8');assert.match(plain,/没有正式 Release/);
  const plainBuild=JSON.parse(await readFile(path.join(dir,'plain/site-build.json')));
- assert.equal(plainBuild.files.length,65);
+ assert.equal(plainBuild.files.length,67);
  assert.deepEqual(await readFile(path.join(dir,'plain/assets/favicon.png')),await readFile(path.join(repo,'apps/desktop/src-tauri/icons/128x128.png')),'payload preserves the canonical raster identity export');
- assert.equal(plainBuild.locales.length,40);
- assert.equal(plainBuild.files.filter(file=>file.path==='index.html'||file.path.endsWith('/index.html')).length,40);
+ assert.equal(plainBuild.locales.length,42);
+ assert.equal(plainBuild.files.filter(file=>file.path==='index.html'||file.path.endsWith('/index.html')).length,42);
  assert.deepEqual(await readFile(path.join(dir,'plain/sitemap.xml')),await readFile(path.join(repo,'apps/site/sitemap.xml')),'payload sitemap matches the canonical generated artifact');
  const packagedSitemap=await readFile(path.join(dir,'plain/sitemap.xml'),'utf8');
- assert.equal([...packagedSitemap.matchAll(/<loc>/g)].length,40);
- assert.equal([...packagedSitemap.matchAll(/hreflang="x-default"/g)].length,40);
+ assert.equal([...packagedSitemap.matchAll(/<loc>/g)].length,42);
+ assert.equal([...packagedSitemap.matchAll(/hreflang="x-default"/g)].length,42);
  const packagedGuide=await readFile(path.join(dir,'plain/en/guide/start-here/index.html'),'utf8');
  assert.match(packagedGuide,/<meta property="og:site_name" content="Lintel">/);
  assert.match(packagedGuide,/<meta name="twitter:title" content="First use · Lintel">/);
@@ -130,7 +130,7 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  assert.equal(plainBuild.files.some(file=>/\/(?:lintel-intro\.mp4|lintel-film-poster\.jpg)$/.test(file.path)),true);
  assert.equal(plainBuild.files.some(file=>/(?:^|\/)\.\.\/|(?:^|\/)qa\/|\.app\.tar\.gz$|\.dmg$/.test(file.path)),false);
  assert.equal(JSON.stringify(plainBuild).includes(repo),false);
- for(const name of ['download/index.html','en/download/index.html','releases/index.html','en/releases/index.html','guide/start-here/index.html','en/guide/start-here/index.html','guide/operator-guide/index.html','en/guide/operator-guide/index.html']){
+ for(const name of ['download/index.html','en/download/index.html','releases/index.html','en/releases/index.html','guide/start-here/index.html','en/guide/start-here/index.html','guide/operator-guide/index.html','en/guide/operator-guide/index.html','guide/cleanup/index.html','en/guide/cleanup/index.html']){
   assert.ok(plainBuild.files.some(file=>file.path===name),`plain payload includes ${name}`);
  }
  const plainDownload=await readFile(path.join(dir,'plain/download/index.html'),'utf8');
