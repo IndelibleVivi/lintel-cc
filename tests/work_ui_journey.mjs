@@ -62,8 +62,10 @@ try{
   assert.equal((await dialog.innerText()).includes('本次不修改配置字段'),false);
   await page.evaluate(()=>Promise.all(document.getAnimations({subtree:true}).filter(animation=>Number.isFinite(animation.effect.getComputedTiming().iterations)).map(animation=>animation.finished.catch(()=>{}))));
   await page.screenshot({path:path.join(fixture,'archive-only-preview.png')});
+  await checkArchivePhrases('preview');
   await approve();
   await dialog.getByRole('button',{name:'查看工作归档',exact:true}).waitFor();
+  await checkArchivePhrases('result');
   assert.equal(await dialog.getByRole('button',{name:'打开 Claude',exact:true}).count(),0,'archive-only result offers reading, not a client launch');
   assert.equal((await dialog.innerText()).includes('此任务没有可用配置恢复动作'),false,'archive-only result omits irrelevant configuration restoration advice');
   await page.screenshot({path:path.join(fixture,'archive-only-result.png')});
@@ -212,6 +214,22 @@ try{
   assert.equal(await reader.getByRole('button',{name:'当前主机的任务归档',exact:true}).isDisabled(),true);
   report.checks.push('Modeled retained-probe receipt → real original-job query → exact scratch path visible in Day/Night; no replay or cleanup');
   report.calls=[...new Set(calls)];report.passed=true;
+  async function checkArchivePhrases(stage){
+    const phrases=stage==='preview'?[
+      ['原环境全部内容（不注销、不删除、不新建）','all original environment content (no logout, deletion or new environment)'],
+      ['settings、hooks、MCP 与插件文件','settings, hooks, MCP and plugin files'],
+    ]:[
+      ['妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。','Keep the archive passphrase safe; Lintel does not save it. If lost, this package cannot be unlocked.'],
+      ['原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。','The original environment, saved login and running processes are unchanged. Choose a separate recipe for cleanup.'],
+    ];
+    const evidence=process.env.LINTEL_WORK_UI_EVIDENCE||fixture;await mkdir(evidence,{recursive:true});
+    for(const locale of ['en','zh-CN']){
+      await page.locator('.language-switch select').selectOption(locale);
+      for(const pair of phrases)await dialog.getByText(pair[locale==='en'?1:0],{exact:true}).waitFor();
+      await page.screenshot({path:path.join(evidence,`archive-only-${stage}-${locale}.png`)});
+    }
+    report.checks.push(`Archive-only ${stage}: exact English projection and Chinese originals rendered`);
+  }
   async function approve(){
     await dialog.getByLabel('归档口令',{exact:true}).fill(password);
     await dialog.getByLabel('再次输入口令',{exact:true}).fill(password);

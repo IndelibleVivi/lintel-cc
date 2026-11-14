@@ -201,6 +201,10 @@ export const PRESENTATION_KEYS: Record<string, string> = {
   '非必要流量总开关': 'present.rule.disableNonessential',
   // Additional canonical core display text: preserves, coverage details and
   // step message bodies. Only exact verified strings; unknown stays raw.
+  "原环境全部内容（不注销、不删除、不新建）": 'present.archive.keep',
+  "settings、hooks、MCP 与插件文件": 'cleanup.keep2',
+  "妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。": 'present.archive.passphrase',
+  "原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。": 'present.archive.next',
   "settings、hooks、MCP 与插件文件（不自动激活到新环境）": 'present.preserve.0',
   "unit 配置与外部编辑": 'present.preserve.1',
   "任务后修改的其他字段": 'present.preserve.2',

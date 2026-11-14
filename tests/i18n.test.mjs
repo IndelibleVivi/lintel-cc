@@ -201,3 +201,22 @@ test('UI-owned errors retain finite wording identity and exact interpolation dat
     assert.ok(rendered.includes(args.reason));assert.ok(rendered.includes(args.unobserved));
   }
 });
+
+test('archive-only approval and next actions project exact canonical phrases', () => {
+  assert.equal(present('原环境全部内容（不注销、不删除、不新建）', 'en'), 'all original environment content (no logout, deletion or new environment)');
+  assert.equal(present('原环境全部内容（不注销、不删除、不新建）', 'zh-CN'), '原环境全部内容（不注销、不删除、不新建）');
+  assert.equal(present('settings、hooks、MCP 与插件文件', 'en'), 'settings, hooks, MCP and plugin files');
+  assert.equal(present('settings、hooks、MCP 与插件文件', 'zh-CN'), 'settings、hooks、MCP 与插件文件');
+  assert.equal(present('妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。', 'en'), 'Keep the archive passphrase safe; Lintel does not save it. If lost, this package cannot be unlocked.');
+  assert.equal(present('妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。', 'zh-CN'), '妥善保管归档口令；Lintel 不保存，遗失后无法解锁此包。');
+  assert.equal(present('原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。', 'en'), 'The original environment, saved login and running processes are unchanged. Choose a separate recipe for cleanup.');
+  assert.equal(present('原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。', 'zh-CN'), '原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。');
+});
+
+test('help build status interpolates the current version without denying earlier public downloads', () => {
+  for(const locale of ['en','zh-CN']) {
+    const value=translate(catalogs,locale,'app.helpScopeNotice',{version:'9.8.7'});
+    assert.ok(value.includes('9.8.7'));
+    assert.ok(!value.includes('0.1.0'));
+  }
+});
