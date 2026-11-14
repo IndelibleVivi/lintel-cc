@@ -1,5 +1,24 @@
 # 当前状态
 
+## 2026-11-14：独立发行审查与 0.2.0 Preview 候选加固
+
+本轮从 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66` 独立复核完整执行／恢复、认证来源、产品任务与分发路径，并实施已复现修复。产品最终 source **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`；[PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。PR #8 已合并为 `448d92bced6e87d34842bb5c54407e675e741653`，完整 tree 与产品 source 相同；独立 PR CI 43526971709 也 14/14 jobs success。其后最终证据更新只改文档。本节是新一轮结论，以下历史条目仍按各自 source 阅读。
+
+**发行决定：建议 0.2.0 Preview，按平台分别放行。** Linux x86_64/aarch64 CLI GO；macOS arm64 CLI 在真实下载隔离／信任说明收口后 CONDITIONAL GO；普通用户 macOS App NO-GO。App 有限技术 Preview 还需最后完整 native 任务／旧 App 升级和图形许可依据。公开 App 仍为 0.1.1 Preview、CLI 仍为 0.1.0；没有创建正式 Release、激活 updater 或部署官网。
+
+| 范围 | 当前源码与实际证据 |
+| --- | --- |
+| 认证正确性 | 保留默认／显式 `CLAUDE_CONFIG_DIR` 的不同认证 namespace；新独立 secure-storage selector 保守核对并冻结；修复实际 Linux writer alias 漏判。Claude 2.1.325 固定分发静态证据不是永久内部 API 合同 |
+| 执行恢复 | 损坏或部分远端记录不再消失成空历史；保留健康记录与原 ID，无法核对安装时在 SSH 前阻止新提交。FIFO 有界拒绝；rename 已发生而 fsync 失败时正确保留不确定副作用标志 |
+| TLS 及依赖 | 精确升级可达 TLS 根／验证器、Tokio、rustix，并配套 xattr 防止 size-query 兼容损失；真实 TLS 与大属性／列表红绿回归。旧公开 source 也包含受影响 TLS 版本，实际范围为 HTTPS upstream／probe，不泛化到所有 Claude TLS |
+| 最终源码 CI | [push 43526964668](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668)：14/14 jobs success；12 份 canonical reports，120 次按平台计的选中 check 执行全部 passed；root 下载读回并独立复跑 production aggregate，problems=[]。临时原生 Security.framework 与 Linux 8 writer 场景均已执行；内部 ignored bundle fixtures 另列，不算通过 |
+| 最终包／native | [candidate 43526964671](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964671)：三平台实际 archives 的 native 0.1.0→0.2.0 原 ID／加密资料实验通过；完整 App 64 文件、DMG／复制 App strict ad-hoc 校验通过；同源码 gate 已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate） |
+| 原生 App 交互 | 对最终 DMG 的实际 WebKit 窗口执行 11 个有限 AX 动作，9 个结果状态检查通过，10 张目标窗口图；中英、Night／system、历史／需环境提示和任务框可用。没有把它记为完整任务、升级、keyboard 或 VoiceOver 验收 |
+| 安装信任 | Gatekeeper 实际拒绝（exit 3），无公证票据（exit 65）；复制样本没有下载隔离。普通用户首次下载、Developer ID／公证与正式 App 升级均未通过 |
+| 网站 | 源码有 42 页、正确三平台旧公开 CLI 下载入口；最终两平台 site-ui 通过。线上仍为旧页面；完整媒体 payload 尚缺原有两份审核媒体，HTTP 取回受限，不能据此说官网离线 |
+
+初始 `e573ce2` 的 PTY／stdin 测试采集失败、第二套 `da7ebd2` 的数字端口断言失败及 gate 拒绝均保留。最终 source 修补安全依赖并直接验证原 listener owner／真实 tunnel；未无证据改写 production shutdown。报告与双语发行草稿见[完整工程交接](release-readiness-20261114/handoff.md)、[认证](release-readiness-20261114/auth-security.md)、[恢复](release-readiness-20261114/execution-recovery.md)、[依赖](release-readiness-20261114/dependency-security.md)、[产品](release-readiness-20261114/product-acceptance.md)、[发行](release-readiness-20261114/release-engineering.md)。
+
 ## 2026-11-14：文档、官网源码与 App 版式收尾
 
 本轮维护当前开发源码；公开 App 0.1.1／CLI 0.1.0 及已部署官网尚未更新。没有安装、Release、updater 激活或生产部署。

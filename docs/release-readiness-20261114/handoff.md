@@ -1,6 +1,10 @@
 # Lintel 0.2.0 Preview — 工程审查与发行交接
 
-**状态：最后一轮固定源码验收收束中。** 本文件汇总独立判断、代码与可执行交接；最终 source、CI、包摘要和分平台决策在验收完成后填写。第一套 `e573ce228e15ee6cb03c2705baf70a8bab1a8c75` 原生包已经通过三平台 CLI 兼容及 DMG 内容检查，但其 canonical CI 有两项测试采集失败，不能称为最终通过候选。
+**最终产品 source：`353536cc7dc3c8c63baa628955ee66332d95bcbb`，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`。** 本轮基于 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66`；修复进入 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。公开下载仍为 App 0.1.1 Preview／CLI 0.1.0，未创建 Release、激活 production updater 或部署官网。最终 canonical 与 candidate gate：已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate）。
+
+**发行建议：0.2.0 Preview，按平台分别决定。** Linux x86_64/aarch64 CLI：GO；macOS arm64 CLI：CONDITIONAL GO，补首下载隔离／信任路径；面向普通用户的 macOS App：NO-GO；有限技术 App Preview：在明确手动信任、完成所选包的 native 完整任务／升级及图形权利条件后 CONDITIONAL GO。这里的 GO 是工程建议，不代替所有者公开发布授权。
+
+源码已通过 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8) 合并为 **`448d92bced6e87d34842bb5c54407e675e741653`**；合并 tree 与固定产品 source 相同。除指定的 push CI 外，[PR CI 43526971709](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526971709) 也已 14/14 jobs success。本文和相关最终说明在其后以 **docs-only** 提交记录结果，不能改写候选的实际构建 source 或代替新代码验收。
 
 ## 阅读顺序
 
@@ -60,26 +64,46 @@ Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 C
 
 ## 3. 证据层与版本身份
 
-| 层 | 本轮已观察的内容 | 不能由这一层推导的结论 |
+| 层 | 最终观察与实际范围 | 不能由这一层推导的结论 |
 | --- | --- | --- |
-| Source | 最新 main 全路径审查；已确认问题修复、双语说明、明确版本 | 用户已安装新版、线上已经更新 |
-| Local synthetic/native Linux | Core 359 passed/2 容量手动 ignores；remote 62 passed/2 独立入口 ignores；真实文件/PTY/proc、故障注入、build/i18n/packaging | macOS GUI、个人账号、其他 CPU 原生运行 |
-| 历史完整 CI | PR #7 14 jobs、120 次选中检查，12 份 reports 独立 aggregate | 本轮所有新改动、正式输入内部 smoke、最终 DMG |
-| 首轮本次 CI | `e573ce2`：实际 Keychain API、两个平台 auth/remote UI、Linux native/SSH/VM 等；PTY/EPIPE 两项失败保留 | 失败未修正前的完整 gate 成功 |
-| Final CLI packages | 首轮三个实际 tar.gz 在 native macOS arm64/Linux x86_64/Linux aarch64 上通过旧公开 0.1.0 升级实验 | 浏览器下载 quarantine、旧程序写未来 state、生产 SSH |
-| Final DMG/package | 首轮完整 64 文件 App，严格 ad-hoc 签名、两版本 0.2.0，DMG mount/copy inventory 一致 | Developer ID 身份、公证、普通首次下载可开 |
-| Installed copy | 首轮临时目录复制 App 可活五秒；Gatekeeper exit 3、无 stapled ticket、无 quarantine | Finder/Applications 升级、完整可见用户旅程 |
-| Supplemental native window | 最后候选追加 CG/AX 只读观察；有既有截图许可才捕获目标窗口 | 没有做过的点击、VoiceOver 验收或系统信任例外 |
-| Deployed/public | 普通浏览器可访问旧 0.1.1 官网；旧 CLI 0.1.0 实际资产可下载 | 0.2.0 已公开、production updater 可用 |
+| Source | 最新 main 全路径审查；三个工程提交 `e573ce2` → `da7ebd2` → `353536cc`；最后一个为固定产品 source | 用户已安装新版、线上已经更新 |
+| Local synthetic/native Linux | 实际文件、PTY、Linux ps/proc、FIFO／rename-fsync 故障、路径替换、独立 TLS／xattr／TCP 反例；记录红／绿结果 | 其他 OS／CPU 或个人账户已验收 |
+| 历史完整 CI | PR #7 14 jobs、120 次按平台计的选中 checks；12 份报告重新聚合通过 | 本轮新改动或最终 DMG 已通过 |
+| Final canonical CI | [push 43526964668](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668)，exact clean `353536cc`；14/14 jobs success；12 份 canonical reports，120 次按平台计的选中 check 执行全部 passed；root 下载读回并独立复跑 production aggregate，problems=[] | 一份 aggregate 自动取消内部 ignored 项或模型边界 |
+| Final native auth | macOS 19/19、Linux 18/18 checks；auth 各 49 cases；临时 Security.framework Keychain、Linux 8 个活 writer 场景实际运行 | 个人账号 ACL、未来客户端版本、真实账户登录 |
+| Final UI/browser | 两平台各 19/19；frontend Mac 15/15、Linux 14/14；真实 Core 与 browser，invoke／SSH 边界明确建模 | Chromium 等同于 native WebKit、生产远端已操作 |
+| Final CLI packages | 最终三份 tar.gz 在 native macOS arm64、Linux x86_64、Linux aarch64 各自通过，`upgrade_tested:true`；输入为真实公开 0.1.0 | 浏览器下载 quarantine、旧程序写未来 state、生产 SSH |
+| Final DMG/package | 完整 64 文件 App／39,934,188 bytes；strict ad-hoc 签名、两 plist 版本 0.2.0；DMG mount/copy inventory 一致 | Developer ID 身份、公证、普通用户首开 |
+| Installed copy | macOS Darwin 24.6.0 arm64 临时复制 App 原生存活；Gatekeeper exit 3 rejected、stapler exit 65 无票据、无 quarantine | Finder/Applications 升级或真实下载信任 |
+| Native WebKit/AX | 同一最终 DMG：11 次有限 AX 控件操作，9 个结果状态检查通过，10 张目标窗口图；Night／系统、中文／系统、历史、需环境提示、任务框开关 | 完整归档／清理／SSH 执行、native 升级、键盘导航或 VoiceOver 验收 |
+| Deployed/public | 实际浏览器观察旧 App 0.1.1 官网；旧三平台 CLI 0.1.0 真实资产用于升级；旧 DMG 读回并重新验证发布记录 | 新 0.2.0 已公开或 updater 已可用 |
 
-第一套候选 [run 43520398419](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43520398419) 成功，source `e573ce228e15ee6cb03c2705baf70a8bab1a8c75`。真实构建为 Rust 1.100.0、cargo-zigbuild 0.23.4、Zig 0.16.0、Node 22.23.4，fresh clone/fresh target/locked dependencies。GitHub artifact ZIP 为 42,564,088 bytes，SHA-256 `720f659b3ad1f1f36e6139a1923ebdcf3a93fbd63f96076845ca631a30f4045f`。该初始记录保留为历史，不替代最终修正提交的 receipt。
+macOS **源码测试**使用 macOS 26.7.2 arm64；最终 **包／安装副本／窗口**使用 macOS 15 系列、Darwin 24.6.0 arm64。两者分列；声明的最低 macOS 12 没有因此获得原生覆盖。两个 desktop bundle resource fixtures 在普通组中仍 ignored：Mac 是 **56 passed + 2 ignored**，Linux 是 **52 passed + 2 ignored**。当前 source/browser host 单测和包资源 inventory 不能冒充这两个最终资源消费者的执行，下面给出直接补跑命令。
 
-### 最终验收收口
+最终 VM 的实际结果也保留了失败语义：普通 setsid 在四个 logout 场景均观察到 worker 结束，没有将其说成跨 logout 保证；具备既有 system／user manager 资格的两组观察到存活，fallback setsid 仍结束。管理认证实验先返回 `submission_uncertain`，随后 **一次 submit、24 次原 ID query**，中间真实观察到 `job_not_found`，最终拿到同 ID 的 `partially_completed`：本地清理完成，超范围官方 logout 拒绝、凭据与 caller 环境保留。真实 reboot 前后原 ID 可查询，`submitted_once:true`、`reexecuted:false`。这是 canonical 源码构建的 disposable Ubuntu/PAM/systemd 证据，不冒充最终 tar.gz 在生产 VPS 的执行。
 
-第二套 `da7ebd2024384ea2019719f63dabef3d9db6cd32` 的两平台 browser 19/19、三平台 CLI 及实际 WebKit 可见窗口通过；native rust 的数字端口断言失败。真正的候选 gate 拒绝了该 incomplete source，没有用其他绿灯代替。该套包还早于 TLS 安全更新，保留为中间证据，不用于本次发行。
+### 固定构建与完整候选
 
-待最后固定提交执行后填入：source/tree、PR、verify push run 与 canonical check 数、candidate run、Mac gate result、三 CLI/native reports、DMG/window observation、artifact 摘要。任何失败、取消、未选择与不支持均独立记载；不得把下一次通过覆盖掉初始失败的根因。
+[Candidate run 43526964671](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964671) 从 clean exact source fresh clone／fresh target 构建。记录 Rust 1.100.0、cargo-zigbuild 0.23.4、Zig 0.16.0、Node 22.23.4、npm 10.9.9 和锁定输入；这不是 bit-for-bit reproducible build 声明。
 
+| 最终资产 | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `lintel-cli-0.2.0-candidate-353536cc7dc3-macos-arm64.tar.gz` | 9,556,992 | `ac62ded7cdbe377d517068ffb55d4db5db0f69245e5177fe45e1c01733579a9e` |
+| `lintel-cli-0.2.0-candidate-353536cc7dc3-linux-x86_64.tar.gz` | 9,807,758 | `a611f5ec8a8067f0c983a93af6756827bdb20aa31b8f786b0a2bd3795f04d98b` |
+| `lintel-cli-0.2.0-candidate-353536cc7dc3-linux-aarch64.tar.gz` | 9,542,757 | `6ac7aa1308c485dbabb89305eba126ff8e8ed9f210c622e29f0bc55abbf77793` |
+| `Lintel_0.2.0_aarch64.dmg` | 13,753,858 | `9865fc72ee05d01b1fb579b5333b579772319debe18efe9198a136c1c86bbf18` |
+
+原 GitHub artifact **14085474075** ZIP 保持不改包：45,199,043 bytes，SHA-256 `ebd9f53edae5b7cdf88bf0acab0f941c7d2b6ace7dc6891f07ec0cafa2b52230`。另保留 Linux aarch64 native report artifact **14086765725**（`c8ddcf0945cf07aa88a81fe1e3eb75003cb567aa246bdc97c351d4f305c2f9c9`）、x86_64 **14086815445**（`abc49063cf4c97bbea9ca2ec69ae4da94b03c67cb1e1fdf4cb1b4765962b00d4`）。下载字节与 GitHub 已认证 artifact metadata digest 一致；root 另外重读四个实际包 SHA，并复核 native 报告与选定 native 图像。每个 CLI 有 28 个 regular members，执行位、安全 modes、完整内部 SHA256SUMS 均验证。
+
+生产候选 gate 绑定最终 source、14-job full plan、12 reports 与同一套包／DMG：artifact **14087520922**，8,860,119 bytes，SHA-256 `44110d76798336ce72c92152b9823cd2ee262ee7e3e985ce165bcb16bd119f1f`；实际 `candidate-verified.json` 为 `ci_profile:full`、`consistency_passed:true`、`release_authorized:false`，其 1,722 bytes／SHA-256 `5082b063ae9362345ad3c7098bd643266f8d951eb0581f6f892a144389db0ed6` 与 provenance 相符。`build-receipt.json` 的 `origin_authenticated:false`、local verifier 的同类边界仍保留；独立的 GitHub run／artifact metadata 是另一层 provenance，不把本地 JSON 自称的身份升级成签名。SHA-256 也不是 Developer ID 或独立分发来源认证。
+
+### 失败历史没有被新的绿灯覆盖
+
+第一套 `e573ce228e15ee6cb03c2705baf70a8bab1a8c75` 的三个 native 包通过，但 canonical 在 macOS PTY 输出采集和 Linux argv-only 空 stdin EPIPE 失败。它们都修正了测试 transport，不放宽产品断言。
+
+第二套 `da7ebd2024384ea2019719f63dabef3d9db6cd32` 三平台包、browser/UI 及 native WebKit 窗口通过，Mac desktop numeric-port assertion 失败。candidate mandatory gate 实际拒绝了该失败 source，未借用其他提交绿灯。原数字端口断言具有已在真实 TCP 复现的 self-connect 假阳性边界，但那次 macOS 成功连接的具体原因未知；最终测试直接核对原 listener owner、双向真实 tunnel 终止及取消后仍保有原 owner，没有发现需要改变生产 shutdown 的证据。第二套也早于 TLS 安全刷新，两套都不作为本次发行候选。
+
+独立证据目录保留 baseline、三套 runs、原始 reports、job logs、artifact digests、故障反例和最终机器可读记录。历史实际包以原 artifact 标识追溯，不把 intermediate bytes 放进最终安装清单。
 ## 4. 升级、保留与回退
 
 0.1.0 CLI 到候选的实验使用**实际旧公开二进制**创建合成 policy job 和 encrypted archive。新包查询原 ID/计划/回执，再重复原批准，并比较真实密文摘要与归档目录清单不变；另一份独立 HOME/state 读取并迁入选定原文，逐字节一致。旧 executable 摘要保持原值。这个实验检验了查询与资料兼容，也排除了“回同一 ID 却暗中重做”的假成功。
@@ -116,6 +140,20 @@ App 手动升级前退出旧 App 并保留旧副本；资料/state 不在 bundle
 
 再用旧公开 App 在独立 state 建立已完成和未确定任务，退出后切换新 App；检查原记录与归档、未执行旧认证预览提示、失败后保持旧副本和原 state。对升级中断，只查询原记录；不删除 deduplication 状态。AX/window/screenshot 可辅助定位，但不能代替实际完整任务。此项可由有原生桌面的 Codex 执行；当前 Linux 工作环境已提供自动 native 包/窗口路径，缺完整可交互桌面时保留具体结果。
 
+
+另外在同一受控 Mac、clean `353536cc` checkout 用**实际 DMG 复制 App 的资源**执行两项已存在但普通组忽略的消费者测试（路径替换成已核对的复制 App）：
+
+```sh
+LINTEL_TEST_BROWSER_HOST_RESOURCES=/absolute/copied/Lintel.app/Contents/Resources/browser-host \
+  cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked \
+  built_host_runs_from_installed_manifest_and_returns_native_frames -- --ignored
+LINTEL_TEST_BROWSER_EXTENSION_RESOURCES=/absolute/copied/Lintel.app/Contents/Resources/browser-extensions \
+  cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked \
+  actual_packaged_extensions_install_from_bundle_with_no_profile_mutation -- --ignored
+```
+
+两者使用自己的合成 HOME；第一项由所装 manifest 执行真实 host 并核对有限 native frames，第二项消费三类扩展实际 bytes、只准备注册文件且不改 profile。通过标准是测试真实执行且通过，不接受 ignored／零测试或换成源码 fixture。这是可执行的 package resource 补充验收，不是完整实际浏览器用户旅程。
+
 ### C. 第三方图形与品牌许可
 
 **需要 Faye 决定：** 提供 Clawd/相关品牌资产的可核实再分发许可，或选择不依赖该资产的原创替代。仓库的 attribution 与项目许可不产生该许可；不能通过测试补齐。按实际 App/site 资产检查；CLI 若未包含相关图形，不应被一并视为同一阻断。
@@ -124,6 +162,23 @@ App 手动升级前退出旧 App 并保留旧副本；资料/state 不在 bundle
 
 **需要明确发布／部署授权。** 发布之前审阅本文选择的平台、版本与双语说明。授权后再创建正式 Release、读回公开 bytes、生成已验证网站 payload、部署并逐语言核对。updater 继续关闭是当前有效方案，不必为了发 Preview 先引入新的密钥运营。
 
+
+当前网站源码已生成 **42 个中英文页面**，最终两平台 site-ui 通过；部署仍是本轮实际浏览器观察到的旧页面，不能混称。完整可部署 payload 还缺审核过的 `lintel-intro.mp4` 和 `lintel-film-poster.jpg`：当前工作区／可用资料中未找到这两个原件，apex 与文档列出的 deployment origin 的普通 HTTP 读取均返回 403。浏览器可以看到线上页面，所以这被记为取回媒体的环境边界，**不是官网故障**；没有用合成替代品伪造原媒体验收。
+
+已重新下载核对旧公开 0.1.1 DMG，并用真实 `app-release.mjs prepare`／`verify-public` 产生 `evidence/site-staging-inputs/verified-public-0.1.1/release.json`，状态 `public_bytes_verified`。最终 0.2.0 DMG 则只生成 `release-preparation/app-manual-prepared/release.json`，状态 `prepared_local`、`publication_verified:false`，不含 updater feed。草稿中的未来 URL 不是可用下载声明，发布时间在正式批准时重新确定。
+
+拿到两份原媒体后可直接执行（所有路径是明确的本地输入；out 必须不存在）：
+
+```sh
+node scripts/prepare-site-languages.mjs --check
+LINTEL_SITE_MEDIA_DIR=/absolute/reviewed-media \
+  python3 tests/verify.py --checks site-game-test,site-ui --require-passed
+node scripts/prepare-site.mjs --media-dir /absolute/reviewed-media \
+  --app-manual /absolute/verified-public-0.1.1/release.json \
+  --out /absolute/absent-site-payload
+```
+
+发布 0.2.0 后再换成经实际公开读回的新 release record，并更新网站有限 CLI asset allowlist／三平台摘要。未批准发布之前，用旧公开 record 生成只会更新说明／CLI 入口的准备包；**不部署**。完整媒体 payload、部署和部署后逐页读回仍须分别记载。
 ## 7. 发布后演进，保持有限范围
 
 可继续提高浏览器非 developer 安装、安装/升级便利性、跨版本客户端认证适配、真实账户/ACL 场景、macOS 最低版本覆盖、长期任务容量与 journaling 退休策略。browser 1000-operation admission cap 当前会明确拒绝新任务并保留原查询，不能通过删除记录绕过；需要后续兼容退休方案。

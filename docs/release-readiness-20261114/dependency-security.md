@@ -20,6 +20,12 @@
 
 没有修改 Cargo manifest、启用新 feature、更换 TLS provider 或升级其他包。root lock 只有五个包的版本和 checksum 改变（10 行换 10 行）；App lock 只有七个包改变（14 行换 14 行）；独立 browser native-host lock 不变。Cargo 曾为已有宽范围约束重选 syn/windows-sys 依赖边；核对精确版本 registry manifest 后恢复了原选择，避免与补丁无关的依赖行为漂移，保存于 `refresh/resolver-edge-*.json`。工作流和 candidate 必须从包含本次 lockfile 修复的新提交重新运行，先前 `da7ebd…` 的构建结果不能重标为新产物。
 
+## 公开旧版本的适用范围复核
+
+协调审计者另行检查了公开 CLI 0.1.0 的 source `fcae6cb1efb50c6384a31ddce161bee6a39646e0` 与 App 0.1.1 的 source `ebbe237cd236a2b299281e070b4758a9e9e522b2`。两者的 root/App lock 均为 `webpki-roots 1.0.9`、`rustls-webpki 0.103.15`、`rustls 0.23.45`；两份 source 的 egress HTTPS upstream 与 probe 根集调用也相同。实际下载的旧 Linux CLI 包内 `third-party-notices/inventory.json` 和 `rust.md` 另确认了 roots／verifier 的相同版本。
+
+因此，这次 TLS 更新也关系到现有公开版本的相应功能，不能只视作开发候选的清洁工作。建议在最终候选验收和所有者发布决定完成后优先更新；使用旧版本时，不应把受影响的 HTTPS 上游／主动探测结果当作已经修补。普通 CONNECT 隧道的客户端 TLS、其他连接路径与上述暴露分别判断，没有实施真实网络攻击或断言所有用户流量已被窃取。原始比对保存在 `dependency-audit/public-version-tls-scope.json`；它将 source/lock 与实际旧 Linux notice 分开记录，没有凭该 notice 单独宣称二进制链接图已被完整重建。
+
 ## 审查方法和证据范围
 
 扫描了三个已提交 Cargo lockfile，共 **566 个唯一 crates.io 名称／版本组合**：root 232 个 registry entries，App 550，独立 native-host 19。没有其他 git registry 来源需要另行判定。`cargo-audit` 在此环境未安装，未安装新工具；使用公开 OSV `POST /v1/querybatch` 对每个精确版本查询，并保存完整请求、响应、HTTP 时间、SHA-256 和每个匹配 advisory 原文。原扫描 11 个包匹配 25 个 advisory ID；其中有 GHSA/RustSec 别名，**不能把 25 当成 25 个独立漏洞**。

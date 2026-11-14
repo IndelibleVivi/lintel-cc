@@ -194,3 +194,49 @@ python3 tests/auth_sources_journey.py target/debug/lintel
 失败发生在测试将已捕获 stdout 解析为 JSON 时，尚未进入预期 `stale_auth_context` 断言。测试 helper 在读取 master 前先关闭最后一个 slave FD，依赖了 Linux 在 hangup 后仍保留输出的行为。Apple 的 [XNU `ptsclose`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty_dev.c#L325) 调用 `ttyclose`；后者会[清空读写队列](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty.c#L376)。因此修正测试为：子进程退出后保留父进程的 slave，以非阻塞方式读尽 master，再在 finally 关闭两端。预期错误码和“无 durable intent”断言保留，并增加缺失输出的明确诊断；没有改动产品实现来迁就测试。
 
 修正后的 Linux 两段 journey 均通过。macOS 对修正提交的再次 canonical 运行仍必须单独确认，首次失败证据不被覆盖。完整 job log、canonical report 摘取、SHA256 与上述 Apple source blob 身份保存在交付 evidence 的 `current-ci/push-43520398332/auth-pty-diagnosis.json` 和同目录 `native-job-132213004331.log`。这次实际执行将临时 Keychain API 证据补齐到了该提交，但没有进行个人账号登录、正式安装或 Gatekeeper 验收。
+
+## 8. 最终固定提交验收收口：353536cc
+
+最终接受本分项自动验收的源码为 **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree 为 `7c12bee277e84c85052d146738bbb395bd9b25b7`。本节补齐上文当时尚待取得的最终 native 证据；`e573ce2` 的源码终审锚点、首次 PTY 失败及修正依据继续作为历史记录保留。中间 `da7ebd…` 的认证检查虽然通过，其 macOS native canonical 仍有 desktop network 测试失败，不能用来代替下面的新提交通过记录。
+
+以下均来自同一个 [push verification run 43526964668](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668)，不是另一个 PR run，也没有在取证时重跑测试。两份 canonical report 均记录上述 SHA、干净工作树及 `require_passed=true`。
+
+| 平台／固定 job | Canonical 选中检查 | 认证与实际运行结果 |
+| --- | --- | --- |
+| [macOS native job 132235079343](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668/job/132235079343)；macOS 26.7.2 / arm64 | **19 selected / 19 passed**，0 failed、0 skipped、0 timeout | Auth core **49 passed、0 ignored**；真实 PTY 和目录选择 CLI journey 通过；`keychain_native_engine_journey` **1 passed、0 ignored**，实际使用 Security.framework 和一次性临时 Keychain |
+| [Linux native job 132235079440](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668/job/132235079440)；Ubuntu 24.04.5 / x86_64 | **18 selected / 18 passed**，0 failed、0 skipped、0 timeout | Auth core **49 passed、0 ignored**；完整 CLI journey 通过，包括下述生产 `/proc` 写入者分支。macOS Keychain 不在 Linux selection 中 |
+
+macOS 的 PTY 输出已实际进入并通过 `stale_auth_context` 与“没有 durable launch intent”断言；默认未设置、匹配绝对原拼写、相对选择拒绝和跨根 secure-storage 拒绝也在同一惰性客户端 journey 完成。临时 Keychain gate 补齐真实系统 API 的精确 item 更新证据，但不表示已验证个人 login Keychain、授权提示、锁定／拒绝交互或真实 Claude 登录。第 5 节第 1 项的固定候选临时 Keychain 自动 gate 已兑现；其余明确列出的真实账户／系统交互边界仍然成立。
+
+### Linux 的八个实际进程场景
+
+Linux 结论同时核对了实际 Linux/Python 平台、固定脚本与普通 `cargo build -p lintel-runner` 的执行记录，不能只引用两个平台共用的 PASS 文案。`tests/auth_sources_journey.py` 的固定 blob 为 `1635d4ebc0e3f98d461859c3bde3c74c15d41701`；入口调用 `execution_context_journey`，其第 305 行的 Linux 分支逐次复制并启动原生 `/bin/sleep`，临时可执行文件名为 `claude`。每次确认进程仍存活，调用生产 CLI 的 `plan_cleanup`，检查结果，然后在 finally 中终止并等待子进程。
+
+| 普通配置目标 | 独立安全存储目标 | 已通过的要求 |
+| --- | --- | --- |
+| 所选根的尾斜杠、symlink alias、`child/..`，各一例 | 未设置 | 三次 `writers_active` |
+| 邻居根 | 所选根、所选根 alias、显式空值，各一例 | 三次 `writers_active` |
+| 邻居根 | 未设置、同一邻居根，各一例 | 两次允许建立计划 |
+
+这八次活进程检查形成 **六次拒绝、两次邻居放行**。普通 runner 不启用 `cfg(test)`，因此实际调用 `cleanup.rs` 的 `/bin/ps` 与 `/proc/<pid>/environ`，没有使用 Rust unit 中返回空列表的替身。漏掉 writer 会使六次拒绝断言失败；将所有 writer 都算作所选根会使两次邻居放行断言失败。最终 PASS 位于整个循环之后。这是实际 Linux 执行与固定控制流证据，不是逐次 syscall trace；进程、HOME 和状态均为合成临时数据。
+
+### 选中 gate 全通过与内部 ignored 的区别
+
+这里的“19/18 个选中检查全通过”不表示所有 Rust test 都无条件执行。macOS desktop 组是 **58 cases：56 passed、2 ignored**；Linux desktop 组是 **54 cases：52 passed、2 ignored**。两项 ignored 分别是：
+
+- `bundled_browser_host::tests::built_host_runs_from_installed_manifest_and_returns_native_frames`：需要预先准备 browser-host bundle 资源。
+- `bundled_browser_extension::tests::actual_packaged_extensions_install_from_bundle_with_no_profile_mutation`：需要预先准备 browser-extension bundle 资源。
+
+这两项需要由对应 prepared-bundle 验收另行证明，本分项不将它们记为通过。普通 workspace 还保留 metadata benchmark 和专用 remote launcher 的明确 ignored 条件；其中 current-HOME shared-remote case 已由同一 job 的独立 journey 执行通过。Linux 的 `/proc` 分支不能由 macOS 的公共 PASS 句子推导，macOS Security.framework 也不能由 Linux 的合成 Keychain 测试推导。
+
+### 分发版本边界与证据位置
+
+对 Claude 内部命名空间、独立 `CLAUDE_SECURESTORAGE_CONFIG_DIR` 和 account 规则的观察，仍严格限定于第 3 节记录的官方分发 **`@anthropic-ai/claude-code-darwin-arm64@2.1.325`** 及其固定 hash；`2.1.101` 只是历史对照。最终 CI 使用惰性客户端与合成来源验证 Lintel 的边界和拒绝行为，没有执行当前官方客户端的真实联网认证，也没有把静态内部结构变成跨版本承诺。更新 vendor 版本时仍须重新核对这些有限假设。
+
+最终证据相对交付 evidence 根的位置如下；artifact 均通过 authenticated GitHub API 获取，完整 ZIP digest 已与 API metadata 匹配：
+
+- `rc-final-ci/native-auth/`：macOS `summary.json`、原始 `native-macos-latest.json`、job log、`artifact-verification.json`；artifact **14086635351**，SHA256 `98cea0a4880e13fa34e39b089ad141a962e104b6c1c9ec2587f795066f80cad4`。
+- `rc-final-ci/native-linux/`：Linux `summary.json`、原始 `native-ubuntu-24.04.json`、job log、固定脚本／`cleanup.rs` 源码 blob 和 source provenance；artifact **14085893124**，SHA256 `ce50aec96f632bb9686ec56e5fe0d8b233e3abca9c8597fdeb7195e2d2a7c9c9`。
+- `current-ci/push-43520398332/`：首次 macOS PTY 失败和诊断，作为历史反例保留，不被成功结果覆盖。
+
+因此，**本分项所要求的固定提交自动回归、生产 CLI 目录绑定、Linux 进程识别和临时 Keychain 原生 gate 已通过，可以进入包含该提交的下一版 Preview 发行决定。** 这不替代安装包、签名／公证、Gatekeeper、真实账户和 updater 的独立结论；无需为本分项再引入全账户扫描、自动登录或扩大清理范围。
