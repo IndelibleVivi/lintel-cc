@@ -202,9 +202,14 @@ fn account(identity: Option<&Value>) -> Result<String> {
             .map(str::to_owned)
             .ok_or_else(|| err("keychain_item_changed", "Keychain 原件身份无法核对"));
     }
-    if let Ok(value) = std::env::var("USER") {
-        if !value.is_empty() && value.len() <= 256 {
-            return Ok(value);
+    if let Some(value) = std::env::var_os("USER") {
+        if !value.is_empty() {
+            return super::supported_account(value.to_str().ok_or_else(|| {
+                err(
+                    "keychain_unavailable",
+                    "当前用户的 Keychain account 选择无法核对",
+                )
+            })?);
         }
     }
     let mut entry = std::mem::MaybeUninit::<libc::passwd>::uninit();
@@ -233,9 +238,16 @@ fn account(identity: Option<&Value>) -> Result<String> {
             "无法确定当前用户的 Keychain 来源",
         ));
     }
-    Ok(unsafe { std::ffi::CStr::from_ptr(entry.pw_name) }
-        .to_string_lossy()
-        .into_owned())
+    super::supported_account(
+        unsafe { std::ffi::CStr::from_ptr(entry.pw_name) }
+            .to_str()
+            .map_err(|_| {
+                err(
+                    "keychain_unavailable",
+                    "当前用户的 Keychain account 选择无法核对",
+                )
+            })?,
+    )
 }
 fn persistent(identity: &Value) -> Result<Vec<u8>> {
     let values = identity["persistent_ref"]

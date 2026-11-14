@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {newer,validateRecord,buildConfiguration,prepare,prepareManual,verifyArtifact,validatePublicRelease,validateManualRecord,validateManualPublicRelease} from '../scripts/app-release.mjs';
+import {newer,validateRecord,buildConfiguration,releaseBuildEnvironment,prepare,prepareManual,verifyArtifact,validatePublicRelease,validateManualRecord,validateManualPublicRelease} from '../scripts/app-release.mjs';
 import {fixture} from './fixtures/app_update_fixture.mjs';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 function record(f){return {schema:'lintel.app-release/1',version:'0.2.0',previous_version:'0.1.0',channel:'preview',source_revision:'a'.repeat(40),pubkey:f.pubkey,notes:'Synthetic test only',pub_date:'2026-10-09T00:00:00Z',platforms:{'darwin-aarch64':{archive_path:f.archive,signature_path:f.signaturePath,dmg_path:f.dmg,archive_name:'Lintel_0.2.0_aarch64.app.tar.gz',dmg_name:'Lintel_0.2.0_aarch64.dmg'}}};}
@@ -14,6 +14,28 @@ test('strict SemVer and frozen release configuration',()=>{
  assert.equal(newer('0.2.0-preview.2','0.1.0'),true);assert.equal(newer('0.2.0-preview.10','0.2.0-preview.9'),true);
  assert.throws(()=>newer('18446744073709551616.0.0','0.1.0'),/u64/);
  assert.throws(()=>newer('0.2.0-preview.01','0.1.0'));assert.throws(()=>newer('01.2.0','0.1.0'));
+});
+test('release overrides bind frontend/native versions and preserve explicit signing environment',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'lintel-release-version-')),r=record(fixture(dir));
+ const signing={APPLE_SIGNING_IDENTITY:'Synthetic identity label',LINTEL_APP_VERSION:'stale',PATH:'/synthetic/tools'};
+ for(const sourceVersion of [r.previous_version,r.version]){
+  const env=releaseBuildEnvironment(r,sourceVersion,signing);
+  assert.equal(env.LINTEL_APP_VERSION,buildConfiguration(r).version);
+  assert.equal(env.LINTEL_REQUIRE_FORMAL_SIGNING,'1');
+  assert.equal(env.APPLE_SIGNING_IDENTITY,signing.APPLE_SIGNING_IDENTITY);
+  assert.equal(env.PATH,signing.PATH);
+ }
+ assert.equal(signing.LINTEL_APP_VERSION,'stale','caller environment is not modified');
+ assert.throws(()=>releaseBuildEnvironment(r,'9.9.9',signing),/source App version/);
+ const prerelease=structuredClone(r);prerelease.version='0.2.0-preview.1';
+ for(const asset of Object.values(prerelease.platforms)){
+  asset.archive_name=asset.archive_name.replace(r.version,prerelease.version);
+  asset.dmg_name=asset.dmg_name.replace(r.version,prerelease.version);
+ }
+ assert.doesNotThrow(()=>validateRecord(prerelease),'SemVer feed records retain prerelease support');
+ assert.throws(()=>releaseBuildEnvironment(prerelease,r.previous_version,signing),/three numeric components/);
+ const buildSource=await readFile(path.join(repo,'scripts/app-release.mjs'),'utf8');
+ assert.match(buildSource,/env:buildEnv/,'canonical process must consume the bound version');
 });
 test('real Ed25519 artifact/comment/version checks on synthetic archive',async()=>{
  const dir=await mkdtemp(path.join(tmpdir(),'lintel-update-signature-')),f=fixture(dir),r=record(f);
@@ -117,6 +139,8 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  assert.equal(pack('plain').status,0);const plain=await readFile(path.join(dir,'plain/index.html'),'utf8');assert.match(plain,/没有正式 Release/);
  const plainBuild=JSON.parse(await readFile(path.join(dir,'plain/site-build.json')));
  assert.equal(plainBuild.files.length,67);
+ assert.deepEqual(plainBuild.app_release_versions,[],'Known public CLI links must not invent an App release');
+ assert.equal(plainBuild.files.some(file=>file.path==='app-downloads.json'||file.path.startsWith('updates/')),false,'Without verified App records there is no App download metadata or updater feed');
  assert.deepEqual(await readFile(path.join(dir,'plain/assets/favicon.png')),await readFile(path.join(repo,'apps/desktop/src-tauri/icons/128x128.png')),'payload preserves the canonical raster identity export');
  assert.equal(plainBuild.locales.length,42);
  assert.equal(plainBuild.files.filter(file=>file.path==='index.html'||file.path.endsWith('/index.html')).length,42);
@@ -134,10 +158,33 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  for(const name of ['download/index.html','en/download/index.html','releases/index.html','en/releases/index.html','guide/start-here/index.html','en/guide/start-here/index.html','guide/operator-guide/index.html','en/guide/operator-guide/index.html','guide/cleanup/index.html','en/guide/cleanup/index.html']){
   assert.ok(plainBuild.files.some(file=>file.path===name),`plain payload includes ${name}`);
  }
- const plainDownload=await readFile(path.join(dir,'plain/download/index.html'),'utf8');
- assert.match(plainDownload,/data-download-app="unavailable"/);
- assert.doesNotMatch(plainDownload,/releases\/download\/v|\b[a-f0-9]{64}\b/);
- assert.match(plainDownload,/0\.1\.0 Preview/);
+ // These finite CLI assets are already public and independently checked. They
+ // do not relax the App projection gate or authorize any new candidate URL.
+ const cliPrefix='https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/';
+ const publicCli=[
+  ['macos-arm64','83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1'],
+  ['linux-x86_64','5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6'],
+  ['linux-aarch64','299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3'],
+ ];
+ for(const [pageName,language] of [['download/index.html','zh-CN'],['en/download/index.html','en']]){
+  const plainDownload=await readFile(path.join(dir,'plain',pageName),'utf8');
+  assert.match(plainDownload,/data-download-app="unavailable"/);
+  assert.doesNotMatch(plainDownload,/data-download-app="verified"|data-release-version=/,'No App release is projected without a verified record');
+  assert.equal(plainDownload.includes(outputs.release.source_revision),false,'Prepared synthetic App provenance must not appear');
+  const cliSection=plainDownload.match(/<section\b[^>]*\bdata-download-cli="0\.1\.0"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  assert.ok(cliSection,'Only the explicitly scoped public CLI section may carry fixed public assets');
+  assert.match(cliSection,/0\.1\.0 Preview/);
+  assert.match(cliSection,language==='en'?/0\.2\.0 has not been publicly released/:/0\.2\.0 尚未公开发布/);
+  const allowedUrls=[
+   ...publicCli.map(([target])=>`${cliPrefix}lintel-cli-0.1.0-candidate-fcae6cb1efb5-${target}.tar.gz`),
+   `${cliPrefix}INSTALL.${language}.md`,`${cliPrefix}SHA256SUMS`,
+  ];
+  assert.deepEqual([...cliSection.matchAll(/href="([^"]*\/releases\/download\/[^"\s]+)"/g)].map(match=>match[1]),allowedUrls,'Only the three known public CLI packages and matching versioned instructions/checksums are allowed');
+  assert.deepEqual(cliSection.match(/\b[a-f0-9]{64}\b/g),publicCli.map(([,digest])=>digest),'Only the independently checked public CLI digests are allowed');
+  const withoutKnownCli=[...allowedUrls,...publicCli.map(([,digest])=>digest)].reduce((html,value)=>html.replaceAll(value,''),cliSection);
+  assert.doesNotMatch(withoutKnownCli,/releases\/download\/v|\b[a-f0-9]{64}\b/,'The fixed CLI section must not admit any additional release URLs or digests');
+  assert.doesNotMatch(plainDownload.replace(cliSection,''),/releases\/download\/v|\b[a-f0-9]{64}\b/,'The original no-invented-App-assets gate still applies outside the fixed public CLI section');
+ }
  const plainArticle=await readFile(path.join(dir,'plain/guide/operator-guide/index.html'),'utf8');
  assert.match(plainArticle,/Lintel 操作指南/);
  assert.match(plainArticle,/data-guide-document="operator-guide"/);

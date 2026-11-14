@@ -132,9 +132,9 @@ fn launch_command(environment_id: &str) -> Result<std::process::Command, String>
     }
     let data = &response["data"];
     let mut command = std::process::Command::new(data["executable"].as_str().unwrap());
-    command
-        .current_dir(data["root"].as_str().unwrap())
-        .env("CLAUDE_CONFIG_DIR", data["root"].as_str().unwrap());
+    command.current_dir(data["root"].as_str().unwrap());
+    lintel_core::configure_client_authentication(&mut command, &data["authentication_context"])
+        .map_err(|error| format!("{}: {}", error.code, error.message))?;
     Ok(command)
 }
 fn read_line(prompt: &str) -> String {
@@ -375,7 +375,7 @@ fn tui() {
                     if sources["ok"] != true {
                         continue;
                     }
-                    println!("只清理所选本机来源；现有进程、Keychain、共享 profile 和服务端撤销需分别核对。官方注销可能同时清除 MCP/插件登录，本计划不调用它。");
+                    println!("只清理所选本机文件和 Keychain 来源；未选来源、现有进程、其他运行上下文和服务端撤销需分别核对。官方注销可能同时清除 MCP/插件登录，本计划不调用它。");
                     let selection = read_line(
                         "来源 ID（逗号分隔；空=默认本机登录字段；none=不删除认证来源）: ",
                     );

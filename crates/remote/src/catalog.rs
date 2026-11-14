@@ -421,7 +421,10 @@ mod tests {
         // creates a task record, needs no runner field and accepts no other key.
         assert!(REQUEST_COMMANDS.contains(&"telemetry_catalog"));
         assert!(validate_request(&json!({"command":"telemetry_catalog"})).is_ok());
-        assert!(validate_request(&json!({"command":"telemetry_catalog","host":"api.anthropic.com"})).is_err());
+        assert!(validate_request(
+            &json!({"command":"telemetry_catalog","host":"api.anthropic.com"})
+        )
+        .is_err());
         let telemetry = branches
             .iter()
             .find(|branch| branch["title"] == "telemetry_catalog")

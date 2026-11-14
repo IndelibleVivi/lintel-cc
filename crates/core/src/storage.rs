@@ -53,14 +53,12 @@ pub fn private_dir(path: &Path) -> Result<()> {
 }
 pub fn read(path: &Path, limit: u64) -> Result<Vec<u8>> {
     guard(path)?;
-    // Refuse FIFOs and other non-regular files before opening: a blocking
-    // open on a FIFO would stall the operation while holding the global lock.
-    if !fs::symlink_metadata(path)?.file_type().is_file() {
-        return Err(err("file_limit", "文件类型或容量不受支持"));
-    }
+    // Open without waiting for a FIFO writer, then validate the opened object.
+    // A pathname check before a blocking open leaves a replacement window that
+    // can stall every operation sharing the engine lock.
     let mut file = OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)?;
     let meta = file.metadata()?;
     if !meta.is_file() || meta.len() > limit {
@@ -108,17 +106,20 @@ pub(crate) fn publish_staged_new(tmp: &Path, path: &Path) -> Result<()> {
     sync_parent(path)
 }
 
-/// Test-only fault injection for the two durability barriers: the parent
-/// directory flush after a no-replace publication (`owner_sync`) and the staged
-/// temp-file flush before publication (`staged_sync`). Each is armed
-/// independently so a test can exercise exactly one writer-flow failure.
-/// Never present in production.
+/// Test-only fault injection for publication durability barriers: the parent
+/// directory flush after publication and the staged temp-file flush before it.
+/// Atomic replacement targets one exact path so receipt writes remain available.
+/// Each is independently armed; none is present in production.
 #[cfg(test)]
 pub(crate) mod sync_fault {
-    use std::cell::Cell;
+    use std::{
+        cell::{Cell, RefCell},
+        path::{Path, PathBuf},
+    };
     thread_local! {
         static OWNER: Cell<bool> = const { Cell::new(false) };
         static STAGED: Cell<bool> = const { Cell::new(false) };
+        static ATOMIC_OWNER: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     }
     /// Arm the parent-directory durability barrier to fail after a rename lands.
     pub(crate) fn arm_owner() {
@@ -139,6 +140,23 @@ pub(crate) mod sync_fault {
     }
     pub(crate) fn staged_armed() -> bool {
         STAGED.with(|a| a.get())
+    }
+    /// Fail one selected atomic replacement after rename but before parent
+    /// durability. Other journal writes must remain available for the receipt.
+    pub(crate) fn arm_atomic_owner(path: PathBuf) {
+        assert!(path.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        ATOMIC_OWNER.with(|target| *target.borrow_mut() = Some(path));
+    }
+    pub(crate) fn take_atomic_owner(path: &Path) -> bool {
+        ATOMIC_OWNER.with(|target| {
+            let mut target = target.borrow_mut();
+            if target.as_deref() == Some(path) {
+                target.take();
+                true
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -285,6 +303,10 @@ fn write_atomic(
         } else {
             publish_new(&tmp, path)?;
         }
+        #[cfg(test)]
+        if sync_fault::take_atomic_owner(path) {
+            return Err(std::io::Error::from_raw_os_error(libc::EIO).into());
+        }
         std::fs::File::open(parent)?.sync_all()?;
         Ok(())
     })();
@@ -306,6 +328,49 @@ pub fn save(path: &Path, value: &Value) -> Result<()> {
         ));
     }
     atomic(path, &bytes, 0o600)
+}
+
+#[cfg(test)]
+mod read_tests {
+    use super::*;
+
+    #[test]
+    fn nonregular_descriptor_is_rejected_without_waiting_for_a_fifo_writer() {
+        let temporary = tempfile::tempdir().unwrap();
+        let base = temporary.path().canonicalize().unwrap();
+        let path = base.join("synthetic-fifo");
+        let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) }, 0);
+        let worker_path = path.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || tx.send(read(&worker_path, 1024)).unwrap());
+        let immediate = rx.recv_timeout(std::time::Duration::from_secs(2));
+        // A regression must fail instead of leaving the suite waiting on a FIFO.
+        if immediate.is_err() {
+            let rescue = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .custom_flags(libc::O_NONBLOCK)
+                .open(&path)
+                .unwrap();
+            drop(rescue);
+            let _ = rx.recv_timeout(std::time::Duration::from_secs(2));
+        }
+        worker.join().unwrap();
+        assert!(
+            immediate.is_ok(),
+            "shared storage reader waited for a FIFO writer"
+        );
+        assert_eq!(immediate.unwrap().unwrap_err().code, "file_limit");
+        // Ordinary finite data and existing symlink refusal keep their contract.
+        let regular = base.join("regular");
+        fs::write(&regular, b"1234").unwrap();
+        assert_eq!(read(&regular, 4).unwrap(), b"1234");
+        assert_eq!(read(&regular, 3).unwrap_err().code, "file_limit");
+        let linked = base.join("linked");
+        std::os::unix::fs::symlink(&regular, &linked).unwrap();
+        assert_eq!(read(&linked, 4).unwrap_err().code, "symlink_target");
+    }
 }
 
 #[cfg(test)]

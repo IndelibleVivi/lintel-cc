@@ -411,6 +411,60 @@ fn retained_other_authentication_is_visible_after_exact_local_cleanup_and_runtim
 }
 
 #[test]
+fn default_root_status_does_not_invent_an_explicit_credential_namespace() {
+    let (_temp, mut engine, mut e, root) = fixture(true);
+    let exe = engine.home.join(".local/bin/claude");
+    fs::create_dir_all(exe.parent().unwrap()).unwrap();
+    // Model the two namespaces documented in the actual client distribution:
+    // a normal default-root login and a separate explicit-root Keychain slot.
+    // The fixture only reports static synthetic state; it reads no Keychain.
+    fs::write(&exe, "#!/bin/sh\n[ \"$1 $2\" = 'auth status' ] || exit 9\nroot=${CLAUDE_CONFIG_DIR:-$HOME/.claude}\nif [ -z \"${CLAUDE_CONFIG_DIR+x}\" ]; then\n printf '{\"configDirectory\":\"%s\",\"authMethod\":\"claude.ai\",\"loggedIn\":true}' \"$root\"\n exit 0\nfi\nprintf '{\"configDirectory\":\"%s\",\"authMethod\":\"none\",\"loggedIn\":false}' \"$root\"\nexit 1\n").unwrap();
+    fs::set_permissions(&exe, fs::Permissions::from_mode(0o700)).unwrap();
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    e["executable"] = json!(exe);
+    save(&engine.state.join("inventory.json"), &json!([e.clone()])).unwrap();
+    let observed = ok(
+        &engine,
+        json!({"command":"auth_probe","environment_id":e["id"]}),
+    );
+    assert_eq!(observed["config_directory"], json!(root));
+    assert_eq!(observed["logged_in"], true);
+    assert_eq!(observed["auth_method"], "claude.ai");
+}
+
+#[test]
+fn authentication_approval_requires_the_frozen_execution_namespace() {
+    let (_temp, mut engine, mut e, root) = fixture(false);
+    seed(&root);
+    let exe = install_marked_status_client(&engine);
+    engine.executable_search_path = Some("/usr/bin:/bin".into());
+    e["executable"] = json!(exe);
+    save(&engine.state.join("inventory.json"), &json!([e.clone()])).unwrap();
+    let p = ok(
+        &engine,
+        json!({"command":"plan_cleanup","environment_id":e["id"],"recipe":"repair_login","writers_confirmed_stopped":true,"verify_auth_status":true}),
+    );
+    let path = engine.path("plans", p["id"].as_str().unwrap());
+    let mut stored = load(&path).unwrap();
+    stored["extra"]["authentication"]
+        .as_object_mut()
+        .unwrap()
+        .remove("execution_context");
+    stored.as_object_mut().unwrap().remove("hash");
+    stored["hash"] = json!(digest(&serde_json::to_vec(&stored).unwrap()));
+    save(&path, &stored).unwrap();
+    let refused = engine
+        .request(json!({"command":"execute","plan_id":stored["id"],"approval":stored["hash"]}));
+    assert_eq!(refused["error"]["code"], "stale_auth_context");
+    assert!(!engine.path("jobs", p["id"].as_str().unwrap()).exists());
+    assert!(!root.join("status-executed").exists());
+    assert!(load(&root.join(".credentials.json"))
+        .unwrap()
+        .get("claudeAiOauth")
+        .is_some());
+}
+
+#[test]
 fn selected_source_missing_from_a_limited_scan_is_not_false_absence() {
     let (_temp, engine, e, root) = fixture(false);
     seed(&root);

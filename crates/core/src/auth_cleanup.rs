@@ -128,6 +128,10 @@ impl Engine {
         authentication["context"] = inventory["context"].clone();
         authentication["runtime_verification_requested"] = json!(flag(r, "verify_auth_status")?);
         authentication["executable"] = e["executable"].clone();
+        if authentication["runtime_verification_requested"] == true {
+            authentication["execution_context"] =
+                crate::keychain::execution_context(&self.home, Path::new(string(&e, "root")?))?;
+        }
         // The optional status command is a separately disclosed process action.
         // Reuse the launch executable identity so approval cannot silently follow an update.
         authentication["executable_snapshot"] =
@@ -211,6 +215,11 @@ impl Engine {
     }
 
     fn check_auth_executable(&self, e: &Value, a: &Value) -> Result<()> {
+        crate::keychain::check_execution_context(
+            &self.home,
+            Path::new(string(e, "root")?),
+            &a["execution_context"],
+        )?;
         // Absence is part of the frozen approval too. A later installation or
         // discovery must not turn a missing status adapter into permission to
         // run a program that was never identified in the original preview.

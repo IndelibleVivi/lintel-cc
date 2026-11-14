@@ -90,6 +90,16 @@ export function buildConfiguration(record){
  validateRecord(record);
  return {version:record.version,bundle:{targets:['app','dmg'],createUpdaterArtifacts:true},plugins:{updater:{pubkey:record.pubkey,endpoints:[feed(record.channel)],requireSignedVersion:true,allowDowngrades:false}}};
 }
+export function releaseBuildEnvironment(record,currentVersion,env=process.env){
+ validateRecord(record);
+ // The pinned macOS bundler copies this verbatim to both Apple version fields.
+ // Keep SemVer feed/comparison support, but do not build invalid plist versions.
+ if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(record.version))fail('macOS build version requires three numeric components; use the Preview channel');
+ // Support both an exact versioned source and the established explicit
+ // override from previous source. Never silently retarget an unrelated tree.
+ if(![record.previous_version,record.version].includes(currentVersion))fail('Build source App version must match release version or previous_version');
+ return {...env,LINTEL_REQUIRE_FORMAL_SIGNING:'1',LINTEL_APP_VERSION:record.version};
+}
 async function absent(out){
  try{await lstat(out);fail('Output directory must be absent')}catch(error){if(error.code!=='ENOENT')throw error;}
  if(out.startsWith(repo+path.sep)&&spawnSync('git',['check-ignore','-q',out],{cwd:repo}).status!==0)fail('Repository output must be ignored or outside Git');
@@ -232,10 +242,10 @@ async function main(){
   if(!platform||!Object.hasOwn(record.platforms,platform))fail('Build requires one platform selected from the record');
   const target={'darwin-aarch64':'aarch64-apple-darwin','darwin-x86_64':'x86_64-apple-darwin'}[platform];
   const current=JSON.parse(await readFile(path.join(repo,'apps/desktop/src-tauri/tauri.conf.json'),'utf8')).version;
-  if(record.previous_version!==current)fail('Build previous_version must match current source App version');
+  const buildEnv=releaseBuildEnvironment(record,current);
   const actual=spawnSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8'}),dirty=spawnSync('git',['status','--porcelain'],{cwd:repo,encoding:'utf8'});
   if(actual.status!==0||dirty.status!==0||actual.stdout.trim()!==record.source_revision||dirty.stdout.trim())fail('Release build requires a clean exact source revision declaration');
-  const result=spawnSync(process.execPath,[path.join(repo,'apps/desktop/scripts/build-macos-app.mjs'),'--target',target,'--config',JSON.stringify(buildConfiguration(record)),'--require-developer-id'],{cwd:path.join(repo,'apps/desktop'),stdio:'inherit',env:{...process.env,LINTEL_REQUIRE_FORMAL_SIGNING:'1'}});
+  const result=spawnSync(process.execPath,[path.join(repo,'apps/desktop/scripts/build-macos-app.mjs'),'--target',target,'--config',JSON.stringify(buildConfiguration(record)),'--require-developer-id'],{cwd:path.join(repo,'apps/desktop'),stdio:'inherit',env:buildEnv});
   if(result.status!==0)fail('Release build failed');return;
  }
  out=path.resolve(out);await absent(out);

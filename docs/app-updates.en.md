@@ -39,7 +39,7 @@ When multiple App copies under one user share records, locking and readback comp
 
 Cancelling an operation wait does not release a still-running blocking core check early. If a channel-stop wait is cancelled, the unfinished original channel continues to block installation; a later explicit stop continues to reconcile the same task.
 
-SemVer comparisons use precedence only: `0.1.0-preview.1` is lower than `0.1.0`; `+build` does not increase precedence; an equal version is not an upgrade. A next preview can use `0.2.0-preview.1`, higher than the current version. Preview and stable feeds are separate; stable accepts no prereleases. Preview selection does not use GitHub `releases/latest`. Older installed Apps without the updater/public key need one manual upgrade.
+SemVer comparisons use precedence only: `0.1.0-preview.1` is lower than `0.1.0`; `+build` does not increase precedence; an equal version is not an upgrade. This candidate uses numeric version `0.2.0` and remains a Preview: current Tauri copies the version into the macOS plist, whose version fields Apple requires to be numeric. Preview and stable feeds are separate; stable accepts no prereleases. Preview selection does not use GitHub `releases/latest`. Older installed Apps without the updater/public key need one manual upgrade.
 
 <a id="local-unsigned-dmg-and-third-party-notices"></a>
 
@@ -104,8 +104,8 @@ First choose the exact source revision, a strictly higher new version, channel, 
 ```json
 {
   "schema": "lintel.app-release/1",
-  "version": "0.2.0-preview.1",
-  "previous_version": "0.1.0",
+  "version": "0.2.0",
+  "previous_version": "0.1.1",
   "channel": "preview",
   "source_revision": "<40-character-source-commit>",
   "pubkey": "<base64-encoded-public-key-file-content>",
@@ -116,8 +116,8 @@ First choose the exact source revision, a strictly higher new version, channel, 
       "archive_path": "/path/to/Lintel.app.tar.gz",
       "signature_path": "/path/to/Lintel.app.tar.gz.sig",
       "dmg_path": "/path/to/Lintel.dmg",
-      "archive_name": "Lintel_0.2.0-preview.1_aarch64.app.tar.gz",
-      "dmg_name": "Lintel_0.2.0-preview.1_aarch64.dmg"
+      "archive_name": "Lintel_0.2.0_aarch64.app.tar.gz",
+      "dmg_name": "Lintel_0.2.0_aarch64.dmg"
     }
   }
 }
@@ -142,7 +142,7 @@ node scripts/app-release.mjs prepare \
   --out candidate-packages/app-prepared
 ```
 
-`build` checks that the current clean Git revision matches the declaration and that previous_version matches the current source App version. It fixes the Tauri target, `app`/`dmg`, `createUpdaterArtifacts`, public key and feed, and passes the same version to the frontend. Update-signing secrets use Tauri's supported local secret/environment mechanisms, never the input record, command line, source, frontend or public manifest. This command may invoke local signing tools and must run only under corresponding build/signing authorization.
+`build` checks that the current clean Git revision matches the declaration. The source App version must equal `version` or `previous_version`, allowing either a committed version bump or an explicit override of the previous version's source. It fixes the Tauri target, `app`/`dmg`, `createUpdaterArtifacts`, public key and feed, and passes that target version to the frontend through `LINTEL_APP_VERSION`, keeping the App information and native bundle version aligned. Update-signing secrets use Tauri's supported local secret/environment mechanisms, never the input record, command line, source, frontend or public manifest. This command may invoke local signing tools and must run only under corresponding build/signing authorization.
 
 `prepare` verifies the actual `.app.tar.gz` finite paths, entry types/capacity, Bundle ID, Info.plist version, Mach-O architecture of `lintel-desktop`, Minisign artifact/trusted-comment signatures and exact version, then computes SHA-256 for uploaded-byte comparison. It executes neither archive nor DMG. DMG byte checks do not prove installation works. source_revision is a declaration, not source authentication; Apple Developer ID/notarization remain unverified. Outputs include:
 
@@ -208,6 +208,6 @@ python3 scripts/prepare-candidate.py verify \
   --out ../lintel-candidate-verified.json
 ```
 
-`build` uses a fresh isolated source clone and fresh target, runs fixed locked builds for all three CLI platforms and their components, and records inputs and final archives. `verify` rereads actual tar member bytes instead of trusting package-declared checksums. It checks the complete platform matrix, components, versions, exact SHA and consistency with the canonical full CI plan/results/evidence, including clean checkouts. Relabeling a reduced plan as full is rejected. App-enabled builds also compare the App and resources in the actual DMG.
+`build` uses a fresh isolated source clone and fresh target, runs fixed locked builds for all three CLI platforms and their components, and records inputs and final archives. `verify` rereads actual tar member bytes instead of trusting package-declared checksums. It also requires executable CLI/runner modes, safe archive permissions and a complete `SHA256SUMS` matching the actual files. It checks the complete platform matrix, components, versions, exact SHA and consistency with the canonical full CI plan/results/evidence, including clean checkouts. Relabeling a reduced plan as full is rejected. App-enabled builds also compare the App and resources in the actual DMG.
 
 These remain local consistency observations: build receipts and CI JSON have no independently authenticated origin and are not trusted CI identity proofs. `c7680f0` completed a real fresh-clone/fresh-target build of three CLI platforms (macOS arm64 and Linux x86_64/arm64 musl) and the macOS App/DMG. Downloaded dependencies were reused; this was not an empty-cache build. [Current state](current-state.md) records the complete candidate source SHA and matrix/full-CI status. Later proof-only documentation commits do not change the built candidate source revision. App installation, clean-Mac trust and Release acceptance remain unverified. The public App 0.1.1 and CLI 0.1.0 remain the previous release lines; current `main` is unreleased. Build, verification, native installation acceptance, signing/notarization, Release, downloads and feed activation remain separate steps, neither authorized nor performed automatically by this script.

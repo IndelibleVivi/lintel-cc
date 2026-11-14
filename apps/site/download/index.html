@@ -41,18 +41,10 @@
       <p class="eyebrow" data-route-copy="downloadEyebrow">DOWNLOAD / APP &amp; CLI</p>
       <h1><span data-route-copy="downloadTitleA">选择你的方式。</span><br><span data-route-copy="downloadTitleB">先核对，再开始。</span></h1>
       <p class="route-intro" data-route-copy="downloadIntro">先核对平台、版本与安装说明，再选择公开下载或源码试用。下载区只展示已核对公开字节的记录；没有记录时，使用明确的源码与本地构建路径。Apple 签名、公证与真实首装分别记录。</p>
-      <div class="route-actions"><a class="button primary" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明</a><a class="text-link" href="/releases/" data-route-copy="status">状态</a></div>
+      <div class="route-actions"><a class="button primary" href="#app-downloads" data-route-copy="appJump">App 下载与安装</a><a class="text-link" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明</a><a class="text-link" href="#cli-downloads" data-route-copy="cliJump">下载 CLI 0.1.0</a><a class="text-link" href="/releases/" data-route-copy="status">状态</a></div>
       <p class="route-boundary"><strong data-route-copy="downloadFacts">当前事实：</strong><span data-route-copy="downloadFactBody">本地候选不自动成为公开下载；准确版本、来源与实测范围见当前状态及下方记录。</span></p>
     </section>
-    <section class="route-section wrap" aria-labelledby="available-title">
-      <div class="route-section-heading"><p class="eyebrow" data-route-copy="availableEyebrow">AVAILABLE NOW</p><h2 id="available-title" data-route-copy="availableTitle">现在可以怎样开始</h2><p data-route-copy="availableIntro">按你已有的环境和目标选择，不要从不存在的按钮推断支持范围。</p></div>
-      <div class="download-grid">
-        <article class="download-choice"><p class="route-kicker">01 / SYNTHETIC UI</p><h3 data-route-copy="trialUi">先看 App 界面</h3><p data-route-copy="trialUiBody">从源码启动合成模式，使用一份新建测试 HOME／state 完成一次归档；不会配置你的 Claude 或浏览器。</p><a class="text-link" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明</a></article>
-        <article class="download-choice"><p class="route-kicker">02 / CLI TRIAL</p><h3 data-route-copy="trialCli">只走独立 CLI</h3><p data-route-copy="trialCliBody">构建 lintel，在一份一次性合成 fixture 中登记、预览、批准、查询并独立读包。</p><a class="text-link" href="/guide/quickstart/" data-route-copy="trialCliLink">打开完整试用</a></article>
-        <article class="download-choice"><p class="route-kicker">03 / LOCAL APP</p><h3 data-route-copy="trialApp">本地构建 macOS App</h3><p data-route-copy="trialAppBody">需要匹配 Rust host 的本机构建。产物不会自动安装到 Applications，也不代表正式签名或可分发。</p><a class="text-link" href="/guide/start-here/#build-native" data-route-copy="trialAppLink">查看构建步骤</a></article>
-      </div>
-    </section>
-    <section class="route-section route-section-ruled wrap" aria-labelledby="app-title">
+    <section id="app-downloads" class="route-section route-section-ruled wrap" aria-labelledby="app-title">
       <div class="route-section-heading"><p class="eyebrow" data-route-copy="appEyebrow">APP / MANUAL DOWNLOAD</p><h2 id="app-title" data-route-copy="appTitle">App 安装资料</h2></div>
       <!-- lintel-app-release:start -->
       <div class="release-facts" data-download-app="unavailable">
@@ -61,6 +53,26 @@
         <p class="route-note" data-route-copy="appNote">已有本地构建的用户按安装与更新指南核对候选来源与版本。公开二进制出现前，不从第三方镜像补齐缺失的 DMG。</p>
       </div>
       <!-- lintel-app-release:end -->
+    </section>
+    <section id="cli-downloads" class="route-section wrap" aria-labelledby="cli-title" data-download-cli="0.1.0">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="cliEyebrow">CLI / PUBLIC PREVIEW</p><h2 id="cli-title" data-route-copy="cliTitle">独立 CLI · 0.1.0 Preview</h2><p data-route-copy="cliIntro">下载与你的系统和架构一致的包，无需安装 App 或编译源码。Linux 包仍为 experimental。</p></div>
+      <p class="route-boundary" data-route-copy="cliVersionScope">这些是现有公开旧版。0.2.0 尚未公开发布；当前开发源码中的新认证来源识别与 Keychain 精确清理不在这些包内。</p>
+      <div class="download-grid">
+        <article class="download-choice" data-cli-target="macos-arm64"><p class="route-kicker">01 / macOS</p><h3>Apple Silicon · arm64</h3><p data-route-copy="cliMacScope">macOS arm64 命令行包；不含 App。</p><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-macos-arm64.tar.gz" data-route-copy="cliDownloadMac">下载 macOS arm64</a></article>
+        <article class="download-choice" data-cli-target="linux-x86_64"><p class="route-kicker">02 / LINUX</p><h3>x86_64</h3><p data-route-copy="cliLinuxScope">Experimental · 静态 Linux CLI／runner；不含桌面 App。</p><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-linux-x86_64.tar.gz" data-route-copy="cliDownloadX64">下载 Linux x86_64</a></article>
+        <article class="download-choice" data-cli-target="linux-aarch64"><p class="route-kicker">03 / LINUX</p><h3>arm64 · aarch64</h3><p data-route-copy="cliLinuxScope">Experimental · 静态 Linux CLI／runner；不含桌面 App。</p><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/lintel-cli-0.1.0-candidate-fcae6cb1efb5-linux-aarch64.tar.gz" data-route-copy="cliDownloadArm">下载 Linux aarch64</a></article>
+      </div>
+      <p class="route-note" data-route-copy="cliInstallNote">先阅读该版本的安装说明并核对 SHA256SUMS。解包后保留完整 bin/remote-runners 目录；使用手动安装与升级，不会自动改写 PATH 或启用更新。</p>
+      <div class="route-actions"><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/INSTALL.zh-CN.md" data-route-attr-href="cliInstallHref" data-route-copy="cliInstallGuide">读取 0.1.0 安装说明</a><a class="text-link" href="https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/SHA256SUMS" data-route-copy="cliChecksumsLink">下载 SHA256SUMS</a><a class="text-link" href="/guide/agents/" data-route-copy="cliSourceGuide">当前源码与 CLI 指南</a></div>
+      <details class="release-notes"><summary data-route-copy="cliDigestsTitle">核对公开包摘要与来源</summary><p data-route-copy="cliDigestScope">以下 SHA-256 对应上述三个下载包，只用于核对字节，不能单独认证发布者。来源 revision：fcae6cb1efb50c6384a31ddce161bee6a39646e0。</p><p>macOS arm64<br><code>83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1</code></p><p>Linux x86_64<br><code>5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6</code></p><p>Linux aarch64<br><code>299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3</code></p></details>
+    </section>
+    <section class="route-section route-section-ruled wrap" aria-labelledby="available-title">
+      <div class="route-section-heading"><p class="eyebrow" data-route-copy="availableEyebrow">AVAILABLE NOW</p><h2 id="available-title" data-route-copy="availableTitle">源码试用与本地构建</h2><p data-route-copy="availableIntro">按你已有的环境和目标选择，不要从不存在的按钮推断支持范围。</p></div>
+      <div class="download-grid">
+        <article class="download-choice"><p class="route-kicker">01 / SYNTHETIC UI</p><h3 data-route-copy="trialUi">先看 App 界面</h3><p data-route-copy="trialUiBody">从源码启动合成模式，使用一份新建测试 HOME／state 完成一次归档；不会配置你的 Claude 或浏览器。</p><a class="text-link" href="/guide/start-here/" data-route-copy="trialUiLink">打开首用说明</a></article>
+        <article class="download-choice"><p class="route-kicker">02 / CLI TRIAL</p><h3 data-route-copy="trialCli">从源码试用 CLI</h3><p data-route-copy="trialCliBody">构建 lintel，在一份一次性合成 fixture 中登记、预览、批准、查询并独立读包。</p><a class="text-link" href="/guide/quickstart/" data-route-copy="trialCliLink">打开完整试用</a></article>
+        <article class="download-choice"><p class="route-kicker">03 / LOCAL APP</p><h3 data-route-copy="trialApp">本地构建 macOS App</h3><p data-route-copy="trialAppBody">需要匹配 Rust host 的本机构建。产物不会自动安装到 Applications，也不代表正式签名或可分发。</p><a class="text-link" href="/guide/start-here/#build-native" data-route-copy="trialAppLink">查看构建步骤</a></article>
+      </div>
     </section>
     <section class="route-section route-section-ruled wrap" aria-labelledby="safety-title">
       <div class="route-section-heading"><p class="eyebrow" data-route-copy="installationEyebrow">INSTALLATION BOUNDARY</p><h2 id="safety-title" data-route-copy="installationTitle">安装顺序与边界</h2></div>

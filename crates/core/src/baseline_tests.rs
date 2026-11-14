@@ -191,6 +191,67 @@ fn an_unattempted_launch_without_the_new_source_binding_requires_preview() {
         .exists());
 }
 
+#[test]
+fn launch_authentication_directory_choice_is_frozen_before_intent() {
+    let (_t, mut engine, e, root) = setup();
+    engine.executable_search_path = Some(engine.home.join("isolated-bin").into_os_string());
+    let e = with_inert_claude(&engine, &e, &root);
+    let project = engine.home.join("project");
+    fs::create_dir(&project).unwrap();
+    let plan = data(
+        &engine,
+        json!({"command":"plan_launch","environment_id":e["id"],"project_cwd":project,"mode":"interactive"}),
+    );
+    let path = engine.path("plans", plan["id"].as_str().unwrap());
+    let original = storage::load(&path).unwrap();
+    for missing in [true, false] {
+        let mut altered = original.clone();
+        if missing {
+            altered["extra"]["launch_request"]
+                .as_object_mut()
+                .unwrap()
+                .remove("authentication_context");
+        } else {
+            altered["extra"]["launch_request"]["authentication_context"]["config_dir"] =
+                Value::Null;
+        }
+        altered.as_object_mut().unwrap().remove("hash");
+        altered["hash"] = json!(storage::digest(&serde_json::to_vec(&altered).unwrap()));
+        storage::save(&path, &altered).unwrap();
+        let rejected = engine.request(
+            json!({"command":"launch_request","request_id":plan["id"],"approval":altered["hash"]}),
+        );
+        assert_eq!(
+            rejected["error"]["code"], "stale_auth_context",
+            "{rejected}"
+        );
+        assert!(!engine
+            .path("launches", plan["id"].as_str().unwrap())
+            .exists());
+    }
+    storage::save(&path, &original).unwrap();
+    let attempted = engine.request(
+        json!({"command":"launch_request","request_id":plan["id"],"approval":plan["hash"]}),
+    );
+    assert!(
+        attempted["ok"] == true || attempted["error"]["code"] == "terminal_required",
+        "{attempted}"
+    );
+    // The original intent wins over later environment/plan drift, so an old
+    // attempted request can only be queried and cannot start another client.
+    let mut legacy = original;
+    legacy["extra"]["launch_request"]
+        .as_object_mut()
+        .unwrap()
+        .remove("authentication_context");
+    storage::save(&path, &legacy).unwrap();
+    let replay = data(
+        &engine,
+        json!({"command":"launch_request","request_id":plan["id"],"approval":"query-original-only"}),
+    );
+    assert_eq!(replay["replayed_query"], true);
+}
+
 // Fault injection for the resume window: the configured file is created when
 // the hook fires, modelling a real external writer that changes settings/MCP
 // during the decrypt ("pre_intent") or copy ("pre_launch") window. The hook is a
@@ -245,6 +306,30 @@ fn supported_resume_fixture() -> (
     );
     assert_eq!(plan["resume"]["supported"], true, "{plan}");
     (temp, engine, plan, project, root)
+}
+
+#[test]
+fn resume_without_frozen_authentication_directory_requires_new_preview() {
+    let (_t, engine, plan, _project, _root) = supported_resume_fixture();
+    let copy = std::path::PathBuf::from(plan["resume"]["private_copy_path"].as_str().unwrap());
+    let path = engine.path("plans", plan["id"].as_str().unwrap());
+    let mut legacy = storage::load(&path).unwrap();
+    legacy["extra"]["resume"]
+        .as_object_mut()
+        .unwrap()
+        .remove("authentication_context");
+    legacy.as_object_mut().unwrap().remove("hash");
+    legacy["hash"] = json!(storage::digest(&serde_json::to_vec(&legacy).unwrap()));
+    storage::save(&path, &legacy).unwrap();
+    let rejected = engine.request(json!({"command":"resume_request","request_id":plan["id"],"approval":legacy["hash"],"archive_passphrase":PASS}));
+    assert_eq!(
+        rejected["error"]["code"], "stale_auth_context",
+        "{rejected}"
+    );
+    assert!(!engine
+        .path("launches", plan["id"].as_str().unwrap())
+        .exists());
+    assert!(!copy.exists());
 }
 
 #[test]

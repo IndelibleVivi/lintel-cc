@@ -273,6 +273,43 @@ test('home routes local task guides without rewriting language-switch roots', ()
   }
 });
 
+test('both download pages expose the actual older public CLI packages without promoting the new candidate', async () => {
+  const base='https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/';
+  const digests={
+    'macos-arm64':'83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1',
+    'linux-x86_64':'5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6',
+    'linux-aarch64':'299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3',
+  };
+  for(const language of ['zh','en']){
+    const html=await readFile(new URL(`../apps/site/${language==='en'?'en/':''}download/index.html`,import.meta.url),'utf8');
+    const hero=html.match(/<section class="route-hero wrap">[\s\S]*?<\/section>/)?.[0];
+    assert.ok(hero,`${language} download hero is present`);
+    assert.match(hero,/<a class="button primary" href="#app-downloads" data-route-copy="appJump">/,'The primary action goes directly to App installation/download facts without claiming availability');
+    const sectionOrder=['class="route-hero wrap"','id="app-downloads"','id="cli-downloads"','aria-labelledby="available-title"','aria-labelledby="safety-title"'].map(marker=>html.indexOf(marker));
+    assert.ok(sectionOrder.every((position,index)=>position>=0&&(index===0||position>sectionOrder[index-1])),`${language} shows App downloads before CLI packages, source trials and installation boundaries`);
+    const block=html.match(/<section\b[^>]*data-download-cli="0\.1\.0"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(block,`${language} public CLI section is readable without JavaScript`);
+    assert.ok(html.includes('href="#cli-downloads"'),`${language} entry points to the download section`);
+    assert.match(block,/0\.1\.0 Preview/);
+    assert.match(block,language==='en'?/0\.2\.0 has not been publicly released/:/0\.2\.0 尚未公开发布/);
+    assert.match(block,language==='en'?/Keychain cleanup[\s\S]*?not included/:/Keychain 精确清理不在这些包内/);
+    assert.equal([...block.matchAll(/data-cli-target=/g)].length,3);
+    const links=[...block.matchAll(/href="([^"]+\.tar\.gz)"/g)].map(match=>match[1]);
+    assert.deepEqual(links,Object.keys(digests).map(target=>`${base}lintel-cli-0.1.0-candidate-fcae6cb1efb5-${target}.tar.gz`));
+    for(const [target,digest] of Object.entries(digests)){
+      assert.ok(block.includes(`data-cli-target="${target}"`));
+      assert.ok(block.includes(`<code>${digest}</code>`),`${language}/${target} displays the public asset digest`);
+    }
+    assert.equal([...block.matchAll(/Experimental ·/g)].length,2,'both Linux cards retain their experimental scope');
+    assert.ok(block.includes(`${base}INSTALL.${language==='en'?'en':'zh-CN'}.md`));
+    assert.ok(block.includes(`${base}SHA256SUMS`));
+    assert.ok(block.includes(`href="${language==='en'?'/en':''}/guide/agents/"`));
+    assert.ok(html.includes(`href="${language==='en'?'/en':''}/guide/quickstart/"`),'source-build trial remains available');
+    assert.doesNotMatch(block,/releases\/download\/v0\.2|data-download-app|\.dmg"/);
+    assert.match(block,language==='en'?/do not independently authenticate/:/不能单独认证发布者/);
+  }
+});
+
 test('maintained guide fragments and locale destinations resolve across all generated pages', async () => {
   const pages=new Map();
   for(const route of SITE_ROUTES)for(const language of ['zh','en']){

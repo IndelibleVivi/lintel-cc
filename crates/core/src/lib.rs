@@ -109,7 +109,7 @@ fn find_executable(home: &Path, path: Option<&std::ffi::OsStr>) -> Option<String
 /// process, so the durable launch record stays at its "attempted/pending" state
 /// rather than claiming the client completed; only a failed exec returns.
 fn direct_tty_launch(
-    config_root: &Path,
+    auth_context: &Value,
     project_cwd: &Path,
     executable: &str,
     proxy_url: Option<&str>,
@@ -123,9 +123,8 @@ fn direct_tty_launch(
         ));
     }
     let mut command = Command::new(executable);
-    command
-        .current_dir(project_cwd)
-        .env("CLAUDE_CONFIG_DIR", config_root);
+    command.current_dir(project_cwd);
+    keychain::configure_execution(&mut command, auth_context)?;
     if let Some(url) = proxy_url {
         for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
             command.env(key, url);
@@ -848,7 +847,10 @@ impl Engine {
                 let exe = self
                     .executable()
                     .ok_or_else(|| err("executable_missing", "没有找到 Claude Code"))?;
-                Ok(json!({"root":root,"executable":exe}))
+                let authentication_context = keychain::execution_context(&self.home, &root)?;
+                Ok(
+                    json!({"root":root,"executable":exe,"authentication_context":authentication_context}),
+                )
             }
             "launch" => self.launch(&self.env(r)?, r.get("proxy_url").and_then(Value::as_str)),
             "export_support" => {
@@ -1179,6 +1181,14 @@ impl Engine {
             // the code/phase or what to do next. Recovery always points at the
             // original job query; completed steps and their artifacts are kept.
             let uncertain = phase == "verifying"
+                // `prepared` is persisted before publishing settings. A rename
+                // can succeed and its parent fsync fail before we can record
+                // `written` or enter verification. Preserve that uncertainty
+                // for the original-job recovery path.
+                || matches!(
+                    j["settings_write"]["state"].as_str(),
+                    Some("prepared" | "written")
+                )
                 || j["steps"].as_array().is_some_and(|steps| {
                     steps.iter().any(|step| {
                         matches!(step["status"].as_str(), Some("running" | "executing"))
@@ -1207,7 +1217,7 @@ impl Engine {
     }
     /// The one macOS Terminal/PTY entry used by both the plain `launch` and the
     /// finite launch-request path. It writes a frozen script that sets cwd to the
-    /// project directory and CLAUDE_CONFIG_DIR to the config root, then asks
+    /// project directory and preserves the selected authentication namespace, then asks
     /// Terminal to open it. No prompt, no hidden pipe, no remote path.
     fn terminal_launch(
         &self,
@@ -1217,7 +1227,15 @@ impl Engine {
         executable: &str,
         proxy_url: Option<&str>,
     ) -> Result<Value> {
-        self.terminal_launch_args(label, config_root, project_cwd, executable, proxy_url, &[])
+        self.terminal_launch_args(
+            label,
+            config_root,
+            project_cwd,
+            executable,
+            proxy_url,
+            &[],
+            None,
+        )
     }
 
     /// The same Terminal/PTY entry with a finite extra argv (for native resume:
@@ -1231,12 +1249,28 @@ impl Engine {
         executable: &str,
         proxy_url: Option<&str>,
         extra_args: &[String],
+        frozen_auth_context: Option<&Value>,
     ) -> Result<Value> {
+        let auth_context = keychain::execution_context(&self.home, config_root)?;
+        if let Some(frozen) = frozen_auth_context {
+            if frozen != &auth_context {
+                return Err(err(
+                    "stale_auth_context",
+                    "客户端认证目录选择已变化；未启动，请核对原请求",
+                ));
+            }
+        }
         // Direct-TTY mode is selected only by the trusted runner CLI interactive
         // branch. It requires a real TTY and execs the fixed client with the
         // frozen cwd/config/argv on every Unix platform.
         if self.interactive_direct {
-            return direct_tty_launch(config_root, project_cwd, executable, proxy_url, extra_args);
+            return direct_tty_launch(
+                &auth_context,
+                project_cwd,
+                executable,
+                proxy_url,
+                extra_args,
+            );
         }
         // App/legacy path: macOS opens a Terminal with a frozen script. On other
         // platforms (headless runner) the same direct-TTY requirement applies.
@@ -1260,9 +1294,9 @@ impl Engine {
                 .map(|arg| format!(" {}", quote(arg)))
                 .collect::<String>();
             let content = format!(
-                "#!/bin/sh\ncd {} || exit 1\nexec env CLAUDE_CONFIG_DIR={}{} {}{}\n",
+                "#!/bin/sh\ncd {} || exit 1\nexec env {}{} {}{}\n",
                 quote(&project_cwd.to_string_lossy()),
-                quote(&config_root.to_string_lossy()),
+                keychain::execution_shell_args(&auth_context)?,
                 proxy_args,
                 quote(executable),
                 extra
@@ -1290,7 +1324,13 @@ impl Engine {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            direct_tty_launch(config_root, project_cwd, executable, proxy_url, extra_args)
+            direct_tty_launch(
+                &auth_context,
+                project_cwd,
+                executable,
+                proxy_url,
+                extra_args,
+            )
         }
     }
     fn launch(&self, e: &Value, proxy_url: Option<&str>) -> Result<Value> {
@@ -1794,6 +1834,13 @@ pub fn handle_interactive_launch(request: Value) -> Value {
         }
         Err(e) => json!({"ok":false,"error":{"code":e.code,"message":e.message}}),
     }
+}
+
+/// Apply the finite authentication-directory descriptor returned by the Core's
+/// `launch_context` to a trusted client's Command. The plain CLI/TUI launcher
+/// uses this same implementation as planned launches and explicit auth status.
+pub fn configure_client_authentication(command: &mut Command, context: &Value) -> Result<()> {
+    keychain::configure_execution(command, context)
 }
 
 /// Readonly execution-context descriptor. Constructs no `Engine`, so the CLI

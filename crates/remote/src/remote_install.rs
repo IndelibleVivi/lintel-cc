@@ -18,6 +18,45 @@ fn checked_digest(value: &Value) -> Result<&str> {
         })
         .ok_or_else(|| failure("invalid_bundle", "Runner 校验值无效"))
 }
+// Inventory is consumed by the same UI as an exact install query. Valid JSON
+// and a status alone do not establish a usable original record. Keep legacy
+// binding fields optional while validating the finite existing display and
+// frozen-target fields before either path exposes a record.
+fn valid_install_record(record: &Value, alias: &str, id: &str) -> bool {
+    record["install_id"] == id
+        && record["alias"] == alias
+        && matches!(
+            record["status"].as_str(),
+            Some(
+                "previewed"
+                    | "needs_reconciliation"
+                    | "not_installed"
+                    | "installed_unverified"
+                    | "ready"
+                    | "superseded"
+                    | "verified"
+            )
+        )
+        && ["os", "architecture", "uid", "target"]
+            .iter()
+            .all(|key| record["probe"][key].is_string())
+        && checked_digest(&record["probe"]["identity"]).is_ok()
+        && ["version", "target"]
+            .iter()
+            .all(|key| record["bundle"][key].is_string())
+        && record["bundle"]["bytes"].is_u64()
+        && record["bundle"]["protocol"] == 1
+        && checked_digest(&record["bundle"]["sha256"]).is_ok()
+        && record["probe"]["target"] == record["bundle"]["target"]
+        && record["destination"].is_string()
+        && checked_digest(&record["approval"]).is_ok()
+        && record["effects"]
+            .as_array()
+            .is_some_and(|effects| effects.iter().all(Value::is_string))
+        && record
+            .get("last_error")
+            .is_none_or(|error| error.is_null() || error["message"].is_string())
+}
 pub(super) fn runner_program(bound: Option<&Value>) -> Result<String> {
     match bound {
         Some(value) => Ok(format!(
@@ -182,7 +221,11 @@ impl Controller {
         Ok(Bundle { meta, bytes })
     }
     fn install_root(&self, alias: &str) -> Result<PathBuf> {
-        let root = self.state.join("installations").join(alias);
+        let parent = self.state.join("installations");
+        // An existing leaf can otherwise resolve through a substituted parent
+        // symlink without private_dir ever examining that parent.
+        private_dir(&parent)?;
+        let root = parent.join(alias);
         private_dir(&root)?;
         Ok(root)
     }
@@ -197,22 +240,78 @@ impl Controller {
                     .exists()
         })
     }
-    pub(super) fn install_inventory(&self) -> Result<Vec<Value>> {
+    pub(super) fn install_inventory(&self, errors: &mut Vec<Value>) -> Result<Vec<Value>> {
         let mut result = vec![];
         let root = self.state.join("installations");
-        if !root.exists() {
-            return Ok(result);
+        match fs::symlink_metadata(&root) {
+            Ok(metadata) if metadata.is_dir() => {}
+            Ok(_) => {
+                errors.push(inventory_error(
+                    "installation",
+                    None,
+                    None,
+                    "local_state_invalid",
+                ));
+                return Ok(result);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(result),
+            Err(error) => return Err(storage(error)),
         }
         for alias in fs::read_dir(root).map_err(storage)? {
             let alias = alias.map_err(storage)?;
-            if !alias.file_type().map_err(storage)?.is_dir() {
+            let is_directory = alias.file_type().map_err(storage)?.is_dir();
+            let Some(alias_name) = alias
+                .file_name()
+                .to_str()
+                .map(str::to_owned)
+                .filter(|value| valid_alias(value).is_ok())
+            else {
+                if is_directory {
+                    errors.push(inventory_error("installation", None, None, "invalid_alias"));
+                }
+                continue;
+            };
+            if !is_directory {
+                errors.push(inventory_error(
+                    "installation",
+                    Some(&alias_name),
+                    None,
+                    "local_state_invalid",
+                ));
                 continue;
             }
             for item in fs::read_dir(alias.path()).map_err(storage)? {
                 let path = item.map_err(storage)?.path();
                 if path.extension().is_some_and(|s| s == "json") {
-                    if let Ok(record) = load(&path) {
-                        result.push(record);
+                    let Some(id) = path
+                        .file_stem()
+                        .and_then(|value| value.to_str())
+                        .filter(|value| valid_id(value).is_ok())
+                    else {
+                        errors.push(inventory_error(
+                            "installation",
+                            Some(&alias_name),
+                            None,
+                            "invalid_id",
+                        ));
+                        continue;
+                    };
+                    match load(&path) {
+                        Ok(record) if valid_install_record(&record, &alias_name, id) => {
+                            result.push(record)
+                        }
+                        Ok(_) => errors.push(inventory_error(
+                            "installation",
+                            Some(&alias_name),
+                            Some(id),
+                            "install_record_invalid",
+                        )),
+                        Err(error) => errors.push(inventory_error(
+                            "installation",
+                            Some(&alias_name),
+                            Some(id),
+                            error.code,
+                        )),
                     }
                 }
             }
@@ -220,8 +319,23 @@ impl Controller {
         Ok(result)
     }
     fn require_reconciled_installs(&self, alias: &str) -> Result<()> {
-        if let Some(record) = self
-            .install_inventory()?
+        let mut errors = Vec::new();
+        let installations = self.install_inventory(&mut errors)?;
+        if let Some(error) = errors.iter().find(|error| error["alias"] == alias) {
+            return Err(Failure {
+                code: "install_record_invalid",
+                message: "此主机有无法读取的原安装记录；保留原记录并核对，不能创建新上传意图"
+                    .into(),
+                diagnostic: Some(json!({
+                    "stage":"local", "reason":"install_record_invalid",
+                    "summary":"原安装记录不完整；本次没有上传或切换 runner。",
+                    "next_steps":["保留原安装记录，按原 install_id 核对；不要删除记录以重试安装。"],
+                    "submission_uncertain":false, "stderr_truncated":false,
+                    "alias":alias, "install_id":error["id"]
+                })),
+            });
+        }
+        if let Some(record) = installations
             .iter()
             .find(|r| r["alias"] == alias && r["status"] == "needs_reconciliation")
         {
@@ -271,8 +385,11 @@ impl Controller {
         let _held = lock(&root.join("install.lock"))?;
         let path = root.join(format!("{id}.json"));
         let mut record = load(&path)?;
-        if record["install_id"] != id || record["alias"] != alias {
-            return Err(failure("install_record_invalid", "安装记录与主机不匹配"));
+        if !valid_install_record(&record, alias, id) {
+            return Err(failure(
+                "install_record_invalid",
+                "原安装记录不完整或与主机不匹配；保留原记录并核对，没有上传或切换绑定",
+            ));
         }
         checked_digest(&record["bundle"]["sha256"])?;
         if payload["op"] == "query_install" && record["status"] == "previewed" {
@@ -535,6 +652,162 @@ eval "$last"
         )
     }
     #[test]
+    fn malformed_installation_directories_block_intent_and_report_incomplete_inventory() {
+        for corruption in [
+            "root_symlink",
+            "root_broken_symlink",
+            "alias_file",
+            "alias_symlink",
+            "alias_broken_symlink",
+        ] {
+            let (temporary, controller) = fixture();
+            let original = prepare(&controller);
+            let is_root = corruption.starts_with("root_");
+            let installation_root = controller.state.join("installations");
+            let replaced = if is_root {
+                installation_root.clone()
+            } else {
+                installation_root.join("synthetic-host")
+            };
+            let retained = temporary.path().join("retained-original-records");
+            fs::rename(&replaced, &retained).unwrap();
+            let retained_record = if is_root {
+                retained.join("synthetic-host")
+            } else {
+                retained.clone()
+            }
+            .join(format!("{}.json", original["install_id"].as_str().unwrap()));
+            let original_bytes = fs::read(&retained_record).unwrap();
+            if corruption == "alias_file" {
+                fs::write(&replaced, b"not a directory").unwrap();
+            } else {
+                let target = if corruption.ends_with("broken_symlink") {
+                    temporary.path().join("missing-target")
+                } else {
+                    retained.clone()
+                };
+                std::os::unix::fs::symlink(target, &replaced).unwrap();
+            }
+            let commands = fs::read(temporary.path().join("commands")).unwrap();
+            for request in [
+                json!({"op":"prepare_runner","alias":"synthetic-host"}),
+                json!({"op":"install_runner","alias":"synthetic-host","install_id":original["install_id"],"approval":original["approval"]}),
+            ] {
+                let error = controller.dispatch(request).unwrap_err();
+                assert_eq!(error.code, "local_state_invalid", "{corruption}");
+            }
+            assert_eq!(
+                fs::read(temporary.path().join("commands")).unwrap(),
+                commands,
+                "{corruption} must stop before SSH"
+            );
+            assert_eq!(fs::read(&retained_record).unwrap(), original_bytes);
+            let inventory = controller.dispatch(json!({"op":"hosts"})).unwrap();
+            assert_eq!(inventory["data"]["records_complete"], false, "{corruption}");
+            assert_eq!(
+                inventory["data"]["record_errors"],
+                json!([{"kind":"installation", "alias":if is_root { Value::Null } else { json!("synthetic-host") }, "id":null, "code":"local_state_invalid"}]),
+                "{corruption}"
+            );
+        }
+    }
+    #[test]
+    fn unreadable_original_installation_blocks_new_intent_without_ssh() {
+        let (temporary, controller) = fixture();
+        let original = prepare(&controller);
+        let another = prepare(&controller);
+        let original_path = controller
+            .state
+            .join("installations/synthetic-host")
+            .join(format!("{}.json", original["install_id"].as_str().unwrap()));
+        // Model an original uncertain upload whose local journal can no longer
+        // be decoded. Its absence from a UI list cannot authorize a new upload.
+        fs::write(&original_path, b"{\"status\":\"needs_reconciliation\"").unwrap();
+        let original_bytes = fs::read(&original_path).unwrap();
+        let commands = fs::read(temporary.path().join("commands")).unwrap();
+        for request in [
+            json!({"op":"prepare_runner","alias":"synthetic-host"}),
+            json!({"op":"install_runner","alias":"synthetic-host","install_id":another["install_id"],"approval":another["approval"]}),
+        ] {
+            let error = controller.dispatch(request).unwrap_err();
+            assert_eq!(error.code, "install_record_invalid");
+        }
+        assert_eq!(
+            fs::read(temporary.path().join("commands")).unwrap(),
+            commands
+        );
+        assert_eq!(fs::read(&original_path).unwrap(), original_bytes);
+        let inventory = controller.dispatch(json!({"op":"hosts"})).unwrap();
+        assert_eq!(inventory["data"]["records_complete"], false);
+        assert!(inventory["data"]["record_errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|error| error["kind"] == "installation"
+                && error["alias"] == "synthetic-host"
+                && error["id"] == original["install_id"]));
+        assert!(inventory["data"]["installations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|record| record["install_id"] == another["install_id"]));
+    }
+    #[test]
+    fn partial_json_installations_are_errors_not_presentable_or_actionable_records() {
+        let (temporary, controller) = fixture();
+        let original = prepare(&controller);
+        let healthy = prepare(&controller);
+        let original_path = controller
+            .state
+            .join("installations/synthetic-host")
+            .join(format!("{}.json", original["install_id"].as_str().unwrap()));
+        let commands = fs::read(temporary.path().join("commands")).unwrap();
+        let partial = json!({"install_id":original["install_id"],"alias":"synthetic-host","status":"needs_reconciliation"});
+        let mut malformed = vec![partial];
+        for field in ["bundle", "probe", "effects", "approval", "destination"] {
+            let mut record = original.clone();
+            record["status"] = json!("needs_reconciliation");
+            record.as_object_mut().unwrap().remove(field);
+            malformed.push(record);
+        }
+        let mut bad_scalar = original.clone();
+        bad_scalar["bundle"]["version"] = json!({"unexpected":"object"});
+        malformed.push(bad_scalar);
+        let mut bad_effect = original.clone();
+        bad_effect["effects"] = json!([{"unexpected":"object"}]);
+        malformed.push(bad_effect);
+        let mut bad_error = original.clone();
+        bad_error["last_error"] = json!({"message":{"unexpected":"object"}});
+        malformed.push(bad_error);
+        for record in malformed {
+            save(&original_path, &record).unwrap();
+            let original_bytes = fs::read(&original_path).unwrap();
+            let inventory = controller.dispatch(json!({"op":"hosts"})).unwrap();
+            assert_eq!(inventory["data"]["records_complete"], false);
+            assert_eq!(inventory["data"]["installations"], json!([healthy]));
+            assert_eq!(
+                inventory["data"]["record_errors"],
+                json!([{"kind":"installation","alias":"synthetic-host","id":original["install_id"],"code":"install_record_invalid"}])
+            );
+            for request in [
+                json!({"op":"prepare_runner","alias":"synthetic-host"}),
+                json!({"op":"install_runner","alias":"synthetic-host","install_id":healthy["install_id"],"approval":healthy["approval"]}),
+                json!({"op":"query_install","alias":"synthetic-host","install_id":original["install_id"]}),
+                json!({"op":"install_runner","alias":"synthetic-host","install_id":original["install_id"],"approval":original["approval"]}),
+            ] {
+                assert_eq!(
+                    controller.dispatch(request).unwrap_err().code,
+                    "install_record_invalid"
+                );
+            }
+            assert_eq!(fs::read(&original_path).unwrap(), original_bytes);
+            assert_eq!(
+                fs::read(temporary.path().join("commands")).unwrap(),
+                commands
+            );
+        }
+    }
+    #[test]
     fn approval_and_fresh_target_and_artifact_precede_upload() {
         let (_t, c) = fixture();
         let p = prepare(&c);
@@ -601,7 +874,10 @@ eval "$last"
         assert!(install(&c, &p).is_err());
         assert!(c.binding("synthetic-host").unwrap().is_none());
         assert_eq!(
-            c.install_inventory().unwrap().last().unwrap()["status"],
+            c.install_inventory(&mut Vec::new())
+                .unwrap()
+                .last()
+                .unwrap()["status"],
             "needs_reconciliation"
         );
         assert_eq!(

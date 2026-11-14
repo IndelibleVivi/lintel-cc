@@ -113,7 +113,11 @@ impl Controller {
         }
         view
     }
-    pub(super) fn launch_inventory(&self, selected_alias: Option<&str>) -> Result<Vec<Value>> {
+    pub(super) fn launch_inventory(
+        &self,
+        selected_alias: Option<&str>,
+        errors: &mut Vec<Value>,
+    ) -> Result<Vec<Value>> {
         let root = self.state.join("launches");
         let mut out = vec![];
         if !root.exists() {
@@ -130,6 +134,7 @@ impl Controller {
                 .map(str::to_owned)
                 .filter(|s| valid_alias(s).is_ok())
             else {
+                errors.push(inventory_error("launch", None, None, "invalid_alias"));
                 continue;
             };
             if selected_alias.is_some_and(|selected| selected != alias) {
@@ -141,13 +146,30 @@ impl Controller {
                     continue;
                 }
                 let Some(id) = path.file_stem().and_then(|v| v.to_str()) else {
+                    errors.push(inventory_error("launch", Some(&alias), None, "invalid_id"));
                     continue;
                 };
-                if self.resolve_launch_binding(&alias, id).is_err() {
+                if valid_core_id(id).is_err() {
+                    errors.push(inventory_error("launch", Some(&alias), None, "invalid_id"));
                     continue;
                 }
-                if let Ok(record) = load(&path) {
-                    out.push(Self::launch_record_view(&alias, &record));
+                if let Err(error) = self.resolve_launch_binding(&alias, id) {
+                    errors.push(inventory_error(
+                        "launch",
+                        Some(&alias),
+                        Some(id),
+                        error.code,
+                    ));
+                    continue;
+                }
+                match load(&path) {
+                    Ok(record) => out.push(Self::launch_record_view(&alias, &record)),
+                    Err(error) => errors.push(inventory_error(
+                        "launch",
+                        Some(&alias),
+                        Some(id),
+                        error.code,
+                    )),
                 }
             }
         }

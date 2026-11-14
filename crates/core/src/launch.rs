@@ -463,6 +463,7 @@ impl Engine {
             "proxy_url": proxy,
             "created_at": now(),
             "startup": startup.view,
+            "authentication_context": crate::keychain::execution_context(&self.home, &root)?,
         });
         let mut plan = self.plan(
             &e,
@@ -558,6 +559,11 @@ impl Engine {
         }
         let root = PathBuf::from(string(request, "config_root")?);
         guard(&root)?;
+        crate::keychain::check_execution_context(
+            &self.home,
+            &root,
+            &request["authentication_context"],
+        )?;
         if dir_identity(&root)? != request["config_root_identity"] {
             return Err(err(
                 "stale_plan",
@@ -606,7 +612,15 @@ impl Engine {
         // The Terminal attempt is the sole side effect. Whether it succeeds or
         // fails, the outcome is recorded so a repeat can only query it and can
         // never open a second session.
-        let outcome = match self.terminal_launch(&rid, &root, &project, executable, proxy) {
+        let outcome = match self.terminal_launch_args(
+            &rid,
+            &root,
+            &project,
+            executable,
+            proxy,
+            &[],
+            Some(&request["authentication_context"]),
+        ) {
             Ok(outcome) => outcome,
             Err(failure) => {
                 record["status"] = json!("launch_failed");
@@ -694,6 +708,7 @@ impl Engine {
             },
             "format": format.format,
             "startup": startup.view,
+            "authentication_context": crate::keychain::execution_context(&self.home, &root)?,
         });
         self.plan(
             &e,
@@ -721,6 +736,11 @@ impl Engine {
         resume: &Value,
         startup_binding: &Value,
     ) -> Result<()> {
+        crate::keychain::check_execution_context(
+            &self.home,
+            root,
+            &resume["authentication_context"],
+        )?;
         if project_identity(project)? != resume["project_cwd_identity"] {
             return Err(err(
                 "stale_plan",
@@ -938,6 +958,7 @@ impl Engine {
             &executable,
             None,
             &extra_args,
+            Some(&resume["authentication_context"]),
         ) {
             Ok(outcome) => outcome,
             Err(failure) => {
