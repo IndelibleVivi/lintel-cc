@@ -185,7 +185,7 @@ python3 tests/auth_sources_journey.py target/debug/lintel
 
 终审没有发现遗漏的自动客户端执行入口或新增的发行阻断缺陷。目录描述是**执行入口的选择绑定**，不是以 OS 文件描述符固定整个后续客户端世界：macOS `open -a Terminal` 为异步交接，回执准确使用 `launch_requested`。交接之后的路径／可执行文件／别名替换、接收 Terminal 的其他认证变量和外部客户端实际加载结果仍不能被这个回执证明；不要在 Release notes 中将它升级为“已认证”“已启动成功并验证来源”或隔离保证。
 
-认证分项没有新增必须交给 Faye 的签名或账户决定。固定候选的 CI、临时 Keychain 和受控惰性客户端验收可继续由工程自动执行。只有另行选择真实联网登录／撤销验收时，才需要专用测试账户及其授权；不能为了填满证据表使用个人凭据。`stale_auth_context` 的下一步是重新预览，`auth_scope_unverified` 的下一步是核对原启动入口的目录选择，Keychain locked/denied 的下一步是针对相应系统入口复查；这些都不应引导用户重复执行已接受的清理任务。
+认证分项没有新增必须交给所有者的签名或账户决定。固定候选的 CI、临时 Keychain 和受控惰性客户端验收可继续由工程自动执行。只有另行选择真实联网登录／撤销验收时，才需要专用测试账户及其授权；不能为了填满证据表使用个人凭据。`stale_auth_context` 的下一步是重新预览，`auth_scope_unverified` 的下一步是核对原启动入口的目录选择，Keychain locked/denied 的下一步是针对相应系统入口复查；这些都不应引导用户重复执行已接受的清理任务。
 
 ### 首次当前提交 native CI 的真实结果与 harness 修正
 
@@ -227,7 +227,7 @@ Linux 结论同时核对了实际 Linux/Python 平台、固定脚本与普通 `c
 - `bundled_browser_host::tests::built_host_runs_from_installed_manifest_and_returns_native_frames`：需要预先准备 browser-host bundle 资源。
 - `bundled_browser_extension::tests::actual_packaged_extensions_install_from_bundle_with_no_profile_mutation`：需要预先准备 browser-extension bundle 资源。
 
-这两项需要由对应 prepared-bundle 验收另行证明，本分项不将它们记为通过。普通 workspace 还保留 metadata benchmark 和专用 remote launcher 的明确 ignored 条件；其中 current-HOME shared-remote case 已由同一 job 的独立 journey 执行通过。Linux 的 `/proc` 分支不能由 macOS 的公共 PASS 句子推导，macOS Security.framework 也不能由 Linux 的合成 Keychain 测试推导。
+两项随后已在本机 macOS 26.5.2 arm64、clean `353536cc` 消费最终 DMG 复制 App 的真实资源，独立各 1 passed、0 failed、0 ignored；host 验证 native frames，扩展只准备扩展文件、不改 profile。普通组的历史 ignored 计数保持，不将独立执行改写为常规组全执行。普通 workspace 还保留 metadata benchmark 和专用 remote launcher 的明确 ignored 条件；其中 current-HOME shared-remote case 已由同一 job 的独立 journey 执行通过。Linux 的 `/proc` 分支不能由 macOS 的公共 PASS 句子推导，macOS Security.framework 也不能由 Linux 的合成 Keychain 测试推导。
 
 ### 分发版本边界与证据位置
 
@@ -240,3 +240,5 @@ Linux 结论同时核对了实际 Linux/Python 平台、固定脚本与普通 `c
 - `current-ci/push-43520398332/`：首次 macOS PTY 失败和诊断，作为历史反例保留，不被成功结果覆盖。
 
 因此，**本分项所要求的固定提交自动回归、生产 CLI 目录绑定、Linux 进程识别和临时 Keychain 原生 gate 已通过，可以进入包含该提交的下一版 Preview 发行决定。** 这不替代安装包、签名／公证、Gatekeeper、真实账户和 updater 的独立结论；无需为本分项再引入全账户扫描、自动登录或扩大清理范围。
+
+本机最终 DMG 的合成 GUI 清理另已通过：三 sources、五 selected steps done，fresh 三 removed、无新 job、邻接数据保持。原始结果仍为 partially_completed／partial；local done 不代表 runtime、其他上下文或服务端撤销。Keychain 为合成 adapter，详见[完整产品记录](product-acceptance.md#本机最终候选补充验收)。

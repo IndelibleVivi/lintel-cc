@@ -10,7 +10,7 @@
 
 Lintel 已经具备一个可信工具的主要结构：按目标选择任务、批准前固定主机与环境、明确实际动作、保留原任务身份、失败后继续查询，以及不依靠删记录来“重试”。工作资料保全／阅读和任务恢复是最成熟的两条路径。认证来源界面与精确清理也已形成有意义的用户闭环，本轮修复了实际认证命名空间和返回查看损坏记录时的重要缺陷。
 
-最终复核确认 PR #7 的版式、双语说明和任务层级改进有效，应继续保留。本轮又完成认证命名空间、损坏原记录反馈、迟到响应隔离、离线帮助和公开 CLI 下载入口等具体改进；两平台 built-App 流程及最终 App 的有限原生控件操作已有结果。三平台 CLI 最终包与旧公开版资料兼容也已实际通过。现在阻挡普通用户 App 分发的条件已经具体：下载首开信任、完整原生任务与 App 升级、尚未执行的两项实际 bundle 资源测试，以及图形授权依据；浏览器手动安装和客户端版本限定支持也要明确告知。继续增加配方或重画界面不能替代这些验收，完整 SPEC 中的未来功能也不应无限推迟范围明确的 CLI Preview。
+最终复核确认 PR #7 的版式、双语说明和任务层级改进有效，应继续保留。本轮又完成认证命名空间、损坏原记录反馈、迟到响应隔离、离线帮助和公开 CLI 下载入口等具体改进；两平台 built-App 流程及最终 App 的有限原生控件操作已有结果。三平台 CLI 最终包与旧公开版资料兼容也已实际通过。现在阻挡普通用户 App 分发的条件已经具体：下载首开信任、实际安装替换、图形授权依据；浏览器手动安装和客户端版本限定支持也要明确告知。继续增加配方或重画界面不能替代这些验收，完整 SPEC 中的未来功能也不应无限推迟范围明确的 CLI Preview。
 
 ## 2. 六类任务的验收结论
 
@@ -49,7 +49,7 @@ Lintel 已经具备一个可信工具的主要结构：按目标选择任务、�
 
 本轮进一步处理了两种真实返回故障：安装 parent／alias 被文件或 symlink 替换时，准备与批准在 SSH 前失败；合法但缺字段的安装 JSON 进入错误列表，而不会触发 `bundle.version` 等解引用使整个面板崩溃。原 bytes 与健康邻居记录都保留。相关 before/after 复现及 62 项 remote 回归结果见[执行与恢复审查](execution-recovery.md)。修复并不自动重建损坏的原记录；用户仍应保留原 ID 和文件进行核对。
 
-## 4. 升级验收：最终 CLI 旧包到新包已通过，App 升级仍需单独成立
+## 4. 升级验收：最终 CLI 旧包到新包已通过，App 跨版本状态与中断查询已补验，安装层仍独立
 
 | 升级问题 | 当前可以成立的结论 | 不能据此推出的结论 |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ Lintel 已经具备一个可信工具的主要结构：按目标选择任务、�
 | CLI 0.1.0 → 0.2.0 | 最终 `353536cc` 的 macOS arm64、Linux x86_64、Linux aarch64 三份报告均为 `passed:true`、`upgrade_tested:true`，各自在匹配的原生 OS／CPU 运行最终包。旧公开 0.1.0 先创建真实合成 state／job／密文，新包查询原 ID、保留 archive bytes，并在独立 state 读取及迁入。 | 这些结果不包含普通浏览器下载后的 macOS quarantine／信任首开、App 替换升级或旧版本反向写入新 state；一个平台的结果没有代替其他架构。 |
 | 重复原批准 | 最终 CLI 程序不仅核对返回 ID/path，也比较重复前后的实际密文摘要和目录清单，防止“回旧 ID、实际又归档”的假成功。 | 这不证明所有操作在每个旧版本上都可反向写入。 |
 | 回滚 | 验收保留旧可执行文件并再次核对摘要；手动选择旧版本的路径仍在。 | 未验证旧版本写入已经被新版本改变的 state；不能把“旧文件还在”表述成自动双向回滚。不得删 state、历史或密文来恢复启动。 |
-| App 0.1.1 → 0.2.0 | 最终 DMG 已挂载、复制 App、比较完整资源、严格验签并直接启动；独立窗口程序还确认了第 5 节的九个有限原生界面状态。 | 这些程序没有执行旧 App 到新 App 的替换升级、完整任务或升级中断恢复，也没有建立 Finder／Applications、LaunchServices 和隔离属性下载首开的成功证据。 |
+| App 0.1.1 → 0.2.0 | 最终 DMG 已挂载、复制、严格验签并直接启动；旧公开 App 建立的原状态、原任务与中断原 ID 查询已由最终候选实际补验。 | 尚未建立真实 Finder／Applications 替换、普通下载 quarantine 与用户系统信任首开的成功证据。 |
 | 自动更新 | 未配置 updater 的旧公开 Preview 仍需手动获取新包；新源码有更新实现，不会让旧包自动获得 feed。 | SHA-256 不是独立发行者认证；没有配置生产 key/feed 时不能宣传自动升级已可用。 |
 
 最终候选程序：[CLI](../../scripts/accept-cli-candidate.py)、[macOS App](../../scripts/accept-macos-candidate.py)。本地 debug 试验曾在加密归档相关请求超时，未通过完整程序；该失败仍保留。后来通过的是三平台实际最终优化包，来自候选 run `43526964671`，没有把 debug 试验的部分进展补记成通过。准确 artifact provenance 由发行工程报告记录。
@@ -94,11 +94,11 @@ Lintel 已经具备一个可信工具的主要结构：按目标选择任务、�
 
 这些结果证明最终 App 在真实 WebKit 中能够渲染、暴露有名称的 AX 控件并响应上述导航、主题、语言和面板操作。每个状态均核对操作后的结果，未仅凭 AXPress 返回成功记为通过。该程序没有执行归档、批准、清理、SSH 或任何业务任务；没有使用全局键盘输入、WebKit 注入或系统权限例外。
 
-### 仍明确未验证的最终 App 路径
+### 最终 App 的补充范围与未验证路径
 
-- **完整原生任务与 App 升级：** 选定最终 App 的六文件首用／批准／回执／重开／独立读包，以及旧公开 App 0.1.1 → 0.2.0 的原状态、原任务和中断恢复，仍需在受控 Mac 完整执行。CLI 的已完成升级实验和 Chromium bridge journey 不替代这些结果。
-- **键盘、焦点与 VoiceOver：** 此次 AXPress 没有验收原生 Tab／Shift-Tab／Enter／Escape、关闭面板后的键盘焦点、屏幕朗读顺序或 VoiceOver 使用；也没有完成原生窗口缩放矩阵。已有 Chromium 键盘／焦点断言及 AX 元素存在是各自独立的证据。
-- **两项实际 bundle 资源 fixtures：** 最终 desktop Rust 报告分别为 macOS 56 passed／2 ignored、Linux 52 passed／2 ignored。两项未运行的是 [bundled_browser_host.rs](../../apps/desktop/src-tauri/src/bundled_browser_host.rs) 的 `built_host_runs_from_installed_manifest_and_returns_native_frames`，以及 [bundled_browser_extension.rs](../../apps/desktop/src-tauri/src/bundled_browser_extension.rs) 的 `actual_packaged_extensions_install_from_bundle_with_no_profile_mutation`。它们要求准备真实资源并显式运行；当前候选的文件 inventory、普通 installer 单元测试和 browser runtime 通过，均没有补记这两项 ignored。最后验收应消费选定最终 App 的资源、记录资源摘要、在合成 HOME 安装并核对 native frames／不改 profile，保留这两项独立结果。
+- **完整原生任务与 App 升级：** 选定最终 App 的首用归档、批准、回执、重开与读包，以及旧公开 App 的跨版本状态／中断查询已补验。真实 Applications 替换、普通下载 quarantine 与旧 approval UI 承接仍未覆盖。
+- **键盘、焦点与 VoiceOver：** 初始 AXPress 没有验收完整键盘路径；本机随后观察到原生 Escape 关闭 Help 并返回 Help 按钮焦点，但没有完成 Tab／Shift-Tab／Enter 矩阵、屏幕朗读顺序、VoiceOver 或窗口缩放矩阵。已有 Chromium 键盘／焦点断言及 AX 元素存在是各自独立的证据。
+- **两项实际 bundle 资源 fixtures：** 常规 macOS 56 passed／2 ignored、Linux 52 passed／2 ignored 计数保持。本机 macOS 26.5.2 arm64 在 clean `353536cc` 另行显式执行两个既有 ignored 测试，消费最终 DMG 复制 App 的真实资源，各 **1 passed、0 failed、0 ignored**；host 从合成 HOME 的安装 manifest 启动并验证 native frames，扩展验证 Chrome／Edge／Firefox 选择对应 bytes、仅准备扩展文件、不改 profile。此证据不替代完整真实浏览器旅程。
 - **普通下载与信任：** 临时复制、直接启动和上述有限 AX 交互未覆盖带 quarantine 的普通下载首开、Applications 替换或 Gatekeeper 接受。Developer ID／公证与含图形资产的授权条件仍由总交接单独处理。
 
 最终原始报告保存在工程证据包的 `rc-final-ci/browser/`、`rc-final-ci/native-auth/`、`rc-final-ci/native-linux/` 和 `rc-final-candidate-ci/`；source、run、artifact metadata 与摘要相互绑定。完整 candidate gate 的最终结论以总交接为准，本分项的 browser 成功没有代替其他矩阵项。
@@ -106,9 +106,23 @@ Lintel 已经具备一个可信工具的主要结构：按目标选择任务、�
 ## 6. 发布前真正需要的决定与最后验收
 
 1. **版本定位：** 保持数字版本 0.2.0，渠道为 Preview。工作资料、配置、精确来源清理和原任务恢复可以进入候选；浏览器手动安装、有限续聊和真实认证覆盖明确标注范围。无需为未来 SPEC 功能无限延期。
-2. **逐平台决定：** 最终 Linux x86_64／aarch64 CLI 已获得各自原生包与旧包升级证据，可支持范围明确的 0.2.0 Preview GO；macOS CLI 同样通过原生功能与资料兼容，普通下载信任仍是其技术 Preview 的条件。macOS App 保持有限技术 Preview 的 CONDITIONAL GO、普通用户分发 NO-GO，继续完成第 5 节的完整任务／升级、bundle fixtures 与信任条件。
-3. **macOS 分发方式：** 若继续 ad-hoc 手动 Preview，必须由 Faye 明确接受其信任操作成本，并完成选定候选的可见 native 任务和升级验收。若目标是普通用户自然下载并信任，需 Developer ID、公证与实际下载／首开／升级证据；不能用“严格签名通过”替代。
-4. **更新与上线：** 手动升级是有效的当前方案。生产 updater 的签名 key／公钥／feed 是独立决定；本轮不创建凭据或激活渠道。官网待真实资产和发布说明冻结后另行批准上线。
+2. **逐平台决定：** 最终 Linux x86_64／aarch64 CLI 已获得各自原生包与旧包升级证据，可支持范围明确的 0.2.0 Preview GO；macOS CLI 同样通过原生功能与资料兼容，普通下载信任仍是其技术 Preview 的条件。macOS App 保持有限技术 Preview 的 CONDITIONAL GO、普通用户分发 NO-GO，继续完成第 5 节的实际安装替换与下载信任条件。
+3. **macOS 分发方式：** 已选保留 strict ad-hoc、由用户通过系统例外手动信任的技术 Preview，暂不 Developer ID／公证；选定候选原生归档、合成清理及跨版本状态／中断查询已补验，实际安装替换与下载首开仍未验。若目标是普通用户自然下载并信任，需 Developer ID、公证与实际下载／首开／升级证据；不能用“严格签名通过”替代。
+4. **更新与上线：** 手动升级是有效的当前方案。生产 updater 的签名 key／公钥／feed 是独立决定；本轮不创建凭据或激活渠道。官网原媒体已补齐，完整离线包已准备；仍须另行批准上线。
 5. **资产许可：** 包中的权利归属与未决许可问题依发行工程报告处理，功能测试和第三方 notice 完整不能替代这些决定。
 
-本分项不建议再做大规模 UI 或状态格式重构。已通过的三平台 CLI 最终包和原生 App 有限交互应明确认可；剩余工作集中于选定 App 的完整任务／升级、两项实际 bundle fixtures、键盘与 VoiceOver、普通下载信任及图形授权。公开下载／指南与实际交付同步仍是发布后的独立部署动作。这些条件具体且有限，不要求先完成全部长期路线图。
+本分项不建议再做大规模 UI 或状态格式重构。已通过的三平台 CLI 最终包和原生 App 有限交互应明确认可；剩余工作集中于选定 App 的实际安装替换、键盘与 VoiceOver、普通下载信任及图形授权。公开下载／指南与实际交付同步仍是发布后的独立部署动作。这些条件具体且有限，不要求先完成全部长期路线图。
+
+## 本机最终候选补充验收
+
+实际 `353536cc` 最终 DMG 在 macOS 26.5.2 arm64、独立合成 HOME/state 中完成空 state GUI 登记 → archive-only 精确选择三件（90 bytes）→ 批准前无 ciphertext → 一次批准、原 ID completed。六份原件 bytes 保持一致且未创建新 root。Quit 后确认进程退出，再以相同 HOME/state 重开，原记录可查询；错误口令返回 archive_locked，重新输入正确口令后三份正文及会话 structured/raw 均可读。另一独立 HOME/state 的实际 packaged CLI inspect/read/list PASS：三件，jobs=[]。旧 App 跨版本补验见下文；真实安装升级仍未覆盖。
+
+独立合成 auth root 的 GUI 清理选择文件 OAuth、settings API、synthetic Keychain OAuth，共三 sources；一次批准的五个 selected steps 全部 done。主界面报告所选本地清理完成，原始 status 仍为 partially_completed、task_result.outcome 为 partial。四层 coverage 分别是 local done、runtime not requested、other contexts/server unverified；fresh 复查显示三来源 removed 且没有新 job。邻接 MCP/plugin/unknown 字段、item identity、work 与原六文件均保持。Keychain 使用合成 adapter，不是个人 native Keychain 库验收。
+
+后续 native 发现促成两项 source-only 修复：四条 archive 英文显示漏投影，以及 Help 硬写 0.1.0／没有公开 release 的文案。fresh work-ui、i18n-test、i18n-coverage-test、i18n-ui 已通过，新 dirty QA App strict ad-hoc build 与复制校验通过（59 path entries、26,295,400 bytes）；该 QA App 不是原 `353536cc` 候选，尚未完成修后 native 复验。固定候选 source 身份不变，本轮也不能再描述为仅文档变化。
+
+App updates 中英文指南的 TMPDIR 示例已改为 fixture 父目录；实际交付 CLI 相同参数修改前返回 invalid_path，修改后 auth inventory PASS，site guides 已重新生成，镜像 16 tests PASS。原媒体离线 payload 已准备，但其冻结 source 仍是 `353536cc`；含新版指南命令的网站包待另行生成，未部署。
+
+### 旧公开 App 跨版本状态与中断查询补验
+
+真实旧公开 0.1.1 DMG 副本 GUI 在合成 root 建立四件 134 bytes 的 archive-only completed 任务，并保留未批准 cleanup plan。第二次归档经 GUI 批准，外部合成 monitor 在原 job executing 已持久化时仅 SIGSTOP/SIGKILL 测试 App，保留 records/bytes。真实 353536cc 候选以相同 HOME/state 启动后同时显示旧 completed 与 executing 原 ID；打开中断任务并查询最新后，原 ID 转 needs_reconciliation，界面明确结果不确定、查询原任务、勿重新提交，启动禁用。jobs 仍仅两个，无第二份 ciphertext；旧 completed receipt 原字节、旧 ciphertext 大小与摘要、六份源文件 bytes 均不变。旧未执行 cleanup preview 由实际最终 CLI execute 拒绝为 stale_auth_plan，无新 job，旧 plan bytes 保留；这是 CLI 拒绝证据，不是 App 承接旧 approval UI。旧 App 密文另由独立 HOME/state 的实际最终 CLI inspect/read/list 成功读取四件及原指令，jobs=[]；这也不冒充新 App reader 原生复验。上述证明跨版本状态与中断查询保留，不覆盖真实 Applications 替换或普通下载 quarantine 首开。
