@@ -188,7 +188,7 @@ node scripts/prepare-site.mjs --media-dir /absolute/reviewed-media \
 
 独立合成 auth root 的 GUI 清理选择文件 OAuth、settings API、synthetic Keychain OAuth，共三 sources；一次批准的五个 selected steps 全部 done。主界面报告所选本地清理完成，原始 status 仍为 partially_completed、task_result.outcome 为 partial。四层 coverage 分别是 local done、runtime not requested、other contexts/server unverified；fresh 复查显示三来源 removed 且没有新 job。邻接 MCP/plugin/unknown 字段、item identity、work 与原六文件均保持。Keychain 使用合成 adapter，不是个人 native Keychain 库验收。
 
-后续 native 发现促成两项 source-only 修复：四条 archive 英文显示漏投影，以及 Help 硬写 0.1.0／没有公开 release 的文案。fresh work-ui、i18n-test、i18n-coverage-test、i18n-ui 已通过，新 dirty QA App strict ad-hoc build 与复制校验通过（59 path entries、26,295,400 bytes）；该 QA App 不是原 `353536cc` 候选，尚未完成修后 native 复验。固定候选 source 身份不变，本轮也不能再描述为仅文档变化。
+后续 native 发现促成两项 source-only 修复：四条 archive 英文显示漏投影，以及 Help 硬写 0.1.0／没有公开 release 的文案。fresh work-ui、i18n-test、i18n-coverage-test、i18n-ui 已通过，新 dirty QA App strict ad-hoc build 与复制校验通过（59 path entries、26,295,400 bytes）；该 QA App 不是原 `353536cc` 候选，修后有限 native 验收已完成：中英 Help 原生 AX 均显示当前 0.2.0 和较早公开下载的准确区别；英文版本提示、archive-only 预览与原任务结果三处实际窗口图已目视核对，四条归档投影正确，所观察窗口无文字截断或组件重叠。仅新增合成预览，未输入口令或批准；原两项任务、六份原件 bytes 和无新密文均已核对，测试界面已还原中文／Night／原环境。该有限验收不扩展为完整 keyboard、VoiceOver、resize 或正式安装矩阵。固定候选 source 身份不变，本轮也不能再描述为仅文档变化。
 
 App updates 中英文指南的 TMPDIR 示例已改为 fixture 父目录；实际交付 CLI 相同参数修改前返回 invalid_path，修改后 auth inventory PASS，site guides 已重新生成，镜像 16 tests PASS。原媒体离线 payload 已准备，但其冻结 source 仍是 `353536cc`；含新版指南命令的网站包已从 clean `71f5994e0a3aef2d4497b60b7e6461fabba2d65f` 另行准备：68 files／28,150,621 bytes，ZIP 69 members／26,245,912 bytes，全部逐 member 字节读回一致；真实原媒体下 canonical site-game-test、site-ui 均通过。42 locale URLs／16 guides、Google verification tag、原媒体和旧公开下载保留。此包无额外截图目视，不借用旧包图作为新包证据；未部署。
 
