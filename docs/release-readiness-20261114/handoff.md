@@ -190,7 +190,7 @@ node scripts/prepare-site.mjs --media-dir /absolute/reviewed-media \
 
 后续 native 发现促成两项 source-only 修复：四条 archive 英文显示漏投影，以及 Help 硬写 0.1.0／没有公开 release 的文案。fresh work-ui、i18n-test、i18n-coverage-test、i18n-ui 已通过，新 dirty QA App strict ad-hoc build 与复制校验通过（59 path entries、26,295,400 bytes）；该 QA App 不是原 `353536cc` 候选，尚未完成修后 native 复验。固定候选 source 身份不变，本轮也不能再描述为仅文档变化。
 
-App updates 中英文指南的 TMPDIR 示例已改为 fixture 父目录；实际交付 CLI 相同参数修改前返回 invalid_path，修改后 auth inventory PASS，site guides 已重新生成，镜像 16 tests PASS。原媒体离线 payload 已准备，但其冻结 source 仍是 `353536cc`；含新版指南命令的网站包待另行生成，未部署。
+App updates 中英文指南的 TMPDIR 示例已改为 fixture 父目录；实际交付 CLI 相同参数修改前返回 invalid_path，修改后 auth inventory PASS，site guides 已重新生成，镜像 16 tests PASS。原媒体离线 payload 已准备，但其冻结 source 仍是 `353536cc`；含新版指南命令的网站包已从 clean `71f5994e0a3aef2d4497b60b7e6461fabba2d65f` 另行准备：68 files／28,150,621 bytes，ZIP 69 members／26,245,912 bytes，全部逐 member 字节读回一致；真实原媒体下 canonical site-game-test、site-ui 均通过。42 locale URLs／16 guides、Google verification tag、原媒体和旧公开下载保留。此包无额外截图目视，不借用旧包图作为新包证据；未部署。
 
 ### 旧公开 App 跨版本补验
 

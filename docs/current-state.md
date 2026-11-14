@@ -2,7 +2,7 @@
 
 ## 2026-11-14：独立发行审查与 0.2.0 Preview 候选加固
 
-本轮从 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66` 独立复核完整执行／恢复、认证来源、产品任务与分发路径，并实施已复现修复。产品最终 source **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`；[PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。PR #8 已合并为 `448d92bced6e87d34842bb5c54407e675e741653`，完整 tree 与产品 source 相同；独立 PR CI 43526971709 也 14/14 jobs success。其后另有 source-only App 文案修复与验收命令修正；这些未进入固定 353536cc 候选。本节是新一轮结论，以下历史条目仍按各自 source 阅读。
+本轮从 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66` 独立复核完整执行／恢复、认证来源、产品任务与分发路径，并实施已复现修复。固定候选 source **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`；[PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。PR #8 已合并为 `448d92bced6e87d34842bb5c54407e675e741653`，完整 tree 与产品 source 相同；独立 PR CI 43526971709 也 14/14 jobs success。其后另有 source-only App 文案修复与验收命令修正；这些未进入固定 353536cc 候选。本节是新一轮结论，以下历史条目仍按各自 source 阅读。
 
 **发行决定：建议 0.2.0 Preview，按平台分别放行。** Linux x86_64/aarch64 CLI GO；macOS arm64 CLI 在真实下载隔离／信任说明收口后 CONDITIONAL GO；普通用户 macOS App NO-GO。已选用户系统例外手动信任的 strict ad-hoc 技术 Preview，暂不 Developer ID／公证；最终候选原生归档与合成认证清理已补验，实际安装替换与图形许可依据仍待收口。公开 App 仍为 0.1.1 Preview、CLI 仍为 0.1.0；没有创建正式 Release、激活 updater 或部署官网。
 
@@ -230,4 +230,4 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 
 这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、生产 VPS 任务验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。
 
-本机补充：macOS 26.5.2 arm64 的最终 `353536cc` DMG 已完成空 state 登记、精确三件归档、批准与原 ID 完成、退出重开、错误口令及正确口令读包；独立 packaged CLI inspect/read/list 通过且独立 jobs 为空。合成认证清理一次批准的五步全部 done，但原始结果仍为 partially_completed／partial；仅所选本地来源完成，其他覆盖不据此升级。详见[产品验收](release-readiness-20261114/product-acceptance.md)。后续 App 英文投影／Help 版本文案修复已通过 source 检查及新 QA build，未在原候选 native 复验；更新指南后的新 site 包尚待另行生成，既有 353536cc 冻结离线包范围不变。
+本机补充：macOS 26.5.2 arm64 的最终 `353536cc` DMG 已完成空 state 登记、精确三件归档、批准与原 ID 完成、退出重开、错误口令及正确口令读包；独立 packaged CLI inspect/read/list 通过且独立 jobs 为空。合成认证清理一次批准的五步全部 done，但原始结果仍为 partially_completed／partial；仅所选本地来源完成，其他覆盖不据此升级。详见[产品验收](release-readiness-20261114/product-acceptance.md)。后续 App 英文投影／Help 版本文案修复已通过 source 检查及新 QA build，修后 QA App 的原生目视复验未完成；固定 353536cc 包不含这些修复。新版指南离线官网包已从 clean `71f5994` 另行准备并通过真实媒体 site-game-test／site-ui 与 ZIP 逐文件读回；既有 353536cc 冻结离线包范围不变，未部署。
