@@ -83,10 +83,10 @@ Vite 使用内置 `build.license` 生成 frontend 的许可与版权正文。完
    env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /usr/bin/open -g -n -a "$APP" \
      --env "HOME=$ROOT/home" --env "CFFIXED_USER_HOME=$ROOT/home" \
      --env "LINTEL_TEST_HOME=$ROOT/home" --env "LINTEL_STATE_DIR=$ROOT/state" \
-     --env "LINTEL_BROWSER_STATE=$ROOT/browser-state" --env "TMPDIR=$ROOT"
+     --env "LINTEL_BROWSER_STATE=$ROOT/browser-state" --env "TMPDIR=$(dirname "$ROOT")"
    ```
 
-   `open` 返回只说明启动请求已发出，须另外观察真实窗口与所选环境；`-g` 不主动切前台。不要同时启动同一测试 state 的多个副本。这些变量隔离本次指定的 HOME／state，不构成 OS sandbox，也不代替干净 Mac 的首次安装验收。quickstart 的 `ROOT` 已解析为实际路径；输出路径也保留这一形式，不能改填指向符号链接的简写路径。
+   `open` 返回只说明启动请求已发出，须另外观察真实窗口与所选环境；`-g` 不主动切前台。不要同时启动同一测试 state 的多个副本。这些变量隔离本次指定的 HOME／state，不构成 OS sandbox，也不代替干净 Mac 的首次安装验收。`TMPDIR` 使用 fixture 的父目录，使合成启动来源边界严格位于临时目录内。quickstart 的 `ROOT` 已解析为实际路径；输出路径也保留这一形式，不能改填指向符号链接的简写路径。
 3. **从空白工作区登记。** 添加已有环境，名称使用 `Synthetic native trial`，配置目录填写 `$ROOT/claude-root` 展开的绝对路径；只登记，不运行 Claude。确认当前主机是本机、环境是这份 fixture。
 4. **精确预览。** 进入“工作保全”，选择“只生成工作归档”，启用“精确到原件”，仅保留 `CLAUDE.md`、`projects/example/memory/MEMORY.md` 与 `projects/example/session.jsonl`，取消 `NOT_SELECTED.md`。输出使用 `$ROOT/carried.age` 的绝对路径。容量预检与批准前计划都应恰好三件；计划阶段密文尚不存在，settings 与占位凭据不在选择中。
 5. **批准一次并核对原任务。** 输入只用于此次合成试用的口令，批准当前计划；保存原 ID／hash。等待原任务真正完成，不能把已接收当完成；结果不确定时只查询原 ID，不重新提交。回执应只有归档结果，无新环境／新 root；按 [quickstart 第 6 步](quickstart.md#6-确认源原件保留没有新建根) 的字节检查核对全部六份原件，包括未选文件。

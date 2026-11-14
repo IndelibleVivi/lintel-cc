@@ -2,13 +2,13 @@
 
 **最终产品 source：`353536cc7dc3c8c63baa628955ee66332d95bcbb`，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`。** 本轮基于 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66`；修复进入 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。公开下载仍为 App 0.1.1 Preview／CLI 0.1.0，未创建 Release、激活 production updater 或部署官网。最终 canonical 与 candidate gate：已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate）。
 
-**发行建议：0.2.0 Preview，按平台分别决定。** Linux x86_64/aarch64 CLI：GO；macOS arm64 CLI：CONDITIONAL GO，补首下载隔离／信任路径；面向普通用户的 macOS App：NO-GO；有限技术 App Preview：在明确手动信任、完成所选包的 native 完整任务／升级及图形权利条件后 CONDITIONAL GO。这里的 GO 是工程建议，不代替所有者公开发布授权。
+**发行建议：0.2.0 Preview，按平台分别决定。** Linux x86_64/aarch64 CLI：GO；macOS arm64 CLI：CONDITIONAL GO，补首下载隔离／信任路径；面向普通用户的 macOS App：NO-GO；有限技术 App Preview：在已选手动信任路线下，完成真实下载／安装替换及图形权利条件后 CONDITIONAL GO。这里的 GO 是工程建议，不代替所有者公开发布授权。
 
-源码已通过 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8) 合并为 **`448d92bced6e87d34842bb5c54407e675e741653`**；合并 tree 与固定产品 source 相同。除指定的 push CI 外，[PR CI 43526971709](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526971709) 也已 14/14 jobs success。本文和相关最终说明在其后以 **docs-only** 提交记录结果，不能改写候选的实际构建 source 或代替新代码验收。
+源码已通过 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8) 合并为 **`448d92bced6e87d34842bb5c54407e675e741653`**；合并 tree 与固定产品 source 相同。除指定的 push CI 外，[PR CI 43526971709](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526971709) 也已 14/14 jobs success。后续记录包含文档补充、App 显示修复和指南命令修正；显示修复已独立构建 QA App，不能改写固定候选的实际 source 或借用其 CI 证明新代码。
 
 ## 阅读顺序
 
-Faye 先读最终 Release Decision Brief。维护者从本文的证据矩阵和剩余任务进入；需要复现时再读对应专项报告。
+所有者先读最终 Release Decision Brief。维护者从本文的证据矩阵和剩余任务进入；需要复现时再读对应专项报告。
 
 | 材料 | 负责的问题 |
 | --- | --- |
@@ -73,12 +73,12 @@ Lintel 已有可保留的产品基础：六类工作有入口，GUI/CLI 共用 C
 | Final native auth | macOS 19/19、Linux 18/18 checks；auth 各 49 cases；临时 Security.framework Keychain、Linux 8 个活 writer 场景实际运行 | 个人账号 ACL、未来客户端版本、真实账户登录 |
 | Final UI/browser | 两平台各 19/19；frontend Mac 15/15、Linux 14/14；真实 Core 与 browser，invoke／SSH 边界明确建模 | Chromium 等同于 native WebKit、生产远端已操作 |
 | Final CLI packages | 最终三份 tar.gz 在 native macOS arm64、Linux x86_64、Linux aarch64 各自通过，`upgrade_tested:true`；输入为真实公开 0.1.0 | 浏览器下载 quarantine、旧程序写未来 state、生产 SSH |
-| Final DMG/package | 完整 64 文件 App／39,934,188 bytes；strict ad-hoc 签名、两 plist 版本 0.2.0；DMG mount/copy inventory 一致 | Developer ID 身份、公证、普通用户首开 |
+| Final DMG/package | 完整 App 64 total path entries（含目录，50 个实际文件）／39,934,188 bytes；strict ad-hoc 签名、两 plist 版本 0.2.0；DMG mount/copy inventory 一致 | Developer ID 身份、公证、普通用户首开 |
 | Installed copy | macOS Darwin 24.6.0 arm64 临时复制 App 原生存活；Gatekeeper exit 3 rejected、stapler exit 65 无票据、无 quarantine | Finder/Applications 升级或真实下载信任 |
-| Native WebKit/AX | 同一最终 DMG：11 次有限 AX 控件操作，9 个结果状态检查通过，10 张目标窗口图；Night／系统、中文／系统、历史、需环境提示、任务框开关 | 完整归档／清理／SSH 执行、native 升级、键盘导航或 VoiceOver 验收 |
+| Native WebKit/AX | 初始 11 次有限 AX 操作／9 个状态之外，本机最终 DMG 已完成精确归档、退出重开、错误口令恢复、合成认证清理及旧 App 跨版本状态／中断原 ID 查询；详细范围见本机补充验收 | 个人认证、生产 SSH、实际 Applications 替换、完整键盘导航或 VoiceOver |
 | Deployed/public | 实际浏览器观察旧 App 0.1.1 官网；旧三平台 CLI 0.1.0 真实资产用于升级；旧 DMG 读回并重新验证发布记录 | 新 0.2.0 已公开或 updater 已可用 |
 
-macOS **源码测试**使用 macOS 26.7.2 arm64；最终 **包／安装副本／窗口**使用 macOS 15 系列、Darwin 24.6.0 arm64。两者分列；声明的最低 macOS 12 没有因此获得原生覆盖。两个 desktop bundle resource fixtures 在普通组中仍 ignored：Mac 是 **56 passed + 2 ignored**，Linux 是 **52 passed + 2 ignored**。当前 source/browser host 单测和包资源 inventory 不能冒充这两个最终资源消费者的执行，下面给出直接补跑命令。
+macOS **源码测试**使用 macOS 26.7.2 arm64；最终 **包／安装副本／窗口**使用 macOS 15 系列、Darwin 24.6.0 arm64。两者分列；声明的最低 macOS 12 没有因此获得原生覆盖。两个 desktop bundle resource fixtures 在普通组中仍 ignored：Mac 是 **56 passed + 2 ignored**，Linux 是 **52 passed + 2 ignored**。其后两个最终资源消费者已在本机独立各 1 passed、0 ignored；不改写普通组计数，下面保留精确复验命令。
 
 最终 VM 的实际结果也保留了失败语义：普通 setsid 在四个 logout 场景均观察到 worker 结束，没有将其说成跨 logout 保证；具备既有 system／user manager 资格的两组观察到存活，fallback setsid 仍结束。管理认证实验先返回 `submission_uncertain`，随后 **一次 submit、24 次原 ID query**，中间真实观察到 `job_not_found`，最终拿到同 ID 的 `partially_completed`：本地清理完成，超范围官方 logout 拒绝、凭据与 caller 环境保留。真实 reboot 前后原 ID 可查询，`submitted_once:true`、`reexecuted:false`。这是 canonical 源码构建的 disposable Ubuntu/PAM/systemd 证据，不冒充最终 tar.gz 在生产 VPS 的执行。
 
@@ -130,18 +130,15 @@ App 手动升级前退出旧 App 并保留旧副本；资料/state 不在 bundle
 
 ### A. 正式 macOS 分发身份与首次下载
 
-**需要 Faye 决定：** 是否投入 Developer ID/公证，或明确继续限制为了解手动信任操作的技术 Preview。签名身份与私钥只由所有者的受控环境提供。工程人员可以完成构建、签名校验、公证提交/票据处理和重新打包，但本轮没有这项授权或凭据。
+**已选路线：** 本次采用保留 strict ad-hoc 校验、由用户通过系统例外手动信任的技术 Preview；暂不采用 Developer ID／公证。签名路线不再待所有者决定。这项选择不授权 Release、部署或安装真实 App。
 
-**执行与通过标准：** 在专用测试 Mac 记录 OS/CPU、DMG SHA、source；按项目构建入口产出完整 bundle。严格 codesign、Developer ID identity、hardened runtime、公证与 stapler 的实际结果全部保存。通过浏览器从经批准的真实下载来源取得文件，保留 quarantine，用正常 Finder/Applications 路径安装并首次打开；记录系统提示和最终结果。不能将 CLI curl 下载、直接 binary launch 或手工取消隔离当成此项成功。
+**仍待验收：** 从获准的真实下载来源用浏览器取得候选，保留 quarantine，通过正常 Finder／Applications 路径记录系统提示、用户手动信任和首开结果。严格签名通过、临时复制启动和 CLI 下载不能替代这项证据；既有 Gatekeeper 拒绝及无公证票据事实保留。
 
 ### B. 当前候选的 native 操作与升级
 
-**不需要新的产品决定。** 在可交互的受控 Mac 执行 [App 首次使用验收](../app-updates.md#候选首次使用验收) 的合成六文件流程：登记、恰好三件选择、批准前无密文、批准一次、原 ID 完成、六份原 bytes、退出重开、独立读包、错误口令、中英主题与焦点。使用本轮候选本身，不用另一个 QA rebuild 冒充。
+最终候选的首用归档、合成认证清理与旧公开 App 跨版本状态／中断查询已完成，详细记录见下文。剩余安装层为真实 Applications 替换与普通下载 quarantine 首开；不要求重复已成立的合成旅程。
 
-再用旧公开 App 在独立 state 建立已完成和未确定任务，退出后切换新 App；检查原记录与归档、未执行旧认证预览提示、失败后保持旧副本和原 state。对升级中断，只查询原记录；不删除 deduplication 状态。AX/window/screenshot 可辅助定位，但不能代替实际完整任务。此项可由有原生桌面的 Codex 执行；当前 Linux 工作环境已提供自动 native 包/窗口路径，缺完整可交互桌面时保留具体结果。
-
-
-另外在同一受控 Mac、clean `353536cc` checkout 用**实际 DMG 复制 App 的资源**执行两项已存在但普通组忽略的消费者测试（路径替换成已核对的复制 App）：
+**已独立通过：** 本机 macOS 26.5.2 arm64 在 clean `353536cc` checkout 用**实际 DMG 复制 App 的资源**执行两项已存在但普通组忽略的消费者测试，各自 **1 passed、0 failed、0 ignored**。下列命令保留为复验程序（路径替换成已核对的复制 App）：
 
 ```sh
 LINTEL_TEST_BROWSER_HOST_RESOURCES=/absolute/copied/Lintel.app/Contents/Resources/browser-host \
@@ -152,22 +149,22 @@ LINTEL_TEST_BROWSER_EXTENSION_RESOURCES=/absolute/copied/Lintel.app/Contents/Res
   actual_packaged_extensions_install_from_bundle_with_no_profile_mutation -- --ignored
 ```
 
-两者使用自己的合成 HOME；第一项由所装 manifest 执行真实 host 并核对有限 native frames，第二项消费三类扩展实际 bytes、只准备注册文件且不改 profile。通过标准是测试真实执行且通过，不接受 ignored／零测试或换成源码 fixture。这是可执行的 package resource 补充验收，不是完整实际浏览器用户旅程。
+两者使用自己的合成 HOME；第一项由所装 manifest 执行真实 host 并核对有限 native frames，第二项消费 Chrome／Edge／Firefox 选择对应的实际扩展 bytes、只准备扩展文件且不改 profile。通过标准是测试真实执行且通过，不接受 ignored／零测试或换成源码 fixture。这是可执行的 package resource 补充验收，不是完整实际浏览器用户旅程。
 
 ### C. 第三方图形与品牌许可
 
-**需要 Faye 决定：** 提供 Clawd/相关品牌资产的可核实再分发许可，或选择不依赖该资产的原创替代。仓库的 attribution 与项目许可不产生该许可；不能通过测试补齐。按实际 App/site 资产检查；CLI 若未包含相关图形，不应被一并视为同一阻断。
+**需要所有者决定：** 提供 Clawd/相关品牌资产的可核实再分发许可，或选择不依赖该资产的原创替代。仓库的 attribution 与项目许可不产生该许可；不能通过测试补齐。按实际 App/site 资产检查；CLI 若未包含相关图形，不应被一并视为同一阻断。
 
 ### D. 最终公开资产与部署
 
 **需要明确发布／部署授权。** 发布之前审阅本文选择的平台、版本与双语说明。授权后再创建正式 Release、读回公开 bytes、生成已验证网站 payload、部署并逐语言核对。updater 继续关闭是当前有效方案，不必为了发 Preview 先引入新的密钥运营。
 
 
-当前网站源码已生成 **42 个中英文页面**，最终两平台 site-ui 通过；部署仍是本轮实际浏览器观察到的旧页面，不能混称。完整可部署 payload 还缺审核过的 `lintel-intro.mp4` 和 `lintel-film-poster.jpg`：当前工作区／可用资料中未找到这两个原件，apex 与文档列出的 deployment origin 的普通 HTTP 读取均返回 403。浏览器可以看到线上页面，所以这被记为取回媒体的环境边界，**不是官网故障**；没有用合成替代品伪造原媒体验收。
+原审核电影和 poster 已在本机找回。固定 clean `353536cc` 的完整离线 payload 已准备：42 locale URLs、16 guides，真实原媒体下 canonical `site-game-test`／`site-ui` 全通过；payload 68 文件、28,150,332 bytes，ZIP 69 members、26,245,789 bytes，逐 member 与 payload 字节一致。电影和 poster 与原件一致，保留旧 App 0.1.1 与三平台 CLI 0.1.0 公开下载，没有新增 0.2.0 下载或部署。过去 HTTP 取回受限的记录不再是媒体缺口，也不是官网故障。
 
 已重新下载核对旧公开 0.1.1 DMG，并用真实 `app-release.mjs prepare`／`verify-public` 产生 `evidence/site-staging-inputs/verified-public-0.1.1/release.json`，状态 `public_bytes_verified`。最终 0.2.0 DMG 则只生成 `release-preparation/app-manual-prepared/release.json`，状态 `prepared_local`、`publication_verified:false`，不含 updater feed。草稿中的未来 URL 不是可用下载声明，发布时间在正式批准时重新确定。
 
-拿到两份原媒体后可直接执行（所有路径是明确的本地输入；out 必须不存在）：
+已使用原媒体完成以下离线准备；复验时可执行（所有路径是明确的本地输入；out 必须不存在）：
 
 ```sh
 node scripts/prepare-site-languages.mjs --check
@@ -178,9 +175,23 @@ node scripts/prepare-site.mjs --media-dir /absolute/reviewed-media \
   --out /absolute/absent-site-payload
 ```
 
-发布 0.2.0 后再换成经实际公开读回的新 release record，并更新网站有限 CLI asset allowlist／三平台摘要。未批准发布之前，用旧公开 record 生成只会更新说明／CLI 入口的准备包；**不部署**。完整媒体 payload、部署和部署后逐页读回仍须分别记载。
+发布 0.2.0 后再换成经实际公开读回的新 release record，并更新网站有限 CLI asset allowlist／三平台摘要。未批准发布之前，用旧公开 record 生成只会更新说明／CLI 入口的准备包；**不部署**。完整媒体 payload 已准备；部署与部署后逐页读回仍待独立授权和验证。
 ## 7. 发布后演进，保持有限范围
 
 可继续提高浏览器非 developer 安装、安装/升级便利性、跨版本客户端认证适配、真实账户/ACL 场景、macOS 最低版本覆盖、长期任务容量与 journaling 退休策略。browser 1000-operation admission cap 当前会明确拒绝新任务并保留原查询，不能通过删除记录绕过；需要后续兼容退休方案。
 
 后续测试优先分配给会区分真实结果的路径：外部 writer 冲突、权限拒绝、掉电/持久化、客户端版本差异、下载隔离与操作系统实际授权、升级中断和真实 UI 错误回路。已足够验证的 exact-selection、原 ID 去重及加密原文路径保留既有证据，避免用重复数量替代新增可信范围。
+
+## 本机最终候选补充验收
+
+实际 `353536cc` 最终 DMG 在 macOS 26.5.2 arm64、独立合成 HOME/state 中完成空 state GUI 登记 → archive-only 精确选择三件（90 bytes）→ 批准前无 ciphertext → 一次批准、原 ID completed。六份原件 bytes 保持一致且未创建新 root。Quit 后确认进程退出，再以相同 HOME/state 重开，原记录可查询；错误口令返回 archive_locked，重新输入正确口令后三份正文及会话 structured/raw 均可读。另一独立 HOME/state 的实际 packaged CLI inspect/read/list PASS：三件，jobs=[]。旧 App 跨版本补验见下文；真实安装升级仍未覆盖。
+
+独立合成 auth root 的 GUI 清理选择文件 OAuth、settings API、synthetic Keychain OAuth，共三 sources；一次批准的五个 selected steps 全部 done。主界面报告所选本地清理完成，原始 status 仍为 partially_completed、task_result.outcome 为 partial。四层 coverage 分别是 local done、runtime not requested、other contexts/server unverified；fresh 复查显示三来源 removed 且没有新 job。邻接 MCP/plugin/unknown 字段、item identity、work 与原六文件均保持。Keychain 使用合成 adapter，不是个人 native Keychain 库验收。
+
+后续 native 发现促成两项 source-only 修复：四条 archive 英文显示漏投影，以及 Help 硬写 0.1.0／没有公开 release 的文案。fresh work-ui、i18n-test、i18n-coverage-test、i18n-ui 已通过，新 dirty QA App strict ad-hoc build 与复制校验通过（59 path entries、26,295,400 bytes）；该 QA App 不是原 `353536cc` 候选，尚未完成修后 native 复验。固定候选 source 身份不变，本轮也不能再描述为仅文档变化。
+
+App updates 中英文指南的 TMPDIR 示例已改为 fixture 父目录；实际交付 CLI 相同参数修改前返回 invalid_path，修改后 auth inventory PASS，site guides 已重新生成，镜像 16 tests PASS。原媒体离线 payload 已准备，但其冻结 source 仍是 `353536cc`；含新版指南命令的网站包已从 clean `71f5994e0a3aef2d4497b60b7e6461fabba2d65f` 另行准备：68 files／28,150,621 bytes，ZIP 69 members／26,245,912 bytes，全部逐 member 字节读回一致；真实原媒体下 canonical site-game-test、site-ui 均通过。42 locale URLs／16 guides、Google verification tag、原媒体和旧公开下载保留。此包无额外截图目视，不借用旧包图作为新包证据；未部署。
+
+### 旧公开 App 跨版本补验
+
+真实旧公开 0.1.1 DMG 副本 GUI 在合成 root 建立四件 134 bytes 的 archive-only completed 任务，并保留未批准 cleanup plan。第二次归档经 GUI 批准，外部合成 monitor 在原 job executing 已持久化时仅 SIGSTOP/SIGKILL 测试 App，保留 records/bytes。真实 353536cc 候选以相同 HOME/state 启动后同时显示旧 completed 与 executing 原 ID；打开中断任务并查询最新后，原 ID 转 needs_reconciliation，界面明确结果不确定、查询原任务、勿重新提交，启动禁用。jobs 仍仅两个，无第二份 ciphertext；旧 completed receipt 原字节、旧 ciphertext 大小与摘要、六份源文件 bytes 均不变。旧未执行 cleanup preview 由实际最终 CLI execute 拒绝为 stale_auth_plan，无新 job，旧 plan bytes 保留；这是 CLI 拒绝证据，不是 App 承接旧 approval UI。旧 App 密文另由独立 HOME/state 的实际最终 CLI inspect/read/list 成功读取四件及原指令，jobs=[]；这也不冒充新 App reader 原生复验。上述证明跨版本状态与中断查询保留，不覆盖真实 Applications 替换或普通下载 quarantine 首开。

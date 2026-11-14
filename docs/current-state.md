@@ -2,20 +2,20 @@
 
 ## 2026-11-14：独立发行审查与 0.2.0 Preview 候选加固
 
-本轮从 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66` 独立复核完整执行／恢复、认证来源、产品任务与分发路径，并实施已复现修复。产品最终 source **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`；[PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。PR #8 已合并为 `448d92bced6e87d34842bb5c54407e675e741653`，完整 tree 与产品 source 相同；独立 PR CI 43526971709 也 14/14 jobs success。其后最终证据更新只改文档。本节是新一轮结论，以下历史条目仍按各自 source 阅读。
+本轮从 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66` 独立复核完整执行／恢复、认证来源、产品任务与分发路径，并实施已复现修复。固定候选 source **`353536cc7dc3c8c63baa628955ee66332d95bcbb`**，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`；[PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。PR #8 已合并为 `448d92bced6e87d34842bb5c54407e675e741653`，完整 tree 与产品 source 相同；独立 PR CI 43526971709 也 14/14 jobs success。其后另有 source-only App 文案修复与验收命令修正；这些未进入固定 353536cc 候选。本节是新一轮结论，以下历史条目仍按各自 source 阅读。
 
-**发行决定：建议 0.2.0 Preview，按平台分别放行。** Linux x86_64/aarch64 CLI GO；macOS arm64 CLI 在真实下载隔离／信任说明收口后 CONDITIONAL GO；普通用户 macOS App NO-GO。App 有限技术 Preview 还需最后完整 native 任务／旧 App 升级和图形许可依据。公开 App 仍为 0.1.1 Preview、CLI 仍为 0.1.0；没有创建正式 Release、激活 updater 或部署官网。
+**发行决定：建议 0.2.0 Preview，按平台分别放行。** Linux x86_64/aarch64 CLI GO；macOS arm64 CLI 在真实下载隔离／信任说明收口后 CONDITIONAL GO；普通用户 macOS App NO-GO。已选用户系统例外手动信任的 strict ad-hoc 技术 Preview，暂不 Developer ID／公证；最终候选原生归档与合成认证清理已补验，实际安装替换与图形许可依据仍待收口。公开 App 仍为 0.1.1 Preview、CLI 仍为 0.1.0；没有创建正式 Release、激活 updater 或部署官网。
 
 | 范围 | 当前源码与实际证据 |
 | --- | --- |
 | 认证正确性 | 保留默认／显式 `CLAUDE_CONFIG_DIR` 的不同认证 namespace；新独立 secure-storage selector 保守核对并冻结；修复实际 Linux writer alias 漏判。Claude 2.1.325 固定分发静态证据不是永久内部 API 合同 |
 | 执行恢复 | 损坏或部分远端记录不再消失成空历史；保留健康记录与原 ID，无法核对安装时在 SSH 前阻止新提交。FIFO 有界拒绝；rename 已发生而 fsync 失败时正确保留不确定副作用标志 |
 | TLS 及依赖 | 精确升级可达 TLS 根／验证器、Tokio、rustix，并配套 xattr 防止 size-query 兼容损失；真实 TLS 与大属性／列表红绿回归。旧公开 source 也包含受影响 TLS 版本，实际范围为 HTTPS upstream／probe，不泛化到所有 Claude TLS |
-| 最终源码 CI | [push 43526964668](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668)：14/14 jobs success；12 份 canonical reports，120 次按平台计的选中 check 执行全部 passed；root 下载读回并独立复跑 production aggregate，problems=[]。临时原生 Security.framework 与 Linux 8 writer 场景均已执行；内部 ignored bundle fixtures 另列，不算通过 |
-| 最终包／native | [candidate 43526964671](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964671)：三平台实际 archives 的 native 0.1.0→0.2.0 原 ID／加密资料实验通过；完整 App 64 文件、DMG／复制 App strict ad-hoc 校验通过；同源码 gate 已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate） |
-| 原生 App 交互 | 对最终 DMG 的实际 WebKit 窗口执行 11 个有限 AX 动作，9 个结果状态检查通过，10 张目标窗口图；中英、Night／system、历史／需环境提示和任务框可用。没有把它记为完整任务、升级、keyboard 或 VoiceOver 验收 |
-| 安装信任 | Gatekeeper 实际拒绝（exit 3），无公证票据（exit 65）；复制样本没有下载隔离。普通用户首次下载、Developer ID／公证与正式 App 升级均未通过 |
-| 网站 | 源码有 42 页、正确三平台旧公开 CLI 下载入口；最终两平台 site-ui 通过。线上仍为旧页面；完整媒体 payload 尚缺原有两份审核媒体，HTTP 取回受限，不能据此说官网离线 |
+| 最终源码 CI | [push 43526964668](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964668)：14/14 jobs success；12 份 canonical reports，120 次按平台计的选中 check 执行全部 passed；root 下载读回并独立复跑 production aggregate，problems=[]。临时原生 Security.framework 与 Linux 8 writer 场景均已执行；常规组内部 ignored 计数保留；两个最终资源消费者已在本机另行各 1 passed／0 ignored |
+| 最终包／native | [candidate 43526964671](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43526964671)：三平台实际 archives 的 native 0.1.0→0.2.0 原 ID／加密资料实验通过；完整 App 64 total path entries（含目录，50 个实际文件）、DMG／复制 App strict ad-hoc 校验通过；同源码 gate 已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate） |
+| 原生 App 交互 | 初始有限 AX 观察之外，本机最终 DMG 已完成精确三件归档、一次批准、退出重开与错误口令恢复；合成认证清理五步 done，保留四层覆盖与 partial 原始状态；旧公开 App 跨版本状态／中断原 ID 查询通过。未覆盖真实安装替换、完整 keyboard 或 VoiceOver；详见下方产品验收 |
+| 安装信任 | Gatekeeper 实际拒绝（exit 3），无公证票据（exit 65）；复制样本没有下载隔离。已选用户系统例外手动信任的技术 Preview，暂不 Developer ID／公证；真实下载首开与 Applications 安装替换仍未验 |
+| 网站 | 源码有 42 页、正确三平台旧公开 CLI 下载入口；最终两平台 site-ui 通过。线上仍为旧页面；原媒体已找回，clean `353536cc` 完整离线 payload 与真实电影 site-game/site-ui 通过，ZIP 69 members 逐字节一致；保留 App 0.1.1／CLI 0.1.0 下载，未部署或新增 0.2.0 下载 |
 
 初始 `e573ce2` 的 PTY／stdin 测试采集失败、第二套 `da7ebd2` 的数字端口断言失败及 gate 拒绝均保留。最终 source 修补安全依赖并直接验证原 listener owner／真实 tunnel；未无证据改写 production shutdown。报告与双语发行草稿见[完整工程交接](release-readiness-20261114/handoff.md)、[认证](release-readiness-20261114/auth-security.md)、[恢复](release-readiness-20261114/execution-recovery.md)、[依赖](release-readiness-20261114/dependency-security.md)、[产品](release-readiness-20261114/product-acceptance.md)、[发行](release-readiness-20261114/release-engineering.md)。
 
@@ -229,3 +229,5 @@ GitHub Actions 是主要 CI owner；`tests/ci_plan.py` 选择有限 changed-path
 6. **并发与恢复：** 不合作的外部编辑器或已持有文件描述符的 writer 没有 OS 级 CAS；不确定副作用需核对。历史混合状态加密备份不支持自动恢复；新认证清理不再生成凭据恢复备份，未决敏感暂存须核对原任务。会话/记忆迁入不证明可以续聊。
 
 这些是原始完整目标的差距，不是缩小后的新 SPEC。下一关口是正式浏览器／AdsPower 与非开发者安装、真实认证／入口矩阵、生产 VPS 任务验收。隔离 runtime 与合成数据能证明机制，不能替代真实产品场景；现有个人登录和生产服务不作开发 mutation fixture。
+
+本机补充：macOS 26.5.2 arm64 的最终 `353536cc` DMG 已完成空 state 登记、精确三件归档、批准与原 ID 完成、退出重开、错误口令及正确口令读包；独立 packaged CLI inspect/read/list 通过且独立 jobs 为空。合成认证清理一次批准的五步全部 done，但原始结果仍为 partially_completed／partial；仅所选本地来源完成，其他覆盖不据此升级。详见[产品验收](release-readiness-20261114/product-acceptance.md)。后续 App 英文投影／Help 版本文案修复已通过 source 检查及新 QA build，修后 QA App 的原生目视复验未完成；固定 353536cc 包不含这些修复。新版指南离线官网包已从 clean `71f5994` 另行准备并通过真实媒体 site-game-test／site-ui 与 ZIP 逐文件读回；既有 353536cc 冻结离线包范围不变，未部署。
