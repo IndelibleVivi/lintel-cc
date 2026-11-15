@@ -22,18 +22,18 @@ export default function WorkCapacity({send=request,environment,categories,select
   },[send,environment.id,environment.root,selection,selectionReady,refresh]);
   return <section className="surface capacity-preflight" aria-label={t('capacity.aria')}>
     <div className="surface-heading"><h2>{t('capacity.title')}</h2><button className="text-button" disabled={busy||!categories.length||!selectionReady||selectedPaths?.length===0} onClick={()=>setRefresh(v=>v+1)}><Icon name="refresh" size={14}/>{t('capacity.refresh')}</button></div>
-    <div className="padded">
+    <div className="padded capacity-body" aria-busy={busy}>
       {busy&&<p role="status">{t('capacity.checking')}</p>}
       {!categories.length&&<p className="muted">{t('capacity.chooseCategory')}</p>}
       {!!categories.length&&(!selectionReady||selectedPaths?.length===0)&&<p className="muted">{t('capacity.needSelection')}</p>}
       {error&&<><RequestFailure error={error} context={t('capacity.context')}/><p className="small-print">{t('capacity.noResult')}</p></>}
       {result&&<>
-        <div className="fact-row"><span>{t('capacity.scanned')}</span><strong>{t('capacity.filesBytes',{files:result.totals.files,bytes:formatBytes(result.totals.bytes)})}</strong></div>
+        <dl className="capacity-summary"><div><dt>{t('capacity.scanned')}</dt><dd>{t('capacity.filesBytes',{files:result.totals.files,bytes:formatBytes(result.totals.bytes)})}</dd></div></dl>
         <p className="small-print">{t('capacity.limits',{file:formatBytes(result.limits.file_bytes),total:formatBytes(result.limits.total_bytes),files:formatNumber(result.limits.files)})}</p>
         <Notice tone={result.eligible?'neutral':'warning'}>{!result.complete?t('capacity.incomplete'):result.eligible?t('capacity.eligible'):t('capacity.exceeds')}</Notice>
         {!!result.blockers.length&&<ul className="capacity-blockers">{result.blockers.map((blocker,i)=><li key={i}>{blocker.path&&<code>{blocker.path}</code>}<span>{blocker.message}</span><small>{blocker.code}</small></li>)}</ul>}
         {result.blockers_truncated&&<p className="small-print">{t('capacity.truncated')}</p>}
-        <p className="small-print">{t('capacity.footer',{time:formatDateTime(result.checked_at)})}</p>
+        <p className="small-print capacity-checked">{t('capacity.footer',{time:formatDateTime(result.checked_at)})}</p>
       </>}
     </div>
   </section>;

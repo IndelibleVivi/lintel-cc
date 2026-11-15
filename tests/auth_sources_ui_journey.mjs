@@ -80,6 +80,13 @@ try{
  await page.getByRole('button',{name:'清理与重建',exact:true}).click();
  await page.waitForFunction(()=>document.activeElement===document.querySelector('main h1'));
  let inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field] input').waitFor();
+ assert.equal(await inventory.getByRole('button',{name:'重新检查认证来源',exact:true}).count(),1,'the source action names the actual inspect operation');
+ assert.equal(await inventory.getByText('已选 2 / 5 个可清理来源',{exact:true}).count(),1);
+ let auxiliary=inventory.locator('details.authentication-auxiliary');
+ assert.equal(await auxiliary.count(),1,'read-only context, absent locations, project input and client metadata share one auxiliary entry');
+ assert.equal(await auxiliary.evaluate(element=>element.open),false);
+ assert.equal(await auxiliary.locator(':scope > summary .authentication-disclosure-label > span').first().innerText(),'辅助检查与详细依据');
+ assert.ok(await auxiliary.locator('summary .ui-icon').count());
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),2);
  const quickRecipes=page.locator('.cleanup-recipes');
  assert.equal(await quickRecipes.evaluate(element=>element.open),false,'cleanup begins with login choices, keeping quick recipes available on demand');
@@ -103,11 +110,15 @@ try{
  await quickRecipes.locator(':scope > summary').click();
  assert.equal(await quickRecipes.evaluate(element=>element.open),false);
  report.checks.push('optional quick recipes retain all three apply/edit/save controls, mounted editor across language switches and draft-only application; collapsing leaves source selection and action dock available');
+ assert.equal(await inventory.locator('.authentication-source-details[open]:visible').count(),0,'source evidence is secondary to the selection');
+ assert.equal(await auxiliary.evaluate(element=>element.open),false);
+ assert.equal(await inventory.locator('.authentication-context:visible').count(),0,'the read-only context is not flattened outside the auxiliary entry');
 
  for(const [width,height,theme] of [[1120,820,'light'],[1120,820,'dark'],[900,720,'light'],[900,720,'dark']]){
   await page.setViewportSize({width,height});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
   await page.getByRole('heading',{name:'清理本机登录',exact:true}).evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  for(const summary of await inventory.locator('summary.authentication-disclosure-summary:visible').all()){const aligned=await summary.evaluate(element=>{const box=element.getBoundingClientRect(),icon=element.querySelector(':scope > svg')?.getBoundingClientRect();return !!icon&&icon.width>0&&icon.left>=box.left&&icon.right<=box.right+1&&Math.abs((icon.top+icon.bottom-box.top-box.bottom)/2)<=2});assert.ok(aligned,'disclosure icon stays visible and centered within its summary');}
   await page.screenshot({path:path.join(artifacts,`auth-start-zh-${theme}-${width}.png`),animations:'disabled'});
   await inventory.locator('.authentication-group').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
   await page.screenshot({path:path.join(artifacts,`auth-saved-zh-${theme}-${width}.png`),animations:'disabled'});
@@ -119,8 +130,9 @@ try{
  assert.equal(await inventory.locator('[data-auth-kind=process_env] input').count(),0);
  assert.equal(await page.getByRole('checkbox',{name:'同时请求官方注销',exact:true}).count(),0);
  // Restoring recommendations never silently opts into shared startup edits.
- await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
+ assert.equal(await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).isDisabled(),true,'the current selection already matches the recommendation');
  assert.equal(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count(),0);
+ await inventory.locator('.authentication-injection-options > summary').click();
  const selectInjection=inventory.getByRole('button',{name:'选择本组',exact:true});
  await selectInjection.focus();assert.equal(await selectInjection.evaluate(element=>element===document.activeElement),true);
  await page.keyboard.press('Enter');
@@ -129,16 +141,80 @@ try{
  assert.equal(await inventory.locator('[data-auth-kind=shell_assignment] input:checked').count(),0);
  assert.equal(await inventory.locator('[data-auth-kind=credential_field] input:checked').count(),1);
  await selectInjection.click();
- for(const detail of await inventory.locator('.authentication-source-details,.authentication-context').all())await detail.evaluate(element=>element.open=true);
+ await auxiliary.locator(':scope > summary').click();
+ for(const detail of await inventory.locator('.authentication-source-details').all())await detail.evaluate(element=>element.open=true);
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),await inventory.locator('input[type=checkbox]').count(),'explicit injection group selection includes every removable source alongside both saved logins');
  assert.ok((await inventory.innerText()).includes('此主机用户共享'));
+ assert.equal(await page.getByText('确认已关闭目标的终端、IDE 与自动重启来源',{exact:true}).count(),1,'the footer names the remaining confirmation');
  await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).check();
  await page.getByRole('checkbox',{name:'清理后显式检查此执行上下文的认证',exact:false}).check();
- const chosen=await inventory.locator('input[type=checkbox]:checked').count();
+ await inventory.getByRole('button',{name:'取消选择',exact:true}).click();
+ assert.equal(await auxiliary.evaluate(element=>element.open),true);
+ assert.equal(await auxiliary.locator(':scope > summary .authentication-disclosure-state:visible').innerText(),'收起');
+ assert.equal(await auxiliary.locator('.authentication-project').count(),1);
+ assert.equal(await auxiliary.locator('.authentication-legacy-metadata').count(),1);
+ await auxiliary.locator('.authentication-project > summary').click();
+ const projectInput=auxiliary.locator('.authentication-project input');
+ const missingProject=path.join(cores.get(null).home,'missing project');
+ await projectInput.fill(missingProject);
+ await inventory.getByRole('button',{name:'重新检查认证来源',exact:true}).click();
+ await page.locator('.request-failure').filter({hasText:'project_missing'}).waitFor();
+ assert.equal(await projectInput.isVisible(),true,'a rejected project scan retains its editable recovery input');
+ assert.equal(await projectInput.inputValue(),missingProject,'the failed project draft stays available to correct');
+ assert.equal(await page.getByRole('button',{name:'预览核验计划',exact:true}).isDisabled(),true,'a rejected inventory cannot preview');
+ await projectInput.fill('');
+ assert.equal(await projectInput.isVisible(),true,'clearing the invalid draft does not collapse its recovery editor');
+ await inventory.getByRole('button',{name:'重新检查认证来源',exact:true}).click();
+ await inventory.locator('[data-auth-kind=credential_field]').waitFor();
+ assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),0,'recovery preserves the explicit zero-source selection');
+ assert.equal(await page.getByRole('button',{name:'预览核验计划',exact:true}).isEnabled(),true,'correcting the project on the same page restores preview');
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup'||call.payload.command==='execute').length,0,'failed scan and same-page recovery never create or execute a plan');
+ if(!await auxiliary.evaluate(element=>element.open))await auxiliary.locator(':scope > summary').click();
+ report.checks.push('real project_missing retains the editable draft and blocks preview; clearing the project and rechecking recovers on the same page without a plan or execution');
+ await auxiliary.locator(':scope > summary').focus();assert.equal(await auxiliary.locator(':scope > summary').evaluate(element=>element===document.activeElement),true);
+ await page.keyboard.press('Enter');assert.equal(await auxiliary.evaluate(element=>element.open),false);
+ await auxiliary.locator(':scope > summary').click();
+ assert.equal(await inventory.getByText('当前将只核验认证来源',{exact:true}).count(),1);
+ await auxiliary.locator(':scope > summary').click();
+ assert.equal(await auxiliary.evaluate(element=>element.open),false);
+ assert.equal(await inventory.locator('.authentication-verification-only').count(),1,'zero selection has one verification-only explanation');
+ assert.equal(await page.getByRole('button',{name:'预览核验计划',exact:true}).isEnabled(),true,'zero selection remains a valid verification-only preview');
+ await calls.splice(0,calls.length);
+ await page.getByRole('button',{name:'预览核验计划',exact:true}).click();
+ const verificationDialog=page.getByRole('dialog');await verificationDialog.getByRole('region',{name:'本次只核验认证来源',exact:true}).waitFor();
+ assert.equal(await verificationDialog.locator('.flow-title').innerText(),'当前将只核验认证来源','the primary preview title matches the zero-source plan');
+ assert.equal(await verificationDialog.getByRole('heading',{name:/其他配置字段/}).count(),0,'no irrelevant zero-field edit section in an exact-source plan');
+ const verificationPlanCall=calls.findLast(call=>call.payload.command==='plan_cleanup');
+ assert.deepEqual(verificationPlanCall.payload.auth_source_ids,[]);
+ await verificationDialog.getByRole('button',{name:'返回调整',exact:true}).click();
+ for(const [recipe,choice,title,step] of [['reset_client','清理并重建','保全工作并重建环境','rebuild'],['retire','退役此环境','清理所选认证并退役环境','retire']]){
+  await page.getByRole('radio',{name:new RegExp('^'+choice)}).check();
+  await page.getByRole('button',{name:'预览这份计划',exact:true}).click();
+  const mutationDialog=page.getByRole('dialog');await mutationDialog.getByRole('heading',{name:'确认这份计划',exact:true}).waitFor();
+  assert.equal(await mutationDialog.locator('.flow-title').innerText(),title,'zero-source mutation preview retains its actual workflow title');
+  assert.equal(await mutationDialog.getByRole('region',{name:'本次只核验认证来源',exact:true}).count(),0);
+  assert.equal(await mutationDialog.locator('.archive-password').count(),1,'work preservation still requires a passphrase');
+  const frozen=responses.findLast(response=>response.ok&&response.data?.kind==='cleanup').data;
+  assert.equal(frozen.kind,'cleanup','all three real Core recipes share the cleanup kind');
+  assert.ok(frozen.actions.some(action=>action.id===step));
+  assert.deepEqual(frozen.authentication.selected_sources,[]);
+  assert.equal(calls.findLast(call=>call.payload.command==='plan_cleanup').payload.recipe,recipe);
+  assert.equal(calls.filter(call=>call.payload.command==='execute').length,0,'previewing each recipe executes nothing');
+  await mutationDialog.getByRole('button',{name:'返回调整',exact:true}).click();
+ }
+ await page.getByRole('radio',{name:/^清理登录/}).check();
+ await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
+ const recommendedCount=await inventory.locator('input[type=checkbox]:checked').count();
+ assert.equal(recommendedCount,2,'recommended selection restores exactly the saved local logins');
+ report.checks.push('zero-source login verification is distinct from real Core rebuild/retirement previews; all retain frozen scope and no preview executes; recommendations restore exactly saved logins');
+ const injectionOptions=inventory.locator('.authentication-injection-options');if(!await injectionOptions.evaluate(element=>element.open))await injectionOptions.locator(':scope > summary').click();
+ await inventory.getByRole('button',{name:'选择本组',exact:true}).click();
+ const chosen=await inventory.locator('input[type=checkbox]:checked').count();assert.equal(chosen,5,'saved logins plus the explicitly selected three injections enter cleanup');
  await page.getByRole('combobox',{name:'界面语言',exact:true}).selectOption('en');
  inventory=page.getByRole('region',{name:'Where authentication comes from',exact:true});
+ auxiliary=inventory.locator('details.authentication-auxiliary');
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),chosen);
- assert.equal(calls.some(call=>call.payload.command==='plan_cleanup'),false);
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,3,'locale switching creates no additional plan');
  const visible=await page.locator('body').innerText();for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'])assert.equal(visible.includes(secret),false);
  await page.getByRole('button',{name:'Preview this plan',exact:true}).click();
  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Confirm this plan',exact:true}).waitFor();
@@ -156,7 +232,7 @@ try{
  await page.evaluate(()=>document.documentElement.dataset.theme='light');
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
  await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png'),animations:'disabled'});
- const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,1);
+ const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,4,'verification, rebuild, retirement and selected-source cleanup each have one preview');
  await dialog.getByRole('button',{name:'Approve and run',exact:true}).click();
  await dialog.getByRole('region',{name:'Authentication cleanup verification',exact:true}).waitFor();
  const verification=dialog.getByRole('region',{name:'Authentication cleanup verification',exact:true});
@@ -216,12 +292,14 @@ try{
  async function selectHost(alias){await page.locator('.host-switch').click();await page.getByRole('dialog').locator('.host-row').filter({hasText:alias}).getByRole('button',{name:'连接并管理',exact:true}).click();await page.locator('.host-switch').getByText(alias,{exact:true}).waitFor();await page.getByRole('button',{name:'清理与重建',exact:true}).click();}
  await selectHost(aliases[0]);inventory=page.getByRole('region',{name:'认证从哪里来',exact:true});await inventory.locator('[data-auth-kind=credential_field]').waitFor();
  const completedA=await page.evaluate(alias=>window.__authInventoryResponses[alias]||0,aliases[0]);
- held={};held.promise=new Promise(resolve=>held.release=resolve);await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();await wait(()=>requested);
+ held={};held.promise=new Promise(resolve=>held.release=resolve);const recheck=inventory.getByRole('button',{name:'重新检查认证来源',exact:true});await recheck.focus();assert.equal(await recheck.evaluate(element=>element===document.activeElement),true);await page.keyboard.press('Enter');await wait(()=>requested);
  await selectHost(aliases[1]);await inventory.locator('[data-auth-kind=credential_field]').waitFor();held.release();held=null;
  // Observe the actual A response delivered into the page, then allow the
  // request continuation and React rendering to run before inspecting B.
  await page.waitForFunction(({alias,previous})=>(window.__authInventoryResponses[alias]||0)>previous,{alias:aliases[0],previous:completedA});
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ auxiliary=inventory.locator('details.authentication-auxiliary');
+ await auxiliary.locator(':scope > summary').click();
  for(const detail of await inventory.locator('.authentication-source-details').all())await detail.evaluate(element=>element.open=true);
  const finalText=await inventory.innerText();assert.ok(finalText.includes(cores.get(aliases[1]).root));assert.equal(finalText.includes(cores.get(aliases[0]).root),false);
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),2);assert.equal(await page.getByRole('checkbox',{name:'已关闭目标的终端、IDE 与自动重启来源',exact:false}).isChecked(),false);
@@ -229,7 +307,7 @@ try{
  const actorB=cores.get(aliases[1]);
  for(const reason of ['keychain_locked','keychain_access_denied']){
   await writeFile(actorB.keychainPath,JSON.stringify({...actorB.keychain,error:reason}));
-  await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();
+  await inventory.getByRole('button',{name:'重新检查认证来源',exact:true}).click();
   const keychainRow=inventory.locator('[data-auth-reason='+reason+']');
   await keychainRow.locator('.authentication-keychain-state').waitFor();
   assert.equal(await keychainRow.locator('input[type=checkbox]').count(),0);
@@ -237,19 +315,21 @@ try{
   await keychainRow.evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));
   await page.screenshot({path:path.join(artifacts,`auth-${reason}-zh-dark-900.png`),animations:'disabled'});
   await writeFile(actorB.keychainPath,JSON.stringify(actorB.keychain));
-  await inventory.getByRole('button',{name:'刷新范围',exact:true}).click();
+  await inventory.getByRole('button',{name:'重新检查认证来源',exact:true}).click();
   const restoredKeychain=inventory.locator('[data-auth-kind=keychain_field]');
   await restoredKeychain.locator('input[type=checkbox]').waitFor();
   await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
   assert.equal(await restoredKeychain.locator('input:checked').count(),1);
  }
  assert.equal(calls.filter(call=>call.payload.command==='execute').length,1);
- assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,1);
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,4);
  for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH']){
   assert.equal(JSON.stringify(responses).includes(secret),false);
   assert.equal((await page.evaluate(()=>JSON.stringify(localStorage))).includes(secret),false);
  }
  report.checks.push('locked/denied Keychain remains unknown without a checkbox; refreshing after access recovery restores exact selectable source without another plan or execution');
+ auxiliary=inventory.locator('details.authentication-auxiliary');
+ await auxiliary.locator(':scope > summary').click();
  for(const detail of await inventory.locator('.authentication-source-details').all())await detail.evaluate(element=>element.open=true);
  const sourceCard=inventory.locator('[data-auth-kind=credential_field]').first();
  await inventory.locator('.authentication-group').first().evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));

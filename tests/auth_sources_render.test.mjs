@@ -4,13 +4,15 @@ import assert from 'node:assert/strict';
 import {test,after} from 'node:test';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import os from 'node:os';
 import {createServer} from '../apps/desktop/node_modules/vite/dist/node/index.js';
 import React from '../apps/desktop/node_modules/react/index.js';
 import {renderToStaticMarkup} from '../apps/desktop/node_modules/react-dom/server.node.js';
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const server=await createServer({root:path.join(repo,'apps/desktop'),server:{middlewareMode:true,hmr:false,watch:null},appType:'custom'});
+const server=await createServer({root:path.join(repo,'apps/desktop'),configFile:false,cacheDir:path.join(os.tmpdir(),'lintel-auth-sources-vite'),server:{middlewareMode:true,hmr:false,watch:null,ws:false},appType:'custom'});
 after(()=>server.close());
-const {AuthenticationSourceRow,AuthenticationInventoryView,AuthenticationPlanReview,AuthenticationResult}=await server.ssrLoadModule('/src/AuthenticationSources.tsx');
+const {AuthenticationSourceRow,AuthenticationInventoryView,AuthenticationSelection,AuthenticationPlanReview,AuthenticationResult}=await server.ssrLoadModule('/src/AuthenticationSources.tsx');
+const {default:PlanReview}=await server.ssrLoadModule('/src/PlanReview.tsx');
 const {LanguageContext}=await server.ssrLoadModule('/src/i18n-provider.tsx');
 const {translate}=await server.ssrLoadModule('/src/i18n.ts');
 const {zhCN}=await server.ssrLoadModule('/src/i18n.catalog.zh-CN.ts');
@@ -45,6 +47,87 @@ test('source inventory renders evidence, exact shared location, unknowns and bou
  }
 });
 
+test('inventory prioritizes current results, separates read-only context and keeps source details collapsed',()=>{
+ for(const locale of ['en','zh-CN']){
+  const html=render(AuthenticationInventoryView,{inventory,selected:[sources[0].id],onToggle(){}},locale);
+  const saved=html.indexOf(catalogs[locale]['cleanup.authSavedGroup']);
+  const dynamic=html.indexOf(catalogs[locale]['cleanup.authInjectionGroup']);
+  const auxiliary=html.indexOf(catalogs[locale]['cleanup.authAuxiliarySummary']);
+  assert.ok(saved>=0&&dynamic>=0&&auxiliary>=0);
+  assert.ok(saved<dynamic&&dynamic<auxiliary,'saved logins, optional injection and one auxiliary disclosure have a stable reading order');
+  assert.equal((html.match(/class="authentication-disclosure authentication-auxiliary"/g)||[]).length,1,'only one auxiliary disclosure renders');
+  assert.equal([...html.matchAll(/<summary class="authentication-disclosure-summary"/g)].length,[...html.matchAll(/<details /g)].length,'every disclosure uses the explicit summary');
+  const attention=render(AuthenticationInventoryView,{inventory:{...inventory,sources:[{...sources[0],removable:false},{...sources[4],presence:'present',evidence:'inaccessible',reason:'keychain_locked'}]}},locale);
+  assert.ok(attention.indexOf(catalogs[locale]['cleanup.authAttentionGroup'])>=0);
+  assert.ok(html.includes(catalogs[locale]['cleanup.authContextNote']));
+  assert.ok(html.includes(catalogs[locale]['cleanup.authSourceDetails']));
+  const details=[...html.matchAll(/<details /g)].length,summaries=[...html.matchAll(/<summary class="authentication-disclosure-summary"/g)].length;
+  assert.equal(summaries,details,'every disclosure uses the shared explicit summary');
+  assert.equal(html.includes(' open=""'),false,'ordinary inventory disclosures start collapsed');
+  assert.ok(html.includes(catalogs[locale]['cleanup.authScopeProcess']));
+ }
+});
+
+test('selection summary is explicit and treats zero cleanable sources as a verification-only state',()=>{
+ for(const locale of ['en','zh-CN']){
+  const selection=render(AuthenticationSelection,{inventory,selected:[],onToggle(){},onRestoreRecommended(){}},locale);
+  assert.ok(selection.includes(translate(catalogs,locale,'cleanup.authSelectionSummary',{selected:0,available:2})));
+  assert.ok(selection.includes(catalogs[locale]['cleanup.authVerificationOnlyTitle']));
+  assert.ok(selection.includes(catalogs[locale]['cleanup.authChooseSources']));
+  assert.equal(selection.includes(catalogs[locale]['cleanup.authRecommendedSelection']),false,'without default_selected metadata the UI does not invent recommendations');
+  assert.equal(selection.includes(catalogs[locale]['cleanup.authClearSelection']),false);
+  const empty=render(AuthenticationSelection,{inventory:{...inventory,sources:[sources[2],sources[4],sources[5]]},selected:[],onToggle(){},onRestoreRecommended(){}},locale);
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authNoCleanableSources']),false,'uncertain scans do not show a second clear-state summary');
+  assert.ok(empty.includes(catalogs[locale]['cleanup.authNoCleanableUncertain']),'locked or incomplete scans retain an uncertainty state');
+  assert.equal((empty.match(/data-auth-no-cleanable=/g)||[]).length,1,'one concise empty-state explanation');
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authSelectGroup']),false);
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authRecommendedSelection']),false);
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authVerificationOnlyTitle']),false);
+ }
+});
+
+test('selection offers one verification-only explanation and a useful clear action only for selected sources',()=>{
+ for(const locale of ['en','zh-CN']){
+  const selected=render(AuthenticationSelection,{inventory,selected:[sources[0].id],onToggle(){},onRestoreRecommended(){}},locale);
+  assert.ok(selected.includes(catalogs[locale]['cleanup.authClearSelection']));
+  assert.equal(selected.includes(catalogs[locale]['cleanup.authVerificationOnlyTitle']),false);
+  const verify=render(AuthenticationSelection,{inventory,selected:[],onToggle(){},onRestoreRecommended(){}},locale);
+  assert.equal(verify.split(catalogs[locale]['cleanup.authVerificationOnlyTitle']).length-1,1);
+  assert.equal(verify.includes(catalogs[locale]['cleanup.authClearSelection']),false);
+  assert.equal(selected.includes(secret),false);
+ }
+});
+
+test('all details use one native disclosure summary with explicit state, icons and inset focus styling',async()=>{
+ for(const locale of ['en','zh-CN']){
+  const html=render(AuthenticationInventoryView,{inventory,selected:[sources[0].id],onToggle(){}},locale);
+  assert.ok(html.includes('authentication-disclosure-summary'));
+  assert.ok(html.includes(catalogs[locale]['cleanup.authDisclosureExpand']));
+  assert.ok(html.includes(catalogs[locale]['cleanup.authDisclosureCollapse']));
+  assert.ok(html.includes('authentication-disclosure-open'));
+  assert.ok(html.includes('authentication-disclosure-closed'));
+  assert.equal([...html.matchAll(/<summary class="authentication-disclosure-summary"/g)].length,[...html.matchAll(/<details /g)].length);
+ }
+ const css=await import('node:fs/promises').then(fs=>fs.readFile(path.join(repo,'apps/desktop/src/authentication.css'),'utf8'));
+ assert.ok(css.includes('.authentication-disclosure-summary:focus-visible{outline:none;box-shadow:inset 0 -2px var(--focus);background:var(--accent-bg)}'));
+ assert.ok(css.includes('[open]>.authentication-disclosure-summary>.ui-icon{transform:rotate(-90deg)}'));
+ assert.equal(css.includes('outline-offset:2px'),false);
+});
+
+test('auxiliary inventory renders context, absent locations and external diagnostics through one disclosure',()=>{
+ const auxiliary=React.createElement('div',{className:'authentication-surface-auxiliary'},React.createElement('input',{'aria-label':'Synthetic project cwd'}));
+ for(const locale of ['en','zh-CN']){
+  const html=render(AuthenticationInventoryView,{inventory,selected:[],onToggle(){},auxiliary},locale);
+  assert.equal([...html.matchAll(/class="authentication-disclosure authentication-auxiliary"/g)].length,1);
+  assert.equal([...html.matchAll(/class="authentication-disclosure authentication-context"/g)].length,1);
+  assert.equal([...html.matchAll(/class="authentication-disclosure authentication-absent"/g)].length,1);
+  assert.ok(html.includes('Synthetic project cwd'));
+  assert.ok(html.indexOf('Synthetic project cwd')<html.indexOf(catalogs[locale]['cleanup.authContextNote']),'project input precedes lengthy read-only evidence');
+  assert.equal(html.indexOf(catalogs[locale]['cleanup.authAuxiliaryNote'])<html.indexOf(catalogs[locale]['cleanup.authContextNote']),true);
+  assert.equal(html.includes('authentication-source-details" open='),false);
+ }
+});
+
 test('frozen plan clearly includes shared-file consequences and opt-in runtime execution',()=>{
  for(const locale of ['en','zh-CN']){
   const html=render(AuthenticationPlanReview,{authentication},locale);
@@ -52,6 +135,19 @@ test('frozen plan clearly includes shared-file consequences and opt-in runtime e
   assert.equal(html.includes(secret),false);assert.equal((html.match(/type="checkbox"/g)||[]).length,0);
   const empty=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[],local_source_count:0,runtime_verification_requested:false}},locale);
   assert.ok(empty.includes(catalogs[locale]['cleanup.authNoSelection']));assert.ok(empty.includes(catalogs[locale]['cleanup.authRuntimeNotIncluded']));
+  const verification=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[]},verificationOnly:true},locale);
+  assert.ok(verification.includes(catalogs[locale]['cleanup.authVerificationPlanNote']));
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authVerificationPlanNote']),false,'an empty authentication subset alone does not make rebuilding or retirement read-only');
+ }
+});
+
+test('whole frozen plans distinguish zero-source login verification from rebuild and retirement',()=>{
+ const base={kind:'cleanup',id:'synthetic-plan',hash:'synthetic-hash',environment_id:'synthetic-env',title:'Synthetic cleanup',changes:[],preserves:[],warnings:[],created_at:'2026-11-15T00:00:00Z',status:'planned',authentication:{...authentication,selected_sources:[],local_source_count:0}};
+ for(const locale of ['en','zh-CN'])for(const steps of [[],['archive','rebuild'],['archive','retire']]){
+  const plan={...base,archive_passphrase_required:steps.length>0,actions:['quiescence',...steps,'auth_status','auth_verify'].map(id=>({id,label:id,reversible:false}))};
+  const html=render(PlanReview,{plan},locale);
+  assert.equal(html.includes(catalogs[locale]['cleanup.authVerificationPlanNote']),steps.length===0,'archive/rebuild/retire steps prevent a whole-plan verification-only label');
+  assert.equal(html.includes(catalogs[locale]['cleanup.authOtherFields']),false,'empty configuration fields stay omitted in every cleanup recipe');
  }
 });
 
@@ -88,7 +184,7 @@ test('result keeps removed sources, still-active auth, unknown scopes and retain
 test('unknown runtime results and zero-selection verification never render a signed-out claim',()=>{
  for(const locale of ['en','zh-CN']){
   const html=render(AuthenticationResult,{receipt:{...receipt,auth_verification:{...report,local_sources:[],runtime:{state:'unavailable',error_code:'auth_schema_unknown'},retained_sensitive_material:[]}}},locale);
-  assert.ok(html.includes(catalogs[locale]['cleanup.authNoSelection']));assert.ok(html.includes(catalogs[locale]['cleanup.authRuntimeUnavailable']));
+  assert.ok(html.includes(catalogs[locale]['cleanup.authVerificationOnlyResult']));assert.ok(html.includes(catalogs[locale]['cleanup.authRuntimeUnavailable']));
   assert.equal(html.includes('No login reported'),false);assert.equal(html.includes('当前未报告登录'),false);
  }
 });

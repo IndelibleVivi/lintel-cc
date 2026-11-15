@@ -312,7 +312,7 @@ try{
  await writeFile(path.join(state,'jobs',receipt.id+'.json'),JSON.stringify(accepted));
  const executions=calls.filter(c=>c.command==='execute').length;
  await page.locator('.sidebar nav').getByRole('button',{name:'记录与恢复',exact:true}).click();
- await page.getByRole('button',{name:'刷新',exact:true}).click();await page.locator('.job-row').filter({hasText:receipt.id}).getByRole('button',{name:'查看结果',exact:true}).click();
+ await page.getByRole('button',{name:'刷新记录',exact:true}).click();await page.locator('.job-row').filter({hasText:receipt.id}).getByRole('button',{name:'查看结果',exact:true}).click();
  await dialog.getByRole('button',{name:'交给 Agent',exact:true}).click();
  await page.getByRole('button',{name:'核对 CLI 与上下文',exact:true}).click();
  const acceptedPacket=JSON.parse(await page.getByLabel('Agent 操作交接包').inputValue());

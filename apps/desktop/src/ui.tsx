@@ -14,7 +14,7 @@ export function hasConfirmedWorkArchive(receipt: Receipt): boolean {
   return !!receipt.archive_path && (!!receipt.archive_digest || receipt.steps.some(step => step.id === 'archive' && step.status === 'completed'));
 }
 
-export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download' | 'language' | 'preserve' | 'sessions' | 'folder' | 'system';
+export type IconName = 'sidebar' | 'environments' | 'policy' | 'rebuild' | 'history' | 'settings' | 'help' | 'plus' | 'arrow' | 'check' | 'refresh' | 'search' | 'copy' | 'close' | 'terminal' | 'chevron' | 'warning' | 'sun' | 'moon' | 'download' | 'language' | 'preserve' | 'sessions' | 'folder' | 'system';
 const paths: Record<IconName, ReactNode> = {
   sidebar: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></>,
   environments: <><path d="M4 6.5 12 3l8 3.5v3.25L12 13l-8-3.25Z"/><path d="m4 12.25 8 3.25 8-3.25M4 16.5l8 3.25 8-3.25"/><rect x="10.25" y="15.25" width="3.5" height="3.5" rx="1"/></>,
@@ -25,6 +25,7 @@ const paths: Record<IconName, ReactNode> = {
   help: <><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3h.01"/></>,
   plus: <path d="M12 5v14M5 12h14"/>, arrow: <path d="M4 12h16m-6-6 6 6-6 6"/>,
   check: <path d="m5 12 4 4L19 6"/>, refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6"/></>,
+  search: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></>,
   copy: <><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></>, close: <path d="m6 6 12 12M6 18 18 6"/>,
   terminal: <><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m6 9 3 3-3 3m6 0h5"/></>, chevron: <path d="m9 5 7 7-7 7"/>,
   warning: <><path d="M10.28 4.23a2 2 0 0 1 3.44 0l7 12.25a2 2 0 0 1-1.73 3H5a2 2 0 0 1-1.73-3Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r=".9"/></>,
@@ -37,7 +38,7 @@ const paths: Record<IconName, ReactNode> = {
   folder: <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4l2 2.5h8A1.5 1.5 0 0 1 20.5 9v8.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/>,
   system: <><circle cx="12" cy="12" r="8.5"/><path d="M12 5a7 7 0 0 1 0 14Z" fill="currentColor" stroke="none"/></>,
 };
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
+export function Icon({ name, size = 18 }: { name: IconName; size?: number }) { return <svg className="ui-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>; }
 export function Brand() { return <svg className="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect className="brand-beam" x="4" y="8.5" width="23" height="4"/><rect className="brand-support" x="6.5" y="12.5" width="4" height="10.5"/><rect className="brand-support" x="20.5" y="12.5" width="3.5" height="10.5"/><rect className="brand-mark-cursor" x="24.75" y="21" width="4" height="2"/></svg>; }
 
 // Finite status vocabulary shared by App, panels and the CLI capability map.
