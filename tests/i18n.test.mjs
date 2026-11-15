@@ -213,7 +213,7 @@ test('archive-only approval and next actions project exact canonical phrases', (
   assert.equal(present('原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。', 'zh-CN'), '原环境、旧登录与运行进程未被注销或删除；如需清理请另选独立配方。');
 });
 
-test('help build status interpolates the current version without denying earlier public downloads', () => {
+test('help Preview status interpolates the running version independently of publication', () => {
   for(const locale of ['en','zh-CN']) {
     const value=translate(catalogs,locale,'app.helpScopeNotice',{version:'9.8.7'});
     assert.ok(value.includes('9.8.7'));

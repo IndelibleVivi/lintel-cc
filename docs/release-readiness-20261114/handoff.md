@@ -153,7 +153,7 @@ LINTEL_TEST_BROWSER_EXTENSION_RESOURCES=/absolute/copied/Lintel.app/Contents/Res
 
 ### C. 第三方图形与品牌许可
 
-**需要所有者决定：** 提供 Clawd/相关品牌资产的可核实再分发许可，或选择不依赖该资产的原创替代。仓库的 attribution 与项目许可不产生该许可；不能通过测试补齐。按实际 App/site 资产检查；CLI 若未包含相关图形，不应被一并视为同一阻断。
+**2026-11-15 所有者决定：** 维护者确认 Lintel 字标和 App 图标为项目自制素材，选择在本轮 Preview 中保留现有 Clawd 图形与非官方关联说明。没有提供 Anthropic 再分发许可，不能把本项记为第三方权利已核实、已获 Anthropic 授权或 Lintel 对该角色拥有权利。品牌／Clawd 仍排除在项目对外许可之外；排除与 attribution 本身不产生外部许可。本轮保留该权利不确定性，不能通过测试补齐。CLI 若未包含相关图形，按其实际包内容独立判断。
 
 ### D. 最终公开资产与部署
 
