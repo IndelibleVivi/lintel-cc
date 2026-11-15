@@ -12,7 +12,9 @@
 | 公开资产 | 八个附件的 API upload digest 与本地一致；DMG 用 canonical `verify-public`、其余七件从无认证公开 URL 完整读回，大小与 SHA-256 一致。CLI 原包身份 `0.2.0-candidate-85e2f435fe81` 保留 |
 | 安装与更新 | 完整 bundle ad-hoc、手动下载／用户自行信任；没有 Developer ID、公证或 updater。Gatekeeper 拒绝与无 stapled ticket 如实保留；干净 Mac 首装未验证。旧 0.1.0／0.1.1 不删除，本机日常 App 未在本轮再次替换 |
 | 权利与限制 | 维护者确认自制 Lintel 字标／App 图标；选择保留 Clawd，不声明 Anthropic 许可。品牌／Clawd 不在项目对外许可内。个人账号、生产浏览器、生产 VPS、完整 VoiceOver 仍未验收；Linux CLI 仍 experimental |
-| 文档与官网 | README、配对用户／Agent 指南及官网源码跟随真实 0.2.0 下载；线上官网部署另行记录，不能从 source push 或 Release 推断已上线 |
+| 文档与官网 | README、配对指南与官网已跟随真实 0.2.0 下载；[后续 CI 43718457544](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43718457544) 在 `4cbbeda` 再次 14/14 jobs success。官网经单独授权，clean `91d5980` 同包先 preview、后 production，42 页／66 个公开资源在正式域名读回通过，视频 Range 206；详情见下段 |
+
+官网的冻结 payload source 为 `91d598087acb3efc6dd87d2b1050df49d5fba2d6`，68 文件／28,152,279 bytes（含平台消费的 `_headers` 与独立 404）。[Preview c7a5ef34](https://c7a5ef34.lintel-aue.pages.dev/)（`c7a5ef34-0b64-4101-a97d-cd47bc81d802`）与 [Production 41b0bae2](https://41b0bae2.lintel-aue.pages.dev/)（`41b0bae2-3b20-438b-86f9-a7ceeaadaabb`）使用同一包；实际 [lintel.page](https://lintel.page/) 的中英 App／CLI 下载均为 0.2.0。所有 42 页与可公开资源逐字节一致，仅指南允许平台消费既定 `email_off` 标记；CSP、无额外 beacon／解码脚本、生产无 noindex 与未知路径 404 均通过。Preview 对视频 Range 返回 200，完整 17,196,417 bytes 已核对；生产同请求为 206／1024 bytes，完整电影另行读回一致。实际浏览器已观察中英下载、播放到结尾、字幕 track loaded，以及关闭复位到 0／焦点回入口。未改变 DNS、账号权限或 updater，也未执行 Search Console 操作。
 
 以下条目是各轮当时的候选与开发观察；其中“未发布”描述原时间点，不覆盖上方当前发行事实。
 
