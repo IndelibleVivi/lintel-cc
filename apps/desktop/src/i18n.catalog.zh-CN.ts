@@ -2493,7 +2493,7 @@ export const zhCN: Catalog = {
   "cleanup.authPlanTitle": "本次精确移除的认证来源",
   "cleanup.authVerificationPlanTitle": "本次只核验认证来源",
   "cleanup.authVerificationPlanNote": "没有选择可清理来源；本次计划不会移除认证，只重新检查当前来源与覆盖范围。",
-  "cleanup.authVerificationOnlyResult": "本次只核验计划没有选择要移除的来源；没有据此声称登录已清除。",
+  "cleanup.authVerificationOnlyResult": "未选择需要移除的认证来源；这项核验不代表登录已清除。",
   "cleanup.authNoSelection": "未选择认证来源；不会清除其他未列出的来源。",
   "cleanup.authSharedImpact": "所选 Shell 配置供此主机的同一用户共享。它可能影响其他 Claude 环境及后续终端；已运行进程仍可能持有旧值。",
   "cleanup.authRuntimeIncluded": "完成后将显式调用 Claude auth status，单独记录此执行上下文的结果。",

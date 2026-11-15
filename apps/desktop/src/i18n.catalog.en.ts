@@ -2493,7 +2493,7 @@ export const en: Catalog = {
   "cleanup.authPlanTitle": "Authentication sources selected for exact removal",
   "cleanup.authVerificationPlanTitle": "Verify authentication sources only",
   "cleanup.authVerificationPlanNote": "No cleanable source is selected. This plan removes no authentication and only rechecks current sources and coverage.",
-  "cleanup.authVerificationOnlyResult": "This verification-only plan selected no sources for removal; it does not claim a login was cleared.",
+  "cleanup.authVerificationOnlyResult": "No authentication sources were selected for removal; this check does not claim a login was cleared.",
   "cleanup.authNoSelection": "No authentication sources were selected. Unlisted sources will not be removed.",
   "cleanup.authSharedImpact": "The selected shell configuration is shared by this host user. It may affect other Claude environments and future terminals; running processes can retain old values.",
   "cleanup.authRuntimeIncluded": "After cleanup, Claude auth status will be explicitly invoked and recorded for this execution context.",

@@ -164,6 +164,8 @@ try{
  await calls.splice(0,calls.length);
  await page.getByRole('button',{name:'预览核验计划',exact:true}).click();
  const verificationDialog=page.getByRole('dialog');await verificationDialog.getByRole('region',{name:'本次只核验认证来源',exact:true}).waitFor();
+ assert.equal(await verificationDialog.locator('.flow-title').innerText(),'当前将只核验认证来源','the primary preview title matches the zero-source plan');
+ assert.equal(await verificationDialog.getByRole('heading',{name:/其他配置字段/}).count(),0,'no irrelevant zero-field edit section in an exact-source plan');
  const verificationPlanCall=calls.findLast(call=>call.payload.command==='plan_cleanup');
  assert.deepEqual(verificationPlanCall.payload.auth_source_ids,[]);
  await verificationDialog.getByRole('button',{name:'返回调整',exact:true}).click();

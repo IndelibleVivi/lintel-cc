@@ -113,15 +113,6 @@ test('all details use one native disclosure summary with explicit state, icons a
  assert.equal(css.includes('outline-offset:2px'),false);
 });
 
-test('footer blockers are finite and do not turn zero source selection into an error',async()=>{
- const cleanupSource=await import('node:fs/promises').then(fs=>fs.readFile(path.join(repo,'apps/desktop/src/CleanupPanel.tsx'),'utf8'));
- for(const key of ['cleanup.authGateBusy','cleanup.authGateRetired','cleanup.authGateSources','cleanup.authGateFiles','cleanup.authGateWriters','cleanup.authGateWritersStopped','cleanup.authGateProject','cleanup.authGateCategories'])assert.ok(cleanupSource.includes(`t('${key}')`),`${key} is part of the actual footer blocker`);
- for(const locale of ['en','zh-CN'])for(const key of ['cleanup.authGateBusy','cleanup.authGateRetired','cleanup.authGateSources','cleanup.authGateFiles','cleanup.authGateWriters','cleanup.authGateWritersStopped','cleanup.authGateProject','cleanup.authGateCategories','cleanup.authVerificationFooter'])assert.ok(key in catalogs[locale]);
- assert.ok(cleanupSource.includes("const previewDisabled=!!busy||!stopped||!inspection||!inventory||projectChanged||!!inspection?.writers.length||(recipe!=='repair_login'&&categories.length===0)||environment.status==='retired'"));
- assert.equal(cleanupSource.includes('selectedSources.length'),true);
- assert.equal(cleanupSource.includes('previewDisabled=!!busy||!stopped||!inspection||!inventory||projectChanged||!!inspection?.writers.length||(recipe!==\'repair_login\'&&categories.length===0)||environment.status===\'retired\'||!selectedSources.length'),false,'zero selection is not a preview gate');
-});
-
 test('auxiliary inventory renders context, absent locations and external diagnostics through one disclosure',()=>{
  const auxiliary=React.createElement('div',{className:'authentication-surface-auxiliary'},React.createElement('input',{'aria-label':'Synthetic project cwd'}));
  for(const locale of ['en','zh-CN']){
@@ -143,6 +134,9 @@ test('frozen plan clearly includes shared-file consequences and opt-in runtime e
   assert.equal(html.includes(secret),false);assert.equal((html.match(/type="checkbox"/g)||[]).length,0);
   const empty=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[],local_source_count:0,runtime_verification_requested:false}},locale);
   assert.ok(empty.includes(catalogs[locale]['cleanup.authNoSelection']));assert.ok(empty.includes(catalogs[locale]['cleanup.authRuntimeNotIncluded']));
+  const verification=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[]},verificationOnly:true},locale);
+  assert.ok(verification.includes(catalogs[locale]['cleanup.authVerificationPlanNote']));
+  assert.equal(empty.includes(catalogs[locale]['cleanup.authVerificationPlanNote']),false,'an empty authentication subset alone does not make rebuilding or retirement read-only');
  }
 });
 

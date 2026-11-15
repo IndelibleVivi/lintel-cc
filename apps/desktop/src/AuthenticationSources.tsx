@@ -133,11 +133,11 @@ export function AuthenticationSelection({inventory,selected,onToggle,onRestoreRe
   </>;
 }
 
-export function AuthenticationPlanReview({authentication}:{authentication:AuthenticationPlan}) {
+export function AuthenticationPlanReview({authentication,verificationOnly=false}:{authentication:AuthenticationPlan;verificationOnly?:boolean}) {
   const {t}=useI18n();
   const selected=authentication.selected_sources.length>0;
-  return <section className="authentication-plan frozen-destination" aria-label={t(selected?'cleanup.authPlanTitle':'cleanup.authVerificationPlanTitle')}>
-    <h4>{t(selected?'cleanup.authPlanTitle':'cleanup.authVerificationPlanTitle')}</h4><p>{t(selected?'cleanup.authSelectedCount':'cleanup.authVerificationPlanNote',{count:authentication.selected_sources.length})}</p>
+  return <section className="authentication-plan frozen-destination" aria-label={t(!selected&&verificationOnly?'cleanup.authVerificationPlanTitle':'cleanup.authPlanTitle')}>
+    <h4>{t(!selected&&verificationOnly?'cleanup.authVerificationPlanTitle':'cleanup.authPlanTitle')}</h4><p>{t(!selected&&verificationOnly?'cleanup.authVerificationPlanNote':'cleanup.authSelectedCount',{count:authentication.selected_sources.length})}</p>
     {selected&&<div className="authentication-source-list">{authentication.selected_sources.map(source=><AuthenticationSourceRow key={source.id} source={source} expanded/>)}</div>}
     {!selected&&<p>{t('cleanup.authNoSelection')}</p>}
     {authentication.selected_sources.some(source=>source.scope==='host_shared')&&<Notice tone="warning">{t('cleanup.authSharedImpact')}</Notice>}
