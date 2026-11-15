@@ -8,7 +8,9 @@
 
 当前新增检查已确认记录刷新不触发环境发现、筛选／搜索保留，真实空态不覆盖不完整扫描；工作保全在 1120／900 的昼夜布局和容量／说明间距通过。语言切换、环境组件、客户端控制及产品任务旅程通过。认证清理的只核验预览、零来源重建／退役的实际步骤与口令要求、明确所选五类来源的一次批准、独立复查、locked／denied 恢复和主机／语言隔离旅程通过，paired catalog／SSR／配方检查通过。以上为 bundled Chromium 与 synthetic Core 证据。
 
-产品 source `5fd6c39062edbfd931de87068329d21a1d6aef1a` 的 clean 本机 warm-cache App 构建与完整 bundle strict ad-hoc 校验通过。实际 native WebKit 已观察记录空态、工作容量版式、认证辅助入口与键盘收起；最终原生复核中，零来源登录核验、重建和退役分别保留正确主标题，后两种继续显示工作保全与口令要求。空配置变更区不再出现。原生合成检查只生成未批准预览，没有执行认证变更，原工作文件保持。随后保留旧 bundle、更新本机正常使用副本，重新打开后已观察正常默认环境、新入口与可用的只读页面导航；这不替代下载首开、完整无障碍或正式发行验收。
+产品 source `ec225d1b49b27b0531cacff38f383cd2637994e0` 的 clean 本机 warm-cache App 构建与完整 bundle strict ad-hoc 校验通过。本轮 native WebKit 已观察记录空态、工作容量版式、认证辅助入口与键盘收起；`5fd6c3` 的零来源登录核验、重建和退役分别保留正确主标题，后两种继续显示工作保全与口令要求。最终 `ec225d1` 原生复核确认错误项目目录仍可同页编辑、清空并重新检查成功；冻结步骤判定未变。空配置变更区不再出现。原生合成检查未执行认证变更，原工作文件保持。随后保留旧 bundle、更新本机正常使用副本，重新打开后已观察正常默认环境、新入口与可用的只读页面导航；这不替代下载首开、完整无障碍或正式发行验收。
+
+[PR #10](https://github.com/IndelibleVivi/lintel-cc/pull/10) 已合并为 `9bdd30733579f51c7e9801817ef324aed9da7031`，完整 tree 与产品 source 相同。[最终 PR CI 43707731115](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43707731115) 的 `app-ui+site+docs` profile 通过：Ubuntu frontend 9/9、browser/UI 19/19、controller 自检及 production aggregate；实际汇总确认所有选中 job／check 通过，四个未选 job 类别为 planned skips。两份 canonical reports 绑定 clean merge checkout `151c1325c10e929d38b2ff9522ef51eb5a60bac5`，其完整 tree 同样一致；这不是完整跨平台发行矩阵。
 
 本轮未改变 CLI／Core、公开 App 0.1.1／CLI 0.1.0 下载、updater 或网站线上状态；固定 `353536cc` 候选不包含本轮界面调整。使用说明与官网指南的生成投影跟随源码维护，生成文件不等于网站已经部署。
 
