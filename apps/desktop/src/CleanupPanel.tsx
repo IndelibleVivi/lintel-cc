@@ -8,7 +8,7 @@ import type { Api, AuthenticationInventory, CleanupInspection, Environment, Plan
 import { Icon, Notice, Status, WorkspaceActions } from './ui';
 import RequestFailure, { asError } from './RequestFailure';
 import { useI18n } from './i18n-provider';
-import { AuthenticationDisclosureSummary, AuthenticationSelection, authenticationMethodLabel } from './AuthenticationSources';
+import { AuthenticationAuxiliary, AuthenticationDisclosureSummary, AuthenticationSelection, authenticationMethodLabel } from './AuthenticationSources';
 import { LocalizedError } from './i18n';
 
 type Recipe = 'repair_login' | 'reset_client' | 'retire';
@@ -91,7 +91,7 @@ export default function CleanupPanel({ send = request, environment, refreshKey, 
   const previewDisabled=!!busy||!stopped||!inspection||!inventory||projectChanged||!!inspection?.writers.length||(recipe!=='repair_login'&&categories.length===0)||environment.status==='retired';
   const steps=recipe==='repair_login'?[t('cleanup.stepRecheckWriters'),t(verificationOnly?'cleanup.authStepVerifyOnly':'cleanup.authStepRemove'),t('cleanup.authStepVerify')]:[t('cleanup.authStepArchive'),...(recipe==='reset_client'?[t('cleanup.stepNewEnv')]:[]),t('cleanup.authStepRemove'),...(recipe==='retire'?[t('cleanup.stepRetire')]:[]),t('cleanup.authStepVerify')];
   const auxiliary=<>
-    <details className="authentication-disclosure authentication-project"><AuthenticationDisclosureSummary>{t('cleanup.authProjectLabel')}</AuthenticationDisclosureSummary><label className="field">{t('cleanup.authProjectLabel')}<input value={project} onChange={event=>setProject(event.target.value)} disabled={!!busy} placeholder={t('component.projectPlaceholder')}/><span className="small-print">{t('cleanup.authProjectNote')}</span></label></details>
+    <details className="authentication-disclosure authentication-project" open={!inventory&&!!error}><AuthenticationDisclosureSummary>{t('cleanup.authProjectLabel')}</AuthenticationDisclosureSummary><label className="field">{t('cleanup.authProjectLabel')}<input value={project} onChange={event=>setProject(event.target.value)} disabled={!!busy} placeholder={t('component.projectPlaceholder')}/><span className="small-print">{t('cleanup.authProjectNote')}</span></label></details>
     {inspection&&<details className="authentication-disclosure authentication-legacy-metadata"><AuthenticationDisclosureSummary>{t('cleanup.authLegacyMetadata')}</AuthenticationDisclosureSummary><div className="cleanup-files">{inspection.files.map(file=><div className="cleanup-file" key={file.path}><details className="authentication-disclosure cleanup-file-path"><AuthenticationDisclosureSummary><span>{t(file.category==='credentials'?'cleanup.localCredential':'cleanup.clientState')}</span><code>{file.path.split('/').pop()||file.path}</code></AuthenticationDisclosureSummary><code className="cleanup-file-full-path">{file.path}</code></details><Status value={file.present?'discovered':'not_present'}/></div>)}</div></details>}
   </>;
   return <>
@@ -102,7 +102,7 @@ export default function CleanupPanel({ send = request, environment, refreshKey, 
       <div className="authentication-section-heading"><div><span className="eyebrow">{t('cleanup.authInventoryEyebrow')}</span><h2>{t('cleanup.authInventoryTitle')}</h2><p>{t('cleanup.authInventoryIntro')}</p></div><button className="text-button" disabled={!!busy} onClick={()=>void inspect(project.trim())}><Icon name="refresh" size={14}/>{t(busy==='inspect'?'cleanup.authInventoryScanning':'cleanup.authInventoryAction')}</button></div>
       <p className="authentication-scope-note"><Icon name="history" size={14}/><span>{t('cleanup.authInventoryScope')}</span></p>
       <div className="padded">
-        {!inventory?<p role="status" className="muted">{t(busy==='inspect'?'cleanup.authScanning':'cleanup.authScanNeeded')}</p>:<>
+        {!inventory?<><p role="status" className="muted">{t(busy==='inspect'?'cleanup.authScanning':'cleanup.authScanNeeded')}</p><AuthenticationAuxiliary open={!!error}>{auxiliary}</AuthenticationAuxiliary></>:<>
           <AuthenticationSelection inventory={inventory} selected={selectedSources} disabled={!!busy} auxiliary={auxiliary} onRestoreRecommended={()=>setSelectedSources(inventory.sources.filter(source=>source.removable&&source.default_selected===true&&source.scope==='selected_root').map(source=>source.id))} onToggle={(id,checked)=>setSelectedSources(current=>checked?[...current.filter(value=>value!==id),id]:current.filter(value=>value!==id))}/>
           {sharedSelected&&<Notice tone="warning">{t('cleanup.authSharedImpact')}</Notice>}
           {projectChanged&&<Notice>{t('cleanup.authRefreshProject')}</Notice>}

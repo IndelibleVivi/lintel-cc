@@ -42,6 +42,14 @@ export function AuthenticationDisclosureSummary({children}:{children:ReactNode})
   </summary>;
 }
 
+export function AuthenticationAuxiliary({children,contextCount=0,open=false}:{children:ReactNode;contextCount?:number;open?:boolean}) {
+  const {t}=useI18n();
+  return <details className="authentication-disclosure authentication-auxiliary" open={open}>
+    <AuthenticationDisclosureSummary><span>{t('cleanup.authAuxiliarySummary')}</span>{contextCount>0&&<span className="small-label">{t('cleanup.authContextLabel',{count:contextCount})}</span>}</AuthenticationDisclosureSummary>
+    <div className="authentication-auxiliary-body"><p className="small-print authentication-auxiliary-note">{t('cleanup.authAuxiliaryNote')}</p>{children}</div>
+  </details>;
+}
+
 /** Display only the core's finite public projection. No field values or helper text. */
 export function AuthenticationSourceRow({source,selected,onToggle,disabled=false,expanded=false}:{source:AuthenticationSource;selected?:boolean;onToggle?:(id:string,selected:boolean)=>void;disabled?:boolean;expanded?:boolean}) {
   const {t}=useI18n();
@@ -99,15 +107,11 @@ export function AuthenticationInventoryView({inventory,selected,onToggle,disable
     {!!saved.length&&<section className="authentication-group"><h3>{t('cleanup.authSavedGroup')}</h3><p className="small-print">{t('cleanup.authSavedGroupNote')}</p><div className="authentication-source-list">{saved.map(row)}</div></section>}
     {!!injections.length&&<details className="authentication-disclosure authentication-injection-options" open={!saved.length}><AuthenticationDisclosureSummary><span>{t('cleanup.authInjectionGroup')}</span><span className="small-label">{injections.filter(source=>selected?.includes(source.id)).length} / {injections.length}</span></AuthenticationDisclosureSummary><div className="authentication-group-heading"><p className="small-print">{t('cleanup.authInjectionGroupNote')}</p>{onToggle&&<div className="button-row"><button className="text-button" disabled={disabled} onClick={()=>injections.forEach(source=>onToggle(source.id,true))}>{t('cleanup.authSelectGroup')}</button><button className="text-button" disabled={disabled||!injections.some(source=>selected?.includes(source.id))} onClick={()=>injections.forEach(source=>onToggle(source.id,false))}>{t('cleanup.authClearGroup')}</button></div>}</div><div className="authentication-source-list">{injections.map(row)}</div></details>}
     {!visible.length&&!unavailable&&<p>{t('cleanup.authNoneObserved')}</p>}
-    {(!!context.length||!!absent.length||!!auxiliary)&&<details className="authentication-disclosure authentication-auxiliary">
-      <AuthenticationDisclosureSummary><span>{t('cleanup.authAuxiliarySummary')}</span>{!!context.length&&<span className="small-label">{t('cleanup.authContextLabel',{count:context.length})}</span>}</AuthenticationDisclosureSummary>
-      <div className="authentication-auxiliary-body">
-        <p className="small-print authentication-auxiliary-note">{t('cleanup.authAuxiliaryNote')}</p>
+    {(!!context.length||!!absent.length||!!auxiliary)&&<AuthenticationAuxiliary contextCount={context.length}>
         {auxiliary}
         {!!context.length&&<details className="authentication-disclosure authentication-context"><AuthenticationDisclosureSummary>{t('cleanup.authContextCount',{count:context.length})}</AuthenticationDisclosureSummary><p className="small-print">{t('cleanup.authContextNote')}</p><div className="authentication-source-list">{context.map(row)}</div></details>}
         {!!absent.length&&<details className="authentication-disclosure authentication-absent"><AuthenticationDisclosureSummary>{t('cleanup.authAbsentCount',{count:absent.length})}</AuthenticationDisclosureSummary><div className="authentication-source-list">{absent.map(row)}</div></details>}
-      </div>
-    </details>}
+    </AuthenticationAuxiliary>}
   </div>;
 }
 
