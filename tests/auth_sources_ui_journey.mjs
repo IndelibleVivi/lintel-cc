@@ -169,10 +169,26 @@ try{
  const verificationPlanCall=calls.findLast(call=>call.payload.command==='plan_cleanup');
  assert.deepEqual(verificationPlanCall.payload.auth_source_ids,[]);
  await verificationDialog.getByRole('button',{name:'返回调整',exact:true}).click();
+ for(const [recipe,choice,title,step] of [['reset_client','清理并重建','保全工作并重建环境','rebuild'],['retire','退役此环境','清理所选认证并退役环境','retire']]){
+  await page.getByRole('radio',{name:new RegExp('^'+choice)}).check();
+  await page.getByRole('button',{name:'预览这份计划',exact:true}).click();
+  const mutationDialog=page.getByRole('dialog');await mutationDialog.getByRole('heading',{name:'确认这份计划',exact:true}).waitFor();
+  assert.equal(await mutationDialog.locator('.flow-title').innerText(),title,'zero-source mutation preview retains its actual workflow title');
+  assert.equal(await mutationDialog.getByRole('region',{name:'本次只核验认证来源',exact:true}).count(),0);
+  assert.equal(await mutationDialog.locator('.archive-password').count(),1,'work preservation still requires a passphrase');
+  const frozen=responses.findLast(response=>response.ok&&response.data?.kind==='cleanup').data;
+  assert.equal(frozen.kind,'cleanup','all three real Core recipes share the cleanup kind');
+  assert.ok(frozen.actions.some(action=>action.id===step));
+  assert.deepEqual(frozen.authentication.selected_sources,[]);
+  assert.equal(calls.findLast(call=>call.payload.command==='plan_cleanup').payload.recipe,recipe);
+  assert.equal(calls.filter(call=>call.payload.command==='execute').length,0,'previewing each recipe executes nothing');
+  await mutationDialog.getByRole('button',{name:'返回调整',exact:true}).click();
+ }
+ await page.getByRole('radio',{name:/^清理登录/}).check();
  await inventory.getByRole('button',{name:'恢复建议选择',exact:true}).click();
  const recommendedCount=await inventory.locator('input[type=checkbox]:checked').count();
  assert.equal(recommendedCount,2,'recommended selection restores exactly the saved local logins');
- report.checks.push('zero selection is explicitly a verification-only plan with no source IDs and one core plan; restoring recommendations preserves the exact saved-login scope');
+ report.checks.push('zero-source login verification is distinct from real Core rebuild/retirement previews; all retain frozen scope and no preview executes; recommendations restore exactly saved logins');
  const injectionOptions=inventory.locator('.authentication-injection-options');if(!await injectionOptions.evaluate(element=>element.open))await injectionOptions.locator(':scope > summary').click();
  await inventory.getByRole('button',{name:'选择本组',exact:true}).click();
  const chosen=await inventory.locator('input[type=checkbox]:checked').count();assert.equal(chosen,5,'saved logins plus the explicitly selected three injections enter cleanup');
@@ -180,7 +196,7 @@ try{
  inventory=page.getByRole('region',{name:'Where authentication comes from',exact:true});
  auxiliary=inventory.locator('details.authentication-auxiliary');
  assert.equal(await inventory.locator('input[type=checkbox]:checked').count(),chosen);
- assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,1,'locale switching creates no additional verification plan');
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,3,'locale switching creates no additional plan');
  const visible=await page.locator('body').innerText();for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH'])assert.equal(visible.includes(secret),false);
  await page.getByRole('button',{name:'Preview this plan',exact:true}).click();
  const dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Confirm this plan',exact:true}).waitFor();
@@ -198,7 +214,7 @@ try{
  await page.evaluate(()=>document.documentElement.dataset.theme='light');
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'light');
  await page.screenshot({path:path.join(artifacts,'auth-plan-en-light-1120.png'),animations:'disabled'});
- const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,2,'one verification preview and one distinct cleanup preview');
+ const plans=calls.filter(call=>call.payload.command==='plan_cleanup').length;assert.equal(plans,4,'verification, rebuild, retirement and selected-source cleanup each have one preview');
  await dialog.getByRole('button',{name:'Approve and run',exact:true}).click();
  await dialog.getByRole('region',{name:'Authentication cleanup verification',exact:true}).waitFor();
  const verification=dialog.getByRole('region',{name:'Authentication cleanup verification',exact:true});
@@ -288,7 +304,7 @@ try{
   assert.equal(await restoredKeychain.locator('input:checked').count(),1);
  }
  assert.equal(calls.filter(call=>call.payload.command==='execute').length,1);
- assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,2);
+ assert.equal(calls.filter(call=>call.payload.command==='plan_cleanup').length,4);
  for(const secret of [...secrets,'SYNTHETIC_INHERITED_DO_NOT_PUBLISH']){
   assert.equal(JSON.stringify(responses).includes(secret),false);
   assert.equal((await page.evaluate(()=>JSON.stringify(localStorage))).includes(secret),false);

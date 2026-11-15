@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { request, requester } from './api';
-import type { AuthenticationInventory, AuthenticationPlan, AuthenticationSource, AuthenticationVerification, Receipt } from './types';
+import type { AuthenticationInventory, AuthenticationPlan, AuthenticationSource, AuthenticationVerification, Plan, Receipt } from './types';
 import { Icon, Notice } from './ui';
 import RequestFailure, { asError } from './RequestFailure';
 import { useI18n } from './i18n-provider';
@@ -131,6 +131,14 @@ export function AuthenticationSelection({inventory,selected,onToggle,onRestoreRe
     <AuthenticationInventoryView inventory={inventory} selected={selected} onToggle={onToggle} disabled={disabled} auxiliary={auxiliary}/>
     {!validSelected.length&&<div className="authentication-selection-note authentication-verification-only" role="status"><Icon name="history" size={17}/><div><strong>{t('cleanup.authVerificationOnlyTitle')}</strong><p>{t('cleanup.authChooseSources')}</p></div></div>}
   </>;
+}
+
+export function isAuthenticationVerificationPlan(plan:Plan) {
+  // All three recipes share kind=cleanup. The frozen steps distinguish login
+  // verification from plans that also archive, rebuild or retire an environment.
+  return plan.kind==='cleanup'&&plan.authentication?.selected_sources.length===0
+    &&plan.actions.some(action=>action.id==='auth_verify')
+    &&plan.actions.every(action=>['quiescence','auth_status','auth_verify'].includes(action.id));
 }
 
 export function AuthenticationPlanReview({authentication,verificationOnly=false}:{authentication:AuthenticationPlan;verificationOnly?:boolean}) {

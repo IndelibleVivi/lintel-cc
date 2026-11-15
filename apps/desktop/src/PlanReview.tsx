@@ -2,14 +2,14 @@ import type { Plan } from './types';
 import { Icon, formatBytes } from './ui';
 import { useI18n } from './i18n-provider';
 import { present } from './i18n-presentation';
-import { AuthenticationPlanReview } from './AuthenticationSources';
+import { AuthenticationPlanReview, isAuthenticationVerificationPlan } from './AuthenticationSources';
 
 const categoryKeys: Record<string, string> = { instructions: 'category.instructions', memory: 'category.memory', sessions: 'category.sessions' };
 
 function FrozenTargets({plan}:{plan:Plan}) {
   const {t,locale}=useI18n();
   return <>
-    {plan.authentication&&<AuthenticationPlanReview authentication={plan.authentication} verificationOnly={plan.kind==='cleanup'}/>}
+    {plan.authentication&&<AuthenticationPlanReview authentication={plan.authentication} verificationOnly={isAuthenticationVerificationPlan(plan)}/>}
     {plan.configuration&&<section className="frozen-destination"><h4>{t('config.file')}</h4><code>{plan.configuration.path}</code><p>{plan.configuration.scope}</p></section>}
     {plan.residue_selection&&<section className="frozen-destination"><h4>{t('residue.selectedCount',{count:plan.residue_selection.files.length})}</h4><p>{t(plan.residue_selection.archive_before_clear?'planReview.encryptedFirst':'planReview.withoutBackup')}</p><ul>{plan.residue_selection.files.map(file=><li key={file.path}><code>{file.path}</code> · {formatBytes(file.bytes)}</li>)}</ul></section>}
     {plan.identity_reset&&<section className="frozen-destination"><h4>{t('identity.title')}</h4><code>{plan.identity_reset.path}</code><p>{t('planReview.identityFields',{keys:plan.identity_reset.remove_keys.join(', ')})}</p><p>{t('planReview.retainedFields',{keys:plan.identity_reset.retained_keys.join(', ')})}</p><p>{t('residue.combineResetIdentityDetail')}</p><ul>{plan.identity_reset.backup_paths.map(path=><li key={path}><code>{path}</code></li>)}</ul></section>}

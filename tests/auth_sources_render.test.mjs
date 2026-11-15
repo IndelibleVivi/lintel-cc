@@ -12,6 +12,7 @@ const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const server=await createServer({root:path.join(repo,'apps/desktop'),configFile:false,cacheDir:path.join(os.tmpdir(),'lintel-auth-sources-vite'),server:{middlewareMode:true,hmr:false,watch:null,ws:false},appType:'custom'});
 after(()=>server.close());
 const {AuthenticationSourceRow,AuthenticationInventoryView,AuthenticationSelection,AuthenticationPlanReview,AuthenticationResult}=await server.ssrLoadModule('/src/AuthenticationSources.tsx');
+const {default:PlanReview}=await server.ssrLoadModule('/src/PlanReview.tsx');
 const {LanguageContext}=await server.ssrLoadModule('/src/i18n-provider.tsx');
 const {translate}=await server.ssrLoadModule('/src/i18n.ts');
 const {zhCN}=await server.ssrLoadModule('/src/i18n.catalog.zh-CN.ts');
@@ -137,6 +138,16 @@ test('frozen plan clearly includes shared-file consequences and opt-in runtime e
   const verification=render(AuthenticationPlanReview,{authentication:{...authentication,selected_sources:[]},verificationOnly:true},locale);
   assert.ok(verification.includes(catalogs[locale]['cleanup.authVerificationPlanNote']));
   assert.equal(empty.includes(catalogs[locale]['cleanup.authVerificationPlanNote']),false,'an empty authentication subset alone does not make rebuilding or retirement read-only');
+ }
+});
+
+test('whole frozen plans distinguish zero-source login verification from rebuild and retirement',()=>{
+ const base={kind:'cleanup',id:'synthetic-plan',hash:'synthetic-hash',environment_id:'synthetic-env',title:'Synthetic cleanup',changes:[],preserves:[],warnings:[],created_at:'2026-11-15T00:00:00Z',status:'planned',authentication:{...authentication,selected_sources:[],local_source_count:0}};
+ for(const locale of ['en','zh-CN'])for(const steps of [[],['archive','rebuild'],['archive','retire']]){
+  const plan={...base,archive_passphrase_required:steps.length>0,actions:['quiescence',...steps,'auth_status','auth_verify'].map(id=>({id,label:id,reversible:false}))};
+  const html=render(PlanReview,{plan},locale);
+  assert.equal(html.includes(catalogs[locale]['cleanup.authVerificationPlanNote']),steps.length===0,'archive/rebuild/retire steps prevent a whole-plan verification-only label');
+  assert.equal(html.includes(catalogs[locale]['cleanup.authOtherFields']),false,'empty configuration fields stay omitted in every cleanup recipe');
  }
 });
 

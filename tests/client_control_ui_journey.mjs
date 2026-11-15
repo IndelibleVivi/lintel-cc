@@ -453,9 +453,12 @@ try{
   await page.locator('.sidebar nav').getByRole('button',{name:'清理与重建',exact:true}).click();
   await waitForResult('cleanup_inspect',previousScope);
   const scope=page.locator('.cleanup-scope');
-  // File-presence metadata now has its own disclosure, separate from the
-  // exact authentication-source choices. Open it as a user before testing
-  // the existing per-file full-path disclosure.
+  // Supporting file metadata starts behind the single auxiliary entry.
+  // Follow its ordinary controls before checking the per-file full path.
+  const auxiliary=scope.locator('.authentication-auxiliary');
+  assert.equal(await auxiliary.evaluate(element=>element.open),false,'supporting evidence starts collapsed');
+  assert.equal(await scope.getByText('查看客户端文件存在情况（不代表整文件删除）',{exact:true}).isVisible(),false,'file metadata stays out of the primary source choices');
+  await auxiliary.locator(':scope > summary').click();
   await scope.getByText('查看客户端文件存在情况（不代表整文件删除）',{exact:true}).click();
   await scope.locator('.cleanup-file-path').first().waitFor();
   await scope.scrollIntoViewIfNeeded();
