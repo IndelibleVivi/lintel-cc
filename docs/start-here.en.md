@@ -12,9 +12,9 @@ Begin with one small task: **select two synthetic files, create an encrypted wor
 | A macOS app built by you or a trusted provider | Open it and register a test configuration directory you explicitly chose. Verify candidate source/version against [current status (Chinese)](current-state.md) |
 | Linux, or a CLI-only workflow | Use [Agent CLI](agents.en.md) for installation and the [complete CLI trial](quickstart.en.md) for a synthetic example |
 
-Current manual downloads: [App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), [CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.
+Current manual downloads: [App / three-platform CLI v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0). The App has a complete ad-hoc bundle signature without Developer ID, notarization or an updater feed; Linux CLI remains experimental. Older releases are retained for history. Clean-Mac first installation from the public download remains unverified.
 
-Those downloads do not include the latest one-approval file/Keychain cleanup, bounded history or interface fixes. The source trial below matches current guides; downloads follow their own bundled help and Release notes. App help shows the build version/docs revision; the CLI exposes `version --json` and `capabilities --json`.
+Version 0.2.0 includes one-approval file / Keychain cleanup, bounded history and interface fixes. The source trial below matches current guides; downloads follow their own bundled help and Release notes. App help shows the build version/docs revision; the CLI exposes `version --json` and `capabilities --json`.
 
 Read the Release's INSTALL and checksums first. If macOS blocks the app, stop and use the source trial below. Ordinary `npm run dev` starts only the frontend, without the native execution channel used by this trial.
 

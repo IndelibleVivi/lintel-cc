@@ -4,7 +4,7 @@
 
 按眼前要做的事情读。第一次使用不需要先读完整 SPEC，也不需要掌握协议字段。
 
-这里维护当前开发源码的使用说明。公开手动下载仍是 App 0.1.1／CLI 0.1.0，不包含最新认证来源／Keychain 清理和有界任务记录等增强。按[第一次使用](start-here.md)选择下载或源码入口；下载版以对应 Release 安装说明、内置帮助和实际二进制能力为准，不能因指南更新就获得新功能。
+这里维护当前源码说明。公开 App／三平台 CLI 已更新至 0.2.0 Preview，包含认证来源／Keychain 清理、有界记录和界面收尾。按[第一次使用](start-here.md)选择下载或源码入口；后续 main 变化仍以对应 Release、内置帮助和实际二进制能力为界。
 
 ## 第一次来
 
@@ -16,7 +16,7 @@
 | --- | --- |
 | 设置保护方案（含 27 字段逐项／批量编辑）、工作保全、清理重建、恢复结果与配方 | [按目标操作](operator-guide.md) |
 | 使用 CLI、安装独立候选、交接给 Agent | [Agent CLI](agents.md) |
-| 文件与 Keychain 登录、注入来源精确清理与独立复查（未进入 App 0.1.1／CLI 0.1.0） | [认证清理](cleanup.md) |
+| 文件与 Keychain 登录、注入来源精确清理与独立复查（0.2.0 Preview） | [认证清理](cleanup.md) |
 | 配置编辑与恢复、残留／身份、语义快照与组合配方 | [客户端控制操作](operator-guide.md#client-control)／[CLI 对应入口](agents.md#client-control) |
 | App 页面、语言、桌面使用 | [桌面指南](desktop.md) |
 | 扩展安装、配对、浏览器重启后的清理收尾 | [浏览器](browser.md) |
@@ -35,6 +35,6 @@
 
 中文为产品文档的主版本，配套英文页维护相同命令、默认值和操作边界。工程规格与验收记录尚有中文专页；英文入口会明确标注。
 
-当前手动下载：[App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)、[CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)。App v0.1.0 因封装签名缺陷已被替代。没有 Developer ID 签名、公证或 updater feed；干净 Mac 首装仍未验证。
+当前手动下载：[App／三平台 CLI v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0)。App 为完整 bundle ad-hoc 签名，没有 Developer ID、公证或 updater feed；Linux CLI 仍为 experimental。旧版本保留供历史核对，干净 Mac 公开下载首装仍未验证。
 
 页面语言与方向保持稳定；如果结果是等待、部分完成或 `needs_reconciliation`，从保留的原 ID 进入[排错指南](troubleshooting.md)，不要为了重新阅读而删除 Lintel state 或工作包。

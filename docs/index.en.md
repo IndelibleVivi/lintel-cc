@@ -4,7 +4,7 @@
 
 Choose a page by what you need to do. First use does not require reading the full specification or learning protocol fields.
 
-These guides follow current development source. Public downloads remain App 0.1.1/CLI 0.1.0 and lack the latest authentication-source/Keychain cleanup, bounded task history and other enhancements. [First use](start-here.en.md) separates download and source entry points. For downloads, follow the matching Release notes, bundled help and actual binary capabilities; updated guides do not upgrade the binary.
+These guides follow current source. App / three-platform CLI 0.2.0 Preview includes authentication-source / Keychain cleanup, bounded history and interface refinements. [First use](start-here.en.md) separates download and source entry points; later main changes remain subject to the matching Release, bundled help and actual capabilities.
 
 ## New here
 
@@ -16,7 +16,7 @@ These guides follow current development source. Public downloads remain App 0.1.
 | --- | --- |
 | Protection (including 27-field individual/bulk editing), work preservation, cleanup, recovery and recipes | [Operator guide](operator-guide.en.md) |
 | CLI use, standalone candidates or agent handoff | [Agent CLI](agents.en.md) |
-| Exact file/Keychain login and injection cleanup with independent checks (not in App 0.1.1/CLI 0.1.0) | [Authentication cleanup](cleanup.en.md) |
+| Exact file/Keychain login and injection cleanup with independent checks (0.2.0 Preview) | [Authentication cleanup](cleanup.en.md) |
 | Configuration editing/restoration, residue/identity, semantic snapshots and composite recipes | [Client-control operations](operator-guide.en.md#client-control) / [CLI entries](agents.en.md#client-control) |
 | App pages, language and desktop use | [Desktop](desktop.en.md) |
 | Extension setup, pairing and post-restart cleanup | [Browser](browser.en.md) |
@@ -35,6 +35,6 @@ For goals, see the [SPEC (Chinese)](SPEC.md) and [product baseline (Chinese)](sp
 
 Chinese is the canonical product-documentation edition. Paired English pages maintain the same commands, defaults and operational boundaries. Some engineering specifications and acceptance records remain Chinese-only, as labelled above.
 
-Current manual downloads: [App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1), [CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0). App v0.1.0 is superseded due to bundle signing defects. No Developer ID signing, notarization or updater feed; clean-Mac installation remains unverified.
+Current manual downloads: [App / three-platform CLI v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0). The App has a complete ad-hoc bundle signature without Developer ID, notarization or an updater feed; Linux CLI remains experimental. Older releases are retained for history. Clean-Mac first installation from the public download remains unverified.
 
 Page language and direction remain stable. For waiting, partial or `needs_reconciliation` results, keep the original ID and use [Troubleshooting](troubleshooting.en.md) rather than deleting Lintel state or a work package to re-read it.

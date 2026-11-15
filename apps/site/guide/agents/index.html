@@ -44,21 +44,21 @@
       <article class="guide-body" data-guide-document="agents">
         <h1 id="lintel-agent-cli">Lintel Agent CLI</h1>
 <p>简体中文（canonical） · <a href="/guide/agents/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
-<p>此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.1.0 开发者 Preview 使用协议 1 / catalog 1，已提供<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">公开手动下载</a>，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。</p>
+<p>此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.2.0 开发者 Preview 使用协议 1 / catalog 1，已提供<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0">公开手动下载</a>，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。</p>
 <p>首次试用可先走 <a href="/guide/quickstart/">中文 quickstart</a> / <a href="/guide/quickstart/">English quickstart</a>，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。</p>
-<p>本页同时维护公开包安装与当前源码接口。公开 CLI 0.1.0 不包含最新 <code>auth inventory</code>／<code>auth verify</code>、精确认证来源选择和有界记录；要用这些入口需从当前源码构建。执行前始终用所选 binary 的 <code>version</code>、<code>capabilities</code>、<code>describe</code>／<code>schema</code> 核对；远端还要核对目标 runner，App 升级不会替它升级。</p>
+<p>本页同时维护公开包安装与当前源码接口。公开 CLI 0.2.0 已包含 <code>auth inventory</code>／<code>auth verify</code>、精确认证来源选择和有界记录。执行前用所选 binary 的 <code>version</code>、<code>capabilities</code>、<code>describe</code>／<code>schema</code> 核对；远端另核对目标 runner，App 升级不会替它升级。</p>
 <h2 id="从-app-接到终端或-agent">从 App 接到终端或 Agent</h2>
-<p>App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0">v0.1.0 开发者 Preview</a> 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。</p>
+<p>App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。<a href="https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0">v0.2.0 Preview</a> 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。</p>
 <p>macOS 在读取外置宗卷等受保护位置的 CLI 时可能先等待系统文件访问授权；CLI 的子进程时限不包含这段 OS 等待。核对长期停在等待时，先查看原生权限提示。也可将已核验候选按原目录结构复制到已允许的本地新版本／测试目录，再选择其中的 <code>bin/lintel</code> 重新核对；系统权限由用户自行决定。</p>
 <p>App 不后台下载、修改 PATH 或复制 journal。缺少 candidate sidecar 表示身份未知；字节一致只说明文件与 sidecar 匹配，不证明签名或源码可信。错误架构、协议不合、摘要不符和无法完成有限静态探测会给出具体错误。</p>
 <p>交接包须明确使用原任务所在的 state。对于已接受或结果不确定的 job，执行它给出的原 ID 查询命令；对于会话启动，使用原 launch request 的只读查询。换 CLI 不等于换 state，也不改绑原远端 runner；不从交接文字获得新的执行授权。</p>
 <h2 id="用户安装候选包">用户安装候选包</h2>
-<p>从可信的候选提供方取得当前平台 archive 与索引，核对 candidate 身份和平台；然后使用系统工具解到新的版本目录。下列 identity 是合成示例，须替换为实际索引中的值。</p>
+<p>从可信的候选提供方取得当前平台 archive 与索引，核对 candidate 身份和平台；然后使用系统工具解到新的版本目录。下列 identity 对应 0.2.0 Preview；其他版本须替换为实际索引中的值。</p>
 <p>安装与升级只用最简单可检视的机制：解到明确选择的<strong>新身份目录</strong>。先只创建父目录，再用普通 <code>mkdir &quot;$dest&quot;</code>（目录已存在会失败）作为是否解包的条件，因此绝不会覆盖已有版本：</p>
 <pre class="guide-code" data-language="sh"><code>parent=&quot;${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}&quot;
 mkdir -p &quot;$parent&quot;
 # 用实际索引名替换：&lt;version&gt;-candidate-&lt;revision 前 12 位&gt;
-identity=&quot;0.1.0-candidate-a239123903b6&quot;
+identity=&quot;0.2.0-candidate-85e2f435fe81&quot;
 dest=&quot;$parent/$identity&quot;
 mkdir &quot;$dest&quot; &amp;&amp; tar -xzf &quot;candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz&quot; -C &quot;$dest&quot;</code></pre>
 <p>安装后从选定目录核对实际字节；<strong>目标主机不需要 Node</strong>，用系统 <code>shasum</code>／<code>sha256sum</code> 校验随包生成的 <code>SHA256SUMS</code>。清单覆盖全部 payload、<code>candidate.json</code> 与 <code>README.txt</code>，只排除清单自身；它证明这些文件的字节一致，不提供签名或可信源码 provenance。再运行绝对路径：</p>
@@ -67,7 +67,7 @@ shasum -a 256 -c SHA256SUMS      # macOS
 # Linux 上改用：sha256sum -c SHA256SUMS
 &quot;$dest/bin/lintel&quot; version --json
 &quot;$dest/bin/lintel&quot; capabilities --json</code></pre>
-<p>升级时把<strong>另一个</strong>身份归档解到另一个目录，重跑上面的校验与 <code>version</code>/<code>capabilities</code>，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。candidate 不是签名发行：Linux 归档在 macOS 上只做格式与字节检查，没有 Linux 运行时证据；只有本机架构匹配时才在本机执行所选 executable。</p>
+<p>升级时把<strong>另一个</strong>身份归档解到另一个目录，重跑上面的校验与 <code>version</code>/<code>capabilities</code>，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。包没有发布者签名；0.2.0 实际最终包已分别通过 macOS arm64、Linux x86_64／aarch64 原生升级验收。只有本机架构匹配时才在本机执行所选 executable，Linux 仍为 experimental。</p>
 <p>卸载某个 CLI 版本时，先停止使用该路径，确认没有该版本正在执行的任务，再删除自己解包的那个候选目录。保留 Lintel state、工作包与原 job ID；移除 executable 不会恢复已经批准的配置，也不会卸载独立安装的浏览器 host 或远端 runner。配置恢复与这些组件各自的管理入口仍是独立操作，不要通过删除 state 代替恢复。</p>
 <h2 id="从源码独立安装">从源码独立安装</h2>
 <p>从已核对的源码 checkout 安装到你明确选择的用户目录（需要 Rust stable 与本地平台 toolchain；CLI 不需要 Node、Tauri、GUI 或已安装 App）：</p>
@@ -75,7 +75,7 @@ shasum -a 256 -c SHA256SUMS      # macOS
 &quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; version --json
 &quot;$HOME/.local/share/lintel-cli/chosen-candidate/bin/lintel&quot; capabilities --json</code></pre>
 <p>脚本优先使用这个绝对 executable 路径；要使用 <code>lintel</code> 简写，把该目录的 <code>bin</code> 明确加入自己的 PATH。安装不自动修改 shell rc、系统 service、Claude、浏览器 profile 或既有 App。Linux runner 不编译 Tauri / browser；macOS CLI 包含有限 browser-host control 的库适配。</p>
-<p>升级时在核对新 checkout 后选择<strong>另一个版本目录</strong>重新运行安装，检查 <code>version</code>、<code>capabilities</code> 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 <code>0.1.0</code> 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。</p>
+<p>升级时在核对新 checkout 后选择<strong>另一个版本目录</strong>重新运行安装，检查 <code>version</code>、<code>capabilities</code> 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 <code>0.2.0</code> 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。</p>
 <h2 id="先发现接口再发现目标">先发现接口，再发现目标</h2>
 <pre class="guide-code" data-language="sh"><code>lintel --help
 lintel version --json
@@ -106,8 +106,8 @@ lintel capabilities --environment &lt;environment-id&gt;</code></pre>
 <p>Named execute 与有限远端新提交的 <code>approval</code> 必须是原计划返回的 64 位 lowercase hex hash。格式错误在初始化 named core 或创建远端任务 intent／调用 SSH 前拒绝，格式合法仍须由 core 核对准确 plan.hash 与当前目标。已有远端任务记录的重复 execute 保持 query-only，不因参数错误删除记录或重发；原 ID 的 reconnect 是明确恢复入口。</p>
 <p>专用真实 TTY <code>lintel launch ID</code> 与 <code>capabilities --environment ID</code> 的目标 ID 同样在 core 调用前校验；错误 UUID 返回非零 <code>invalid_request</code>，不初始化 state。launch 仍先要求真实 stdin/stdout TTY，不接受 prompt。</p>
 <p><code>env list</code> 和 <code>discover</code> 可能登记已发现的默认根并保存 inventory；<code>job</code> 查询可能持久标记中断。<code>auth_inventory</code> 和默认 <code>auth_verify</code> 有界读取认证来源，不运行客户端；显式 <code>auth_probe</code> 或 <code>auth_verify.observe_runtime:true</code> 才执行官方状态命令，并以 <code>identity_observed</code> 布尔值说明主体能否核对。结果属于当前执行器，不能代表其他 Terminal／IDE。<code>archive_read</code> 返回工作正文。不要把它们都当成无副作用元数据操作。<code>discover</code> 快捷入口与 <code>request</code> JSON discover 返回同一 runner capability 集合。</p>
-<h3 id="认证来源与清理11-13-开发源码">认证来源与清理（11-13 开发源码）</h3>
-<p>公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。<code>auth_inventory(environment_id, project_cwd?)</code> 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；<code>auth_verify(environment_id, job_id?, observe_runtime?)</code> 独立重读，默认 <code>observe_runtime:false</code>。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，未选／无法检查的 Keychain、共享 profiles 与动态注入保留未知范围。</p>
+<h3 id="认证来源与清理020-preview">认证来源与清理（0.2.0 Preview）</h3>
+<p>App／CLI 0.2.0 Preview 已包含本节能力。<code>auth_inventory(environment_id, project_cwd?)</code> 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；<code>auth_verify(environment_id, job_id?, observe_runtime?)</code> 独立重读，默认 <code>observe_runtime:false</code>。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，未选／无法检查的 Keychain、共享 profiles 与动态注入保留未知范围。</p>
 <pre class="guide-code" data-language="sh"><code>lintel auth inventory --environment &lt;environment-id&gt; --project-cwd /synthetic/project --json
 lintel auth cleanup plan --environment &lt;environment-id&gt; --recipe repair_login --writers-confirmed-stopped --auth-source &#39;&lt;source-id-from-inventory&gt;&#39;
 lintel plan show &lt;returned-plan-id&gt;
@@ -314,7 +314,7 @@ node apps/desktop/scripts/prepare-remote-runners.mjs</code></pre>
 <p>candidate 的身份是 <code>&lt;version&gt;-candidate-&lt;revision 前 12 位&gt;</code>，因此裸 <code>0.1.0</code> 从来不是唯一身份；索引写成 <code>candidates-&lt;identity&gt;.json</code>，不会覆盖其它身份的索引。<code>--revision</code> 必须是精确的完整小写十六进制 git object id（40 或 64 位），它是调用方声明的构建身份，不由 digest 或探测证明。<code>candidate.json</code> 记录 product/version/protocol/catalog、<code>source_revision</code>、target、payload 文件的字节数与 SHA-256、<code>signed:false</code>、<code>release:false</code>、平台限制，以及<strong>逐目标</strong>的 <code>identity_source</code>：只有 macOS 输入成功返回身份数据时才标为 <code>macos_input_executed</code>，Linux 目标标为 <code>declared_static</code>。macOS 输入成功探测时其自报 <code>version</code> 权威并要求 manifest 一致；不能执行或未返回身份数据时（如 Linux 打包）必须显式传 <code>--version</code>，并记录 <code>identity_verified_executed:false</code>，否则拒绝。已有归档（包括悬空符号链接）或已有同身份索引都会在任何写入前被拒绝，绝不覆盖。</p>
 <p>源码构建的 debug 入口是 <code>cargo build -p lintel-runner</code> 后的 <code>target/debug/lintel</code>。独立 Native Messaging 可执行文件另行从 <code>extensions/browser/native-host</code> 安装；在 Mac 上 <code>lintel browser control</code> 的安装预览仍需准确 <code>host_path</code>，不会假定 GUI 或 PATH 已提供它。扩展开发包从 canonical extension source 准备，步骤与平台限制见 <a href="/guide/browser/">browser.md</a>。</p>
 <p>远端 runner 的静态资源与 App 使用同一 <a href="/guide/remote/#准备-app-内置资源">生成流程</a>。仅从明确核对的 canonical bundles 调用 <code>lintel remote control --bundles /absolute/runner-bundles</code>，或配置 <code>LINTEL_RUNNER_BUNDLES</code>；默认查当前 executable 旁的 <code>remote-runners</code>。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。</p>
-<h3 id="有界任务记录当前未发布源码">有界任务记录（当前未发布源码）</h3>
+<h3 id="有界任务记录020-preview">有界任务记录（0.2.0 Preview）</h3>
 <p><code>lintel jobs</code> 与 <code>lintel work archive list</code> 使用 <code>jobs_page</code>，<code>lintel job detail ID</code> 使用 <code>job_detail_page</code>。列表默认最多 50 条、显式 <code>--limit</code> 为 1–100；继续页使用返回的 <code>next_offset</code> 与同一 <code>digest</code>（<code>--expected-digest</code>）。详情按 section 读取，不把全回执塞进摘要列表；<code>detail_item_too_large</code> 明确保留原 ID 与原文件。记录变化时重新读取首页，不能拼接两个快照。<code>scan_complete</code>、<code>records_complete</code>、<code>record_errors</code> 分别说明扫描与坏记录缺口；空页不必然代表扫描结束。</p>
 <pre class="guide-code" data-language="sh"><code>lintel jobs --filter attention --limit 50
 lintel jobs --filter attention --offset 50 --expected-digest REPLACE_WITH_RETURNED_DIGEST --limit 50

@@ -1,6 +1,6 @@
 # Credential provenance：认证机制核对与实现边界
 
-2026-11-13 · 工程证据记录 · [English](credential-provenance-evidence.en.md)。本文记录官方机制、Lintel 的设计判断及仍缺少的实机证据；用户操作见 [清理指南](cleanup.md)。新增能力属于开发源码，未包含在已发布 App 0.1.1 或 CLI 0.1.0 中。
+2026-11-13 · 工程证据记录 · [English](credential-provenance-evidence.en.md)。本文记录官方机制、Lintel 的设计判断及仍缺少的实机证据；用户操作见 [清理指南](cleanup.md)。本记录保留 11-13 的机制核对日期；相关能力已随 App／CLI 0.2.0 Preview 发布，发行不扩大下述实机证据。
 
 ## 1. 本轮怎样取得证据
 

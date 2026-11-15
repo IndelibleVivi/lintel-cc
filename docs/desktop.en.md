@@ -6,7 +6,7 @@ Lintel desktop uses Tauri 2 + React. `src/App.tsx` manages host/environment sele
 
 The [operator guide](operator-guide.en.md) covers goals through results. App help provides six task paths, scenario guides and [Agent CLI](agents.en.md). Links open only fixed named HTTPS documents.
 
-This guide follows current `main`, including authentication-source/Keychain cleanup, bounded history and interface refinements; these enhancements are unreleased. The public App remains 0.1.1 and the independent CLI remains 0.1.0. Source checks do not establish a new candidate, a native cold build, a verified new DMG, clean-Mac installation or a Release.
+This guide follows current `main`; authentication-source / Keychain cleanup, bounded history and interface refinements are included in 0.2.0 Preview. Downloads bind a fixed source. Final DMG / strict-signature checks and three-platform native CLI upgrades were independently completed. Clean-Mac first installation and complete accessibility acceptance remain unverified; see [current state](current-state.md).
 
 `HistoryPanel.tsx` loads `jobs_page` summaries and `job_detail_page` sections on demand in Records and recovery; changing a record or section does not load all history. Continuation pages bind the original `digest`; follow `next_offset` to load more. Scan completion and incompleteness from invalid records are separate; an oversized detail item reports a limitation and retains the original record. Environment discovery through `discover` is independent of the history list. An older runner without these endpoints explicitly reports bounded history as unsupported, with no full `jobs`/`discover` fallback. Details, archive reading and restoration retain the owning host and original task ID; pagination never deletes, rewrites or replays tasks.
 
@@ -57,7 +57,7 @@ In current source, archive-only previews show selected originals, the frozen des
 
 `WorkFileSelection.tsx` provides project-path/session-file groups and individual files, loads bounded metadata pages and refuses missing/changed pages without transcript reads. Search affects display only; oversized files can be excluded explicitly. Selected paths are not persisted in drafts, new files never silently selected. `WorkCapacity` preflights the same selection; `PlanReview` shows originals/frozen destinations. Without confirmed exact-selection support, approval is unavailable; old-runner errors never silently fall back to categories.
 
-The following authentication cleanup belongs to the November 13, 2026 development source, not the published App 0.1.1/CLI 0.1.0. Environment and Components lead into the same Clear local login flow with three paths:
+The following authentication cleanup shipped in App / CLI 0.2.0 Preview. Environment and Components lead into the same Clear local login flow with three paths:
 
 | Path | Current scope |
 | --- | --- |

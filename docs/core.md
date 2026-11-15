@@ -151,7 +151,7 @@ flowchart TD
 
 ## 有限清理与认证
 
-本节描述 2026-11-13 开发源码，公开 App 0.1.1／CLI 0.1.0 不含新增来源选择与验证能力。完整操作与官方机制证据见[认证清理指南](cleanup.md)和[机制核对](credential-provenance-evidence.md)。
+本节的来源选择与验证能力已随 App／CLI 0.2.0 Preview 发布。完整操作与官方机制证据见[认证清理指南](cleanup.md)和[机制核对](credential-provenance-evidence.md)。
 
 `cleanup_inspect` 保留精确状态文件元数据与写入者观察。新的 `auth_inventory(environment_id, project_cwd?)` 由 `auth_sources.rs` 有界读取已知位置，区分已确认本地来源、当前执行器环境观察、仅声明、无法检查及其他上下文；它不运行 Claude、shell 初始化、helper、hooks 或 MCP，不读取历史记录，不返回 token、helper 正文或稳定凭据指纹。`presence` 与空／非空值状态不证明实际使用来源。
 

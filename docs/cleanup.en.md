@@ -2,7 +2,7 @@
 
 [简体中文](cleanup.md) · English · [Operator guide](operator-guide.en.md#cleanup)
 
-**This guide describes the November 13, 2026 development source. The published App 0.1.1 and CLI 0.1.0 do not include this work.** It extends Lintel's environment management, work preservation, rebuilding and original-job recovery. Every operation retains an explicit host and configuration root.
+**This guide describes authentication cleanup shipped in App / CLI 0.2.0 Preview.** It extends Lintel's environment management, work preservation, rebuilding and original-job recovery. Every operation retains an explicit host and configuration root.
 
 ## Understand the inventory
 

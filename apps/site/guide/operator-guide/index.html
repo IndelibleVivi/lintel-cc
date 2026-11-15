@@ -44,7 +44,7 @@
       <article class="guide-body" data-guide-document="operator-guide">
         <h1 id="lintel-操作指南">Lintel 操作指南</h1>
 <p>简体中文（canonical） · <a href="/guide/operator-guide/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
-<p>本指南对应当前开发源码，公开下载仍为 App 0.1.1／CLI 0.1.0，尚不包含最新认证来源／Keychain 清理、有界记录和界面收尾。下载版先核对对应 Release、内置帮助和实际能力；从源码试用从<a href="/guide/start-here/">第一次使用</a>或 <a href="/guide/quickstart/">CLI 完整试用</a>开始。准确候选与 runtime 状态见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
+<p>本指南维护当前源码；公开 App／三平台 CLI 0.2.0 Preview 已包含认证来源／Keychain 清理、有界记录和界面收尾。下载版先核对对应 Release、内置帮助和实际能力；源码试用从<a href="/guide/start-here/">第一次使用</a>或 <a href="/guide/quickstart/">CLI 完整试用</a>开始。准确 source 与 runtime 状态见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
 <p>Lintel 帮你处理具体的 Claude 使用环境：减少指定的可选外发、管理浏览器权限与站点状态、保住工作内容、清理已识别的旧状态，以及在 Mac 上管理 Linux VPS 的同类任务。每次先认准目标，再查看实际变化，最后根据执行回执继续工作或恢复。</p>
 <p>以下路径描述已接通的源码能力。正式浏览器安装、真实 Claude 认证、生产 VPS、真实首次使用与非开发者安装仍有验收缺口；相应步骤会说明，不把某个模块的测试结果当作整套使用环境已验证。</p>
 <h2 id="如何开始">如何开始</h2>
@@ -165,7 +165,7 @@
 <a id="cleanup"></a>
 <h2 id="4-处理登录异常清理旧状态或退役环境">4. 处理登录异常、清理旧状态或退役环境</h2>
 <p>从侧栏“清理与重建”进入，页内主标题为“清理本机登录”。</p>
-<p>本节描述 2026-11-13 开发源码；公开 App 0.1.1／CLI 0.1.0 仍是旧能力。完整说明、CLI 示例和覆盖矩阵见<a href="/guide/cleanup/">认证来源与清理指南</a>。Lintel 不把网络错误或一个失败响应自动判定为封禁；本地来源清理不改变服务端账号状态。</p>
+<p>本节描述已随 App／CLI 0.2.0 Preview 发布的能力。完整说明、CLI 示例和覆盖矩阵见<a href="/guide/cleanup/">认证来源与清理指南</a>。Lintel 不把网络错误或一个失败响应自动判定为封禁；本地来源清理不改变服务端账号状态。</p>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">“清理本机登录”中的配方</th><th class="align-left">当前实际范围</th><th class="align-left">做完还要确认什么</th></tr></thead><tbody><tr><td class="align-left">修复本地登录</td><td class="align-left">选择可安全处理的登录字段、用户 settings 认证声明和简单 shell 赋值</td><td class="align-left">当前执行器、未选 Keychain、其他上下文与服务端撤销分别看结果</td></tr><tr><td class="align-left">清理并重建</td><td class="align-left">先加密保全工作、建立新环境并迁入，再处理已批准认证来源</td><td class="align-left">新环境启动、正常登录，以及浏览器等独立范围</td></tr><tr><td class="align-left">退役此环境</td><td class="align-left">先保全工作、处理所选认证来源，再停用 Lintel 启动入口；保留原目录</td><td class="align-left">独立处理其他启动入口，删除的凭据不能自动恢复</td></tr></tbody></table></div>
 <h3 id="先看认证可能来自哪里">先看认证可能来自哪里</h3>
 <p>清单分开显示：已识别本地来源、Lintel／runner 当前执行环境中观察到的变量、仅发现声明、无法读取或归属不明，以及其他未覆盖上下文。存在不等于正在使用。<code>setup-token</code> 只生成并打印 token，没有固定保存文件；后来的 shell、settings、IDE、服务或 CI 才决定它从哪里进入。点击来源行查看准确位置、共享影响与不能处理的原因。</p>

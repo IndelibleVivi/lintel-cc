@@ -8,11 +8,11 @@
 
 Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、加密保全指令和会话、清理重建环境，以及管理具体浏览器 profile 和 SSH 主机。App 与 CLI 共用执行核心；修改前查看目标与变化，执行后核对结果，需要恢复时保留后续编辑。
 
-**0.1.1 开发者 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1) 手动下载 Apple Silicon macOS App，先阅读双语 INSTALL 与 SHA256SUMS。本版修复 0.1.0 的 App bundle 资源签名封装；四个公开资产已下载核对，新 DMG 内的 App 也通过严格签名校验。App 使用完整 ad-hoc 签名，**没有 Developer ID、Apple 公证或 updater feed**；首次打开可能需要在“系统设置 → 隐私与安全性”为这一 App 选择“仍要打开”。旧 DMG 与 tag 保留供历史核对，CLI 继续使用下方原候选下载。准确来源、安装步骤与验收范围见 [App 安装说明](docs/app-updates.md) 和[当前状态](docs/current-state.md)。
+**0.2.0 Preview 已发布。** 从 [GitHub prerelease](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) 手动下载 Apple Silicon macOS App／CLI 或 Linux x86_64／aarch64 CLI，先阅读双语 INSTALL 与 SHA256SUMS。新版包含认证来源与 Keychain 精确清理、有界任务记录、工作保全及本轮界面收尾。App 使用完整 bundle ad-hoc 签名，**没有 Developer ID、Apple 公证或 updater feed**；首次打开可能需要由用户按 Apple 的单 App 流程选择“仍要打开”。Linux 仍为 experimental，旧版本继续保留。准确安装与验收范围见 [App 安装说明](docs/app-updates.md)和[当前状态](docs/current-state.md)。
 
-本页与 `main` 指南描述当前开发源码；公开下载仍为 App 0.1.1／CLI 0.1.0。新增认证来源清理、有界任务记录和最新界面修复尚未进入这些下载包。试用当前能力请按下方从源码构建，使用下载版时先核对它的版本与内置帮助。准确候选、CI 与原生测试范围见[当前状态](docs/current-state.md)。
+本页与 `main` 指南维护当前源码说明；0.2.0 下载绑定 source `85e2f435fe815806071fe848f39e2cc6d08d3ef9`。后续 main 变化不会自动进入下载包。使用下载版先核对对应 Release、内置帮助、版本与实际能力。
 
-**11-13 开发版：清理本机登录与独立复查。** App／CLI 可选择精确登录字段、认证注入和 shell 赋值，沿同一计划批准、执行、重新检查。macOS 开发源码已接入有限 Keychain 服务中的 Claude 登录字段清理，保留 MCP／插件与其他字段；一次性临时 Keychain 的原生 API 检查已通过，个人账号／真实 Claude 验收仍独立。App 默认建议可处理的已保存登录，认证注入按需选择，结果优先显示本地移除、仍存在与待核对数量。`setup-token` 没有固定保存文件；共享 profiles、其他上下文与服务端撤销仍单列。官方 logout 范围过宽，仍拒绝自动调用。操作与兼容边界见[认证清理指南](docs/cleanup.md)；这轮尚未进入公开 0.1.1 App 或 0.1.0 CLI。
+**0.2.0 Preview：清理本机登录与独立复查。** App／CLI 可选择精确登录字段、认证注入和 shell 赋值，沿同一计划批准、执行、重新检查。macOS 0.2.0 已接入有限 Keychain 服务中的 Claude 登录字段清理，保留 MCP／插件与其他字段；一次性临时 Keychain 的原生 API 检查已通过，个人账号／真实 Claude 验收仍独立。App 默认建议可处理的已保存登录，认证注入按需选择，结果优先显示本地移除、仍存在与待核对数量。`setup-token` 没有固定保存文件；共享 profiles、其他上下文与服务端撤销仍单列。官方 logout 范围过宽，仍拒绝自动调用。操作与兼容边界见[认证清理指南](docs/cleanup.md)，已包含在本次 App 与 CLI 下载中。
 
 [第一次使用](docs/start-here.md) · [按目标操作](docs/operator-guide.md) · [交给 Agent](docs/agents.md) · [架构](docs/architecture.md)
 
@@ -28,7 +28,7 @@ Lintel 提供 macOS App 与独立 CLI，帮助你审阅配置与可选外发、�
 | --- | --- | --- |
 | 减少外发，保留需要的功能 | 保护方案、逐项配置、受控代理通道与出口测试 | [保护方案](docs/operator-guide.md#protect) |
 | 收好工作，或准备新环境 | 精确选择指令、记忆和会话；加密归档、独立阅读与选择性迁入 | [工作保全](docs/operator-guide.md#work) |
-| 修复登录、清理旧状态、退役环境 | 有界认证来源清单、精确选择与统一批准、清理后独立复查；重建前保全工作 | [清理与重建](docs/operator-guide.md#cleanup)／[开发版认证来源](docs/cleanup.md) |
+| 修复登录、清理旧状态、退役环境 | 有界认证来源清单、精确选择与统一批准、清理后独立复查；重建前保全工作 | [清理与重建](docs/operator-guide.md#cleanup)／[认证来源](docs/cleanup.md) |
 | 管理某个浏览器 profile | 配对扩展与本地 host，处理对应权限和站点状态 | [浏览器](docs/browser.md) |
 | 从 Mac 或 CLI 操作 SSH 主机 | 核对远端 runner，在目标主机执行，断线后查询原任务 | [远程](docs/remote.md) |
 | 管理配置与本地资料，找回结果 | 配置编辑与恢复、残留／身份的明确处理、变化比较、原任务记录及 systemd 服务恢复 | [客户端配置与本地数据](docs/operator-guide.md#client-control)／[记录与恢复](docs/operator-guide.md#recovery) |
@@ -66,7 +66,7 @@ cargo build -p lintel-runner --locked
 ./target/debug/lintel capabilities --json
 ```
 
-这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选为 `0.1.0-candidate-fcae6cb1efb5`，已随 [v0.1.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 公开下载；包名保留原候选身份，Linux 两架构为 experimental。从源码构建的 CLI 不受 App 候选版本约束。
+这些静态入口先说明当前 executable、上下文和接口。随后按 [Agent CLI 指南](docs/agents.md) 选择目标、生成计划并执行；要走完可逐字节核对的合成归档旅程，使用 [CLI 完整试用](docs/quickstart.md)。Linux 使用独立 CLI／runner，无需桌面环境。当前独立三平台 CLI 候选为 `0.2.0-candidate-85e2f435fe81`，已随 [v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) 公开下载；包名保留原候选身份，Linux 两架构为 experimental。从源码构建的 CLI 不受 App 候选版本约束。
 
 ## 从原件到下一次工作
 

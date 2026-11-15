@@ -12,9 +12,9 @@
 | 已由自己或可信提供方构建的 macOS App | 打开 App；用你明确选定的测试目录登记环境。核对候选来源与版本，见[当前状态](current-state.md) |
 | Linux，或只需要 CLI | [Agent CLI](agents.md)负责安装；[CLI 完整试用](quickstart.md)提供全程合成示例 |
 
-当前手动下载：[App v0.1.1](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1)、[CLI v0.1.0](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)。App v0.1.0 因封装签名缺陷已被替代。没有 Developer ID 签名、公证或 updater feed；干净 Mac 首装仍未验证。
+当前手动下载：[App／三平台 CLI v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0)。App 为完整 bundle ad-hoc 签名，没有 Developer ID、公证或 updater feed；Linux CLI 仍为 experimental。旧版本保留供历史核对，干净 Mac 公开下载首装仍未验证。
 
-这些下载包不包含最新文件＋Keychain 一次批准清理、有界记录和界面修复。下方源码试用对应当前指南；下载版先按它自己的内置帮助和 Release 说明操作。需要比较来源时，App 帮助显示构建版本／docs revision，CLI 使用 `version --json` 和 `capabilities --json`。
+0.2.0 包含文件与 Keychain 一次批准清理、有界记录和界面修复。下方源码试用对应当前指南；下载版以自己的内置帮助和 Release 说明为准。App 帮助显示构建版本／docs revision，CLI 使用 `version --json` 和 `capabilities --json`。
 
 先阅读 Release 内的 INSTALL 与校验和。系统阻止时停止，继续下方源码试用。普通 `npm run dev` 只启动前端，没有下面这条本机执行通道。
 

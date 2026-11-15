@@ -1,6 +1,6 @@
 # Credential provenance: evidence and implementation boundaries
 
-November 13, 2026 · Engineering evidence record · [中文](credential-provenance-evidence.md). This document separates official mechanisms, Lintel's product decisions and missing device evidence. For user operations, see the [cleanup guide](cleanup.en.md). The additions belong to development source and are absent from the published App 0.1.1 and CLI 0.1.0.
+November 13, 2026 · Engineering evidence record · [中文](credential-provenance-evidence.md). This document separates official mechanisms, Lintel's product decisions and missing device evidence. For user operations, see the [cleanup guide](cleanup.en.md). This record retains its November 13 mechanism-review date. The capabilities shipped in App / CLI 0.2.0 Preview; publication does not expand the device evidence below.
 
 ## 1. How evidence was obtained
 

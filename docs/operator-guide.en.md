@@ -2,7 +2,7 @@
 
 [简体中文 (canonical)](operator-guide.md) · English · [Documentation](index.en.md)
 
-This guide follows current development source. Public downloads remain App 0.1.1/CLI 0.1.0 and lack the latest authentication-source/Keychain cleanup, bounded history and interface refinements. Check a download’s matching Release, bundled help and actual capabilities first. For source trials, start with [First use](start-here.en.md) or the [CLI trial](quickstart.en.md); [current state](current-state.md) owns exact candidate/runtime evidence.
+This guide follows current source. Public App / three-platform CLI 0.2.0 Preview includes authentication-source / Keychain cleanup, bounded history and interface refinements. Check the matching Release, bundled help and actual capabilities. For source trials, start with [First use](start-here.en.md) or the [CLI trial](quickstart.en.md); [current state](current-state.md) owns source/runtime evidence.
 
 Lintel handles specific Claude environments: reduce selected optional egress, manage browser permissions/site state, preserve work, clean identified old state and manage similar Linux VPS tasks from Mac. Identify the target, review actual changes, then use receipts to continue or restore.
 
@@ -233,7 +233,7 @@ No real login in this development. Official entry/inert argument correctness/rea
 
 Open Cleanup & rebuild in the sidebar; the page heading is Clear local login.
 
-This section describes the November 13, 2026 development source; the published App 0.1.1/CLI 0.1.0 retain their earlier capabilities. See [Authentication sources and cleanup](cleanup.en.md) for the complete scope matrix and CLI examples. Network errors or failed responses are not automatically bans; local cleanup never changes server account status.
+This section describes capabilities shipped in App / CLI 0.2.0 Preview. See [Authentication sources and cleanup](cleanup.en.md) for the complete scope matrix and CLI examples. Network errors or failed responses are not automatically bans; local cleanup never changes server account status.
 
 | Recipe | Actual scope | Remaining checks |
 | --- | --- | --- |

@@ -6,7 +6,7 @@ Lintel 桌面使用 Tauri 2 + React。`src/App.tsx` 管理主机与环境选择�
 
 完整从目标到结果的说明见 [operator-guide.md](operator-guide.md)；App 帮助提供六条目标路径、关键场景指南与 [Agent CLI](agents.md) 入口。链接仍只打开固定命名 HTTPS 文档。
 
-本指南描述当前 `main`，包括认证来源／Keychain 清理、有界记录和界面收尾；这些增强尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。源码检查通过不代表已生成新候选、完成原生冷构建、核对新 DMG、通过干净 Mac 安装或创建 Release。
+本指南维护当前 `main`；认证来源／Keychain 清理、有界记录和界面收尾已进入 0.2.0 Preview 下载。下载绑定固定 source。最终 DMG／strict 签名与三平台 CLI 原生升级验收已独立完成；干净 Mac 首装与完整辅助功能验收仍未完成，见[当前状态](current-state.md)。
 
 “记录与恢复”由 `HistoryPanel.tsx` 按需读取 `jobs_page` 摘要与 `job_detail_page` 详情；切换记录或详情 section 不读取全部历史。后续页绑定原 `digest`，有 `next_offset` 时继续加载；扫描完成与坏记录造成的不完整分别显示，单项超出详情预算会明确报错并保留原记录。环境发现 `discover` 独立于历史列表，不再靠发现响应携带全量回执。旧 runner 缺少这两个入口时显示有界历史不支持，不回退全量 `jobs`／`discover`。详情、归档阅读及恢复仍指向所属主机与原任务 ID；分页不删除、重写或重放原任务。
 
@@ -57,7 +57,7 @@ App 支持简体中文 / English，默认跟随系统。顶部入口只显示实
 
 `WorkFileSelection.tsx` 在同一工作页提供项目路径组、会话文件组和单文件选择，加载有界 metadata 页并拒绝缺页／变动，不读取会话正文。文件搜索只改变显示，超限文件可明确排除；选中路径不持久保存到草案，新出现文件不自动加入。`WorkCapacity` 使用同一选择重新预检，`PlanReview` 展示批准中的原件范围与已有冻结落点；runner 未确认 exact selection 时不开放批准。旧 runner 清单错误明确显示，不隐式变回整类。
 
-以下认证清理能力属于 2026-11-13 开发版，公开 App 0.1.1／CLI 0.1.0 尚未包含。环境与关联组件可进入同一个“清理本机登录”流程，提供三条路径：
+以下认证清理能力已随 App／CLI 0.2.0 Preview 发布。环境与关联组件可进入同一个“清理本机登录”流程，提供三条路径：
 
 | 路径 | 当前处理范围 |
 | --- | --- |

@@ -1,5 +1,7 @@
 # Lintel 0.2.0 Preview — 工程审查与发行交接
 
+本目录主要保留 2026-11-14 固定 `353536cc` 候选的审查与当时建议。当前已发布 0.2.0 source 为 `85e2f435`，新成品／CI／下载事实见[当前状态](../current-state.md)及 [v0.2.0 Release](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0)；下文旧候选不是公开包身份。
+
 **最终产品 source：`353536cc7dc3c8c63baa628955ee66332d95bcbb`，tree `7c12bee277e84c85052d146738bbb395bd9b25b7`。** 本轮基于 PR #7 后 main `73f34ed06b5d630d2a36910baf88ff5713aede66`；修复进入 [PR #8](https://github.com/IndelibleVivi/lintel-cc/pull/8)。公开下载仍为 App 0.1.1 Preview／CLI 0.1.0，未创建 Release、激活 production updater 或部署官网。最终 canonical 与 candidate gate：已通过（完整 push CI 43526964668；candidate 43526964671 的强制 macOS gate）。
 
 **发行建议：0.2.0 Preview，按平台分别决定。** Linux x86_64/aarch64 CLI：GO；macOS arm64 CLI：CONDITIONAL GO，补首下载隔离／信任路径；面向普通用户的 macOS App：NO-GO；有限技术 App Preview：在已选手动信任路线下，完成真实下载／安装替换及图形权利条件后 CONDITIONAL GO。这里的 GO 是工程建议，不代替所有者公开发布授权。

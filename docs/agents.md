@@ -2,15 +2,15 @@
 
 简体中文（canonical） · [English](agents.en.md) · [文档入口](index.md)
 
-此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.1.0 开发者 Preview 使用协议 1 / catalog 1，已提供[公开手动下载](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0)，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
+此指南面向已有操作授权的 coding agent 和脚本作者。Lintel 0.2.0 开发者 Preview 使用协议 1 / catalog 1，已提供[公开手动下载](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0)，没有 Developer ID 签名或公证。CLI 独立于 GUI，所有配置、计划、执行、归档和恢复调用同一个 core。命令自描述是当前二进制的合同；目标适用性要继续检查，不从“实现存在”推断“这个目标可以执行”。
 
 首次试用可先走 [中文 quickstart](quickstart.md) / [English quickstart](quickstart.en.md)，用一次性合成目录完成保全、原任务查询与独立读包，再按本指南准备实际操作。
 
-本页同时维护公开包安装与当前源码接口。公开 CLI 0.1.0 不包含最新 `auth inventory`／`auth verify`、精确认证来源选择和有界记录；要用这些入口需从当前源码构建。执行前始终用所选 binary 的 `version`、`capabilities`、`describe`／`schema` 核对；远端还要核对目标 runner，App 升级不会替它升级。
+本页同时维护公开包安装与当前源码接口。公开 CLI 0.2.0 已包含 `auth inventory`／`auth verify`、精确认证来源选择和有界记录。执行前用所选 binary 的 `version`、`capabilities`、`describe`／`schema` 核对；远端另核对目标 runner，App 升级不会替它升级。
 
 ## 从 App 接到终端或 Agent
 
-App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。[v0.1.0 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。
+App 的“终端与 Agent”接受一个明确选择的 CLI 完整路径，核对原生平台／架构、protocol、有限静态接口和 HOME／UID／state。没有 CLI 时先使用下面的源码安装，或取得经过核对的当前平台候选包。[v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) 提供三平台 CLI 手动下载；先读 INSTALL 与 SHA256SUMS，Linux 为 experimental。官网与 App 的 main 文档入口都标为“最新开发说明”。
 
 macOS 在读取外置宗卷等受保护位置的 CLI 时可能先等待系统文件访问授权；CLI 的子进程时限不包含这段 OS 等待。核对长期停在等待时，先查看原生权限提示。也可将已核验候选按原目录结构复制到已允许的本地新版本／测试目录，再选择其中的 `bin/lintel` 重新核对；系统权限由用户自行决定。
 
@@ -20,7 +20,7 @@ App 不后台下载、修改 PATH 或复制 journal。缺少 candidate sidecar �
 
 ## 用户安装候选包
 
-从可信的候选提供方取得当前平台 archive 与索引，核对 candidate 身份和平台；然后使用系统工具解到新的版本目录。下列 identity 是合成示例，须替换为实际索引中的值。
+从可信的候选提供方取得当前平台 archive 与索引，核对 candidate 身份和平台；然后使用系统工具解到新的版本目录。下列 identity 对应 0.2.0 Preview；其他版本须替换为实际索引中的值。
 
 安装与升级只用最简单可检视的机制：解到明确选择的**新身份目录**。先只创建父目录，再用普通 `mkdir "$dest"`（目录已存在会失败）作为是否解包的条件，因此绝不会覆盖已有版本：
 
@@ -28,7 +28,7 @@ App 不后台下载、修改 PATH 或复制 journal。缺少 candidate sidecar �
 parent="${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}"
 mkdir -p "$parent"
 # 用实际索引名替换：<version>-candidate-<revision 前 12 位>
-identity="0.1.0-candidate-a239123903b6"
+identity="0.2.0-candidate-85e2f435fe81"
 dest="$parent/$identity"
 mkdir "$dest" && tar -xzf "candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz" -C "$dest"
 ```
@@ -43,7 +43,7 @@ shasum -a 256 -c SHA256SUMS      # macOS
 "$dest/bin/lintel" capabilities --json
 ```
 
-升级时把**另一个**身份归档解到另一个目录，重跑上面的校验与 `version`/`capabilities`，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。candidate 不是签名发行：Linux 归档在 macOS 上只做格式与字节检查，没有 Linux 运行时证据；只有本机架构匹配时才在本机执行所选 executable。
+升级时把**另一个**身份归档解到另一个目录，重跑上面的校验与 `version`/`capabilities`，再由调用方明确切换到新的绝对路径。安装不替换任何已有版本，不改 PATH、shell rc、App、用户设置、service、Claude、credentials 或浏览器注册；原有 Lintel state 与 job ID 继续可用，只是调用方换了 executable。包没有发布者签名；0.2.0 实际最终包已分别通过 macOS arm64、Linux x86_64／aarch64 原生升级验收。只有本机架构匹配时才在本机执行所选 executable，Linux 仍为 experimental。
 
 卸载某个 CLI 版本时，先停止使用该路径，确认没有该版本正在执行的任务，再删除自己解包的那个候选目录。保留 Lintel state、工作包与原 job ID；移除 executable 不会恢复已经批准的配置，也不会卸载独立安装的浏览器 host 或远端 runner。配置恢复与这些组件各自的管理入口仍是独立操作，不要通过删除 state 代替恢复。
 
@@ -60,7 +60,7 @@ cargo install --path apps/runner --locked --root "$HOME/.local/share/lintel-cli/
 
 脚本优先使用这个绝对 executable 路径；要使用 `lintel` 简写，把该目录的 `bin` 明确加入自己的 PATH。安装不自动修改 shell rc、系统 service、Claude、浏览器 profile 或既有 App。Linux runner 不编译 Tauri / browser；macOS CLI 包含有限 browser-host control 的库适配。
 
-升级时在核对新 checkout 后选择**另一个版本目录**重新运行安装，检查 `version`、`capabilities` 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 `0.1.0` 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。
+升级时在核对新 checkout 后选择**另一个版本目录**重新运行安装，检查 `version`、`capabilities` 和所需 schema，再让调用方选择新的 executable。不要仅凭相同的 `0.2.0` 推断两个候选构建相同；当前候选的已支持操作以 catalog 为准。旧任务仍使用原 Lintel state 与原 ID 查询；SSH controller 给新绑定任务冻结 runner digest，查询旧任务使用其记录的 runner，不因升级改绑。
 
 ## 先发现接口，再发现目标
 
@@ -107,9 +107,9 @@ Named execute 与有限远端新提交的 `approval` 必须是原计划返回的
 
 `env list` 和 `discover` 可能登记已发现的默认根并保存 inventory；`job` 查询可能持久标记中断。`auth_inventory` 和默认 `auth_verify` 有界读取认证来源，不运行客户端；显式 `auth_probe` 或 `auth_verify.observe_runtime:true` 才执行官方状态命令，并以 `identity_observed` 布尔值说明主体能否核对。结果属于当前执行器，不能代表其他 Terminal／IDE。`archive_read` 返回工作正文。不要把它们都当成无副作用元数据操作。`discover` 快捷入口与 `request` JSON discover 返回同一 runner capability 集合。
 
-### 认证来源与清理（11-13 开发源码）
+### 认证来源与清理（0.2.0 Preview）
 
-公开 App 0.1.1／CLI 0.1.0 尚无本节新增能力。`auth_inventory(environment_id, project_cwd?)` 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读，默认 `observe_runtime:false`。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，未选／无法检查的 Keychain、共享 profiles 与动态注入保留未知范围。
+App／CLI 0.2.0 Preview 已包含本节能力。`auth_inventory(environment_id, project_cwd?)` 返回来源位置和有限证据，不返回 token、helper 正文或 shell 行原文；`auth_verify(environment_id, job_id?, observe_runtime?)` 独立重读，默认 `observe_runtime:false`。当前运行环境的变量、文件声明和实际 CLI 状态分别表达，未选／无法检查的 Keychain、共享 profiles 与动态注入保留未知范围。
 
 ```sh
 lintel auth inventory --environment <environment-id> --project-cwd /synthetic/project --json
@@ -465,7 +465,7 @@ candidate 的身份是 `<version>-candidate-<revision 前 12 位>`，因此裸 `
 
 远端 runner 的静态资源与 App 使用同一 [生成流程](remote.md#准备-app-内置资源)。仅从明确核对的 canonical bundles 调用 `lintel remote control --bundles /absolute/runner-bundles`，或配置 `LINTEL_RUNNER_BUNDLES`；默认查当前 executable 旁的 `remote-runners`。资源缺少时明确拒绝安装，不下载、不在 VPS 编译。不因为读取此指南就安装或更新真实主机。
 
-### 有界任务记录（当前未发布源码）
+### 有界任务记录（0.2.0 Preview）
 
 `lintel jobs` 与 `lintel work archive list` 使用 `jobs_page`，`lintel job detail ID` 使用 `job_detail_page`。列表默认最多 50 条、显式 `--limit` 为 1–100；继续页使用返回的 `next_offset` 与同一 `digest`（`--expected-digest`）。详情按 section 读取，不把全回执塞进摘要列表；`detail_item_too_large` 明确保留原 ID 与原文件。记录变化时重新读取首页，不能拼接两个快照。`scan_complete`、`records_complete`、`record_errors` 分别说明扫描与坏记录缺口；空页不必然代表扫描结束。
 

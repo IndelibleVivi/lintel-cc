@@ -150,7 +150,7 @@ These groups reuse the same plan/approval/job/receipt chain without adding a sec
 
 ## Finite cleanup and authentication
 
-This section describes the November 13, 2026 development source. The published App 0.1.1/CLI 0.1.0 lack the new source selection and verification capabilities. See the [cleanup guide](cleanup.en.md) and [official evidence record](credential-provenance-evidence.en.md).
+The source selection and verification capabilities in this section shipped in App / CLI 0.2.0 Preview. See the [cleanup guide](cleanup.en.md) and [official evidence record](credential-provenance-evidence.en.md).
 
 `cleanup_inspect` retains exact-file metadata and writer observations. New `auth_inventory(environment_id, project_cwd?)` uses bounded reads of known locations in `auth_sources.rs`, separating confirmed local sources, the current executor's environment, declarations, inaccessible sources and other contexts. It never runs Claude, shell startup, helpers, hooks or MCP, reads history, or returns tokens, helper bodies or stable credential fingerprints. Presence and empty/nonempty value state do not prove actual use.
 

@@ -1,10 +1,20 @@
 # 当前状态
 
-## 2026-11-15：0.2.0 Preview 发行准备（尚未发布）
+## 2026-11-15：0.2.0 Preview 已公开
 
-本轮从已验收的 App polish 源码准备同代 App／CLI 发布包。数值产品版本保持 `0.2.0`，GitHub 通道保持 prerelease／Preview；macOS App 沿用完整 bundle ad-hoc 签名、手动下载与用户自行信任，不启用 updater，也不改变全局系统安全设置。安装包、同 source 完整 CI、三平台实际 CLI 升级与最终 DMG 验收需要在新的冻结提交上完成，旧 `353536cc` 候选及日常 UI profile 不能替代本次发行证据。
+[App／三平台 CLI v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) 于 2026-11-15 13:01 UTC 公开，保持 prerelease，未设为 stable／Latest。tag 与冻结 source 为 `85e2f435fe815806071fe848f39e2cc6d08d3ef9`；[PR #11](https://github.com/IndelibleVivi/lintel-cc/pull/11) 已合并为 `a9d481574763163d2db002e0f68fcbc7033d6f76`。后续发布状态／指南维护不重建或改写该包。
 
-App 帮助与工作区标签改为不依赖“尚无新版公开下载”的 Preview 说明，双语发行说明包含本轮刷新作用、认证辅助层级、零来源计划范围及错误目录同页恢复。公开 App 0.1.1／CLI 0.1.0 与线上官网仍保留原状；本节不表示新包已经公开，也不表示网站或 updater 已激活。
+| 层级 | 本次实际结果与边界 |
+| --- | --- |
+| 完整 source CI | [43714286004](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43714286004)：exact-source `full`，14/14 jobs success，production aggregate 通过 |
+| 新包与 native | [43714289626](https://github.com/IndelibleVivi/lintel-cc/actions/runs/43714289626)：fresh App／DMG、三平台 CLI 实际旧公开 0.1.0 升级、最终 full-CI／DMG gate 均通过；本机下载全部证据并独立重跑 canonical 成品 gate 通过 |
+| App 与资源 | 实际最终 DMG／复制 App strict ad-hoc 通过，64 path entries、50 文件、39,950,700 bytes；本机实际 browser host／扩展资源消费者各 1 passed、0 ignored。hosted 原生中英／主题／导航状态及有限截图已观察 |
+| 公开资产 | 八个附件的 API upload digest 与本地一致；DMG 用 canonical `verify-public`、其余七件从无认证公开 URL 完整读回，大小与 SHA-256 一致。CLI 原包身份 `0.2.0-candidate-85e2f435fe81` 保留 |
+| 安装与更新 | 完整 bundle ad-hoc、手动下载／用户自行信任；没有 Developer ID、公证或 updater。Gatekeeper 拒绝与无 stapled ticket 如实保留；干净 Mac 首装未验证。旧 0.1.0／0.1.1 不删除，本机日常 App 未在本轮再次替换 |
+| 权利与限制 | 维护者确认自制 Lintel 字标／App 图标；选择保留 Clawd，不声明 Anthropic 许可。品牌／Clawd 不在项目对外许可内。个人账号、生产浏览器、生产 VPS、完整 VoiceOver 仍未验收；Linux CLI 仍 experimental |
+| 文档与官网 | README、配对用户／Agent 指南及官网源码跟随真实 0.2.0 下载；线上官网部署另行记录，不能从 source push 或 Release 推断已上线 |
+
+以下条目是各轮当时的候选与开发观察；其中“未发布”描述原时间点，不覆盖上方当前发行事实。
 
 ## 2026-11-15：App 操作层级与版式收尾（未发布开发版）
 

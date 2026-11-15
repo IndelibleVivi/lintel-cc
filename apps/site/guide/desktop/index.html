@@ -46,7 +46,7 @@
 <p>简体中文（canonical） · <a href="/guide/desktop/">English</a> · <a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/index.md">文档入口</a></p>
 <p>Lintel 桌面使用 Tauri 2 + React。<code>src/App.tsx</code> 管理主机与环境选择、草案、计划和执行回执；<code>src/api.ts</code> 将同一 typed core 请求送到本机或当前 SSH 主机。浏览器和本机网络通道使用各自有限的 native commands。界面不合成登录清空、保护成功或网络强约束状态。</p>
 <p>完整从目标到结果的说明见 <a href="/guide/operator-guide/">operator-guide.md</a>；App 帮助提供六条目标路径、关键场景指南与 <a href="/guide/agents/">Agent CLI</a> 入口。链接仍只打开固定命名 HTTPS 文档。</p>
-<p>本指南描述当前 <code>main</code>，包括认证来源／Keychain 清理、有界记录和界面收尾；这些增强尚未发布；公开 App 仍为 0.1.1、独立 CLI 仍为 0.1.0。源码检查通过不代表已生成新候选、完成原生冷构建、核对新 DMG、通过干净 Mac 安装或创建 Release。</p>
+<p>本指南维护当前 <code>main</code>；认证来源／Keychain 清理、有界记录和界面收尾已进入 0.2.0 Preview 下载。下载绑定固定 source。最终 DMG／strict 签名与三平台 CLI 原生升级验收已独立完成；干净 Mac 首装与完整辅助功能验收仍未完成，见<a href="https://github.com/IndelibleVivi/lintel-cc/blob/main/docs/current-state.md">当前状态</a>。</p>
 <p>“记录与恢复”由 <code>HistoryPanel.tsx</code> 按需读取 <code>jobs_page</code> 摘要与 <code>job_detail_page</code> 详情；切换记录或详情 section 不读取全部历史。后续页绑定原 <code>digest</code>，有 <code>next_offset</code> 时继续加载；扫描完成与坏记录造成的不完整分别显示，单项超出详情预算会明确报错并保留原记录。环境发现 <code>discover</code> 独立于历史列表，不再靠发现响应携带全量回执。旧 runner 缺少这两个入口时显示有界历史不支持，不回退全量 <code>jobs</code>／<code>discover</code>。详情、归档阅读及恢复仍指向所属主机与原任务 ID；分页不删除、重写或重放原任务。</p>
 <p>顶栏“检查环境”重新读取当前主机的环境清单与所选环境概况；“记录与恢复”只有一个“刷新记录”，只重读当前主机的任务记录并保留搜索与筛选。记录页将“还没有任务记录”“没有匹配的记录”和扫描尚未完成分开显示；坏记录仍单独提示。工作保全中的“刷新容量”只重新检查当前选择的元数据容量，认证面板中的来源检查只更新该面板的来源观察。按原任务／启动请求 ID 查询结果使用查询动作，不重新执行或启动。</p>
 <h2 id="日常使用">日常使用</h2>
@@ -68,7 +68,7 @@
 <p>“工作保全”提供只生成加密包、保全并准备新根两个目标；两者成功为完成，旧登录保留。工作归档面板可从任务或独立绝对路径打开，清单和选择性迁入不依赖源机器 state；密文文件的跨主机传输由用户明确使用系统工具完成。详细步骤见 <a href="/guide/operator-guide/#work">人类操作指南</a>。</p>
 <p>当前源码的只归档预览显示选中原件、冻结归档落点、加密与保留范围，不显示不适用的空配置 diff；完成后提供阅读归档入口，不要求启动 Claude 或恢复未修改的配置。创建新环境、迁入或启动是另外明确选择的操作。</p>
 <p><code>WorkFileSelection.tsx</code> 在同一工作页提供项目路径组、会话文件组和单文件选择，加载有界 metadata 页并拒绝缺页／变动，不读取会话正文。文件搜索只改变显示，超限文件可明确排除；选中路径不持久保存到草案，新出现文件不自动加入。<code>WorkCapacity</code> 使用同一选择重新预检，<code>PlanReview</code> 展示批准中的原件范围与已有冻结落点；runner 未确认 exact selection 时不开放批准。旧 runner 清单错误明确显示，不隐式变回整类。</p>
-<p>以下认证清理能力属于 2026-11-13 开发版，公开 App 0.1.1／CLI 0.1.0 尚未包含。环境与关联组件可进入同一个“清理本机登录”流程，提供三条路径：</p>
+<p>以下认证清理能力已随 App／CLI 0.2.0 Preview 发布。环境与关联组件可进入同一个“清理本机登录”流程，提供三条路径：</p>
 <div class="guide-table-wrap"><table><thead><tr><th class="align-left">路径</th><th class="align-left">当前处理范围</th></tr></thead><tbody><tr><td class="align-left">修复本地登录</td><td class="align-left">核验写入者已停，精确移除选中的受支持认证字段或 shell 赋值，再独立重新检查。</td></tr><tr><td class="align-left">清理并重建</td><td class="align-left">先加密归档选中工作、按冻结落点建立新根并迁入，再编辑所选认证来源；不生成混合客户端状态或 token 恢复备份。</td></tr><tr><td class="align-left">退役此环境</td><td class="align-left">先保全选中工作、处理所选认证来源，再停用本环境入口并复查；原始工作目录保留，重新启用不恢复已删凭据。</td></tr></tbody></table></div>
 <p>三条路径都要求先确认目标终端、IDE 和自动重启来源已关闭。core 会复查写入进程，不能归属的 Claude 写入者会阻止清理；不会全局杀进程。来源检查在已知位置有界读取必要内容，界面只接收位置、证据、可选范围与限制，不接收 token、helper 正文或 shell 原文。它不运行 shell 初始化、helper 或 Claude，也不扫描历史记录。</p>
 <p>侧栏入口仍为“清理与重建”，页内主标题为“清理本机登录”。</p>

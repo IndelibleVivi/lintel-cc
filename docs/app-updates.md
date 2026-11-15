@@ -2,7 +2,7 @@
 
 简体中文（canonical） · [English](app-updates.en.md) · [文档入口](index.md)
 
-本指南说明当前源码中的 macOS App 手动安装、updater 与发行流程。[v0.1.1 开发者 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.1) 已修复 0.1.0 DMG 的 bundle 签名封装缺陷；新 DMG、双语安装说明与校验清单共四个公开资产已核对实际字节，Chrome 下载副本也已只读挂载并通过内部 App 的严格签名校验。旧 0.1.0 DMG 保留为历史，不应继续安装。App 使用完整 ad-hoc 签名，没有 Developer ID 或 Apple 公证，**没有发行公钥或已激活 feed**。未公证下载仍可能被 Gatekeeper 拒绝；本次观察到“仍要打开”入口，未把单 App 信任例外当作干净 Mac 验收。准确证据见 [current-state](current-state.md)。CLI 仍使用 [Agent CLI](agents.md) 的独立流程与原候选版本。
+本指南说明 App 手动安装、updater 与发行流程。当前 [v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) 同时提供 App 与三平台 CLI，双语 INSTALL 与 SHA256SUMS 随附件提供，旧版本继续保留。App 使用完整 bundle ad-hoc 签名，没有 Developer ID 或公证，**没有发行公钥或已激活 feed**。macOS 可能阻止首次打开；核对来源后由用户决定是否按 Apple 的单 App 例外流程信任。干净 Mac 公开下载首装仍未验证，准确证据见[当前状态](current-state.md)，CLI 另见 [Agent CLI](agents.md)。
 
 ## 手动安装开发者 Preview
 
@@ -191,7 +191,8 @@ feed 故障保留当前 App；签名或版本不匹配拒绝安装。误发候�
 
 协议与 API 依据 [Tauri updater](https://v2.tauri.app/plugin/updater/)；运行行为以锁定的 `tauri-plugin-updater`、当前 CLI 的 `signer sign --app-version` 和本仓库检查为准。源码验收标准见 [遥测与更新 Leaf](specs/telemetry-updates.md)。
 
-## 统一候选构建与一致性 gate（未发布）
+<a id="统一候选构建与一致性-gate未发布"></a>
+## 统一候选构建与一致性 gate（构建不自动发布）
 
 `scripts/prepare-candidate.py` 需要 Python 3.11+（标准库 `tomllib`），提供 `build` 与 `verify` 两个本地模式。先提交并核对准确的 clean 40 位 SHA；输出目录必须尚不存在且位于源码 checkout 外。当前 matrix 入口只接受 native macOS arm64；Rust 三个 targets、Node、cargo-zigbuild、Zig 0.16.0 与当前 toolchain 的完整 rust-docs 声明须预先可用。Linux 两目标复用既有 cargo zigbuild 路径，Zig 版本须与受审 native-runtime 声明匹配；脚本在创建输出前检查并拒绝缺项，不安装工具链。示例路径和 SHA 均须替换为实际选定值：
 
@@ -210,4 +211,4 @@ python3 scripts/prepare-candidate.py verify \
 
 `build` 使用 fresh isolated source clone 与 fresh target，固定 locked 构建三个 CLI 平台和配套组件，记录输入与实际最终归档。`verify` 重新读取实际 tar member bytes，不信任包内自报 checksum；同时要求 CLI／runner 可执行、归档权限安全，以及 `SHA256SUMS` 完整对应实际文件。它核对完整三平台、组件、版本、准确 SHA 与 canonical full CI plan／结果／证据一致性（包含 clean checkout），不接受把 reduced plan 改名为 full。带 App 的构建另核对实际 DMG 中的 App 与候选资源。
 
-这些是本地一致性证据：build receipt 和 CI JSON 的来源没有独立认证，不能充当可信 CI 身份证明。`c7680f0` 已实际完成 fresh clone／fresh target 的三平台 CLI（macOS arm64、Linux x86_64／arm64 musl）及 macOS App／DMG 构建，依赖下载缓存复用，并非全空缓存构建。最终候选的完整 source SHA、matrix 与 full CI 状态由[当前状态](current-state.md)按准确 SHA 记录。后续 proof-only 文档提交不改变已构建候选的 source revision。App 安装、干净 Mac 信任与 Release 验收仍未完成。公开 App 0.1.1／CLI 0.1.0 仍为旧发布线，本轮 `main` 未发布。构建、校验、原生安装验收、签名／公证、Release、下载与 feed 激活仍是独立步骤，均不由此脚本自动授予或执行。
+这些脚本输出仍是本地一致性证据：build receipt 和 CI JSON 本身没有独立来源认证，不能单独提供可信 CI 身份或发行授权。本次 0.2.0 Preview 使用 `85e2f435fe815806071fe848f39e2cc6d08d3ef9` 完成 fresh App／DMG、三平台 CLI 与真实旧公开版本升级验收，另保存经认证 GitHub API 读回的 exact-source full CI／最终成品 gate 记录；公开附件已读回验证。准确 source、run 与范围见[当前状态](current-state.md)，早期 `c7680f0` 候选仅为历史。后续文档提交不改变冻结包的 source revision。干净 Mac 首装、Developer ID／公证及 updater 仍未完成；构建、原生验收、Release、下载和 feed 激活各自独立，脚本不自动授予或执行这些动作。

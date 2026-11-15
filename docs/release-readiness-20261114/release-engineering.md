@@ -1,5 +1,7 @@
 # 2026-11-14 Release Engineering Audit and Handoff
 
+This report retains the November 14 `353536cc` candidate audit and its original scope. The published 0.2.0 source is `85e2f435`; current package, CI and download facts are in [current state](../current-state.md) and the [v0.2.0 Release](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0). The older candidate below is not the published package identity.
+
 ## Decision and scope
 
 The next candidate is **Lintel 0.2.0 Preview**, with the same numeric product version for App and CLI. This is preparatory source metadata, not a published version. The public App 0.1.1 Preview and CLI 0.1.0 remain separate, older downloads. Keep the GitHub release prerelease flag and the Preview channel when a release is eventually authorized.

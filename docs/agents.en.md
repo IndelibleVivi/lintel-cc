@@ -2,15 +2,15 @@
 
 [简体中文 (canonical)](agents.md) · English · [Documentation](index.en.md)
 
-For coding agents/script authors with existing operation authorization. Lintel 0.1.0 developer Preview uses protocol 1/catalog 1 and provides [manual public downloads](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) without Developer ID signing or notarization. CLI is GUI-independent; configuration/plans/execution/archive/restoration share core. Self-description is the current binary's contract; inspect target applicability rather than infer permission from implementation.
+For coding agents/script authors with existing operation authorization. Lintel 0.2.0 developer Preview uses protocol 1/catalog 1 and provides [manual public downloads](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) without Developer ID signing or notarization. CLI is GUI-independent; configuration/plans/execution/archive/restoration share core. Self-description is the current binary's contract; inspect target applicability rather than infer permission from implementation.
 
 Start with [English quickstart](quickstart.en.md) / [中文 quickstart](quickstart.md) for disposable synthetic preservation/original-query/independent package reading, then prepare real operations here.
 
-This page covers public-package installation and current source interfaces. Public CLI 0.1.0 lacks the latest `auth inventory`/`auth verify`, exact authentication-source selection and bounded history. Build current source for those entries. Check the selected binary’s `version`, `capabilities` and `describe`/`schema` before use; also check the target runner remotely. Updating the App does not update that runner.
+This page covers public-package installation and current source interfaces. Public CLI 0.2.0 includes `auth inventory`/`auth verify`, exact authentication-source selection and bounded history. Check the selected binary’s `version`, `capabilities` and `describe`/`schema`; also check the target runner remotely. Updating the App does not update that runner.
 
 ## From App to terminal or Agent
 
-Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. The [v0.1.0 developer Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.1.0) provides manual CLI downloads for three platforms. Read INSTALL and SHA256SUMS first; Linux is experimental. Website/App main-doc links mean latest development documentation.
+Terminal and Agent accepts an explicitly chosen full CLI path, checking native platform/architecture, protocol, finite static interfaces and HOME/UID/state. Without CLI, build below or obtain a verified platform candidate. The [v0.2.0 Preview](https://github.com/IndelibleVivi/lintel-cc/releases/tag/v0.2.0) provides manual CLI downloads for three platforms. Read INSTALL and SHA256SUMS first; Linux is experimental. Website/App main-doc links mean latest development documentation.
 
 On macOS, reading a CLI from a protected location such as a removable volume may first wait for system file-access authorization. The CLI subprocess deadline does not include that OS wait. If checking remains pending, inspect the native permission prompt. Alternatively, copy the verified candidate, preserving its directory structure, into a new local version/test directory with existing access and select its `bin/lintel` again. System permission remains the user’s decision.
 
@@ -21,13 +21,13 @@ Handoff must use original task state. Accepted/uncertain jobs query the original
 <a id="install-candidate"></a>
 ## Installing a candidate package
 
-Obtain platform archive/index from a trusted provider, verify identity/platform, unpack with system tools into a new version. Identity below is synthetic; replace with actual index. Create only parent first; ordinary mkdir fails if the **new identity directory** exists, preventing overwrite:
+Obtain platform archive/index from a trusted provider, verify identity/platform, unpack with system tools into a new version. The identity below matches 0.2.0 Preview; use the matching index for another version. Create only parent first; ordinary mkdir fails if the **new identity directory** exists, preventing overwrite:
 
 ```sh
 parent="${LINTEL_CLI_ROOT:-$HOME/.local/share/lintel-cli}"
 mkdir -p "$parent"
 # Replace with actual index identity: <version>-candidate-<first 12 revision characters>
-identity="0.1.0-candidate-a239123903b6"
+identity="0.2.0-candidate-85e2f435fe81"
 dest="$parent/$identity"
 mkdir "$dest" && tar -xzf "candidate-packages/lintel-cli-$identity-macos-arm64.tar.gz" -C "$dest"
 ```
@@ -42,7 +42,7 @@ shasum -a 256 -c SHA256SUMS      # macOS
 "$dest/bin/lintel" capabilities --json
 ```
 
-Upgrade into **another** identity directory, repeat checks/version/capabilities, explicitly switch caller path. No old executable replacement or PATH/rc/App/settings/service/Claude/credentials/browser-registration changes. State/IDs remain. Candidates are unsigned; Linux archives checked on Mac have format/byte evidence only, no Linux runtime. Execute locally only on matching architecture.
+Upgrade into **another** identity directory, repeat checks/version/capabilities, explicitly switch caller path. No old executable replacement or PATH/rc/App/settings/service/Claude/credentials/browser-registration changes. State/IDs remain. Packages have no publisher signature; the final 0.2.0 archives passed native upgrade acceptance on macOS arm64 and Linux x86_64/aarch64. Execute locally only on matching architecture. Linux remains experimental.
 
 Uninstall after ceasing use/checking no executing tasks, deleting only your unpacked version directory. Retain state/packages/IDs. Removing executable neither restores approved config nor removes independent hosts/runners. Their restoration/management remains separate; never delete state instead.
 
@@ -102,9 +102,9 @@ Named execute/new finite remote approval requires 64 lowercase hex. Bad syntax r
 
 env list/discover may register roots/save inventory; job may persist interruption. auth_inventory and default auth_verify read bounded sources without running the client. Explicit auth_probe or auth_verify.observe_runtime:true runs official status, returning identity_observed. This represents the current executor, not all terminals/IDEs. archive_read returns text. These are not all effect-free metadata. discover shortcut/request share capabilities.
 
-### Authentication sources and cleanup (November 13 development source)
+### Authentication sources and cleanup (0.2.0 Preview)
 
-The published App 0.1.1/CLI 0.1.0 do not have these additions. `auth_inventory(environment_id, project_cwd?)` returns locations and finite evidence without tokens, helper bodies or original shell lines. `auth_verify(environment_id, job_id?, observe_runtime?)` independently rereads sources; `observe_runtime` defaults to false. Current process variables, declarations and official CLI status are distinct facts. Unselected/inaccessible Keychain, shared profiles and dynamic injection retain explicit unknown coverage.
+App / CLI 0.2.0 Preview includes these capabilities. `auth_inventory(environment_id, project_cwd?)` returns locations and finite evidence without tokens, helper bodies or original shell lines. `auth_verify(environment_id, job_id?, observe_runtime?)` independently rereads sources; `observe_runtime` defaults to false. Current process variables, declarations and official CLI status are distinct facts. Unselected/inaccessible Keychain, shared profiles and dynamic injection retain explicit unknown coverage.
 
 ```sh
 lintel auth inventory --environment <environment-id> --project-cwd /synthetic/project --json
@@ -427,7 +427,7 @@ Identity `<version>-candidate-<first 12 revision characters>`, never bare 0.1.0;
 
 Debug source cargo build -p lintel-runner → target/debug/lintel. Native host installed separately; Mac browser control requires exact host_path, no GUI/PATH assumptions. Canonical extension source/[browser guide](browser.en.md). Remote resources share [generation](remote.en.md#prepare-app-resources); explicit reviewed --bundles or LINTEL_RUNNER_BUNDLES, default beside executable remote-runners. Missing refuses without download/VPS compilation. Reading grants no real-host installation/update.
 
-### Bounded task records (current unreleased source)
+### Bounded task records (0.2.0 Preview)
 
 `lintel jobs` and `lintel work archive list` use `jobs_page`; `lintel job detail ID` uses `job_detail_page`. Lists default to at most 50 rows; explicit `--limit` accepts 1–100. Continue with the returned `next_offset` and the same `digest` (`--expected-digest`). Details load by section instead of embedding full receipts in summary lists; `detail_item_too_large` retains the original ID and file. Restart from the first page after records change rather than joining snapshots. `scan_complete`, `records_complete` and `record_errors` separately describe scanning and invalid-record gaps; an empty page does not necessarily end the scan.
 
