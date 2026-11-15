@@ -160,23 +160,23 @@ test('site packages only explicit verified metadata, no binaries or invented Rel
  }
  // These finite CLI assets are already public and independently checked. They
  // do not relax the App projection gate or authorize any new candidate URL.
- const cliPrefix='https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.1.0/';
+ const cliPrefix='https://github.com/IndelibleVivi/lintel-cc/releases/download/v0.2.0/';
  const publicCli=[
-  ['macos-arm64','83b6fe24751cc6a1c8617245913da0a8515914c9f0933fb814b540fa83a162e1'],
-  ['linux-x86_64','5d780c50452022efefb62bb18d6ab491b0e2b414351fc215ae30702595972ce6'],
-  ['linux-aarch64','299291030c91d52741b8083e614fab15cbd10c50b165e35b272ef0d34d6c6fc3'],
+  ['macos-arm64','c5ac5fdb1dd6ab7b198f04e5ef80f67405e0709cd54bc401177c075514c233ec'],
+  ['linux-x86_64','8f1df8f44a5db41f22468f4c3d7565b0ff86b31f97ed120ca25143e40b4c3390'],
+  ['linux-aarch64','a2431b67fb688289e8f0b96c53d0b21c8b46b3b8d222dc168623a9323d1ba692'],
  ];
  for(const [pageName,language] of [['download/index.html','zh-CN'],['en/download/index.html','en']]){
   const plainDownload=await readFile(path.join(dir,'plain',pageName),'utf8');
   assert.match(plainDownload,/data-download-app="unavailable"/);
   assert.doesNotMatch(plainDownload,/data-download-app="verified"|data-release-version=/,'No App release is projected without a verified record');
   assert.equal(plainDownload.includes(outputs.release.source_revision),false,'Prepared synthetic App provenance must not appear');
-  const cliSection=plainDownload.match(/<section\b[^>]*\bdata-download-cli="0\.1\.0"[^>]*>[\s\S]*?<\/section>/)?.[0];
+  const cliSection=plainDownload.match(/<section\b[^>]*\bdata-download-cli="0\.2\.0"[^>]*>[\s\S]*?<\/section>/)?.[0];
   assert.ok(cliSection,'Only the explicitly scoped public CLI section may carry fixed public assets');
-  assert.match(cliSection,/0\.1\.0 Preview/);
-  assert.match(cliSection,language==='en'?/0\.2\.0 has not been publicly released/:/0\.2\.0 尚未公开发布/);
+  assert.match(cliSection,/0\.2\.0 Preview/);
+  assert.match(cliSection,language==='en'?/0\.2\.0 Preview is publicly released/:/0\.2\.0 Preview 已公开发布/);
   const allowedUrls=[
-   ...publicCli.map(([target])=>`${cliPrefix}lintel-cli-0.1.0-candidate-fcae6cb1efb5-${target}.tar.gz`),
+   ...publicCli.map(([target])=>`${cliPrefix}lintel-cli-0.2.0-candidate-85e2f435fe81-${target}.tar.gz`),
    `${cliPrefix}INSTALL.${language}.md`,`${cliPrefix}SHA256SUMS`,
   ];
   assert.deepEqual([...cliSection.matchAll(/href="([^"]*\/releases\/download\/[^"\s]+)"/g)].map(match=>match[1]),allowedUrls,'Only the three known public CLI packages and matching versioned instructions/checksums are allowed');
