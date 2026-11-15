@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { request, requester } from './api';
 import type { AuthenticationInventory, AuthenticationPlan, AuthenticationSource, AuthenticationVerification, Receipt } from './types';
 import { Icon, Notice } from './ui';
@@ -32,6 +32,16 @@ const retainedKeys:Record<string,string>={retained:'cleanup.authRetainedFile',re
 const methodKeys:Record<string,string>={none:'cleanup.authMethodNone','claude.ai':'cleanup.authMethodLogin',oauth_token:'cleanup.authMethodOauth',api_key:'cleanup.authMethodKey',api_key_helper:'cleanup.authMethodHelper',third_party:'cleanup.authMethodProvider'};
 export function authenticationMethodLabel(method:string,t:(key:string)=>string):string {return methodKeys[method]?t(methodKeys[method]):method;}
 
+export function AuthenticationDisclosureSummary({children}:{children:ReactNode}) {
+  const {t}=useI18n();
+  return <summary className="authentication-disclosure-summary">
+    <span className="authentication-disclosure-label">{children}</span>
+    <span className="authentication-disclosure-state authentication-disclosure-closed">{t('cleanup.authDisclosureExpand')}</span>
+    <span className="authentication-disclosure-state authentication-disclosure-open">{t('cleanup.authDisclosureCollapse')}</span>
+    <Icon name="chevron" size={14}/>
+  </summary>;
+}
+
 /** Display only the core's finite public projection. No field values or helper text. */
 export function AuthenticationSourceRow({source,selected,onToggle,disabled=false,expanded=false}:{source:AuthenticationSource;selected?:boolean;onToggle?:(id:string,selected:boolean)=>void;disabled?:boolean;expanded?:boolean}) {
   const {t}=useI18n();
@@ -44,9 +54,9 @@ export function AuthenticationSourceRow({source,selected,onToggle,disabled=false
       <div><span className="small-label">{kindKeys[source.kind]?t(kindKeys[source.kind]):source.kind}</span><strong>{friendlyLogin?title:<code>{title}</code>}</strong></div>
       {onToggle&&source.removable&&<input type="checkbox" aria-label={label} checked={selected===true} disabled={disabled} onChange={event=>onToggle(source.id,event.target.checked)}/>}
     </div>
+    <div className="authentication-source-facts"><span className="authentication-evidence" data-evidence={source.evidence}>{evidenceKeys[source.evidence]?t(evidenceKeys[source.evidence]):source.evidence}</span><span>{scopeKeys[source.scope]?t(scopeKeys[source.scope]):source.scope}</span>{source.removable&&<span className="authentication-removable">{t('cleanup.authPreciselyRemovable')}</span>}</div>
     {source.reason&&keychainReasonKeys[source.reason]&&<p className="small-print authentication-keychain-state">{t(keychainReasonKeys[source.reason])}</p>}
-    <details className="authentication-source-details" open={expanded}><summary>{t('cleanup.authSourceDetails')}</summary>
-    <div className="authentication-source-facts"><span className="authentication-evidence" data-evidence={source.evidence}>{evidenceKeys[source.evidence]?t(evidenceKeys[source.evidence]):source.evidence}</span><span>{scopeKeys[source.scope]?t(scopeKeys[source.scope]):source.scope}</span>{source.removable&&<span>{t('cleanup.authPreciselyRemovable')}</span>}</div>
+    <details className="authentication-disclosure authentication-source-details" open={expanded}><AuthenticationDisclosureSummary>{t('cleanup.authSourceDetails')}</AuthenticationDisclosureSummary>
     {valueStateKey&&<p className="small-print"><span className="authentication-evidence" data-value-state={source.value_state}>{t(valueStateKey)}</span> · {t('cleanup.authValueShapeOnly')}</p>}
     {source.service&&<code className="authentication-source-path">{source.service}</code>}
     {source.path&&<code className="authentication-source-path">{source.path}</code>}
@@ -58,36 +68,78 @@ export function AuthenticationSourceRow({source,selected,onToggle,disabled=false
   </div>;
 }
 
-export function AuthenticationInventoryView({inventory,selected,onToggle,disabled=false,compact=false}:{inventory:AuthenticationInventory;selected?:string[];onToggle?:(id:string,selected:boolean)=>void;disabled?:boolean;compact?:boolean}) {
+function savedLoginSource(source:AuthenticationSource) {
+  return ['credential_field','credential_file','client_state_field','keychain_field'].includes(source.kind)
+    || (source.kind==='keychain'&&['keychain_locked','keychain_access_denied','keychain_unavailable','keychain_invalid_format','keychain_too_large'].includes(source.reason||''));
+}
+
+function inventoryHasUnknownSources(inventory:AuthenticationInventory) {
+  const incomplete=!Array.isArray(inventory.limits)&&inventory.limits?.bounded_scan_complete===false;
+  const keychainReasons=['keychain_locked','keychain_access_denied','keychain_unavailable','keychain_unsupported','keychain_synthetic_unavailable','keychain_invalid_format','keychain_too_large'];
+  return !!inventory.error_code||!inventory.context||incomplete||inventory.sources.some(source=>source.evidence==='inaccessible'||(source.evidence==='unknown'&&source.scope!=='external')||keychainReasons.includes(source.reason||''));
+}
+
+export function AuthenticationInventoryView({inventory,selected,onToggle,disabled=false,compact=false,auxiliary}:{inventory:AuthenticationInventory;selected?:string[];onToggle?:(id:string,selected:boolean)=>void;disabled?:boolean;compact?:boolean;auxiliary?:ReactNode}) {
   const {t}=useI18n();
   const visible=inventory.sources.filter(source=>source.presence!=='absent');
-  const saved=visible.filter(source=>['credential_field','credential_file','client_state_field','keychain_field'].includes(source.kind)||(source.kind==='keychain'&&['keychain_locked','keychain_access_denied','keychain_unavailable','keychain_invalid_format','keychain_too_large'].includes(source.reason||'')));
-  const injections=visible.filter(source=>!saved.includes(source)&&source.removable);
-  const context=visible.filter(source=>!saved.includes(source)&&!source.removable);
+  const saved=visible.filter(source=>savedLoginSource(source)&&source.removable);
+  const attention=visible.filter(source=>!source.removable&&(savedLoginSource(source)||['keychain_locked','keychain_access_denied','keychain_unavailable','keychain_unsupported','keychain_synthetic_unavailable','keychain_invalid_format','keychain_too_large'].includes(source.reason||'')));
+  const injections=visible.filter(source=>!savedLoginSource(source)&&source.removable);
+  const context=visible.filter(source=>!saved.includes(source)&&!attention.includes(source)&&!injections.includes(source));
   const absent=inventory.sources.filter(source=>source.presence==='absent');
   const row=(source:AuthenticationSource)=><AuthenticationSourceRow key={source.id} source={source} selected={selected?.includes(source.id)} onToggle={onToggle} disabled={disabled}/>;
   const unavailable=!!inventory.error_code||!inventory.context;
   const incomplete=!Array.isArray(inventory.limits)&&inventory.limits?.bounded_scan_complete===false;
   const inherited=inventory.context?.inherited_config_dir;
   return <div className={`authentication-inventory ${compact?'compact':''}`}>
-    <p className="small-print">{t('cleanup.authInventoryScope')}</p>
     {unavailable&&<Notice tone="warning">{t('cleanup.authInventoryUnavailable')}{inventory.error_code&&<> · <code>{inventory.error_code}</code></>}</Notice>}
     {inherited==='different'&&<Notice tone="warning">{t('cleanup.authDifferentRoot')}</Notice>}
     {incomplete&&<Notice tone="warning">{t('cleanup.authScanIncomplete')}</Notice>}
+    {!!attention.length&&<section className="authentication-group authentication-attention-group"><h3>{t('cleanup.authAttentionGroup')}</h3><p className="small-print">{t('cleanup.authAttentionGroupNote')}</p><div className="authentication-source-list">{attention.map(row)}</div></section>}
     {!!saved.length&&<section className="authentication-group"><h3>{t('cleanup.authSavedGroup')}</h3><p className="small-print">{t('cleanup.authSavedGroupNote')}</p><div className="authentication-source-list">{saved.map(row)}</div></section>}
-    {!!injections.length&&<section className="authentication-group"><div className="authentication-group-heading"><h3>{t('cleanup.authInjectionGroup')}</h3>{onToggle&&<div className="button-row"><button className="text-button" disabled={disabled} onClick={()=>injections.forEach(source=>onToggle(source.id,true))}>{t('cleanup.authSelectGroup')}</button><button className="text-button" disabled={disabled||!injections.some(source=>selected?.includes(source.id))} onClick={()=>injections.forEach(source=>onToggle(source.id,false))}>{t('cleanup.authClearGroup')}</button></div>}</div><p className="small-print">{t('cleanup.authInjectionGroupNote')}</p><div className="authentication-source-list">{injections.map(row)}</div></section>}
-    {!!context.length&&<details className="authentication-context"><summary>{t('cleanup.authContextCount',{count:context.length})}</summary><div className="authentication-source-list">{context.map(row)}</div></details>}
+    {!!injections.length&&<details className="authentication-disclosure authentication-injection-options" open={!saved.length}><AuthenticationDisclosureSummary><span>{t('cleanup.authInjectionGroup')}</span><span className="small-label">{injections.filter(source=>selected?.includes(source.id)).length} / {injections.length}</span></AuthenticationDisclosureSummary><div className="authentication-group-heading"><p className="small-print">{t('cleanup.authInjectionGroupNote')}</p>{onToggle&&<div className="button-row"><button className="text-button" disabled={disabled} onClick={()=>injections.forEach(source=>onToggle(source.id,true))}>{t('cleanup.authSelectGroup')}</button><button className="text-button" disabled={disabled||!injections.some(source=>selected?.includes(source.id))} onClick={()=>injections.forEach(source=>onToggle(source.id,false))}>{t('cleanup.authClearGroup')}</button></div>}</div><div className="authentication-source-list">{injections.map(row)}</div></details>}
     {!visible.length&&!unavailable&&<p>{t('cleanup.authNoneObserved')}</p>}
-    {!!absent.length&&<details className="authentication-absent"><summary>{t('cleanup.authAbsentCount',{count:absent.length})}</summary><div className="authentication-source-list">{absent.map(row)}</div></details>}
+    {(!!context.length||!!absent.length||!!auxiliary)&&<details className="authentication-disclosure authentication-auxiliary">
+      <AuthenticationDisclosureSummary><span>{t('cleanup.authAuxiliarySummary')}</span>{!!context.length&&<span className="small-label">{t('cleanup.authContextLabel',{count:context.length})}</span>}</AuthenticationDisclosureSummary>
+      <div className="authentication-auxiliary-body">
+        <p className="small-print authentication-auxiliary-note">{t('cleanup.authAuxiliaryNote')}</p>
+        {auxiliary}
+        {!!context.length&&<details className="authentication-disclosure authentication-context"><AuthenticationDisclosureSummary>{t('cleanup.authContextCount',{count:context.length})}</AuthenticationDisclosureSummary><p className="small-print">{t('cleanup.authContextNote')}</p><div className="authentication-source-list">{context.map(row)}</div></details>}
+        {!!absent.length&&<details className="authentication-disclosure authentication-absent"><AuthenticationDisclosureSummary>{t('cleanup.authAbsentCount',{count:absent.length})}</AuthenticationDisclosureSummary><div className="authentication-source-list">{absent.map(row)}</div></details>}
+      </div>
+    </details>}
   </div>;
+}
+
+export function AuthenticationSelection({inventory,selected,onToggle,onRestoreRecommended,disabled=false,auxiliary}:{inventory:AuthenticationInventory;selected:string[];onToggle:(id:string,selected:boolean)=>void;onRestoreRecommended:()=>void;disabled?:boolean;auxiliary?:ReactNode}) {
+  const {t}=useI18n();
+  const selectedSet=new Set(selected);
+  const selectable=inventory.sources.filter(source=>source.removable&&source.presence!=='absent');
+  const validSelected=selectable.filter(source=>selectedSet.has(source.id));
+  const recommended=selectable.filter(source=>source.default_selected===true&&source.scope==='selected_root');
+  const recommendedMatches=recommended.length===validSelected.length&&recommended.every(source=>selectedSet.has(source.id));
+  const uncertain=inventoryHasUnknownSources(inventory);
+  if(!selectable.length) return <>
+    <div className={`authentication-selection-note authentication-no-cleanable ${uncertain?'uncertain':'clear'}`} data-auth-no-cleanable={uncertain?'uncertain':'clear'} role="status"><span className="authentication-empty-icon"><Icon name={uncertain?'warning':'history'} size={17}/></span><div><strong>{t(uncertain?'cleanup.authNoCleanableUncertain':'cleanup.authNoCleanableSources')}</strong><p>{t(uncertain?'cleanup.authNoCleanableUncertainHint':'cleanup.authNoCleanableSourcesHint')}</p></div></div>
+    <AuthenticationInventoryView inventory={inventory} selected={selected} disabled={disabled} auxiliary={auxiliary}/>
+  </>;
+  return <>
+    <div className="authentication-selection-toolbar">
+      <div className="authentication-selection-summary"><strong>{t('cleanup.authSelectionSummary',{selected:validSelected.length,available:selectable.length})}</strong><span>{t('cleanup.authSelectionHint')}</span></div>
+      <div className="button-row">{!!recommended.length&&<button className="text-button" disabled={disabled||recommendedMatches} onClick={onRestoreRecommended}>{t('cleanup.authRecommendedSelection')}</button>}{!!validSelected.length&&<button className="text-button" disabled={disabled} onClick={()=>validSelected.forEach(source=>onToggle(source.id,false))}>{t('cleanup.authClearSelection')}</button>}</div>
+    </div>
+    <AuthenticationInventoryView inventory={inventory} selected={selected} onToggle={onToggle} disabled={disabled} auxiliary={auxiliary}/>
+    {!validSelected.length&&<div className="authentication-selection-note authentication-verification-only" role="status"><Icon name="history" size={17}/><div><strong>{t('cleanup.authVerificationOnlyTitle')}</strong><p>{t('cleanup.authChooseSources')}</p></div></div>}
+  </>;
 }
 
 export function AuthenticationPlanReview({authentication}:{authentication:AuthenticationPlan}) {
   const {t}=useI18n();
-  return <section className="authentication-plan frozen-destination" aria-label={t('cleanup.authPlanTitle')}>
-    <h4>{t('cleanup.authPlanTitle')}</h4><p>{t('cleanup.authSelectedCount',{count:authentication.selected_sources.length})}</p>
-    <div className="authentication-source-list">{authentication.selected_sources.map(source=><AuthenticationSourceRow key={source.id} source={source} expanded/>)}</div>
-    {!authentication.selected_sources.length&&<p>{t('cleanup.authNoSelection')}</p>}
+  const selected=authentication.selected_sources.length>0;
+  return <section className="authentication-plan frozen-destination" aria-label={t(selected?'cleanup.authPlanTitle':'cleanup.authVerificationPlanTitle')}>
+    <h4>{t(selected?'cleanup.authPlanTitle':'cleanup.authVerificationPlanTitle')}</h4><p>{t(selected?'cleanup.authSelectedCount':'cleanup.authVerificationPlanNote',{count:authentication.selected_sources.length})}</p>
+    {selected&&<div className="authentication-source-list">{authentication.selected_sources.map(source=><AuthenticationSourceRow key={source.id} source={source} expanded/>)}</div>}
+    {!selected&&<p>{t('cleanup.authNoSelection')}</p>}
     {authentication.selected_sources.some(source=>source.scope==='host_shared')&&<Notice tone="warning">{t('cleanup.authSharedImpact')}</Notice>}
     <p>{t(authentication.runtime_verification_requested?'cleanup.authRuntimeIncluded':'cleanup.authRuntimeNotIncluded')}</p>
     <p className="small-print">{t('cleanup.authNoSecretBackup')}</p><p className="small-print">{t('cleanup.authPersistentBoundary')}</p>
@@ -128,19 +180,19 @@ export function AuthenticationResult({receipt,hostAlias=null}:{receipt:Receipt;h
     <div className="button-row authentication-recheck"><button disabled={busy||pending||!receipt.environment_id} onClick={()=>void recheck(false)}><Icon name="refresh" size={14}/>{t('cleanup.authRecheck')}</button><button disabled={busy||pending||!receipt.environment_id} onClick={()=>void recheck(true)}>{t('cleanup.authRecheckRuntime')}</button>{fresh&&<button className="text-button" disabled={busy} onClick={()=>{setFresh(null);setError(null);}}>{t('cleanup.authShowOriginal')}</button>}</div>
     <p className="small-print">{t('cleanup.authRuntimeOptInDetail')}</p>
     <div className="authentication-coverage">
-      <section><details className="authentication-local-results"><summary>{t('cleanup.authLocalCoverage')}</summary><p>{t('cleanup.authLocalCoverageNote')}</p>
-        {report.local_sources.length?<ul className="authentication-verified-sources">{report.local_sources.map(source=><li key={source.id}><span className="authentication-evidence" data-evidence={source.state}>{verificationKeys[source.state]?t(verificationKeys[source.state]):source.state}</span><div><code>{source.locator||source.kind}</code>{source.service&&<code className="authentication-source-path">{source.service}</code>}{source.path&&<code className="authentication-source-path">{source.path}</code>}</div></li>)}</ul>:<p>{t('cleanup.authNoSelection')}</p>}
+      <section><details className="authentication-disclosure authentication-local-results"><AuthenticationDisclosureSummary>{t('cleanup.authLocalCoverage')}</AuthenticationDisclosureSummary><p>{t('cleanup.authLocalCoverageNote')}</p>
+        {report.local_sources.length?<ul className="authentication-verified-sources">{report.local_sources.map(source=><li key={source.id}><span className="authentication-evidence" data-evidence={source.state}>{verificationKeys[source.state]?t(verificationKeys[source.state]):source.state}</span><div><code>{source.locator||source.kind}</code>{source.service&&<code className="authentication-source-path">{source.service}</code>}{source.path&&<code className="authentication-source-path">{source.path}</code>}</div></li>)}</ul>:<p>{t('cleanup.authVerificationOnlyResult')}</p>}
       </details></section>
       <section><h4>{t('cleanup.authRuntimeCoverage')}</h4>
-        {report.runtime.state==='observed'&&observation?<><p className={observation.logged_in?'authentication-attention':''}>{t(observation.logged_in?'cleanup.authRuntimeStillLoggedIn':'cleanup.authRuntimeLoggedOut',{method:authenticationMethodLabel(observation.auth_method,t)})}</p><details className="authentication-runtime-scope"><summary>{t('cleanup.authRuntimeDetails')}</summary><p className="small-print">{t('cleanup.authRuntimeScope')}</p>{observation.config_directory&&<code className="authentication-source-path">{observation.config_directory}</code>}</details></>:<p>{t(report.runtime.state==='not_requested'?'cleanup.authRuntimeNotChecked':'cleanup.authRuntimeUnavailable')}{report.runtime.error_code&&<> · <code>{report.runtime.error_code}</code></>}</p>}
+        {report.runtime.state==='observed'&&observation?<><p className={observation.logged_in?'authentication-attention':''}>{t(observation.logged_in?'cleanup.authRuntimeStillLoggedIn':'cleanup.authRuntimeLoggedOut',{method:authenticationMethodLabel(observation.auth_method,t)})}</p><details className="authentication-disclosure authentication-runtime-scope"><AuthenticationDisclosureSummary>{t('cleanup.authRuntimeDetails')}</AuthenticationDisclosureSummary><p className="small-print">{t('cleanup.authRuntimeScope')}</p>{observation.config_directory&&<code className="authentication-source-path">{observation.config_directory}</code>}</details></>:<p>{t(report.runtime.state==='not_requested'?'cleanup.authRuntimeNotChecked':'cleanup.authRuntimeUnavailable')}{report.runtime.error_code&&<> · <code>{report.runtime.error_code}</code></>}</p>}
       </section>
-      <details className="authentication-secondary-coverage"><summary>{t('cleanup.authFurtherCoverage')}</summary><div className="authentication-coverage">
+      <details className="authentication-disclosure authentication-secondary-coverage"><AuthenticationDisclosureSummary>{t('cleanup.authFurtherCoverage')}</AuthenticationDisclosureSummary><div className="authentication-coverage">
       <section><h4>{t('cleanup.authOtherCoverage')}</h4><p>{t('cleanup.authOtherUnverified')}</p></section>
       <section><h4>{t('cleanup.authServerCoverage')}</h4><p>{t('cleanup.authServerUnverified')}</p></section>
       </div></details>
     </div>
     {!!report.retained_sensitive_material.length&&<Notice tone="warning"><strong>{t('cleanup.authRetainedTitle')}</strong><p>{t('cleanup.authRetainedNote')}</p><ul>{report.retained_sensitive_material.map(item=><li key={item.path}><span>{retainedKeys[item.state]?t(retainedKeys[item.state]):item.state}</span><code className="authentication-source-path">{item.path}</code></li>)}</ul></Notice>}
-    {report.inventory&&<details className="authentication-after-inventory"><summary>{t('cleanup.authRemainingSources')}</summary><AuthenticationInventoryView inventory={report.inventory} compact/></details>}
+    {report.inventory&&<details className="authentication-disclosure authentication-after-inventory"><AuthenticationDisclosureSummary>{t('cleanup.authRemainingSources')}</AuthenticationDisclosureSummary><AuthenticationInventoryView inventory={report.inventory} compact/></details>}
   </section>;
 }
 

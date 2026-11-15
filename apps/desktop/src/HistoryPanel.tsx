@@ -4,7 +4,7 @@ import {RequestError} from './api';
 import type {Api,Environment,JobSummary,JobsPage,JobDetailPage,Plan,Receipt} from './types';
 import {present} from './i18n-presentation';
 import {useI18n} from './i18n-provider';
-import {Notice,Status} from './ui';
+import {Icon,Notice,Status} from './ui';
 import RequestFailure,{asError} from './RequestFailure';
 
 type Section=NonNullable<Api['job_detail_page']['request']['section']>;
@@ -33,13 +33,22 @@ export default function HistoryPanel({send,environments,selectedId,refreshKey,fi
  }catch(e){if(alive.current&&token===detailGeneration.current)setDetailError(failure(e))}finally{if(alive.current&&token===detailGeneration.current)setDetailPending(false)}}
  const header=detail?.section==='header'?detail.items[0] as {environment_id?:string;restorable?:boolean;service_restorable?:boolean;network_restorable?:boolean;has_work_archive?:boolean}:undefined;
  async function restore(kind:'plan_restore'|'plan_service_resume'|'plan_network_restore'){setDetailPending(true);setDetailError(null);const token=detailGeneration.current;try{const plan=await send(kind,{job_id:detail!.job_id});if(alive.current&&token===detailGeneration.current)onPlan(environments.find(e=>e.id===header?.environment_id)??null,plan)}catch(e){if(alive.current)setDetailError(asError(e))}finally{if(alive.current)setDetailPending(false)}}
- return <section className="history-panel"><p className="small-print">{t('history.boundedOrder')}</p><div className="history-controls"><button disabled={pending} onClick={()=>void load()}>{t('history.boundedRefresh')}</button><select aria-label={t('app.filterAll')} value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}><option value="all">{t('app.filterAll')}</option><option value="attention">{t('app.filterAttention')}</option><option value="target" disabled={!selectedId}>{t('app.filterTarget')}</option></select></div>
- {pending&&<p role="status">{t('history.boundedLoading')}</p>}{error&&<RequestFailure error={error}/>}
- {page&&<p className="history-scan-note">{t(page.scan_complete?'history.boundedEnd':'history.boundedPartial')}</p>}
+ const filtered=filter!=='all'||!!query.trim();
+ const empty=page?.scan_complete&&page.next_offset==null&&!pending&&!error&&!rows.length&&!errors.length;
+ return <section className="history-panel">
+ <div className="history-intro"><p className="small-print">{t('history.boundedOrder')}</p>{rows.length>0&&<span className="small-label">{t('history.resultCount',{count:rows.length})}</span>}</div>
+ <div className="history-controls">
+   <label className="history-search">{t('app.searchRecordsSr')}<input type="search" maxLength={256} value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('app.searchPlaceholder')}/></label>
+   <label className="field history-filter"><span>{t('history.filterLabel')}</span><select aria-label={t('app.filterAll')} value={filter} onChange={e=>setFilter(e.target.value as typeof filter)}><option value="all">{t('app.filterAll')}</option><option value="attention">{t('app.filterAttention')}</option><option value="target" disabled={!selectedId}>{t('app.filterTarget')}</option></select></label>
+   <button disabled={pending} title={t('history.refreshHint')} onClick={()=>void load()}><Icon name="refresh" size={15}/>{t(pending?'history.refreshing':'history.boundedRefresh')}</button>
+ </div>
+ {pending&&<p className="history-scan-note" role="status">{t('history.boundedLoading')}</p>}{error&&<RequestFailure error={error}/>}
+ {page&&!page.scan_complete&&<p className="history-scan-note">{t('history.boundedPartial')}</p>}
  {errors.length>0&&<Notice tone="warning"><p>{t('history.incompleteRecords')}</p>{errors.map((e,i)=><p key={i}><code>{e.job_id??t('history.invalidRecordId')}</code> · {e.code}</p>)}</Notice>}
- <label className="history-search">{t('app.searchRecordsSr')}<input type="search" maxLength={256} value={query} onChange={e=>setQuery(e.target.value)} placeholder={t('app.searchPlaceholder')}/></label><div className="job-list">{rows.map(row=><div className="job-row" key={row.id}><div className="job-copy"><strong>{present(row.title,locale)}{row.title_truncated?'…':''}</strong><span>{formatDateTime(new Date(Number(row.updated_at_ns)/1e6).toISOString())}</span><code>{row.id}</code></div><Status value={row.status}/><button disabled={detailPending} onClick={()=>{setDetail(null);void read(row.id,'header')}}>{t('app.viewResult')}</button></div>)}</div>
+ {empty&&<div className="history-empty"><Icon name={filtered?'search':'history'} size={22}/><div><strong>{t(filtered?'history.noMatches':'history.empty')}</strong><p>{t(filtered?'history.noMatchesHint':'history.emptyHint')}</p></div></div>}
+ {rows.length>0&&<div className="job-list">{rows.map(row=><div className="job-row" key={row.id}><div className="job-copy"><strong>{present(row.title,locale)}{row.title_truncated?'…':''}</strong><span>{formatDateTime(new Date(Number(row.updated_at_ns)/1e6).toISOString())}</span><code>{row.id}</code></div><Status value={row.status}/><button disabled={detailPending} onClick={()=>{setDetail(null);void read(row.id,'header')}}>{t('app.viewResult')}</button></div>)}</div>}
  {page?.next_offset!=null&&<button disabled={pending} onClick={()=>void load(true)}>{t('history.boundedMore')}</button>}
- <details className="query-task"><summary>{t('app.querySummary')}</summary><form onSubmit={e=>{e.preventDefault();setDetail(null);void read(id.trim(),'header')}}><label className="field">{t('app.originalTaskId')}<input value={id} onChange={e=>setId(e.target.value)} spellCheck={false}/></label><button disabled={!id.trim()||detailPending}>{t('app.queryOriginalTask')}</button></form><p className="small-print">{t('app.queryNote')}</p></details>
+ <details className="query-task"><summary><Icon name="history" size={16}/><span>{t('app.querySummary')}</span><Icon name="chevron" size={13}/></summary><form onSubmit={e=>{e.preventDefault();setDetail(null);void read(id.trim(),'header')}}><label className="field">{t('app.originalTaskId')}<input value={id} onChange={e=>setId(e.target.value)} spellCheck={false}/></label><button disabled={!id.trim()||detailPending}><Icon name="search" size={15}/>{t('app.queryOriginalTask')}</button></form><p className="small-print">{t('app.queryNote')}</p></details>
  {detailPending&&<p role="status">{t('history.boundedLoading')}</p>}{detailError&&<RequestFailure error={detailError}/>}
  {detail&&<section><h2>{t('app.viewResult')} · <code>{detail.job_id}</code></h2><p>{t('history.boundedDetail')}</p><div className="button-row">{(['header','steps','warnings','coverage','task_result','result_coverage','next_actions','next_steps','error'] as Section[]).map(part=><button aria-pressed={section===part} disabled={detailPending} key={part} onClick={()=>void read(detail.job_id,part)}>{t(sectionLabels[part])}</button>)}</div><div className="receipt-summary">{detail.items.map((item,index)=>{
  const value=item&&typeof item==='object'&&!Array.isArray(item)?item as Record<string,unknown>:null;

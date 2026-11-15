@@ -46,7 +46,7 @@ export default function TargetBar({ environments, selected, selectedId, hostAlia
       </select><Icon name="chevron" size={11}/></div>
     </div></div>
     {children}
-    <button className="icon-button refresh-button" aria-label={t('app.recheckEnv')} disabled={busy || loading} onClick={onRefresh}><Icon name="refresh" size={16}/></button>
+    <button className="text-button refresh-button" aria-label={t('app.recheckEnv')} title={t('app.recheckEnv')} disabled={busy || loading} onClick={onRefresh}><Icon name="refresh" size={15}/><span>{t('app.checkEnvironments')}</span></button>
   </header>
         {open && <section id={detailsId} className="target-details-panel" role="region" aria-label={t('app.targetDetails')}>
           <div className="target-details-heading"><strong>{t('app.currentTarget')}</strong><button className="icon-button" aria-label={t('app.close')} onClick={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}><Icon name="close" size={15}/></button></div>

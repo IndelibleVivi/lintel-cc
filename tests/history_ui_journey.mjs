@@ -11,15 +11,17 @@ const preview=spawn(process.execPath,[path.join(desktop,'node_modules/vite/bin/v
 const env={id:'00000000-0000-4000-8000-000000000001',name:'SYNTHETIC_DISCOVERY',root:'/synthetic/claude',status:'active',executable:null};
 const digest='a'.repeat(64),job='00000000-0000-4000-8000-000000000002';
 let realMode=false,realEnvironment,realPolicy,realInvoke;
-let historyFail=true,discoverFail=false,hold=false,release,requestedResolve;
+let historyFail=true,discoverFail=false,emptyMode=false,hold=false,release,requestedResolve;
 let requested=new Promise(r=>requestedResolve=r);const calls=[];
 function summary(title){return {id:job,title,created_at:'2026-01-01',updated_at_ns:'1760000000000000000',environment_id:env.id,status:'failed'}}
 async function core(p,remote=false){calls.push({...p,remote});
  if(p.command==='discover'){if(discoverFail)throw new Error('SYNTHETIC_DISCOVERY_FAILURE');return {environments:[{...env,name:remote?'REMOTE_DISCOVERY':env.name}],capabilities:[]}}
  if(p.command==='inspect')return {settings:[],assets:[],warnings:[]};
+ if(p.command==='launches')return {launches:[]};
  if(p.command==='jobs_page'){
   if(hold&&!remote){requestedResolve();await new Promise(r=>release=r);return {jobs:[summary('STALE_LOCAL_ROW')],record_errors:[],digest,next_offset:null,scan_complete:true}}
   if(historyFail)throw new Error('SYNTHETIC_HISTORY_FAILURE');
+  if(emptyMode)return {jobs:[],record_errors:[],digest,next_offset:null,scan_complete:true};
   if(p.offset){assert.equal(p.expected_digest,digest);return {jobs:[summary('SECOND_PAGE')],record_errors:[],digest,next_offset:null,scan_complete:true}}
   return {jobs:remote?[summary('REMOTE_ROW')]:[],record_errors:[{job_id:job,code:'invalid_json'}],digest,next_offset:50,scan_complete:false};
  }
@@ -39,9 +41,24 @@ try{
  await page.goto(url);await page.getByRole('button',{name:'SYNTHETIC_DISCOVERY',exact:true}).waitFor();
  await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();await page.getByText(/SYNTHETIC_HISTORY_FAILURE/).waitFor();assert.equal(calls.filter(c=>c.command==='jobs').length,0);
  await page.locator('.sidebar nav').getByRole('button',{name:'Environments',exact:true}).click();await page.locator('.home-title').waitFor();
- historyFail=false;await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();await page.getByText(/More candidates remain/).waitFor();assert.equal(await page.locator('.job-row').count(),0);await page.getByRole('button',{name:'Read next page',exact:true}).click();await page.getByText('SECOND_PAGE',{exact:true}).waitFor();
+ historyFail=false;await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();await page.getByText(/More candidates remain/).waitFor();assert.equal(await page.getByText('No task records yet',{exact:true}).count(),0,'partial scan must not claim no records');assert.equal(await page.locator('.job-row').count(),0);await page.getByRole('button',{name:'Read next page',exact:true}).click();await page.getByText('SECOND_PAGE',{exact:true}).waitFor();
  await page.getByRole('button',{name:'View result',exact:true}).click();await page.getByRole('button',{name:'Execution steps',exact:true}).waitFor();await page.getByRole('button',{name:'Execution steps',exact:true}).click();await page.getByText('step',{exact:true}).waitFor();assert.equal(calls.filter(c=>c.command==='job').length,0);
  report.checks.push('discovery survives history failure; retry, empty partial page, digest-bound more, original-ID bounded section details; no unbounded fallback');
+ // Empty means a completed scan; refresh only reloads records and retains scope.
+ await page.locator('.sidebar nav').getByRole('button',{name:'Environments',exact:true}).click();emptyMode=true;await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();await page.getByText('No task records yet',{exact:true}).waitFor();
+ await page.locator('input[type="search"]').fill('SECOND');await page.getByText('No matching records',{exact:true}).waitFor();
+ await page.getByLabel('All environments',{exact:true}).selectOption('attention');await page.getByText('No matching records',{exact:true}).waitFor();
+ const discoveriesBeforeRefresh=calls.filter(c=>c.command==='discover').length;
+ assert.equal(await page.locator('main').getByRole('button',{name:'Refresh records',exact:true}).count(),1,'one unambiguous record refresh');
+ await page.getByRole('button',{name:'Refresh records',exact:true}).click();await page.getByRole('button',{name:'Refresh records',exact:true}).waitFor();
+ assert.equal(calls.filter(c=>c.command==='discover').length,discoveriesBeforeRefresh,'record refresh does not rediscover environments');
+ assert.equal(await page.locator('input[type="search"]').inputValue(),'SECOND');assert.equal(await page.getByLabel('All environments',{exact:true}).inputValue(),'attention');
+ assert.equal(await page.locator('.job-list').count(),0,'empty records do not render an empty bordered list');
+ await page.locator('input[type="search"]').fill('');await page.getByLabel('All environments',{exact:true}).selectOption('all');await page.getByText('No task records yet',{exact:true}).waitFor();
+ await page.screenshot({path:path.join(output,'history-empty-en-1120.png')});
+ emptyMode=false;await page.getByRole('button',{name:'Refresh records',exact:true}).click();await page.getByRole('button',{name:'Read next page',exact:true}).click();await page.getByText('SECOND_PAGE',{exact:true}).waitFor();
+ report.checks.push('completed empty and filtered empty states differ from incomplete scans; one record refresh preserves search/filter without rediscovery; no empty list border');
+
  hold=true;requested=new Promise(r=>requestedResolve=r);await page.getByRole('button',{name:'Refresh records',exact:true}).last().click();await requested;
  await page.getByRole('button',{name:'This Mac',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.locator('.host-row').filter({hasText:'synthetic-host'}).getByRole('button',{name:'Connect and manage',exact:true}).click();await page.getByRole('button',{name:'REMOTE_DISCOVERY',exact:true}).waitFor();release();await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();await page.getByText('REMOTE_ROW',{exact:true}).waitFor();assert.equal(await page.getByText('STALE_LOCAL_ROW',{exact:true}).count(),0);report.checks.push('host switch drops late old-host history');
  discoverFail=true;hold=false;await page.reload();await page.locator('.sidebar nav').getByRole('button',{name:'Records & recovery',exact:true}).click();hold=false;await page.getByText(/More candidates remain/).waitFor();report.checks.push('history remains usable when discovery fails');
