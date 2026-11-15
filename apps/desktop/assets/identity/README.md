@@ -4,6 +4,12 @@ Project identity assets supplied for Lintel in October 2026. These editable SVGs
 share the load-bearing beam, two supports and lower-right cursor. They are source
 materials, not generated runtime resources.
 
+The project maintainers confirmed on 2026-11-15 that the Lintel wordmark and App
+icons were made for this project by its maintainers. This provenance statement
+does not change the public licensing scope of brand/identity assets in
+[`LICENSING.md`](../../../../LICENSING.md), and does not cover the separate Clawd
+character or imply Anthropic affiliation or permission.
+
 - The canonical App icon master is [`src/brand.svg`](../../src/brand.svg).
 - Tauri consumes the five supplied exports in [`src-tauri/icons`](../../src-tauri/icons).
 - `source/` contains transparent, monochrome and outlined display variants.
